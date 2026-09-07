@@ -1,45 +1,31 @@
-Historia de Usuario
+---
+name: "Historia de usuario"
+about: "Define una nueva historia de usuario"
+title: "[US] "
+labels: "type: US"
+---
 
-ID: HU-[NÚMERO]
+## Historia de usuario
 
-Como [tipo de usuario],
-quiero [funcionalidad o necesidad],
-para [beneficio o resultado].
+Como [_tipo de usuario_],
+quiero [_funcionalidad o necesidad_],
+para [_beneficio o resultado_].
 
-Criterios de aceptación
-[ ]
-[ ]
-[ ]
-Escenarios principales
+## Criterios de aceptación
 
+- [ ]
+- [ ]
+- [ ]
 
+## Escenarios principales
 
+1. 
+2. 
+3. 
 
+## Tareas relacionadas
 
+- [ ] #1
+- [ ] #2
 
-Tareas relacionadas
-
-<!-- Relacionar mediante referencias a Issues o Pull Requests. -->
-
-
-
-
-
-
-Notas
-
-<!-- Mockups, enlaces, reglas de negocio, restricciones o contexto adicional. -->
-
-Resultado final
-
-<!-- Adjuntar capturas, imágenes, URLs u otra evidencia de la funcionalidad implementada. -->
-
-Trazabilidad
-
-Test Cases relacionados:
-
-<!-- Ejemplo: #125 — TC-001 -->
-
-Bugs relacionados:
-
-<!-- Ejemplo: #138 — BUG-001 -->
+## Notas

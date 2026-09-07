@@ -1,39 +1,19 @@
-Tarea
+---
+name: "Tarea"
+about: "Define una tarea específica o subtarea"
+title: "[TASK] "
+labels: "type: task"
+---
 
-ID: TASK-[NÚMERO]
+## Descripción de la tarea
 
-Descripción
+<!-- Describe el trabajo técnico a realizar -->
 
-<!-- Describir claramente el trabajo que debe realizarse. -->
+## Pasos / Checklist
 
-Historia de Usuario relacionada
+- [ ] 
+- [ ] 
 
-<!-- Ejemplo: #36 — Ingresar información adicional -->
+## Historia de Usuario relacionada
 
-Objetivo
-
-<!-- ¿Qué se debe conseguir con esta tarea? -->
-
-Criterios de finalización
-
-Implementación realizada
-
-Código probado
-
-Cambios revisados
-
-Pull Request creado
-
-Documentación actualizada cuando corresponda
-
-Consideraciones técnicas
-
-<!-- Detalles técnicos, restricciones o decisiones necesarias para realizar la tarea. -->
-
-Pull Request
-
-<!-- Relacionar el Pull Request correspondiente. -->
-
-Observaciones
-
-<!-- Información adicional. -->
+- Relacionado con #
