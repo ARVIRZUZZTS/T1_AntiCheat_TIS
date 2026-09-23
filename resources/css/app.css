@@ -1,3 +1,89 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap');
 @import "tailwindcss";
 @import "flowbite/src/themes/default";
 @plugin "flowbite/plugin";
+
+@theme {
+    --font-sans: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+    /* Acción */
+    --color-brand:             #1B3A73;
+    --color-brand-strong:      #12294F;
+    --color-brand-active:      #0C1D3C;
+    --color-brand-softer:      #E7EDF8;
+    --color-brand-soft:        #CDD8EE;
+    --color-brand-medium:      #5E7FAF;
+    --color-brand-subtle:      #B7C6E4;
+    --color-fg-brand:          #1B3A73;
+    --color-fg-brand-strong:   #1B3A73;
+
+    --color-success:           #2E5AA8;
+    --color-success-strong:    #1F447E;
+    --color-success-softer:    #E7EDF8;
+    --color-success-soft:      #E7EDF8;
+    --color-success-medium:    #5E7FAF;
+    --color-success-subtle:    #CDD8EE;
+    --color-fg-success:        #2E5AA8;
+    --color-fg-success-strong: #2E5AA8;
+
+    --color-danger:            #D32027;
+    --color-danger-strong:     #9B1319;
+    --color-danger-soft:       #FCEAEB;
+    --color-danger-medium:     #E26A6F;
+    --color-danger-subtle:     #F2C9CB;
+    --color-fg-danger:         #D32027;
+    --color-fg-danger-strong:  #D32027;
+
+    --color-warning:           #A15C07;
+    --color-warning-strong:    #7E4705;
+    --color-warning-soft:      #FDF3E2;
+    --color-warning-medium:    #C98A4B;
+    --color-warning-subtle:    #EED9AF;
+    --color-fg-warning:        #A15C07;
+    --color-fg-warning-strong: #A15C07;
+
+    --color-dark:              #0B1220;
+    --color-dark-strong:       #070B16;
+
+    /* Texto */
+    --color-heading:     #111827;
+    --color-body:        #4B5563;
+    --color-muted:       #626C7A;
+    --color-fg-disabled: #9CA3AF;
+    --color-disabled:    #E4E9F2;
+
+    /* Bordes */
+    --color-default:        #CBD5E1;
+    --color-default-medium: #8A94A6;
+    --color-light:          #E4E9F2;
+    --color-light-medium:   #8A94A6;
+
+    /* Neutros / superficies */
+    --color-neutral-primary:          #FFFFFF;
+    --color-neutral-primary-soft:     #FFFFFF;
+    --color-neutral-secondary-soft:   #F4F6FA;
+    --color-neutral-secondary-medium: #E4E9F2;
+    --color-neutral-tertiary:         #CBD5E1;
+    --color-neutral-tertiary-medium:  #8A94A6;
+    --color-neutral-tertiary-soft:    #E4E9F2;
+    --color-neutral-quaternary:       #D7DDE8;
+
+    --color-surface-page:    #F4F6FA;
+    --color-surface-card:    #FFFFFF;
+    --color-surface-sidebar: #1B3A73;
+    --color-overlay-modal:   #0B1220;
+
+    /* Los seis estados */
+    --color-status-habilitado-bg:       #E7EDF8;
+    --color-status-habilitado-fg:       #1B3A73;
+    --color-status-no-habilitado-bg:    #FCEAEB;
+    --color-status-no-habilitado-fg:    #D32027;
+    --color-status-en-revision-bg:      #FDF3E2;
+    --color-status-en-revision-fg:      #A15C07;
+    --color-status-ya-registrado-bg:    #E7EDF8;
+    --color-status-ya-registrado-fg:    #2E5AA8;
+    --color-status-central-riesgos-bg:  #FCEAEB;
+    --color-status-central-riesgos-fg:  #9B1319;
+    --color-status-pendiente-bg:        #F1F3F7;
+    --color-status-pendiente-fg:        #4B5563;
+}
