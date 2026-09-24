@@ -6,9 +6,9 @@
 
     @description
     Paginación de números con anterior/siguiente. Variantes de tamaño
-    default (w-9) y large (w-10). Página activa resaltada con marca.
-    Por defecto los controles son enlaces; con $interactive se vuelven
-    botones que disparan Livewire (método irPagina(número)).
+    sm (w-7), default (w-9) y large (w-10). Página activa resaltada con
+    marca. Por defecto los controles son enlaces; con $interactive se
+    vuelven botones que disparan Livewire (método irPagina(número)).
 --}}
 
 @props([
@@ -17,11 +17,19 @@
     'size' => 'default',
     'href' => null,
     'interactive' => false,
+    'activeFilled' => false,
 ])
 
 @php
-    $box = $size === 'large' ? 'w-10 h-10' : 'w-9 h-9';
+    $box = match ($size) {
+        'sm' => 'w-7 h-7',
+        'large' => 'w-10 h-10',
+        default => 'w-9 h-9',
+    };
     $btnClass = 'flex items-center justify-center text-body bg-neutral-secondary-medium box-border border border-default-medium hover:bg-neutral-tertiary-medium hover:text-heading font-medium text-sm ' . $box . ' focus:outline-none';
+    $activeClass = $activeFilled
+        ? 'text-white bg-brand border-brand hover:bg-brand hover:text-white'
+        : 'text-fg-brand bg-neutral-tertiary-medium';
     $prev = max(1, $current - 1);
     $next = min($total, $current + 1);
 @endphp
@@ -48,7 +56,7 @@
                     <button type="button" wire:click="irPagina({{ $page }})"
                             @class([
                                 $btnClass,
-                                'text-fg-brand bg-neutral-tertiary-medium' => $page === $current,
+                                $activeClass => $page === $current,
                             ])
                             aria-current="{{ $page === $current ? 'page' : null }}">
                         {{ $page }}
@@ -57,7 +65,7 @@
                     <a href="{{ $href ?? '#' }}"
                        @class([
                            $btnClass,
-                           'text-fg-brand bg-neutral-tertiary-medium' => $page === $current,
+                           $activeClass => $page === $current,
                        ])
                        aria-current="{{ $page === $current ? 'page' : null }}">
                         {{ $page }}
