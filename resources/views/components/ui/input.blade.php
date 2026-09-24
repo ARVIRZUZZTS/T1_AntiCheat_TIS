@@ -1,6 +1,6 @@
 {{--
     @file    input.blade.php
-    @author  David E. Chavez T. <virzuzz12345@gmail.com>
+    @author  Candy C. Ordoñez P. <camitkdos@gmail.com>
     @created 2026-09-23
     @updated 2026-09-23
 
