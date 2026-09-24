@@ -38,7 +38,11 @@ use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 
-#[Layout('layouts.app')]
+#[Layout('layouts.app', ['sidebarItems' => [
+    ['label' => 'Inicio', 'route' => 'inicio'],
+    ['label' => 'Materias', 'route' => 'materias'],
+    ['label' => 'Monitor en vivo', 'route' => 'monitoreo'],
+]])]
 #[Title('Estudiantes del curso — Anticheat TIS')]
 class EstudiantesCurso extends Component
 {
@@ -53,7 +57,7 @@ class EstudiantesCurso extends Component
 
     public string $mensajeError = '';
 
-    private const POR_PAGINA = 10;
+    private const POR_PAGINA = 8;
 
     private ListarEstudiantesCursoConEstadoService $servicio;
 
@@ -139,14 +143,6 @@ class EstudiantesCurso extends Component
 
     public function buscar(): void
     {
-        $this->pagina = 1;
-        $this->mensajeError = '';
-    }
-
-    public function limpiar(): void
-    {
-        $this->estado = ListarEstudiantesCursoConEstadoService::FILTRO_TODOS;
-        $this->busqueda = '';
         $this->pagina = 1;
         $this->mensajeError = '';
     }
