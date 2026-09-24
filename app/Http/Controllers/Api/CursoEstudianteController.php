@@ -10,16 +10,16 @@ class CursoEstudianteController extends Controller
 {
     public function index(
         int $idCurso,
-        ListarEstudiantesDeCursoService $service
+        ListarEstudiantesDeCursoService $servicio
     ): JsonResponse {
-        $estudiantes = $service->ejecutar($idCurso);
+        $estudiantes = $servicio->ejecutar($idCurso);
 
         return response()->json([
-            'data' => $estudiantes->map(fn ($e) => [
-                'sis'      => $e->sis_estudiante,
-                'nombre'   => $e->nombre_estudiante,
-                'apellido' => $e->apellido_estudiante,
-                'carrera'  => $e->carrera,
+            'datos' => $estudiantes->map(fn ($estudiante) => [
+                'sis'      => $estudiante->sis_estudiante,
+                'nombre'   => $estudiante->nombre_estudiante,
+                'apellido' => $estudiante->apellido_estudiante,
+                'carrera'  => $estudiante->carrera,
             ]),
         ]);
     }
