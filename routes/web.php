@@ -1,5 +1,6 @@
 <?php
 
+use App\Livewire\Examenes\EstudiantesCurso;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -13,3 +14,6 @@ Route::view('/monitoreo', 'pages.monitoreo')->name('monitoreo');
 Route::view('/central-riesgo', 'pages.central-riesgo')->name('central-riesgo');
 Route::view('/usuarios', 'pages.usuarios')->name('usuarios');
 Route::view('/reportes', 'pages.reportes')->name('reportes');
+
+Route::get('/cursos/{curso}/estudiantes/estado', EstudiantesCurso::class)
+    ->name('cursos.estudiantes.estado');

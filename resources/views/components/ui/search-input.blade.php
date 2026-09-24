@@ -6,7 +6,9 @@
 
     @description
     Campo de búsqueda con icono de lupa y botón opcional. El botón y el
-    icono pueden deshabilitarse con las props correspondientes.
+    icono pueden deshabilitarse con las props correspondientes. Si se
+    provee $wireSubmit, el formulario se envía vía Livewire al método
+    indicado y el botón pasa a ser de tipo submit.
 --}}
 
 @props([
@@ -17,13 +19,15 @@
     'buttonLabel' => 'Search',
     'showButton' => true,
     'showIcon' => true,
+    'wireSubmit' => null,
 ])
 
 @php
     $inputId = $id ?? $name;
 @endphp
 
-<form class="max-w-md mx-auto">
+<form class="max-w-md mx-auto"
+      @if ($wireSubmit) wire:submit.prevent="{{ $wireSubmit }}" @endif>
     @if ($label)
         <label for="{{ $inputId }}" class="block mb-2.5 text-sm font-medium text-heading">{{ $label }}</label>
     @endif
@@ -40,7 +44,7 @@
                placeholder="{{ $placeholder }}" />
 
         @if ($showButton)
-            <button type="button" class="absolute end-1.5 bottom-1.5 text-white bg-brand hover:bg-brand-strong box-border border border-transparent focus:ring-4 focus:ring-brand-medium shadow-xs font-medium leading-5 rounded text-xs px-3 py-1.5 focus:outline-none">
+            <button {{ $wireSubmit ? 'type=submit' : 'type=button' }} class="absolute end-1.5 bottom-1.5 text-white bg-brand hover:bg-brand-strong box-border border border-transparent focus:ring-4 focus:ring-brand-medium shadow-xs font-medium leading-5 rounded text-xs px-3 py-1.5 focus:outline-none">
                 {{ $buttonLabel }}
             </button>
         @endif
