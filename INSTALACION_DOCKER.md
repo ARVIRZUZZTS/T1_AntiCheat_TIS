@@ -95,9 +95,14 @@ docker compose up -d
 
 Esto:
 - Descarga la imagen `postgres:15` (solo la primera vez).
-- Crea la base `t1_anticheat` y ejecuta automaticamente el script
-  `docker/postgres/init/001_create_schema.sql` (solo la **primera vez** que se crea
-  el volumen — si el volumen ya existe, el script no se vuelve a correr).
+- Crea la base `t1_anticheat` y ejecuta automaticamente, en orden, los scripts de
+  `docker/postgres/init/`:
+  - `001_create_schema.sql` — crea los tipos `ENUM`, tablas y llaves foraneas.
+  - `002_seed_data.sql` — llena esas tablas con datos de prueba (usuarios, estudiantes,
+    examenes, alertas, etc.) para poder probar la aplicacion sin cargar datos a mano.
+- Esto solo ocurre la **primera vez** que se crea el volumen — si el volumen ya existe,
+  ninguno de los dos scripts se vuelve a correr automaticamente (ver seccion 5 para
+  recargarlos a mano).
 - Deja el contenedor corriendo en segundo plano, escuchando en `DB_PORT`.
 
 Verificar que quedo sano:
@@ -127,19 +132,47 @@ docker exec -it t1_anticheat_postgres psql -U t1_anticheat -d t1_anticheat
 (salir con `\q`)
 
 ---
-## 5. Comandos utiles del dia a dia
+## 5. Cargar o recargar los datos de prueba
+
+Si el volumen ya existia (por ejemplo porque el contenedor se levanto antes de que
+existiera `002_seed_data.sql`, o porque ya lo habias usado sin datos), los scripts de
+`docker-entrypoint-initdb.d/` **no se vuelven a ejecutar solos**. Hay dos formas de
+cargar los datos de prueba en ese caso:
+
+**Opcion A — Reiniciar el volumen desde cero (mas simple, borra todo lo que tengas):**
+
+```bash
+docker compose down -v
+docker compose up -d
+```
+
+Esto vuelve a correr `001_create_schema.sql` y `002_seed_data.sql` automaticamente.
+
+**Opcion B — Aplicar el script de datos sin borrar el volumen actual:**
+
+```bash
+docker exec -i t1_anticheat_postgres psql -U t1_anticheat -d t1_anticheat < docker/postgres/init/002_seed_data.sql
+```
+
+Util si ya tenias el esquema creado y solo te falta llenarlo de datos. Si las tablas
+ya tienen filas con esos mismos IDs, va a fallar por violacion de llave primaria — en
+ese caso usar la Opcion A.
+
+---
+## 6. Comandos utiles del dia a dia
 
 | Accion | Comando |
 |---|---|
 | Levantar el contenedor | `docker compose up -d` |
 | Ver logs en vivo | `docker compose logs -f postgres` |
 | Detener el contenedor (conserva los datos) | `docker compose down` |
-| Detener y **borrar** los datos (reinicia desde cero, vuelve a correr el script de esquema) | `docker compose down -v` |
+| Detener y **borrar** los datos (reinicia desde cero, vuelve a correr los scripts de `init/`) | `docker compose down -v` |
 | Ver estado / salud del contenedor | `docker compose ps` |
 | Entrar a una consola `psql` | `docker exec -it t1_anticheat_postgres psql -U t1_anticheat -d t1_anticheat` |
+| Cargar solo los datos de prueba (sin borrar el volumen) | `docker exec -i t1_anticheat_postgres psql -U t1_anticheat -d t1_anticheat < docker/postgres/init/002_seed_data.sql` |
 
 ---
-## 6. Problemas comunes
+## 7. Problemas comunes
 
 **"port is already allocated" al hacer `docker compose up -d`**
 Otro proceso (Postgres nativo, otro proyecto en Docker) ya usa ese puerto en tu maquina.
@@ -155,7 +188,7 @@ Verificar que la extension `pdo_pgsql` de PHP este instalada (`php -m | grep pgs
 Ver `INSTALACION.md` para la instalacion de PHP y sus extensiones.
 
 ---
-## 7. Nota sobre alcance
+## 8. Nota sobre alcance
 
 Este `docker-compose.yml` es para **desarrollo local unicamente**. El entorno de
 produccion (deploy) se definira aparte cuando se confirme donde y como se va a
