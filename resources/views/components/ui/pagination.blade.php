@@ -6,9 +6,10 @@
 
     @description
     Paginación de números con anterior/siguiente. Variantes de tamaño
-    sm (w-7), default (w-9) y large (w-10). Página activa resaltada con
-    marca. Por defecto los controles son enlaces; con $interactive se
-    vuelven botones que disparan Livewire (método irPagina(número)).
+    sm (36px en mobile, 28px desde sm: — pensado para uso táctil), default
+    (w-9) y large (w-10). Página activa resaltada con marca. Por defecto
+    los controles son enlaces; con $interactive se vuelven botones que
+    disparan Livewire (método irPagina(número)).
 --}}
 
 @props([
@@ -22,7 +23,7 @@
 
 @php
     $box = match ($size) {
-        'sm' => 'w-7 h-7',
+        'sm' => 'w-9 h-9 sm:w-7 sm:h-7',
         'large' => 'w-10 h-10',
         default => 'w-9 h-9',
     };

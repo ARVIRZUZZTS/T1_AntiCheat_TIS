@@ -11,7 +11,11 @@
         @livewireStyles
     </head>
     <body class="bg-surface-page text-heading antialiased">
-        <x-ui.sidebar title="Control de ingreso Exámenes masivos" :items="$sidebarItems ?? []" />
+        {{-- $sidebarShowTrigger permite que una vista puntual oculte el boton
+             hamburguesa de mobile (ej. una vista de detalle que ya trae su
+             propia flecha de "volver"), sin afectar al resto de las paginas
+             que no lo pasan (quedan con el trigger por defecto). --}}
+        <x-ui.sidebar title="Control de ingreso Exámenes masivos" :items="$sidebarItems ?? []" :show-trigger="$sidebarShowTrigger ?? true" />
 
         {{-- Paginas Blade clasicas (@extends/@yield) caen en el @else. Componentes
              Livewire full-page (via #[Layout('layouts.app', [...])]) llegan aqui

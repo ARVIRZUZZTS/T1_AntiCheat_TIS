@@ -38,11 +38,17 @@ use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 
-#[Layout('layouts.app', ['sidebarItems' => [
-    ['label' => 'Inicio', 'route' => 'inicio'],
-    ['label' => 'Materias', 'route' => 'materias'],
-    ['label' => 'Monitor en vivo', 'route' => 'monitoreo'],
-]])]
+#[Layout('layouts.app', [
+    'sidebarItems' => [
+        ['label' => 'Inicio', 'route' => 'inicio'],
+        ['label' => 'Materias', 'route' => 'materias'],
+        ['label' => 'Monitor en vivo', 'route' => 'monitoreo'],
+    ],
+    // Es una vista de detalle: en mobile ya trae su propia flecha de
+    // "volver" junto al titulo, asi que el trigger de hamburguesa global
+    // sobra (y llegaba a superponerse con el encabezado del curso).
+    'sidebarShowTrigger' => false,
+])]
 #[Title('Estudiantes del curso — Anticheat TIS')]
 class EstudiantesCurso extends Component
 {

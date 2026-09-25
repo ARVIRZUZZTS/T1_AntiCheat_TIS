@@ -68,7 +68,7 @@
                 };
 
                 $avatar = Blade::render(
-                    '<x-ui.avatar name="' . e($nombreCompleto !== '' ? $nombreCompleto : 'na') . '" tone="' . e($tono) . '" size="sm" />'
+                    '<x-ui.avatar name="' . e($nombreCompleto !== '' ? $nombreCompleto : 'na') . '" tone="' . e($tono) . '" size="sm" class="shrink-0" />'
                 );
 
                 return [
@@ -91,7 +91,7 @@
 
 <div class="flex flex-col lg:h-full lg:overflow-hidden">
     {{-- Encabezado --}}
-    <div class="shrink-0 flex items-start sm:items-center justify-between gap-3 px-4 sm:px-6 py-4 border-b border-default bg-neutral-primary-soft">
+    <div class="shrink-0 flex items-start sm:items-center justify-between gap-3 px-4 sm:px-6 pb-4 border-b border-default bg-neutral-primary-soft" style="padding-top: max(1rem, env(safe-area-inset-top));">
         <div class="flex items-center gap-3 min-w-0">
             <a href="{{ route('materias') }}" class="shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-full text-body hover:bg-neutral-secondary-medium hover:text-heading focus:outline-none" aria-label="Volver a materias">
                 <svg class="w-5 h-5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m15 19-7-7 7-7"/></svg>
@@ -170,8 +170,11 @@
             </div>
 
             @if ($this->estudiantes->total() > 0)
-                <div class="shrink-0 relative flex items-center justify-center min-h-[2rem]">
-                    <p class="absolute left-0 text-sm text-muted">
+                {{-- Mobile: apilado (texto arriba, paginacion abajo, ambos centrados).
+                     Desde sm: vuelve al layout de escritorio (texto a la izquierda
+                     en absolute, paginacion centrada en la misma fila). --}}
+                <div class="shrink-0 flex flex-col items-center gap-2 sm:relative sm:flex-row sm:items-center sm:justify-center sm:gap-0 sm:min-h-[2rem]">
+                    <p class="text-sm text-muted text-center sm:absolute sm:left-0 sm:text-left">
                         Mostrando {{ $this->estudiantes->count() }} de {{ $this->estudiantes->total() }} estudiantes
                     </p>
 
