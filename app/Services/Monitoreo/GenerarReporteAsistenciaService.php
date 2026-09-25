@@ -39,6 +39,9 @@ class GenerarReporteAsistenciaService
                     'registrador' => $estado === 'presente' && $registro !== null && $registro->registrador !== null
                         ? trim($registro->registrador->nombre_usuario.' '.$registro->registrador->apellido)
                         : null,
+                    'hora_ingreso' => $estado === 'presente' && $registro !== null
+                        ? $registro->hora_ingreso
+                        : null,
                     'estado_asistencia' => $estado,
                     'observaciones' => $observacion,
                 ];
