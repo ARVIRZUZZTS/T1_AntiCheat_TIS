@@ -2,19 +2,20 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class Exam extends Model
+class Examen extends Model
 {
-    use HasFactory;
-
     protected $table = 'examen';
 
     protected $primaryKey = 'id_examen';
 
     public $timestamps = false;
+
+    public $incrementing = false;
+
+    protected $keyType = 'int';
 
     protected $fillable = [
         'id_examen',
@@ -26,13 +27,13 @@ class Exam extends Model
         'tipo_examen',
     ];
 
-    public function enrollments(): HasMany
+    public function inscripciones(): HasMany
     {
-        return $this->hasMany(Enrollment::class, 'id_examen');
+        return $this->hasMany(EstudianteExamen::class, 'id_examen');
     }
 
-    public function attendanceRecords(): HasMany
+    public function registrosAsistencia(): HasMany
     {
-        return $this->hasMany(AttendanceRecord::class, 'id_examen');
+        return $this->hasMany(RegistroAsistencia::class, 'id_examen');
     }
 }

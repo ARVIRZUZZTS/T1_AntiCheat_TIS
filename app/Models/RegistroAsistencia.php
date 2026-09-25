@@ -2,19 +2,20 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class AttendanceRecord extends Model
+class RegistroAsistencia extends Model
 {
-    use HasFactory;
-
     protected $table = 'registro_asistencia';
 
     protected $primaryKey = 'id_ingreso';
 
     public $timestamps = false;
+
+    public $incrementing = false;
+
+    protected $keyType = 'int';
 
     protected $fillable = [
         'id_ingreso',
@@ -24,18 +25,18 @@ class AttendanceRecord extends Model
         'id_registrador',
     ];
 
-    public function student(): BelongsTo
+    public function estudiante(): BelongsTo
     {
-        return $this->belongsTo(Student::class, 'id_estudiante');
+        return $this->belongsTo(Estudiante::class, 'id_estudiante');
     }
 
-    public function exam(): BelongsTo
+    public function examen(): BelongsTo
     {
-        return $this->belongsTo(Exam::class, 'id_examen');
+        return $this->belongsTo(Examen::class, 'id_examen');
     }
 
-    public function registrar(): BelongsTo
+    public function registrador(): BelongsTo
     {
-        return $this->belongsTo(SystemUser::class, 'id_registrador');
+        return $this->belongsTo(Usuario::class, 'id_registrador');
     }
 }

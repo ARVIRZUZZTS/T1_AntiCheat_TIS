@@ -2,19 +2,20 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class Enrollment extends Model
+class EstudianteExamen extends Model
 {
-    use HasFactory;
-
     protected $table = 'estudiante_examen';
 
     protected $primaryKey = 'id_estudiante_examen';
 
     public $timestamps = false;
+
+    public $incrementing = false;
+
+    protected $keyType = 'int';
 
     protected $fillable = [
         'id_estudiante_examen',
@@ -24,13 +25,13 @@ class Enrollment extends Model
         'motivo',
     ];
 
-    public function student(): BelongsTo
+    public function estudiante(): BelongsTo
     {
-        return $this->belongsTo(Student::class, 'sis_estudiante');
+        return $this->belongsTo(Estudiante::class, 'sis_estudiante');
     }
 
-    public function exam(): BelongsTo
+    public function examen(): BelongsTo
     {
-        return $this->belongsTo(Exam::class, 'id_examen');
+        return $this->belongsTo(Examen::class, 'id_examen');
     }
 }

@@ -2,14 +2,11 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class SystemUser extends Model
+class Usuario extends Model
 {
-    use HasFactory;
-
     protected $table = 'usuario';
 
     protected $primaryKey = 'id_usuario';
@@ -24,8 +21,8 @@ class SystemUser extends Model
         'apellido',
     ];
 
-    public function attendanceRecords(): HasMany
+    public function registrosAsistencia(): HasMany
     {
-        return $this->hasMany(AttendanceRecord::class, 'id_registrador');
+        return $this->hasMany(RegistroAsistencia::class, 'id_registrador');
     }
 }
