@@ -4,14 +4,26 @@
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-        <title>{{ $title ?? config('app.name') }}</title>
+        <title>@yield('title', config('app.name'))</title>
 
         @vite(['resources/css/app.css', 'resources/js/app.js'])
 
         @livewireStyles
     </head>
-    <body>
-        {{ $slot }}
+    <body class="bg-surface-page text-heading antialiased">
+        <x-ui.sidebar title="Control de ingreso Exámenes masivos" />
+
+        <div class="lg:ms-[15%]">
+            <header class="bg-neutral-primary-soft border-b border-default">
+                <div class="px-6 py-4">
+                    <h1 class="text-2xl font-semibold text-heading">@yield('title', config('app.name'))</h1>
+                </div>
+            </header>
+
+            <main class="p-6">
+                @yield('content')
+            </main>
+        </div>
 
         @livewireScripts
         <script src="https://cdn.jsdelivr.net/npm/flowbite@4.0.1/dist/flowbite.min.js"></script>
