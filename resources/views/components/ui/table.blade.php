@@ -8,7 +8,7 @@
     Tabla de datos con encabezados y filas. $headers es un arreglo de
     strings y $rows un arreglo de filas; cada celda puede ser un string
     o ['heading' => true, 'value' => ...] para la columna de cabecera
-    de la fila.
+    de la fila, o ['html' => ...] para contenido HTML (badges, botones).
 --}}
 
 @props([
@@ -29,7 +29,9 @@
             @foreach ($rows as $row)
                 <tr @class(['bg-neutral-primary border-b border-default' => ! $loop->last, 'bg-neutral-primary' => $loop->last])>
                     @foreach ($row as $cell)
-                        @if (is_array($cell) && ! empty($cell['heading']))
+                        @if (is_array($cell) && ! empty($cell['html']))
+                            <td class="px-6 py-4">{!! $cell['html'] !!}</td>
+                        @elseif (is_array($cell) && ! empty($cell['heading']))
                             <th scope="row" class="px-6 py-4 font-medium text-heading whitespace-nowrap">{{ $cell['value'] }}</th>
                         @else
                             <td class="px-6 py-4">{{ is_array($cell) ? $cell['value'] : $cell }}</td>
