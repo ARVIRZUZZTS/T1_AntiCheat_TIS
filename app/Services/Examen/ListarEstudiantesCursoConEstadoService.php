@@ -7,7 +7,7 @@
  *
  * @created 2026-09-24
  *
- * @updated 2026-09-24
+ * @updated 2026-09-25
  *
  * @description
  * Servicio de la feature Examen que lista los estudiantes de un curso con el
@@ -21,6 +21,8 @@
  *
  * @changelog
  * - 2026-09-24  [T1]  feat: creación inicial del servicio.
+ * - 2026-09-25  [T1]  fix: permitir espacios en validarBusqueda para poder
+ *   buscar por nombre y apellido juntos.
  */
 
 namespace App\Services\Examen;
@@ -92,7 +94,12 @@ class ListarEstudiantesCursoConEstadoService
             $query->where(function (Builder $q) use ($busqueda) {
                 $q->where('estudiante.nombre_estudiante', 'ilike', "%{$busqueda}%")
                     ->orWhere('estudiante.apellido_estudiante', 'ilike', "%{$busqueda}%")
-                    ->orWhere('estudiante.sis_estudiante', 'ilike', "%{$busqueda}%");
+                    ->orWhere('estudiante.sis_estudiante', 'ilike', "%{$busqueda}%")
+                    // nombre y apellido concatenados, para buscar "Nombre Apellido" junto
+                    ->orWhereRaw(
+                        "estudiante.nombre_estudiante || ' ' || estudiante.apellido_estudiante ilike ?",
+                        ["%{$busqueda}%"]
+                    );
             });
         }
 
@@ -138,7 +145,8 @@ class ListarEstudiantesCursoConEstadoService
     }
 
     /**
-     * Valida que la búsqueda solo contenga letras (castellano) o dígitos.
+     * Valida que la búsqueda solo contenga letras (castellano), dígitos o
+     * espacios (para permitir buscar por nombre y apellido juntos).
      *
      * @param  ?string  $busqueda  Texto a validar.
      *
@@ -150,8 +158,8 @@ class ListarEstudiantesCursoConEstadoService
             return;
         }
 
-        if (preg_match('/^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9]+$/u', $busqueda) !== 1) {
-            throw new InvalidArgumentException('Caracter no permitido (A-z, 0-9)');
+        if (preg_match('/^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9 ]+$/u', $busqueda) !== 1) {
+            throw new InvalidArgumentException('Caracter no permitido (A-z, 0-9, espacio)');
         }
     }
 
