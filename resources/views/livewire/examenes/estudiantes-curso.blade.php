@@ -1,6 +1,6 @@
 {{--
     @file    estudiantes-curso.blade.php
-    @author  Equipo T1 <dev@techone.local>
+    @author  Diego Tejerina <josediegotejerinamolina@gmail.com>
     @created 2026-09-24
     @updated 2026-09-25
 

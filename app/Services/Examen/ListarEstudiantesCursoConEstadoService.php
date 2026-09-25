@@ -3,7 +3,7 @@
 /**
  * @file    ListarEstudiantesCursoConEstadoService.php
  *
- * @author  Equipo T1 <dev@techone.local>
+ * @author  Diego Tejerina <josediegotejerinamolina@gmail.com>
  *
  * @created 2026-09-24
  *
