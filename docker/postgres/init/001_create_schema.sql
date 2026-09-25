@@ -223,12 +223,14 @@ CREATE TABLE estudiante_examen_ambiente (
 );
 
 CREATE TABLE registro_asistencia (
-  id_ingreso    integer PRIMARY KEY,
-  hora_ingreso  time,
-  id_examen     integer NOT NULL,
-  id_estudiante varchar(20) NOT NULL,       -- corregido: varchar (FK a estudiante.sis_estudiante)
-  CONSTRAINT fk_ra_examen     FOREIGN KEY (id_examen)     REFERENCES examen(id_examen),
-  CONSTRAINT fk_ra_estudiante FOREIGN KEY (id_estudiante) REFERENCES estudiante(sis_estudiante)
+  id_ingreso     integer PRIMARY KEY,
+  hora_ingreso   time,
+  id_examen      integer NOT NULL,
+  id_estudiante  varchar(20) NOT NULL,      -- corregido: varchar (FK a estudiante.sis_estudiante)
+  id_registrador integer NOT NULL,          -- quien registro la asistencia
+  CONSTRAINT fk_ra_examen      FOREIGN KEY (id_examen)      REFERENCES examen(id_examen),
+  CONSTRAINT fk_ra_estudiante  FOREIGN KEY (id_estudiante)  REFERENCES estudiante(sis_estudiante),
+  CONSTRAINT fk_ra_registrador FOREIGN KEY (id_registrador) REFERENCES usuario(id_usuario)
 );
 
 CREATE TABLE central_riesgo (
