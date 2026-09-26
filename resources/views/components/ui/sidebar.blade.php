@@ -1,17 +1,22 @@
 {{--
     @file    sidebar.blade.php
-    @author  Valery D. Ortuno P. <valerydariana98@gmail.com>
+@author  Valery D. Ortuno P. <valerydariana98@gmail.com>
     @created 2026-09-24
-    @updated 2026-09-24
+    @updated 2026-09-25
 
     @description
     Sidebar de navegaciA3n del panel. $items es un arreglo de A-tems:
     ['label', 'route' (nombre de ruta), 'badge', 'count']. El A-tem activo
     se resalta en blanco sobre el fondo azul (`bg-surface-sidebar`); se
-    detecta solo por la ruta actual y/o por el prop $active. El tA-tulo
+    detecta solo por la ruta actual y/o por el prop $active. El A-titulo
     ($title) se muestra junto al logo FCyT dentro de una caja blanca con
     borde redondeado (para que el SVG, que es negro, resalte sobre el
     azul). $logo es un slot opcional para reemplazar el logo.
+
+    @changelog
+    - 2026-09-24  [Valery D. Ortuno P.]  feat:  creaciA3n inicial del componente.
+    - 2026-09-25  [OchoaCesar]  feat:  el A-tem activo tambiA(C)n se resalta en
+                                        rutas hijas (routeName.*) para vistas de detalle.
 --}}
 
 @props([
@@ -71,7 +76,7 @@
             @foreach ($nav as $item)
                 @php
                     $isActive = ($item['route'] ?? null) === $active
-                        || (($item['route'] ?? null) !== null && $current !== '' && request()->routeIs($item['route']));
+                        || (($item['route'] ?? null) !== null && $current !== '' && request()->routeIs($item['route'], $item['route'].'.*'));
                 @endphp
                 <li>
                     <a href="{{ route($item['route']) }}" @class([

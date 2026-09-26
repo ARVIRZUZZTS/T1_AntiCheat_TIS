@@ -17,12 +17,14 @@
                     ['QUM-301', 'Química Orgánica', 'C'],
                     ['INF-401', 'Programación IV', 'A'],
                 ] as [$codigo, $nombre, $seccion])
-                    <li class="flex items-center justify-between py-3">
-                        <div>
-                            <p class="font-medium text-heading">{{ $nombre }}</p>
-                            <p class="text-sm text-body">{{ $codigo }}</p>
-                        </div>
-                        <span class="text-xs font-medium px-1.5 py-0.5 bg-brand-softer text-fg-brand rounded-full">Sección {{ $seccion }}</span>
+                    <li>
+                        <a href="{{ route('materias.detalle', $codigo) }}" class="flex items-center justify-between py-3 -mx-2 px-2 rounded-base hover:bg-neutral-secondary-medium transition-colors">
+                            <div>
+                                <p class="font-medium text-heading">{{ $nombre }}</p>
+                                <p class="text-sm text-body">{{ $codigo }}</p>
+                            </div>
+                            <span class="text-xs font-medium px-1.5 py-0.5 bg-brand-softer text-fg-brand rounded-full">Sección {{ $seccion }}</span>
+                        </a>
                     </li>
                 @endforeach
             </ul>

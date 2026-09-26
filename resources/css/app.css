@@ -87,3 +87,7 @@
     --color-status-pendiente-bg:        #F1F3F7;
     --color-status-pendiente-fg:        #4B5563;
 }
+
+[x-cloak] {
+    display: none !important;
+}
