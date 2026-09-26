@@ -10,10 +10,10 @@
 
         @livewireStyles
     </head>
-    <body>
-        {{ $slot }}
+    <body data-id-examen="{{ request()->route('idExamen') ?? '' }}">
+    {{ $slot }}
 
-        @livewireScripts
-        <script src="https://cdn.jsdelivr.net/npm/flowbite@4.0.1/dist/flowbite.min.js"></script>
+    @livewireScripts
+    <script src="https://cdn.jsdelivr.net/npm/flowbite@4.0.1/dist/flowbite.min.js"></script>
     </body>
 </html>

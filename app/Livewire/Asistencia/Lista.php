@@ -10,15 +10,18 @@ class Lista extends Component
 {
     public int $idExamen;
 
+    public int $ultimoIngreso = 0;
+
     public function mount(int $idExamen): void
     {
         $this->idExamen = $idExamen;
     }
 
-    #[On('echo:examen.{idExamen},AsistenciaRegistrada')]
+    #[On('asistencia-registrada')]
     public function estudianteIngreso(array $payload): void
     {
-        $this->dispatch('notificar-ingreso', nombre: $payload['nombre']);
+        // Cambiar una propiedad fuerza re-render en Livewire
+        $this->ultimoIngreso = time();
     }
 
     public function render(ListarAsistenciaDeExamenService $servicio)

@@ -9,19 +9,23 @@ use Illuminate\Support\Collection;
 class ListarAsistenciaDeExamenService
 {
     /**
-     * Devuelve los estudiantes del examen con su estado de asistencia.
-     *
      * @return Collection<int, array{estudiante: Estudiante, presente: bool, hora: ?string}>
      */
     public function ejecutar(int $idExamen): Collection
     {
-        $examen = Examen::with(['curso.estudiantes', 'registrosAsistencia'])
+        $examen = Examen::with(['cursos.estudiantes', 'registrosAsistencia'])
             ->findOrFail($idExamen);
 
-        $ingresos = $examen->registrosAsistencia
-            ->keyBy('id_estudiante');
+        // Un examen puede estar en varios cursos. Por ahora tomamos el primero.
+        $curso = $examen->cursos->first();
 
-        return $examen->curso->estudiantes->map(fn (Estudiante $estudiante) => [
+        if (! $curso) {
+            return collect();
+        }
+
+        $ingresos = $examen->registrosAsistencia->keyBy('id_estudiante');
+
+        return $curso->estudiantes->map(fn (Estudiante $estudiante) => [
             'estudiante' => $estudiante,
             'presente'   => $ingresos->has($estudiante->sis_estudiante),
             'hora'       => $ingresos->get($estudiante->sis_estudiante)?->hora_ingreso,
