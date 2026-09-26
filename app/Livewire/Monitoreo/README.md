@@ -6,6 +6,7 @@ Sesión de vigilancia en tiempo real: seguir la actividad del estudiante durante
 ## Qué contiene
 - `EnVivo` (streaming de eventos con `wire:poll` o broadcasting).
 - `DetalleAlerta` (revisión de una alerta de trampa).
+- `RegistrarIncidencia` (formulario de registro de incidencia en la central de riesgos).
 
 ## Rol en la arquitectura
 - **Capa:** Presentación (feature `Monitoreo`).
