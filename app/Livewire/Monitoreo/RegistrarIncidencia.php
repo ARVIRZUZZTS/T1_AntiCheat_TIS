@@ -17,6 +17,10 @@
  * - 2026-09-26  [Valery D. Ortuno P]  feat: buscador de estudiantes contra la base
  *   de datos, motivos acordados por el equipo, estado a partir del rol recibido
  *   por la URL y una sola vista responsive de escritorio y móvil.
+ * - 2026-09-26  [Amiddala]  fix: mount() recibía un parámetro `Rol $rol =
+ *   Rol::DOCENTE` que ya no compila, porque `Rol` pasó de ser un enum a un
+ *   modelo Eloquent sin ese caso/constante. Se quita el parámetro y la
+ *   asignación duplicada; el rol se sigue leyendo únicamente de la URL (#68).
  */
 
 namespace App\Livewire\Monitoreo;
@@ -31,7 +35,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
-
+ 
 /**
  * Formulario de registro de incidencia contra un estudiante, invocado desde el
  * monitor del examen en curso.
@@ -56,7 +60,7 @@ class RegistrarIncidencia extends Component
      * @var int
      */
     public const DESCRIPCION_MAXIMO = 300;
-
+ 
     /**
      * Caracteres mínimos antes de consultar estudiantes en la base de datos.
      *
@@ -102,7 +106,7 @@ class RegistrarIncidencia extends Component
         'suplantacion_de_identidad' => 'Suplantación de identidad',
         self::MOTIVO_OTRO => 'Otro',
     ];
-
+ 
     /**
      * Pantalla desde la que se abrió el formulario.
      *
@@ -131,49 +135,52 @@ class RegistrarIncidencia extends Component
      * @var string
      */
     public string $nombreEstudiante = '';
-
+ 
     /**
      * Código SIS del estudiante sobre el que se registra la incidencia.
      *
      * @var string
      */
     public string $codigoSis = '';
-
+ 
     /**
      * Materia del examen en el que se observa la anomalía.
      *
      * @var string
      */
     public string $materia = '';
-
+ 
     /**
      * Motivo de la incidencia, con un valor de `TIPOS_INCIDENCIA`.
      *
      * @var string
      */
     public string $tipoIncidencia = '';
-
+ 
     /**
      * Detalle de lo ocurrido, con un máximo de `DESCRIPCION_MAXIMO` caracteres.
      *
      * @var string
      */
     public string $descripcion = '';
-
+ 
     /**
      * Momento en que se abre el formulario, mostrado como dato de solo lectura.
      *
      * @var string
      */
     public string $fechaHoraRegistro = '';
-
+ 
     /**
      * Precarga el estudiante, la materia y la fecha con lo que llega por la URL.
      *
      * El monitor es la única entrada por ahora: si no viaja el contexto, el
-     * formulario se abre en blanco para completarlo a mano.
+     * formulario se abre en blanco para completarlo a mano. El rol también
+     * llega por la URL como texto (uno de `Rol::NOMBRE_*`), porque `Rol` es un
+     * modelo de la tabla `rol` y no un enum con casos fijos.
      *
      * @author Valery D. Ortuno P. <valerydariana98@gmail.com>
+     * @author Amiddala
      * @since  2026-09-25
      */
     public function mount(): void
@@ -190,7 +197,7 @@ class RegistrarIncidencia extends Component
         $this->codigoSis = (string) request()->query('sis', '');
         $this->materia = (string) request()->query('materia', '');
     }
-
+ 
     /**
      * Tipo de infracción con el que se persiste el registro, derivado del rol
      * de quien lo realiza: un docente confirma y un auxiliar deja el caso en
@@ -212,15 +219,17 @@ class RegistrarIncidencia extends Component
     /**
      * Etiqueta del estado con la que se muestra la incidencia en la pantalla.
      *
-     * @return string  "Confirmado" para el docente, "En revisión" para el auxiliar.
+     * @return string  "Confirmado" para el docente, "Sospechoso" para el auxiliar,
+     *                 tal como pide el criterio de aceptación de la #68.
      *
      * @author Valery D. Ortuno P. <valerydariana98@gmail.com>
+     * @author Amiddala
      * @since  2026-09-26
      */
     #[Computed]
     public function etiquetaEstado(): string
     {
-        return $this->rol === Rol::NOMBRE_AUXILIAR ? 'En revisión' : 'Confirmado';
+        return $this->rol === Rol::NOMBRE_AUXILIAR ? 'Sospechoso' : 'Confirmado';
     }
 
     /**
@@ -239,7 +248,7 @@ class RegistrarIncidencia extends Component
             ? 'status-en-revision'
             : 'status-central-riesgos';
     }
-
+ 
     /**
      * Motivos disponibles para el selector de la vista.
      *
@@ -253,7 +262,7 @@ class RegistrarIncidencia extends Component
     {
         return self::TIPOS_INCIDENCIA;
     }
-
+ 
     /**
      * Materias que se ofrecen en el selector, tomadas de la tabla `curso`.
      *
@@ -317,7 +326,7 @@ class RegistrarIncidencia extends Component
     {
         return mb_strlen($this->descripcion).' / '.self::DESCRIPCION_MAXIMO;
     }
-
+ 
     /**
      * Si la descripción debe rellenarse, lo que solo ocurre con el motivo
      * "Otro".
@@ -378,6 +387,7 @@ class RegistrarIncidencia extends Component
      * @return array<string, array<int, mixed>>  Reglas por propiedad.
      *
      * @author Valery D. Ortuno P. <valerydariana98@gmail.com>
+     * @author Amiddala
      * @since  2026-09-25
      */
     protected function rules(): array
@@ -410,9 +420,31 @@ class RegistrarIncidencia extends Component
             'tipoIncidencia' => 'motivo',
         ];
     }
-
+ 
+    /**
+     * Mensajes de validación personalizados para los campos obligatorios.
+     *
+     * @return array<string, string>  Mensaje por regla incumplida.
+     *
+     * @author Amiddala
+     * @since  2026-09-25
+     */
+    protected function messages(): array
+    {
+        return [
+            'tipoIncidencia.required' => 'Seleccione el motivo de la incidencia.',
+            'tipoIncidencia.in' => 'Seleccione un motivo válido de la lista.',
+            'descripcion.required' => 'Describa el hecho observado.',
+            'descripcion.max' => 'La descripción admite un máximo de '.self::DESCRIPCION_MAXIMO.' caracteres.',
+        ];
+    }
+ 
     /**
      * Registra la incidencia con los datos ingresados en el formulario.
+     *
+     * Valida los campos obligatorios y calcula el estado del registro según el
+     * rol de quien lo realiza; el guardado en la central de riesgos queda a
+     * cargo de la tarea #70.
      *
      * @return void
      *
@@ -423,16 +455,18 @@ class RegistrarIncidencia extends Component
      *                                                       o si excede el límite.
      *
      * @author Valery D. Ortuno P. <valerydariana98@gmail.com>
+     * @author Amiddala
      * @since  2026-09-25
      */
     public function registrar(): void
     {
         $this->validate();
-
-        // TODO(@valerydariana98, 2026-09-25): persistir el registro en la
-        // central de riesgos y refrescar la lista de incidencias recientes (#70).
+ 
+        // TODO(@Amiddala, 2026-09-25): persistir los datos validados junto con
+        // $this->tipoInfraccion en la central de riesgos y refrescar la
+        // lista de incidencias recientes (#70).
     }
-
+ 
     /**
      * Cancela el registro y regresa al monitor en vivo.
      *
@@ -449,7 +483,7 @@ class RegistrarIncidencia extends Component
 
         return redirect()->back();
     }
-
+ 
     /**
      * Renderiza el formulario dentro del layout base de la aplicación.
      *

@@ -25,6 +25,8 @@
  * - 2026-09-26  [Valery D. Ortuno P]  feat: pruebas de la precarga por URL, del
  *   buscador de estudiantes y de la obligatoriedad condicional de la descripción;
  *   cambio de RefreshDatabase a DatabaseTransactions para no borrar el esquema.
+ * - 2026-09-26  [Amiddala]  fix: la etiqueta del auxiliar pasa de "En revisión" a
+ *   "Sospechoso", para calzar literal con el criterio de aceptación de la #68.
  */
 
 namespace Tests\Feature;
@@ -140,7 +142,7 @@ class RegistrarIncidenciaTest extends TestCase
 
     /**
      * Verifica que la etiqueta y el tipo de infraccion del estado sigan al rol:
-     * el docente confirma y el auxiliar deja el caso en revision.
+     * el docente confirma y el auxiliar deja el caso como sospechoso.
      */
     public function test_el_estado_depende_del_rol_del_registrador(): void
     {
@@ -151,13 +153,13 @@ class RegistrarIncidenciaTest extends TestCase
 
         Livewire::test(RegistrarIncidencia::class)
             ->set('rol', Rol::NOMBRE_AUXILIAR)
-            ->assertSee('En revisión')
+            ->assertSee('Sospechoso')
             ->assertSet('tipoInfraccion', TipoInfraccion::Sospechoso);
     }
 
     /**
      * Verifica que el buscador encuentre al estudiante por nombre, por apellido
-     * y por codigo SIS, contra la base de datos.
+     * y por codigo SIS.
      */
     public function test_el_buscador_encuentra_por_nombre_apellido_y_codigo_sis(): void
     {
