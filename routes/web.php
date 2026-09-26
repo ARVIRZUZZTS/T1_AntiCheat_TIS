@@ -17,3 +17,6 @@ Route::view('/reportes', 'pages.reportes')->name('reportes');
 
 Route::get('/cursos/{curso}/estudiantes/estado', EstudiantesCurso::class)
     ->name('cursos.estudiantes.estado');
+
+Route::get('/materias/{materia}', fn (string $codigo) => view('pages.materia-estudiantes', ['codigo' => $codigo]))
+    ->name('materias.detalle');
