@@ -9,12 +9,20 @@
     strings y $rows un arreglo de filas; cada celda puede ser un string
     o ['heading' => true, 'value' => ...] para la columna de cabecera
     de la fila, o ['html' => ...] para contenido HTML (badges, botones).
+    Una fila puede traer la clave '__rowClass' => 'clases-tailwind' para
+    pintar el fondo de esa fila completa (se ignora al renderizar celdas).
+    Con $compact, las filas bajan de py-4 a py-2.5 (~44px de alto).
 --}}
 
 @props([
     'headers' => [],
     'rows' => [],
+    'compact' => false,
 ])
+
+@php
+    $cellPad = $compact ? 'px-4 py-2.5' : 'px-6 py-4';
+@endphp
 
 <div class="relative overflow-x-auto bg-neutral-primary-soft shadow-xs rounded-base border border-default">
     <table class="w-full text-sm text-left rtl:text-right text-body">
@@ -27,14 +35,19 @@
         </thead>
         <tbody>
             @foreach ($rows as $row)
-                <tr @class(['bg-neutral-primary border-b border-default' => ! $loop->last, 'bg-neutral-primary' => $loop->last])>
-                    @foreach ($row as $cell)
+                @php($rowClass = is_array($row) ? ($row['__rowClass'] ?? null) : null)
+                <tr @class([
+                    $loop->last ? 'bg-neutral-primary' : 'bg-neutral-primary border-b border-default',
+                    $rowClass => $rowClass,
+                ])>
+                    @foreach ($row as $key => $cell)
+                        @continue($key === '__rowClass')
                         @if (is_array($cell) && ! empty($cell['html']))
-                            <td class="px-6 py-4">{!! $cell['html'] !!}</td>
+                            <td class="{{ $cellPad }}">{!! $cell['html'] !!}</td>
                         @elseif (is_array($cell) && ! empty($cell['heading']))
-                            <th scope="row" class="px-6 py-4 font-medium text-heading whitespace-nowrap">{{ $cell['value'] }}</th>
+                            <th scope="row" class="{{ $cellPad }} font-medium text-heading whitespace-nowrap">{{ $cell['value'] }}</th>
                         @else
-                            <td class="px-6 py-4">{{ is_array($cell) ? $cell['value'] : $cell }}</td>
+                            <td class="{{ $cellPad }}">{{ is_array($cell) ? $cell['value'] : $cell }}</td>
                         @endif
                     @endforeach
                 </tr>
