@@ -18,7 +18,6 @@
 namespace Tests\Feature;
 
 use App\Livewire\Monitoreo\RegistrarIncidencia;
-use App\Models\EstadoIncidencia;
 use App\Models\Rol;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -88,11 +87,19 @@ class RegistrarIncidenciaTest extends TestCase
     }
 
     /**
-     * Verifica que el estado de la incidencia se derive del rol del registrador.
+     * Verifica que la etiqueta del estado se derive del rol del registrador: un
+     * docente confirma la incidencia y un auxiliar la deja en revisión.
      */
     public function test_el_estado_depende_del_rol_del_registrador(): void
     {
-        $this->assertSame(EstadoIncidencia::CONFIRMADO, EstadoIncidencia::desdeRol(Rol::DOCENTE));
-        $this->assertSame(EstadoIncidencia::SOSPECHOSO, EstadoIncidencia::desdeRol(Rol::AUXILIAR));
+        Livewire::test(RegistrarIncidencia::class)
+            ->set('rol', Rol::NOMBRE_DOCENTE)
+            ->assertSee('Confirmado')
+            ->assertSet('tipoInfraccion', \App\Enums\TipoInfraccion::Tramposo);
+
+        Livewire::test(RegistrarIncidencia::class)
+            ->set('rol', Rol::NOMBRE_AUXILIAR)
+            ->assertSee('En revisión')
+            ->assertSet('tipoInfraccion', \App\Enums\TipoInfraccion::Sospechoso);
     }
 }

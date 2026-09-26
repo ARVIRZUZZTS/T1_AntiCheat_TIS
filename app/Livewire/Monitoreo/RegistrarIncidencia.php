@@ -17,7 +17,7 @@
 
 namespace App\Livewire\Monitoreo;
 
-use App\Models\EstadoIncidencia;
+use App\Enums\TipoInfraccion;
 use App\Models\Rol;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
@@ -32,7 +32,8 @@ use Livewire\Component;
  * @author   Valery D. Ortuno P. <valerydariana98@gmail.com>
  * @since    2026-09-25
  *
- * @see  EstadoIncidencia
+ * @see  \App\Enums\TipoInfraccion
+ * @see  \App\Models\Rol
  */
 class RegistrarIncidencia extends Component
 {
@@ -61,15 +62,12 @@ class RegistrarIncidencia extends Component
     ];
 
     /**
-     * Rol con el que se simula el registro mientras no exista la columna de rol
-     * en la tabla de usuarios.
+     * Rol con el que se registra la incidencia, recibido desde la pantalla que
+     * abrió el formulario.
      *
-     * TODO(@valerydariana98, 2026-09-25): tomar el rol del usuario
-     * autenticado (#67) en lugar de este valor fijo.
-     *
-     * @var Rol
+     * @var string  Uno de los valores de \App\Models\Rol::NOMBRE_*.
      */
-    private const ROL_REGISTRADOR = Rol::DOCENTE;
+    public string $rol = Rol::NOMBRE_DOCENTE;
 
     /**
      * Datos del estudiante sobre el que se registra la incidencia.
@@ -131,17 +129,35 @@ class RegistrarIncidencia extends Component
     }
 
     /**
-     * Estado con el que ingresó la incidencia, derivado del rol de quien registra.
+     * Tipo de infracción con el que se persiste el registro, derivado del rol
+     * de quien lo realiza: un docente confirma y un auxiliar deja el caso en
+     * revisión.
      *
-     * @return EstadoIncidencia  Estado derivado del rol del registrador.
+     * @return TipoInfraccion  Valor del enum `tipo_infraccion` de la base de datos.
      *
      * @author Valery D. Ortuno P. <valerydariana98@gmail.com>
      * @since  2026-09-25
      */
     #[Computed]
-    public function estadoIncidencia(): EstadoIncidencia
+    public function tipoInfraccion(): TipoInfraccion
     {
-        return EstadoIncidencia::desdeRol(self::ROL_REGISTRADOR);
+        return $this->rol === Rol::NOMBRE_AUXILIAR
+            ? TipoInfraccion::Sospechoso
+            : TipoInfraccion::Tramposo;
+    }
+
+    /**
+     * Etiqueta del estado con la que se muestra la incidencia en la pantalla.
+     *
+     * @return string  "Confirmado" para el docente, "En revisión" para el auxiliar.
+     *
+     * @author Valery D. Ortuno P. <valerydariana98@gmail.com>
+     * @since  2026-09-25
+     */
+    #[Computed]
+    public function etiquetaEstado(): string
+    {
+        return $this->rol === Rol::NOMBRE_AUXILIAR ? 'En revisión' : 'Confirmado';
     }
 
     /**
@@ -227,7 +243,10 @@ class RegistrarIncidencia extends Component
     /**
      * Renderiza el formulario dentro del layout base de la aplicación.
      *
-     * @return View  Vista del componente con el layout y el título de la página.
+     * El título se declara como sección en la vista para que el layout lo muestre
+     * tanto en el `<title>` del documento como en el encabezado.
+     *
+     * @return View  Vista del componente con el layout de la aplicación.
      *
      * @author Valery D. Ortuno P. <valerydariana98@gmail.com>
      * @since  2026-09-25
@@ -235,7 +254,6 @@ class RegistrarIncidencia extends Component
     public function render(): View
     {
         return view('livewire.monitoreo.registrar-incidencia')
-            ->extends('layouts.app')
-            ->title('Registrar incidencia');
+            ->extends('layouts.app');
     }
 }

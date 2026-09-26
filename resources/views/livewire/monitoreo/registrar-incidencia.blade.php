@@ -12,16 +12,13 @@
     @see  \App\Livewire\Monitoreo\RegistrarIncidencia
 --}}
 
-@use('App\Models\EstadoIncidencia')
+@section('title', 'Registrar incidencia')
 
 @php
-    $estado = $this->estadoIncidencia;
-
     // Cada estado se apoya en la insignia de la paleta que ya usa el monitor.
-    $tipoEstado = match ($estado) {
-        EstadoIncidencia::SOSPECHOSO => 'status-en-revision',
-        EstadoIncidencia::CONFIRMADO => 'status-central-riesgos',
-    };
+    $tipoEstado = $rol === \App\Models\Rol::NOMBRE_AUXILIAR
+        ? 'status-en-revision'
+        : 'status-central-riesgos';
 @endphp
 
 <div class="max-w-4xl mx-auto space-y-6">
@@ -49,7 +46,7 @@
 
             <div>
                 <span class="block mb-2.5 text-sm font-medium text-heading">Estado de la incidencia</span>
-                <x-ui.badge :type="$tipoEstado">{{ $estado->value }}</x-ui.badge>
+                <x-ui.badge :type="$tipoEstado">{{ $this->etiquetaEstado }}</x-ui.badge>
                 <p class="mt-2.5 text-sm text-body">
                     Un auxiliar registra la incidencia como sospechosa y un docente la confirma.
                 </p>

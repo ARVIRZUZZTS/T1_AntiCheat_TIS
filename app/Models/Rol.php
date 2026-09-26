@@ -2,39 +2,59 @@
 
 /**
  * @file    Rol.php
- * @author  Valery D. Ortuno P. <valerydariana98@gmail.com>
- * @created 2026-09-25
- * @updated 2026-09-25
+ *
+ * @author  Diego Tejerina <josediegotejerinamolina@gmail.com>
+ *
+ * @created 2026-09-24
+ *
+ * @updated 2026-09-24
  *
  * @description
- * Roles del personal que opera el sistema durante un examen. El valor de cada
- * caso es el texto que se muestra en la interfaz.
+ * Modelo de la tabla `rol`: mapea los roles del sistema (docente, auxiliar)
+ * y expone sus valores como constantes de dominio.
  *
  * @changelog
- * - 2026-09-25  [Valery D. Ortuno P]  feat: creación inicial del enum de roles.
+ * - 2026-09-24  [T1]  feat: creación inicial del modelo.
  */
 
 namespace App\Models;
 
-/**
- * Identifica a la persona que registra el ingreso de un estudiante o una
- * incidencia en la central de riesgos.
- *
- * @package  App\Models
- * @author   Valery D. Ortuno P. <valerydariana98@gmail.com>
- * @since    2026-09-25
- *
- * @see  EstadoIncidencia
- */
-enum Rol: string
-{
-    /**
-     * Registra la incidencia, pero la deja a la espera de revisión del docente.
-     */
-    case AUXILIAR = 'Auxiliar';
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
-    /**
-     * Registra la incidencia y la confirma con su propia firma.
-     */
-    case DOCENTE = 'Docente';
+/**
+ * @property int $id_rol
+ * @property string $nombre_rol
+ */
+class Rol extends Model
+{
+    public const NOMBRE_DOCENTE = 'docente';
+
+    public const NOMBRE_AUXILIAR = 'auxiliar';
+
+    protected $table = 'rol';
+
+    protected $primaryKey = 'id_rol';
+
+    public $timestamps = false;
+
+    public $incrementing = false;
+
+    protected $keyType = 'int';
+
+    protected $fillable = [
+        'id_rol',
+        'nombre_rol',
+    ];
+
+    /** @return BelongsToMany<Usuario, $this> */
+    public function usuarios(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            Usuario::class,
+            'rol_usuario',
+            'id_rol',
+            'id_usuario'
+        );
+    }
 }
