@@ -2,16 +2,26 @@
     @file    sidebar.blade.php
     @author  Valery D. Ortuno P. <valerydariana98@gmail.com>
     @created 2026-09-24
-    @updated 2026-09-24
+    @updated 2026-09-26
 
     @description
-    Sidebar de navegaciA3n del panel. $items es un arreglo de A-tems:
-    ['label', 'route' (nombre de ruta), 'badge', 'count']. El A-tem activo
+    Sidebar de navegación del panel. $items es un arreglo de ítems:
+    ['label', 'route' (nombre de ruta), 'badge', 'count']. El ítem activo
     se resalta en blanco sobre el fondo azul (`bg-surface-sidebar`); se
-    detecta solo por la ruta actual y/o por el prop $active. El tA-tulo
+    detecta solo por la ruta actual y/o por el prop $active. El título
     ($title) se muestra junto al logo FCyT dentro de una caja blanca con
     borde redondeado (para que el SVG, que es negro, resalte sobre el
     azul). $logo es un slot opcional para reemplazar el logo.
+
+    En móvil el cajón mide `w-72` en vez del 15% de ancho, que a esa
+    pantalla apenas dejaba 56px, y el botón hamburguesa va en una franja
+    propia con el mismo padding que el encabezado de la página.
+
+    @changelog
+    - 2026-09-24  [Valery D. Ortuno P]  feat: creación inicial del sidebar.
+    - 2026-09-26  [Valery D. Ortuno P]  fix: ancho del cajón y posición del
+      botón hamburguesa en móvil; se corrigen también los acentos del
+      comentario de cabecera, que quedaron como "A3" al escribir el archivo.
 --}}
 
 @props([
@@ -39,14 +49,19 @@
 @endphp
 
 @if ($showTrigger)
-    <button data-drawer-target="{{ $id }}" data-drawer-toggle="{{ $id }}" aria-controls="{{ $id }}" type="button"
-            class="lg:hidden inline-flex items-center justify-center ms-3 mt-3 text-neutral-primary bg-surface-sidebar box-border border border-transparent hover:bg-brand-strong font-medium leading-5 rounded-base text-sm p-2.5 focus:outline-none">
-        <span class="sr-only">Open sidebar</span>
-        <svg class="w-5 h-5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-width="2" d="M5 7h14M5 12h14M5 17h10"/></svg>
-    </button>
+    {{-- En movil el boton va en una franja propia con el mismo padding que el
+         encabezado de la pagina (px-6 py-4), para que quede alineado con el
+         titulo a la izquierda y no encima de el. --}}
+    <div class="lg:hidden flex items-center px-6 py-4">
+        <button data-drawer-target="{{ $id }}" data-drawer-toggle="{{ $id }}" aria-controls="{{ $id }}" type="button"
+                class="inline-flex items-center justify-center text-neutral-primary bg-surface-sidebar box-border border border-transparent hover:bg-brand-strong font-medium leading-5 rounded-base text-sm p-2.5 focus:outline-none">
+            <span class="sr-only">Open sidebar</span>
+            <svg class="w-5 h-5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-width="2" d="M5 7h14M5 12h14M5 17h10"/></svg>
+        </button>
+    </div>
 @endif
 
-<aside id="{{ $id }}" class="fixed top-0 left-0 z-40 h-full w-[15%] bg-surface-sidebar text-neutral-primary transition-transform -translate-x-full lg:translate-x-0" aria-label="Sidebar">
+<aside id="{{ $id }}" class="fixed top-0 left-0 z-40 h-full w-72 lg:w-[15%] bg-surface-sidebar text-neutral-primary transition-transform -translate-x-full lg:translate-x-0" aria-label="Sidebar">
     <button type="button" data-drawer-hide="{{ $id }}" aria-controls="{{ $id }}"
             class="lg:hidden absolute top-2.5 end-2.5 flex items-center justify-center text-neutral-primary hover:bg-brand-strong rounded-base w-9 h-9">
         <span class="sr-only">Close sidebar</span>
