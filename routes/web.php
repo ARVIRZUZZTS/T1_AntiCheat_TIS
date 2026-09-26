@@ -1,5 +1,6 @@
 <?php
 
+use App\Livewire\Examenes\EstudiantesCurso;
 use App\Livewire\Monitoreo\RegistrarIncidencia;
 use Illuminate\Support\Facades\Route;
 
@@ -14,6 +15,9 @@ Route::view('/monitoreo', 'pages.monitoreo')->name('monitoreo');
 Route::view('/central-riesgo', 'pages.central-riesgo')->name('central-riesgo');
 Route::view('/usuarios', 'pages.usuarios')->name('usuarios');
 Route::view('/reportes', 'pages.reportes')->name('reportes');
+
+Route::get('/cursos/{curso}/estudiantes/estado', EstudiantesCurso::class)
+    ->name('cursos.estudiantes.estado');
 
 // TODO(@valerydariana98, 2026-09-25): proteger con el middleware de rol que
 // restringe el registro de incidencias a docentes y auxiliares (#69).
