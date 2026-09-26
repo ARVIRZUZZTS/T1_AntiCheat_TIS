@@ -60,4 +60,18 @@ class Curso extends Model
     {
         return $this->belongsTo(Usuario::class, 'sis_doc', 'id_usuario');
     }
+
+    /**
+     * El examen "actual" del curso: el de fecha más reciente entre los
+     * ligados al curso. Compartido por los servicios que necesitan
+     * resolver a qué examen se refiere una acción (listado con filtros,
+     * cambio de estado, etc.) para no duplicar el criterio en cada uno.
+     */
+    public function examenActual(): ?Examen
+    {
+        return $this->examenes()
+            ->orderByDesc('fecha')
+            ->orderByDesc('id_examen')
+            ->first();
+    }
 }
