@@ -12,7 +12,16 @@
     La segunda concentra el estado, el motivo, la materia, la fecha y hora del
     registro y la descripción del hecho.
 
+    Los campos de solo lectura conservan el fondo gris de fábrica y los
+    editables se ponen en blanco, para que se distingan sin textos de ayuda.
+
     @see  \App\Livewire\Monitoreo\RegistrarIncidencia
+
+    @changelog
+    - 2026-09-25  [Valery D. Ortuno P]  feat: creación inicial de la vista.
+    - 2026-09-26  [Valery D. Ortuno P]  feat: buscador de estudiantes, motivos del
+      equipo, vista responsive de escritorio y móvil, y estado derivado del rol
+      recibido por la URL; se quitan los textos de ayuda de cada campo.
 --}}
 
 @section('title', 'Registrar incidencia')
@@ -31,7 +40,13 @@
     </nav>
 
     {{-- Tarjeta 1: quién es el estudiante. El buscador va fuera del <form> de
-         registro porque `x-ui.search-input` ya emite su propio <form>. --}}
+         registro porque `x-ui.search-input` ya emite su propio <form>.
+
+         Los campos de solo lectura (nombre y código SIS) conservan el fondo
+         gris de fábrica del design system; los editables llevan
+         `bg-neutral-primary-soft!` para ponerse en blanco y así distinguirse
+         de un vistazo. El `!` es necesario porque los componentes de `x-ui`
+         fijan el fondo con su propia utilidad de Tailwind. --}}
     <section class="bg-neutral-primary-soft border border-default rounded-base shadow-xs p-4 sm:p-6">
         <h2 class="text-lg font-semibold text-heading">Datos del estudiante</h2>
 
@@ -43,6 +58,7 @@
                 wire:model.live.debounce.300ms="busqueda"
                 wire:submit.prevent="buscarEstudiantes"
                 :show-button="false"
+                class="bg-neutral-primary-soft!"
             />
 
             @if (filled($busqueda) && $resultados->isNotEmpty())
@@ -97,7 +113,13 @@
         <div class="mt-4 grid gap-4 sm:grid-cols-2">
             <div>
                 <span class="block mb-2.5 text-sm font-medium text-heading">Estado de la incidencia</span>
-                <x-ui.badge :type="$this->tipoEstado">{{ $this->etiquetaEstado }}</x-ui.badge>
+                {{-- La insignia ocupa todo el ancho de la columna y replica el
+                     alto de los campos vecinos (`py-2.5 text-sm` mas el borde)
+                     para que no se vea mas pequena que ellos. --}}
+                <x-ui.badge
+                    :type="$this->tipoEstado"
+                    class="w-full! justify-center! px-3! py-2.5! text-sm!"
+                >{{ $this->etiquetaEstado }}</x-ui.badge>
             </div>
 
             <x-ui.input
@@ -117,6 +139,7 @@
                 :selected="$tipoIncidencia"
                 :error="$errors->first('tipoIncidencia')"
                 placeholder="Seleccione un motivo"
+                class="bg-neutral-primary-soft!"
             />
 
             <x-ui.select
@@ -127,6 +150,7 @@
                 :selected="$materia"
                 :error="$errors->first('materia')"
                 placeholder="Seleccione una materia"
+                class="bg-neutral-primary-soft!"
             />
         </div>
 
@@ -139,6 +163,7 @@
                 wire:model.live="descripcion"
                 :error="$errors->first('descripcion')"
                 placeholder="Cuente la anomalía observada durante el examen."
+                class="bg-neutral-primary-soft!"
             />
 
             <p class="mt-1 text-end text-sm text-body" aria-live="polite">{{ $this->contadorDescripcion }}</p>
