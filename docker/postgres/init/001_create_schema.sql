@@ -210,8 +210,11 @@ CREATE TABLE estudiante_examen (
   id_examen            integer NOT NULL,
   estado               estudiante_examen_estado NOT NULL,
   motivo               varchar(255),
+  modificado_por       integer,           -- usuario que hizo el ultimo cambio de estado (issue #27)
+  fecha_modificacion   timestamp,         -- cuando se hizo ese ultimo cambio (issue #27)
   CONSTRAINT fk_ee_estudiante FOREIGN KEY (sis_estudiante) REFERENCES estudiante(sis_estudiante),
-  CONSTRAINT fk_ee_examen     FOREIGN KEY (id_examen)      REFERENCES examen(id_examen)
+  CONSTRAINT fk_ee_examen     FOREIGN KEY (id_examen)      REFERENCES examen(id_examen),
+  CONSTRAINT fk_ee_modificador FOREIGN KEY (modificado_por) REFERENCES usuario(id_usuario)
 );
 
 CREATE TABLE estudiante_examen_ambiente (

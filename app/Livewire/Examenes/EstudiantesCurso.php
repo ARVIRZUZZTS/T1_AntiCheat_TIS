@@ -28,6 +28,7 @@ namespace App\Livewire\Examenes;
 use App\Models\Curso;
 use App\Models\Rol;
 use App\Models\Usuario;
+use App\Services\Examen\CambiarEstadoEstudianteService;
 use App\Services\Examen\ListarEstudiantesCursoConEstadoService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -37,6 +38,7 @@ use Livewire\Attributes\Layout;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Title;
 use Livewire\Component;
+use RuntimeException;
 
 #[Layout('layouts.app', [
     'sidebarItems' => [
@@ -63,13 +65,30 @@ class EstudiantesCurso extends Component
 
     public string $mensajeError = '';
 
+    // Estado de los modales de #25 (habilitar) y #26 (inhabilitar) — issue #27.
+    // Vive acá porque tabla y modales comparten la misma pantalla; #25/#26
+    // solo agregan el HTML condicional a estas propiedades/metodos, sin
+    // tocar la logica de persistencia.
+    public ?string $sisModalAbierto = null;
+
+    public string $tipoModal = '';
+
+    public string $motivoInhabilitacion = '';
+
+    public bool $motivoValido = false;
+
+    public string $mensajeErrorModal = '';
+
     private const POR_PAGINA = 8;
 
     private ListarEstudiantesCursoConEstadoService $servicio;
 
+    private CambiarEstadoEstudianteService $servicioCambioEstado;
+
     public function boot(): void
     {
         $this->servicio = app(ListarEstudiantesCursoConEstadoService::class);
+        $this->servicioCambioEstado = app(CambiarEstadoEstudianteService::class);
     }
 
     public function mount(Curso $curso): void
@@ -156,6 +175,121 @@ class EstudiantesCurso extends Component
     public function irPagina(int $pagina): void
     {
         $this->pagina = max(1, $pagina);
+    }
+
+    /**
+     * Abre el modal de #25 (confirmar habilitación) para un estudiante.
+     */
+    public function abrirModalHabilitar(string $sisEstudiante): void
+    {
+        $this->sisModalAbierto = $sisEstudiante;
+        $this->tipoModal = 'habilitar';
+        $this->mensajeErrorModal = '';
+    }
+
+    /**
+     * Abre el modal de #26 (motivo de inhabilitación) para un estudiante.
+     */
+    public function abrirModalInhabilitar(string $sisEstudiante): void
+    {
+        $this->sisModalAbierto = $sisEstudiante;
+        $this->tipoModal = 'inhabilitar';
+        $this->motivoInhabilitacion = '';
+        $this->motivoValido = false;
+        $this->mensajeErrorModal = '';
+    }
+
+    /**
+     * Cierra cualquiera de los dos modales sin tocar el estado persistido
+     * (criterio 3 de #27).
+     */
+    public function cerrarModal(): void
+    {
+        $this->sisModalAbierto = null;
+        $this->tipoModal = '';
+        $this->motivoInhabilitacion = '';
+        $this->motivoValido = false;
+        $this->mensajeErrorModal = '';
+    }
+
+    /**
+     * Hook de Livewire: se ejecuta en cada tecla del campo de motivo (si la
+     * vista de #26 usa wire:model.live). Recalcula $motivoValido para que el
+     * botón de confirmar se pueda deshabilitar sin duplicar la regla de
+     * validación en la vista (criterio 1 de #27).
+     */
+    public function updatedMotivoInhabilitacion(): void
+    {
+        try {
+            $this->servicioCambioEstado->validarMotivo($this->motivoInhabilitacion);
+            $this->motivoValido = true;
+        } catch (InvalidArgumentException) {
+            $this->motivoValido = false;
+        }
+    }
+
+    /**
+     * Confirma la habilitación del estudiante con el modal abierto (#25).
+     */
+    public function confirmarHabilitar(): void
+    {
+        if ($this->sisModalAbierto === null) {
+            return;
+        }
+
+        try {
+            $this->servicioCambioEstado->habilitar($this->curso, $this->sisModalAbierto, $this->idUsuarioActual());
+            $this->cerrarModal();
+        } catch (InvalidArgumentException|RuntimeException $e) {
+            $this->mensajeErrorModal = $e->getMessage();
+        }
+    }
+
+    /**
+     * Confirma la inhabilitación del estudiante con el modal abierto (#26).
+     */
+    public function confirmarInhabilitar(): void
+    {
+        if ($this->sisModalAbierto === null) {
+            return;
+        }
+
+        try {
+            $this->servicioCambioEstado->inhabilitar(
+                $this->curso,
+                $this->sisModalAbierto,
+                $this->motivoInhabilitacion,
+                $this->idUsuarioActual()
+            );
+            $this->cerrarModal();
+        } catch (InvalidArgumentException|RuntimeException $e) {
+            $this->mensajeErrorModal = $e->getMessage();
+        }
+    }
+
+    /**
+     * Usuario que hace el cambio, para auditoría (modificado_por). Mismo
+     * patrón de esAuxiliar(): busca el Usuario por cod_sis del autenticado.
+     *
+     * TODO(@equipo, 2026-09-26): hoy siempre devuelve null en la práctica,
+     * porque auth() todavía no está conectado a la tabla `usuario` (ver
+     * revisión de #29) — no hay ningún login real implementado todavía.
+     * No bloquea el cambio de estado; solo el campo modificado_por queda
+     * vacío hasta que se resuelva esa brecha.
+     */
+    private function idUsuarioActual(): ?int
+    {
+        if (! auth()->check()) {
+            return null;
+        }
+
+        $codSis = (string) (auth()->user()->getAttribute('cod_sis') ?? '');
+
+        if ($codSis === '') {
+            return null;
+        }
+
+        return Usuario::query()->where('cod_sis', $codSis)->value('id_usuario');
     }
 
     public function render(): View
