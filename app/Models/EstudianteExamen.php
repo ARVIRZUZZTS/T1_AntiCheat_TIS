@@ -1,5 +1,27 @@
 <?php
 
+/**
+ * @file    EstudianteExamen.php
+ *
+ * @author  OchoaCesar <cesareduardonick@gmail.com>
+ *
+ * @created 2026-09-25
+ *
+ * @updated 2026-09-25
+ *
+ * @description
+ * Modelo Eloquent de la tabla `estudiante_examen`. Representa la inscripción
+ * de un estudiante a un examen con su estado de habilitación
+ * (`habilitado` / `deshabilitado`) y el motivo de la deshabilitación cuando
+ * corresponde.
+ *
+ * @changelog
+ * - 2026-09-25  [OchoaCesar]  feat:  creación inicial del modelo.
+ *
+ * @see  Estudiante
+ * @see  Examen
+ */
+
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;

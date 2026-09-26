@@ -1,3 +1,19 @@
+/*
+ * @file    seed-examen-prueba.sql
+ * @author  OchoaCesar <cesareduardonick@gmail.com>
+ * @created 2026-09-25
+ * @updated 2026-09-25
+ *
+ * @description
+ * Script de prueba para el endpoint de monitoreo de asistencia. Crea un examen
+ * "hoy" (CURRENT_DATE) con todos los casos de asistencia posibles
+ * (habilitado/deshabilitado con y sin registro) y devuelve el id_examen
+ * generado para probarlo en Postman.
+ *
+ * @changelog
+ * - 2026-09-25  [OchoaCesar]  feat:  creación inicial del script de prueba.
+ */
+
 -- ============================================================
 -- SCRIPT DE PRUEBA: ENDPOINT DE MONITOREO DE EXAMEN
 -- ============================================================

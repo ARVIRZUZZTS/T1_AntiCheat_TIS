@@ -1,5 +1,36 @@
 <?php
 
+/**
+ * @file    GenerarReporteAsistenciaService.php
+ *
+ * @author  OchoaCesar <cesareduardonick@gmail.com>
+ *
+ * @created 2026-09-25
+ *
+ * @updated 2026-09-25
+ *
+ * @description
+ * Servicio de dominio que genera el reporte de asistencia de un examen.
+ * Dado el id de un examen, resuelve el estado de asistencia de cada estudiante
+ * inscrito (`presente` / `ausente` / `pendiente`) contrastando la hora actual
+ * contra la ventana horaria del examen (fecha + hora_inicio / hora_fin), e
+ * incluye registrador, hora de ingreso y observaciones de cada estudiante.
+ *
+ * @changelog
+ * - 2026-09-25  [OchoaCesar]  feat:  creación inicial del servicio con estados
+ *                                    presente/ausente/pendiente, registrador y
+ *                                    observaciones.
+ * - 2026-09-25  [OchoaCesar]  fix:   el estado deshabilitado dejó de forzar
+ *                                    'rechazado' y sigue la lógica temporal;
+ *                                    el ingreso rechazado se marca como 'ausente'.
+ * - 2026-09-25  [OchoaCesar]  feat:  se agregó hora_ingreso a la respuesta
+ *                                    (solo cuando el estado es 'presente').
+ *
+ * @see  EstudianteExamen
+ * @see  RegistroAsistencia
+ * @see  Examen
+ */
+
 namespace App\Services\Monitoreo;
 
 use App\Models\EstudianteExamen;

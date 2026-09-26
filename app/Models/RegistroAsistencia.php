@@ -1,5 +1,27 @@
 <?php
 
+/**
+ * @file    RegistroAsistencia.php
+ *
+ * @author  OchoaCesar <cesareduardonick@gmail.com>
+ *
+ * @created 2026-09-25
+ *
+ * @updated 2026-09-25
+ *
+ * @description
+ * Modelo Eloquent de la tabla `registro_asistencia`. Representa el registro de
+ * ingreso de un estudiante a un examen, con la hora de ingreso y el usuario
+ * que realizó el registro.
+ *
+ * @changelog
+ * - 2026-09-25  [OchoaCesar]  feat:  creación inicial del modelo.
+ *
+ * @see  Estudiante
+ * @see  Examen
+ * @see  Usuario
+ */
+
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
