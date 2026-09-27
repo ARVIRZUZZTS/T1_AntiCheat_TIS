@@ -9,16 +9,19 @@
     las pestañas Estudiantes / Habilitación / Exámenes / Auxiliares. La
     pestaña Estudiantes (principal) es una calca de pages/monitoreo[.blade].php
     con la columna "Registrar" reemplazada por "Motivo" y "Acciones"
-    (Editar / Deshabilitar). Incluye la integración del modal de deshabilitación
-    de estudiantes.
+    (Editar / Habilitar / Deshabilitar). Incluye la integración de los modales
+    de habilitación e inhabilitación de estudiantes (ambos mock: no hay
+    endpoint real detrás todavía, ver @see pages/materia-estudiantes.blade.php).
 
     @changelog
     - 2026-09-25  [OchoaCesar]  feat: creación inicial de la vista.
     - 2026-09-26  [Alisson D. Alvarado]  feat: conexión del modal de deshabilitar estudiantes.
+    - 2026-09-26  [Diego Tejerina]  feat: conexión del modal de habilitar estudiantes (#25).
 
     @see  pages/materias.blade.php
     @see  pages/monitoreo.blade.php
     @see  resources/views/components/ui/modal-deshabilitar.blade.php
+    @see  resources/views/components/ui/modal-habilitar.blade.php
 --}}
 
 @php
@@ -43,7 +46,7 @@
     $acciones = fn (string $nombreEstudiante, string $sisEstudiante, string $estado = 'Habilitado') => '<a href="#" class="font-medium text-fg-brand hover:underline">Editar</a>'
         . '<span class="text-neutral-tertiary-medium mx-1.5">·</span>'
         . ($estado === 'Deshabilitado'
-            ? '<span class="text-fg-disabled font-medium">Deshabilitar</span>'
+            ? '<button type="button" @click="abrirModalHabilitar(\'' . e($nombreEstudiante) . '\', \'' . e($sisEstudiante) . '\')" class="font-medium text-fg-brand hover:underline bg-transparent border-0 cursor-pointer p-0 text-sm">Habilitar</button>'
             : '<button type="button" @click="abrirModalDeshabilitar(\'' . e($nombreEstudiante) . '\', \'' . e($sisEstudiante) . '\')" class="font-medium text-fg-danger hover:underline bg-transparent border-0 cursor-pointer p-0 text-sm">Deshabilitar</button>');
 @endphp
 
@@ -138,6 +141,27 @@
                     return;
                 }
                 this.cerrarModalDeshabilitar();
+            },
+            // Modal de habilitar (#25) — mismo patrón mock que el de arriba,
+            // sin motivo porque habilitar no lo necesita.
+            modalHabilitarAbierto: false,
+            nombreHabilitar: '',
+            sisHabilitar: '',
+            errorHabilitar: '',
+            abrirModalHabilitar(nombre, sis) {
+                this.nombreHabilitar = nombre;
+                this.sisHabilitar = sis;
+                this.errorHabilitar = '';
+                this.modalHabilitarAbierto = true;
+            },
+            cerrarModalHabilitar() {
+                this.modalHabilitarAbierto = false;
+                this.nombreHabilitar = '';
+                this.sisHabilitar = '';
+                this.errorHabilitar = '';
+            },
+            confirmarHabilitar() {
+                this.cerrarModalHabilitar();
             }
         }"
         class="mt-6"
@@ -198,6 +222,11 @@
              ese mismo scope, asi que se actualizan al abrir el modal. --}}
         <div x-show="modalAbierto" x-cloak>
             <x-ui.modal-deshabilitar :show="true" />
+        </div>
+
+        {{-- Modal de habilitar estudiante (#25), mismo patrón mock. --}}
+        <div x-show="modalHabilitarAbierto" x-cloak>
+            <x-ui.modal-habilitar :show="true" />
         </div>
 
         {{-- Pestañas pendientes (mocks hasta tener endpoint) --}}

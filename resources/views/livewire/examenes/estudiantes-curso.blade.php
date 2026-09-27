@@ -15,8 +15,10 @@
     - 2026-09-24  [Diego Tejerina]  feat: creación inicial del componente.
     - 2026-09-25  [Diego Tejerina]  refactor: ajustes en la paginación y diseño responsivo.
     - 2026-09-26  [Alisson D. Alvarado]  feat: conexión del modal de deshabilitar estudiantes.
+    - 2026-09-26  [Diego Tejerina]  feat: conexión del modal de habilitar estudiantes (#25).
     @see  App\Livewire\Examenes\EstudiantesCurso
     @see  resources/views/components/ui/modal-deshabilitar.blade.php
+    @see  resources/views/components/ui/modal-habilitar.blade.php
 --}}
 
 @php
@@ -80,9 +82,18 @@
         ])->render();
     };
 
+    // Deshabilitado -> ofrece "Habilitar" (issue #25). Cualquier otro estado
+    // (incluido null / sin fila todavia) -> ofrece "Deshabilitar" (issue #26),
+    // igual que ya hacia antes de agregar el caso de #25.
     $acciones = function (string $sis, ?string $estado, bool $esDocente): string {
-        if (! $esDocente || $estado === 'deshabilitado') {
-            return '<span class="text-fg-disabled">Deshabilitar</span>';
+        if (! $esDocente) {
+            $etiqueta = $estado === 'deshabilitado' ? 'Habilitar' : 'Deshabilitar';
+
+            return '<span class="text-fg-disabled">' . $etiqueta . '</span>';
+        }
+
+        if ($estado === 'deshabilitado') {
+            return '<button type="button" wire:click="abrirModalHabilitar(\'' . e($sis) . '\')" class="font-medium text-fg-brand hover:underline bg-transparent border-0 p-0 cursor-pointer text-sm">Habilitar</button>';
         }
 
         return '<button type="button" wire:click="abrirModalInhabilitar(\'' . e($sis) . '\')" class="font-medium text-fg-danger hover:underline bg-transparent border-0 p-0 cursor-pointer text-sm">Deshabilitar</button>';
@@ -198,6 +209,12 @@
             </x-ui.alert>
         @endif
 
+        @if ($mensajeExito !== '')
+            <x-ui.alert type="success" title="Listo" class="shrink-0">
+                {{ $mensajeExito }}
+            </x-ui.alert>
+        @endif
+
         @if ($mensajeError)
             <x-ui.alert type="danger" title="Elemento inválido" class="shrink-0">
                 {{ $mensajeError }}
@@ -243,7 +260,7 @@
             @endif
         @endif
 
-        {{-- Modal de deshabilitar estudiante --}}
+        {{-- Modal de deshabilitar estudiante (#26) --}}
         <x-ui.modal-deshabilitar
             :show="$sisModalAbierto !== null && $tipoModal === 'inhabilitar'"
             :nombre="$nombreModal"
@@ -253,6 +270,16 @@
             wire-model="motivoInhabilitacion"
             wire-close="cerrarModal"
             wire-confirm="confirmarInhabilitar"
+        />
+
+        {{-- Modal de habilitar estudiante (#25) --}}
+        <x-ui.modal-habilitar
+            :show="$sisModalAbierto !== null && $tipoModal === 'habilitar'"
+            :nombre="$nombreModal"
+            :sis="$sisModalAbierto ?? ''"
+            :error="$mensajeErrorModal"
+            wire-close="cerrarModal"
+            wire-confirm="confirmarHabilitar"
         />
     </div>
 </div>
