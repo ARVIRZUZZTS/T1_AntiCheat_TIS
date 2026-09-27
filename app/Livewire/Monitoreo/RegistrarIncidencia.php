@@ -229,7 +229,7 @@ class RegistrarIncidencia extends Component
     #[Computed]
     public function etiquetaEstado(): string
     {
-        return $this->rol === Rol::NOMBRE_AUXILIAR ? 'Sospechoso' : 'Confirmado';
+        return $this->rol === Rol::NOMBRE_AUXILIAR ? 'En revision' : 'Confirmado';
     }
 
     /**
