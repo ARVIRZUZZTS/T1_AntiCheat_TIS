@@ -2,18 +2,23 @@
     @file    materia-estudiantes.blade.php
     @author  OchoaCesar <cesareduardonick@gmail.com>
     @created 2026-09-25
-    @updated 2026-09-25
+    @updated 2026-09-26
 
     @description
     Vista de detalle de una materia (vista mock): muestra las cards resumen y
     las pestañas Estudiantes / Habilitación / Exámenes / Auxiliares. La
     pestaña Estudiantes (principal) es una calca de pages/monitoreo[.blade].php
     con la columna "Registrar" reemplazada por "Motivo" y "Acciones"
-    (Editar / Deshabilitar). Todo con datos mockeados hasta que existan los
-    endpoints correspondientes.
+    (Editar / Deshabilitar). Incluye la integración del modal de deshabilitación
+    de estudiantes.
+
+    @changelog
+    - 2026-09-25  [OchoaCesar]  feat: creación inicial de la vista.
+    - 2026-09-26  [Alisson D. Alvarado]  feat: conexión del modal de deshabilitar estudiantes.
 
     @see  pages/materias.blade.php
     @see  pages/monitoreo.blade.php
+    @see  resources/views/components/ui/modal-deshabilitar.blade.php
 --}}
 
 @php
@@ -35,10 +40,11 @@
         default => '<span class="text-xs font-medium px-1.5 py-0.5 rounded-full bg-status-central-riesgos-bg text-status-central-riesgos-fg">Tramposo</span>',
     };
 
-    // Acciones: Editar (#1B3A73 → token fg-brand) y Deshabilitar (#D32027 → token fg-danger).
-    $acciones = '<a href="#" class="font-medium text-fg-brand hover:underline">Editar</a>'
+    $acciones = fn (string $nombreEstudiante, string $sisEstudiante, string $estado = 'Habilitado') => '<a href="#" class="font-medium text-fg-brand hover:underline">Editar</a>'
         . '<span class="text-neutral-tertiary-medium mx-1.5">·</span>'
-        . '<a href="#" class="font-medium text-fg-danger hover:underline">Deshabilitar</a>';
+        . ($estado === 'Deshabilitado'
+            ? '<span class="text-fg-disabled font-medium">Deshabilitar</span>'
+            : '<button type="button" @click="abrirModalDeshabilitar(\'' . e($nombreEstudiante) . '\', \'' . e($sisEstudiante) . '\')" class="font-medium text-fg-danger hover:underline bg-transparent border-0 cursor-pointer p-0 text-sm">Deshabilitar</button>');
 @endphp
 
 @extends('layouts.app')
@@ -100,7 +106,42 @@
         </div>
     </div>
 
-    <div x-data="{ tab: 'estudiantes' }" class="mt-6">
+    <div
+        x-data="{
+            tab: 'estudiantes',
+            modalAbierto: false,
+            nombre: '',
+            sis: '',
+            motivo: '',
+            errorMotivo: '',
+            abrirModalDeshabilitar(nombre, sis) {
+                this.nombre = nombre;
+                this.sis = sis;
+                this.motivo = '';
+                this.errorMotivo = '';
+                this.modalAbierto = true;
+            },
+            cerrarModalDeshabilitar() {
+                this.modalAbierto = false;
+                this.nombre = '';
+                this.sis = '';
+                this.motivo = '';
+                this.errorMotivo = '';
+            },
+            confirmarDeshabilitar() {
+                if (this.motivo.trim() === '') {
+                    this.errorMotivo = 'El motivo es obligatorio.';
+                    return;
+                }
+                if (this.motivo.length > 150) {
+                    this.errorMotivo = 'El motivo no puede exceder los 150 caracteres.';
+                    return;
+                }
+                this.cerrarModalDeshabilitar();
+            }
+        }"
+        class="mt-6"
+    >
         {{-- Pestañas de la materia (Alpine toggla el estado en runtime) --}}
         @php
             $tabClases = 'inline-flex items-center justify-center box-border border focus:ring-4 shadow-xs font-medium leading-5 rounded-base focus:outline-none px-4 py-2.5 text-sm';
@@ -137,12 +178,12 @@
                 <x-ui.table
                     :headers="['Estudiante', 'Código SIS', 'Hora', 'Registro', 'Estado', 'Motivo', 'Acciones']"
                     :rows="[
-                        [['heading' => true, 'value' => 'Ana López'], '202201013', '08:12', 'Doc. Mariana G.', ['html' => $estadoBadge('Habilitado')], '—', ['html' => $acciones]],
-                        [['heading' => true, 'value' => 'Bruno Díaz'], '202101022', '08:20', 'Aux. Jorge S.', ['html' => $estadoBadge('Sospechoso')], '—', ['html' => $acciones]],
-                        [['heading' => true, 'value' => 'Carla Ruiz'], '202201031', '—', '—', ['html' => $estadoBadge('Pendiente')], '—', ['html' => $acciones]],
-                        [['heading' => true, 'value' => 'Diego Soto'], '202202045', '—', '—', ['html' => $estadoBadge('Ausente')], '—', ['html' => $acciones]],
-                        [['heading' => true, 'value' => 'Ernesto Vera'], '202002107', '07:58', 'Doc. Mariana G.', ['html' => $estadoBadge('Tramposo')], 'Suplantación de identidad', ['html' => $acciones]],
-                        [['heading' => true, 'value' => 'Fátima Quispe'], '202201056', '08:05', 'Aux. Jorge S.', ['html' => $estadoBadge('Deshabilitado')], 'No cumple requisitos', ['html' => $acciones]],
+                        [['heading' => true, 'value' => 'Ana López'], '202201013', '08:12', 'Doc. Mariana G.', ['html' => $estadoBadge('Habilitado')], '—', ['html' => $acciones('Ana López', '202201013', 'Habilitado')]],
+                        [['heading' => true, 'value' => 'Bruno Díaz'], '202101022', '08:20', 'Aux. Jorge S.', ['html' => $estadoBadge('Sospechoso')], '—', ['html' => $acciones('Bruno Díaz', '202101022', 'Sospechoso')]],
+                        [['heading' => true, 'value' => 'Carla Ruiz'], '202201031', '—', '—', ['html' => $estadoBadge('Pendiente')], '—', ['html' => $acciones('Carla Ruiz', '202201031', 'Pendiente')]],
+                        [['heading' => true, 'value' => 'Diego Soto'], '202202045', '—', '—', ['html' => $estadoBadge('Ausente')], '—', ['html' => $acciones('Diego Soto', '202202045', 'Ausente')]],
+                        [['heading' => true, 'value' => 'Ernesto Vera'], '202002107', '07:58', 'Doc. Mariana G.', ['html' => $estadoBadge('Tramposo')], 'Suplantación de identidad', ['html' => $acciones('Ernesto Vera', '202002107', 'Tramposo')]],
+                        [['heading' => true, 'value' => 'Fátima Quispe'], '202201056', '08:05', 'Aux. Jorge S.', ['html' => $estadoBadge('Deshabilitado')], 'No cumple requisitos', ['html' => $acciones('Fátima Quispe', '202201056', 'Deshabilitado')]],
                     ]"
                 />
             </div>
@@ -151,6 +192,13 @@
                 <x-ui.pagination :current="2" :total="5" />
             </div>
         </section>
+
+        {{-- Modal de deshabilitar estudiante. La visibilidad la maneja Alpine
+             (x-show) desde el scope de arriba; nombre, SIS y motivo se leen de
+             ese mismo scope, asi que se actualizan al abrir el modal. --}}
+        <div x-show="modalAbierto" x-cloak>
+            <x-ui.modal-deshabilitar :show="true" />
+        </div>
 
         {{-- Pestañas pendientes (mocks hasta tener endpoint) --}}
         <div x-show="tab === 'habilitacion'" x-cloak class="mt-6">
