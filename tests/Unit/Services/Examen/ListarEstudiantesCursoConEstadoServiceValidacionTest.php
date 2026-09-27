@@ -7,64 +7,60 @@
  *
  * @created 2026-09-25
  *
- * @updated 2026-09-25
+ * @updated 2026-09-26
  *
  * @description
- * Pruebas unitarias de validarBusqueda(): es la unica logica del servicio
- * que no depende de la base de datos, por eso va como test unitario puro
- * (sin bootstrap de Laravel) en vez de en tests/Feature.
+ * Pruebas unitarias de la validación de búsqueda del servicio de listado. Ya
+ * no es lógica propia: desde el refactor del 2026-09-26 el criterio vive en
+ * BusquedaEstudianteService y el servicio lo recibe por inyección, así que acá
+ * se cubre ese contrato (que se pueda inyectar y que la regla no esté
+ * duplicada).
  *
  * @see  App\Services\Examen\ListarEstudiantesCursoConEstadoService
+ * @see  App\Services\Examen\BusquedaEstudianteService
  *
  * @changelog
  * - 2026-09-25  [T1]  test: creación inicial.
+ * - 2026-09-26  [Alisson D. Alvarado]  test: la validación de la búsqueda se
+ *   delega a BusquedaEstudianteService; se cubre la inyección del criterio y
+ *   que el servicio ya no duplique la regla.
  */
 
 namespace Tests\Unit\Services\Examen;
 
+use App\Services\Examen\BusquedaEstudianteService;
 use App\Services\Examen\ListarEstudiantesCursoConEstadoService;
-use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
+use ReflectionProperty;
 
 class ListarEstudiantesCursoConEstadoServiceValidacionTest extends TestCase
 {
+    private BusquedaEstudianteService $busqueda;
+
     private ListarEstudiantesCursoConEstadoService $servicio;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->servicio = new ListarEstudiantesCursoConEstadoService;
+        $this->busqueda = new BusquedaEstudianteService;
+        $this->servicio = new ListarEstudiantesCursoConEstadoService($this->busqueda);
     }
 
-    public function test_acepta_busqueda_alfanumerica_valida(): void
+    public function test_acepta_el_criterio_de_busqueda_por_inyeccion(): void
     {
-        $this->servicio->validarBusqueda('Juan');
-        $this->servicio->validarBusqueda('202100542');
-        $this->servicio->validarBusqueda('Ñoño');
-
-        $this->addToAssertionCount(3);
+        $this->assertInstanceOf(ListarEstudiantesCursoConEstadoService::class, $this->servicio);
     }
 
-    public function test_acepta_busqueda_vacia_o_nula(): void
+    public function test_el_servicio_usa_el_criterio_inyectado(): void
     {
-        $this->servicio->validarBusqueda(null);
-        $this->servicio->validarBusqueda('');
+        $propiedad = new ReflectionProperty(ListarEstudiantesCursoConEstadoService::class, 'busqueda');
 
-        $this->addToAssertionCount(2);
+        $this->assertSame($this->busqueda, $propiedad->getValue($this->servicio));
     }
 
-    public function test_rechaza_caracteres_no_permitidos(): void
+    public function test_el_servicio_no_duplica_la_validacion_de_busqueda(): void
     {
-        $this->expectException(InvalidArgumentException::class);
-
-        $this->servicio->validarBusqueda('juan@perez.com');
-    }
-
-    public function test_acepta_busqueda_de_nombre_completo_con_espacio(): void
-    {
-        $this->servicio->validarBusqueda('Diego Camacho');
-
-        $this->addToAssertionCount(1);
+        $this->assertFalse(method_exists($this->servicio, 'validarBusqueda'));
     }
 }

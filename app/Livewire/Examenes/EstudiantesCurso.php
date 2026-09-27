@@ -13,16 +13,21 @@
  * Componente Livewire de la feature Examenes: lista los estudiantes de un curso
  * con su estado de habilitación en el examen actual (habilitado/deshabilitado)
  * y las observaciones de la central de riesgos (sospechoso/tramposo/
- * pendiente/aula equivocada). Incluye búsqueda por nombre o código SIS,
- * filtros por estado con contadores, paginación y manejo de los modales de
- * habilitación e inhabilitación.
+ * pendiente/aula equivocada). Incluye búsqueda por nombre o código SIS (el
+ * criterio lo decide el primer caracter del término), filtros por estado con
+ * contadores, paginación y manejo de los modales de habilitación e
+ * inhabilitación.
  *
  * @see  App\Services\Examen\ListarEstudiantesCursoConEstadoService
+ * @see  App\Services\Examen\BusquedaEstudianteService
+ * @see  resources/views/partials/busqueda-estudiante.blade.php
  * @see  resources/views/components/ui/modal-deshabilitar.blade.php
  *
  * @changelog
  * - 2026-09-24  [Diego Tejerina]  feat: creación inicial del componente.
  * - 2026-09-26  [Alisson D. Alvarado]        feat: integración de lógica de modales para deshabilitar.
+ * - 2026-09-26  [Alisson D. Alvarado]        refactor: el criterio del buscador
+ *   pasa a BusquedaEstudianteService y el componente guarda el modo resuelto.
  */
 
 namespace App\Livewire\Examenes;
@@ -30,6 +35,7 @@ namespace App\Livewire\Examenes;
 use App\Models\Curso;
 use App\Models\Rol;
 use App\Models\Usuario;
+use App\Services\Examen\BusquedaEstudianteService;
 use App\Services\Examen\CambiarEstadoEstudianteService;
 use App\Services\Examen\ListarEstudiantesCursoConEstadoService;
 use Illuminate\Contracts\View\View;
@@ -62,6 +68,7 @@ class EstudiantesCurso extends Component
     public string $estado = ListarEstudiantesCursoConEstadoService::FILTRO_TODOS;
 
     public string $busqueda = '';
+    public string $modoBusqueda = '';
 
     public int $pagina = 1;
 
@@ -87,10 +94,13 @@ class EstudiantesCurso extends Component
 
     private CambiarEstadoEstudianteService $servicioCambioEstado;
 
+    private BusquedaEstudianteService $servicioBusqueda;
+
     public function boot(): void
     {
         $this->servicio = app(ListarEstudiantesCursoConEstadoService::class);
         $this->servicioCambioEstado = app(CambiarEstadoEstudianteService::class);
+        $this->servicioBusqueda = app(BusquedaEstudianteService::class);
     }
 
     public function mount(Curso $curso): void
@@ -104,17 +114,20 @@ class EstudiantesCurso extends Component
         $this->mensajeError = '';
 
         try {
-            $this->servicio->validarBusqueda($this->busqueda !== '' ? $this->busqueda : null);
+            // El criterio del buscador por numeros o letras
+            $termino = $this->terminoBusqueda();
+            $this->modoBusqueda = $this->servicioBusqueda->validar($termino);
 
             return $this->servicio->ejecutar(
                 $this->curso->id_curso,
                 $this->estado,
-                $this->busqueda !== '' ? $this->busqueda : null,
+                $termino,
                 max(1, $this->pagina),
                 self::POR_PAGINA,
             );
         } catch (InvalidArgumentException $e) {
             $this->mensajeError = $e->getMessage();
+            $this->modoBusqueda = '';
 
             return $this->paginarVacio();
         }
@@ -314,5 +327,12 @@ class EstudiantesCurso extends Component
                 'pageName' => 'page',
             ]
         );
+    }
+
+    private function terminoBusqueda(): ?string
+    {
+        $termino = trim($this->busqueda);
+
+        return $termino === '' ? null : $termino;
     }
 }
