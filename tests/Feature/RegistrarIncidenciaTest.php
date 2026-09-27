@@ -153,7 +153,7 @@ class RegistrarIncidenciaTest extends TestCase
 
         Livewire::test(RegistrarIncidencia::class)
             ->set('rol', Rol::NOMBRE_AUXILIAR)
-            ->assertSee('Sospechoso')
+            ->assertSee('En revision')
             ->assertSet('tipoInfraccion', TipoInfraccion::Sospechoso);
     }
 
