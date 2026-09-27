@@ -26,6 +26,7 @@
  * @changelog
  * - 2026-09-24  [Diego Tejerina]  feat: creación inicial del componente.
  * - 2026-09-26  [Alisson D. Alvarado]        feat: integración de lógica de modales para deshabilitar.
+ * - 2026-09-26  [Diego Tejerina]  feat: agregar mensaje de éxito al habilitar (#25).
  * - 2026-09-26  [Alisson D. Alvarado]        refactor: el criterio del buscador
  *   pasa a BusquedaEstudianteService y el componente guarda el modo resuelto.
  */
@@ -87,6 +88,11 @@ class EstudiantesCurso extends Component
     public bool $motivoValido = false;
 
     public string $mensajeErrorModal = '';
+
+    // Mensaje de éxito de la issue #25 al habilitar. #26 (inhabilitar) no
+    // tiene uno equivalente todavía — es una asimetría conocida entre los
+    // dos modales, no un descuido.
+    public string $mensajeExito = '';
 
     private const POR_PAGINA = 8;
 
@@ -200,6 +206,7 @@ class EstudiantesCurso extends Component
         $this->sisModalAbierto = $sisEstudiante;
         $this->tipoModal = 'habilitar';
         $this->mensajeErrorModal = '';
+        $this->mensajeExito = '';
     }
 
     /**
@@ -212,6 +219,7 @@ class EstudiantesCurso extends Component
         $this->motivoInhabilitacion = '';
         $this->motivoValido = false;
         $this->mensajeErrorModal = '';
+        $this->mensajeExito = '';
     }
 
     /**
@@ -255,6 +263,7 @@ class EstudiantesCurso extends Component
         try {
             $this->servicioCambioEstado->habilitar($this->curso, $this->sisModalAbierto, $this->idUsuarioActual());
             $this->cerrarModal();
+            $this->mensajeExito = 'Estudiante habilitado correctamente.';
         } catch (InvalidArgumentException|RuntimeException $e) {
             $this->mensajeErrorModal = $e->getMessage();
         }
