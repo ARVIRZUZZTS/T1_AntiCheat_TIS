@@ -19,7 +19,7 @@ class CursoEstudianteController extends Controller
                 'sis'      => $estudiante->sis_estudiante,
                 'nombre'   => $estudiante->nombre_estudiante,
                 'apellido' => $estudiante->apellido_estudiante,
-                'carrera'  => $estudiante->carrera,
+                'carrera'  => $estudiante->carrera
             ]),
         ]);
     }

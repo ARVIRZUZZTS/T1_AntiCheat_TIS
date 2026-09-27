@@ -1,6 +1,6 @@
 {{--
     @file    sidebar.blade.php
-    @author  Valery D. Ortuno P. <valerydariana98@gmail.com>
+@author  Valery D. Ortuno P. <valerydariana98@gmail.com>
     @created 2026-09-24
     @updated 2026-09-26
 
@@ -86,7 +86,7 @@
             @foreach ($nav as $item)
                 @php
                     $isActive = ($item['route'] ?? null) === $active
-                        || (($item['route'] ?? null) !== null && $current !== '' && request()->routeIs($item['route']));
+                        || (($item['route'] ?? null) !== null && $current !== '' && request()->routeIs($item['route'], $item['route'].'.*'));
                 @endphp
                 <li>
                     <a href="{{ route($item['route']) }}" @class([

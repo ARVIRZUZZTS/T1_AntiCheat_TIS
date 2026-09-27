@@ -147,12 +147,12 @@ INSERT INTO estudiante_examen_ambiente (id_ee, id_ambiente) VALUES
 (4, 4),
 (5, 5);
 
-INSERT INTO registro_asistencia (id_ingreso, hora_ingreso, id_examen, id_estudiante) VALUES
-(1, '08:05', 1, '20210001'),
-(2, '10:03', 2, '20210002'),
-(3, '14:10', 3, '20210003'),
-(4, '08:02', 4, '20210004'),
-(5, '16:01', 5, '20210005');
+INSERT INTO registro_asistencia (id_ingreso, hora_ingreso, id_examen, id_estudiante, id_registrador) VALUES
+(1, '08:05', 1, '20210001', 3),
+(2, '10:03', 2, '20210002', 4),
+(3, '14:10', 3, '20210003', 3),
+(4, '08:02', 4, '20210004', 4),
+(5, '16:01', 5, '20210005', 3);
 
 INSERT INTO central_riesgo (id_registro, id_ingreso, id_registrador, detalle_motivo, fecha_registro, tipo_infraccion) VALUES
 (1, 1, 3, 'Estudiante mirando hacia otro lado', '2024-06-10', 'sospechoso'),

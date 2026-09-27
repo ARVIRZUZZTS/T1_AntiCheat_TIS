@@ -138,6 +138,7 @@ class ListarEstudiantesCursoFiltroTest extends TestCase
                 'hora_ingreso' => '08:05',
                 'id_examen' => self::ID_EXAMEN,
                 'id_estudiante' => $sis,
+                'id_registrador' => self::ID_DOCENTE,
             ]);
 
             $idRiesgo++;

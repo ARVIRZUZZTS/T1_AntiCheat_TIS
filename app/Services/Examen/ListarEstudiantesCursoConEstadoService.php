@@ -85,7 +85,7 @@ class ListarEstudiantesCursoConEstadoService
         $filtro = $this->normalizarFiltro($filtroEstado);
 
         $curso = Curso::findOrFail($idCurso);
-        $examen = $this->examenActualDe($curso);
+        $examen = $curso->examenActual();
 
         $query = $curso->estudiantes()
             ->with(['estudianteExamenes', 'registrosAsistencia.centralRiesgos']);
@@ -132,7 +132,7 @@ class ListarEstudiantesCursoConEstadoService
     public function conteosPorEstado(int $idCurso): array
     {
         $curso = Curso::findOrFail($idCurso);
-        $examen = $this->examenActualDe($curso);
+        $examen = $curso->examenActual();
         $idExamen = $examen?->id_examen;
 
         return [
@@ -180,20 +180,6 @@ class ListarEstudiantesCursoConEstadoService
         }
 
         return $filtro;
-    }
-
-    /**
-     * Obtiene el examen más reciente de un curso (el "examen actual").
-     *
-     * @param  Curso  $curso  Curso consultado.
-     * @return Examen|null Examen vigente o null si el curso no tiene exámenes.
-     */
-    private function examenActualDe(Curso $curso): ?Examen
-    {
-        return $curso->examenes()
-            ->orderByDesc('fecha')
-            ->orderByDesc('id_examen')
-            ->first();
     }
 
     /**
