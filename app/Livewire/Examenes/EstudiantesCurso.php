@@ -7,20 +7,22 @@
  *
  * @created 2026-09-24
  *
- * @updated 2026-09-24
+ * @updated 2026-09-26
  *
  * @description
  * Componente Livewire de la feature Examenes: lista los estudiantes de un curso
  * con su estado de habilitación en el examen actual (habilitado/deshabilitado)
  * y las observaciones de la central de riesgos (sospechoso/tramposo/
  * pendiente/aula equivocada). Incluye búsqueda por nombre o código SIS,
- * filtros por estado con contadores y paginación; todo sin recargar la página.
- * Es de solo lectura: los estados solo se modifican desde la vista de examen.
+ * filtros por estado con contadores, paginación y manejo de los modales de
+ * habilitación e inhabilitación.
  *
  * @see  App\Services\Examen\ListarEstudiantesCursoConEstadoService
+ * @see  resources/views/components/ui/modal-deshabilitar.blade.php
  *
  * @changelog
- * - 2026-09-24  [T1]  feat: creación inicial del componente.
+ * - 2026-09-24  [Diego Tejerina]  feat: creación inicial del componente.
+ * - 2026-09-26  [Alisson D. Alvarado]        feat: integración de lógica de modales para deshabilitar.
  */
 
 namespace App\Livewire\Examenes;
