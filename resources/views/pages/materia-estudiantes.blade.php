@@ -12,16 +12,26 @@
     (Editar / Habilitar / Deshabilitar). Incluye la integración de los modales
     de habilitación e inhabilitación de estudiantes (ambos mock: no hay
     endpoint real detrás todavía, ver @see pages/materia-estudiantes.blade.php).
+    (Editar / Deshabilitar). Incluye la integración del modal de deshabilitación
+    de estudiantes y el buscador que decide su modo por el primer caracter
+    tecleado: dígitos (hasta 9) busca por código SIS, letras busca por nombre.
+    Ese criterio y sus constantes salen de
+    App\Services\Examen\BusquedaEstudianteService; lo que la vista agrega es
+    filtrar las filas en el navegador y avisar cuando no hay coincidencias.
 
     @changelog
     - 2026-09-25  [OchoaCesar]  feat: creación inicial de la vista.
     - 2026-09-26  [Alisson D. Alvarado]  feat: conexión del modal de deshabilitar estudiantes.
     - 2026-09-26  [Diego Tejerina]  feat: conexión del modal de habilitar estudiantes (#25).
 
+    - 2026-09-26  [Alisson D. Alvarado]  feat: buscador por código SIS (9 dígitos) o por
+      nombre según el primer caracter; las filas se filtran en el navegador.
     @see  pages/materias.blade.php
     @see  pages/monitoreo.blade.php
+    @see  resources/views/components/ui/table.blade.php
     @see  resources/views/components/ui/modal-deshabilitar.blade.php
     @see  resources/views/components/ui/modal-habilitar.blade.php
+    @see  resources/views/partials/busqueda-estudiante.blade.php
 --}}
 
 @php
@@ -48,6 +58,39 @@
         . ($estado === 'Deshabilitado'
             ? '<button type="button" @click="abrirModalHabilitar(\'' . e($nombreEstudiante) . '\', \'' . e($sisEstudiante) . '\')" class="font-medium text-fg-brand hover:underline bg-transparent border-0 cursor-pointer p-0 text-sm">Habilitar</button>'
             : '<button type="button" @click="abrirModalDeshabilitar(\'' . e($nombreEstudiante) . '\', \'' . e($sisEstudiante) . '\')" class="font-medium text-fg-danger hover:underline bg-transparent border-0 cursor-pointer p-0 text-sm">Deshabilitar</button>');
+
+   
+    $estudiantes = [
+        ['nombre' => 'Ana López', 'sis' => '202201013', 'hora' => '08:12', 'registro' => 'Doc. Mariana G.', 'estado' => 'Habilitado', 'motivo' => '—'],
+        ['nombre' => 'Bruno Díaz', 'sis' => '202101022', 'hora' => '08:20', 'registro' => 'Aux. Jorge S.', 'estado' => 'Sospechoso', 'motivo' => '—'],
+        ['nombre' => 'Carla Ruiz', 'sis' => '202201031', 'hora' => '—', 'registro' => '—', 'estado' => 'Pendiente', 'motivo' => '—'],
+        ['nombre' => 'Diego Soto', 'sis' => '202202045', 'hora' => '—', 'registro' => '—', 'estado' => 'Ausente', 'motivo' => '—'],
+        ['nombre' => 'Ernesto Vera', 'sis' => '202002107', 'hora' => '07:58', 'registro' => 'Doc. Mariana G.', 'estado' => 'Tramposo', 'motivo' => 'Suplantación de identidad'],
+        ['nombre' => 'Fátima Quispe', 'sis' => '202201056', 'hora' => '08:05', 'registro' => 'Aux. Jorge S.', 'estado' => 'Deshabilitado', 'motivo' => 'No cumple requisitos'],
+    ];
+
+    $filas = array_map(
+        fn (array $estudiante): array => [
+            '__xShow' => 'coincideEstudiante('
+                . json_encode($estudiante['nombre'], JSON_UNESCAPED_UNICODE)
+                . ', ' . json_encode($estudiante['sis']) . ')',
+            ['heading' => true, 'value' => $estudiante['nombre']],
+            $estudiante['sis'],
+            $estudiante['hora'],
+            $estudiante['registro'],
+            ['html' => $estadoBadge($estudiante['estado'])],
+            $estudiante['motivo'],
+            ['html' => $acciones($estudiante['nombre'], $estudiante['sis'], $estudiante['estado'])],
+        ],
+        $estudiantes
+    );
+    $estudiantesBusqueda = array_map(
+        fn (array $estudiante): array => [
+            'nombre' => $estudiante['nombre'],
+            'sis' => $estudiante['sis'],
+        ],
+        $estudiantes
+    );
 @endphp
 
 @extends('layouts.app')
@@ -111,6 +154,8 @@
 
     <div
         x-data="{
+            @include('partials.busqueda-estudiante')
+            estudiantesBusqueda: {{ Illuminate\Support\Js::from($estudiantesBusqueda) }},
             tab: 'estudiantes',
             modalAbierto: false,
             nombre: '',
@@ -184,7 +229,17 @@
         <section x-show="tab === 'estudiantes'" x-cloak class="mt-6 bg-neutral-primary-soft border border-default rounded-base shadow-xs p-6">
             <div class="flex flex-wrap items-center justify-between gap-4">
                 <div class="w-full sm:max-w-md">
-                    <x-ui.search-input placeholder="Buscar por nombre o código SIS..." :show-button="false" />
+                    {{-- El buscador delega el sanitizeo en Alpine: se reescribe
+                         el valor del input con lo permitido por el modo activo
+                         (9 digitos para el código SIS, letras y espacios para el
+                         nombre) y se guarda en `busqueda` para filtrar las filas.
+                         El modo lo decide BusquedaEstudianteService. --}}
+                    <x-ui.search-input
+                        placeholder="Buscar por nombre o código SIS..."
+                        :show-button="false"
+                        @input="$event.target.value = sanitizarBusqueda($event.target.value); busqueda = $event.target.value"
+                        x-bind:maxlength="maximoBusqueda()"
+                    />
                 </div>
 
                 <div class="flex flex-wrap gap-2">
@@ -198,17 +253,14 @@
 
             <h2 class="mt-6 text-lg font-semibold text-heading">Registro de ingresos</h2>
 
+            <x-ui.alert x-show="sinResultados()" x-cloak title="Sin resultados" class="mt-4">
+                Ningún estudiante coincide con la búsqueda.
+            </x-ui.alert>
+
             <div class="mt-4">
                 <x-ui.table
                     :headers="['Estudiante', 'Código SIS', 'Hora', 'Registro', 'Estado', 'Motivo', 'Acciones']"
-                    :rows="[
-                        [['heading' => true, 'value' => 'Ana López'], '202201013', '08:12', 'Doc. Mariana G.', ['html' => $estadoBadge('Habilitado')], '—', ['html' => $acciones('Ana López', '202201013', 'Habilitado')]],
-                        [['heading' => true, 'value' => 'Bruno Díaz'], '202101022', '08:20', 'Aux. Jorge S.', ['html' => $estadoBadge('Sospechoso')], '—', ['html' => $acciones('Bruno Díaz', '202101022', 'Sospechoso')]],
-                        [['heading' => true, 'value' => 'Carla Ruiz'], '202201031', '—', '—', ['html' => $estadoBadge('Pendiente')], '—', ['html' => $acciones('Carla Ruiz', '202201031', 'Pendiente')]],
-                        [['heading' => true, 'value' => 'Diego Soto'], '202202045', '—', '—', ['html' => $estadoBadge('Ausente')], '—', ['html' => $acciones('Diego Soto', '202202045', 'Ausente')]],
-                        [['heading' => true, 'value' => 'Ernesto Vera'], '202002107', '07:58', 'Doc. Mariana G.', ['html' => $estadoBadge('Tramposo')], 'Suplantación de identidad', ['html' => $acciones('Ernesto Vera', '202002107', 'Tramposo')]],
-                        [['heading' => true, 'value' => 'Fátima Quispe'], '202201056', '08:05', 'Aux. Jorge S.', ['html' => $estadoBadge('Deshabilitado')], 'No cumple requisitos', ['html' => $acciones('Fátima Quispe', '202201056', 'Deshabilitado')]],
-                    ]"
+                    :rows="$filas"
                 />
             </div>
 

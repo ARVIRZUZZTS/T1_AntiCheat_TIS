@@ -2,7 +2,7 @@
     @file    table.blade.php
     @author  David E. Chavez T. <virzuzz12345@gmail.com>
     @created 2026-09-23
-    @updated 2026-09-23
+    @updated 2026-09-26
 
     @description
     Tabla de datos con encabezados y filas. $headers es un arreglo de
@@ -10,8 +10,17 @@
     o ['heading' => true, 'value' => ...] para la columna de cabecera
     de la fila, o ['html' => ...] para contenido HTML (badges, botones).
     Una fila puede traer la clave '__rowClass' => 'clases-tailwind' para
-    pintar el fondo de esa fila completa (se ignora al renderizar celdas).
-    Con $compact, las filas bajan de py-4 a py-2.5 (~44px de alto).
+    pintar el fondo de esa fila completa, y '__xShow' => 'expresion-alpine'
+    para ocultar la fila según el estado del formulario (se ignora al
+    renderizar celdas). Con $compact, las filas bajan de py-4 a py-2.5
+    (~44px de alto).
+
+    @changelog
+    - 2026-09-23  [David E. Chavez T.]  feat: creación inicial del componente.
+    - 2026-09-26  [Alisson D. Alvarado] feat: soporte de visibilidad por fila
+      con la clave '__xShow' (misma convención '__' que '__rowClass').
+
+    @see  resources/views/pages/materia-estudiantes.blade.php
 --}}
 
 @props([
@@ -35,13 +44,16 @@
         </thead>
         <tbody>
             @foreach ($rows as $row)
-                @php($rowClass = is_array($row) ? ($row['__rowClass'] ?? null) : null)
+                @php
+                    $rowClass = is_array($row) ? ($row['__rowClass'] ?? null) : null;
+                    $rowXShow = is_array($row) ? ($row['__xShow'] ?? null) : null;
+                @endphp
                 <tr @class([
                     $loop->last ? 'bg-neutral-primary' : 'bg-neutral-primary border-b border-default',
                     $rowClass => $rowClass,
-                ])>
+                ]) @if ($rowXShow !== null) x-show="{{ $rowXShow }}" @endif>
                     @foreach ($row as $key => $cell)
-                        @continue($key === '__rowClass')
+                        @continue(in_array($key, ['__rowClass', '__xShow'], true))
                         @if (is_array($cell) && ! empty($cell['html']))
                             <td class="{{ $cellPad }}">{!! $cell['html'] !!}</td>
                         @elseif (is_array($cell) && ! empty($cell['heading']))

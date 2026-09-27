@@ -16,6 +16,11 @@
  * equivocada). Soporta filtro por estado, búsqueda por nombre o código SIS y
  * paginación en la base. Es de solo lectura: nunca modifica estados.
  *
+ * El criterio de la búsqueda (qué se busca según el primer caracter del
+ * término) ya no está en este servicio: lo aporta
+ * {@see BusquedaEstudianteService}, que es su única fuente.
+ *
+ * @see  App\Services\Examen\BusquedaEstudianteService
  * @see  App\Http\Controllers\Api\EstudianteExamenController
  * @see  App\Livewire\Examenes\EstudiantesCurso
  *
@@ -23,6 +28,9 @@
  * - 2026-09-24  [T1]  feat: creación inicial del servicio.
  * - 2026-09-25  [T1]  fix: permitir espacios en validarBusqueda para poder
  *   buscar por nombre y apellido juntos.
+ * - 2026-09-26  [Alisson D. Alvarado]  refactor: delegar el criterio de la
+ *   búsqueda a BusquedaEstudianteService; ahora un término que empieza con un
+ *   dígito busca solo por código SIS y uno que empieza con letra solo por nombre.
  */
 
 namespace App\Services\Examen;
@@ -63,6 +71,19 @@ class ListarEstudiantesCursoConEstadoService
     private const POR_PAGINA_DEFAULT = 10;
 
     /**
+     * Criterio de búsqueda (modo, saneo, validación y predicado SQL).
+     */
+    private readonly BusquedaEstudianteService $busqueda;
+
+    /**
+     * @param  BusquedaEstudianteService|null  $busqueda
+     */
+    public function __construct(?BusquedaEstudianteService $busqueda = null)
+    {
+        $this->busqueda = $busqueda ?? app(BusquedaEstudianteService::class);
+    }
+
+    /**
      * Lista paginada de estudiantes del curso con su estado en el examen actual.
      *
      * @param  int  $idCurso  ID del curso.
@@ -81,7 +102,6 @@ class ListarEstudiantesCursoConEstadoService
         int $pagina = 1,
         int $porPagina = self::POR_PAGINA_DEFAULT,
     ): LengthAwarePaginator {
-        $this->validarBusqueda($busqueda);
         $filtro = $this->normalizarFiltro($filtroEstado);
 
         $curso = Curso::findOrFail($idCurso);
@@ -90,18 +110,7 @@ class ListarEstudiantesCursoConEstadoService
         $query = $curso->estudiantes()
             ->with(['estudianteExamenes', 'registrosAsistencia.centralRiesgos']);
 
-        if ($busqueda !== null && $busqueda !== '') {
-            $query->where(function (Builder $q) use ($busqueda) {
-                $q->where('estudiante.nombre_estudiante', 'ilike', "%{$busqueda}%")
-                    ->orWhere('estudiante.apellido_estudiante', 'ilike', "%{$busqueda}%")
-                    ->orWhere('estudiante.sis_estudiante', 'ilike', "%{$busqueda}%")
-                    // nombre y apellido concatenados, para buscar "Nombre Apellido" junto
-                    ->orWhereRaw(
-                        "estudiante.nombre_estudiante || ' ' || estudiante.apellido_estudiante ilike ?",
-                        ["%{$busqueda}%"]
-                    );
-            });
-        }
+        $this->busqueda->aplicar($query, $busqueda);
 
         $idExamen = $examen?->id_examen;
         $this->aplicarFiltro($query, $filtro, $idExamen);
@@ -142,25 +151,6 @@ class ListarEstudiantesCursoConEstadoService
             self::FILTRO_SOSPECHOSOS => $this->contarInfraccion($curso, $idExamen, TipoInfraccion::Sospechoso->value),
             self::FILTRO_TRAMPOSOS => $this->contarInfraccion($curso, $idExamen, TipoInfraccion::Tramposo->value),
         ];
-    }
-
-    /**
-     * Valida que la búsqueda solo contenga letras (castellano), dígitos o
-     * espacios (para permitir buscar por nombre y apellido juntos).
-     *
-     * @param  ?string  $busqueda  Texto a validar.
-     *
-     * @throws InvalidArgumentException Si contiene caracteres no permitidos.
-     */
-    public function validarBusqueda(?string $busqueda): void
-    {
-        if ($busqueda === null || $busqueda === '') {
-            return;
-        }
-
-        if (preg_match('/^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9 ]+$/u', $busqueda) !== 1) {
-            throw new InvalidArgumentException('Caracter no permitido (A-z, 0-9, espacio)');
-        }
     }
 
     /**
