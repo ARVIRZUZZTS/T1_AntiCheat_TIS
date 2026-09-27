@@ -195,8 +195,10 @@ class CambiarEstadoEstudianteTest extends TestCase
 
         Livewire::test(EstudiantesCurso::class, ['curso' => $this->curso()])
             ->call('abrirModalHabilitar', self::SIS)
+            ->assertSet('tipoModal', 'habilitar')
             ->call('confirmarHabilitar')
-            ->assertSet('sisModalAbierto', null);
+            ->assertSet('sisModalAbierto', null)
+            ->assertSet('mensajeExito', 'Estudiante habilitado correctamente.');
 
         $registro = $this->registro();
         $this->assertSame('habilitado', $registro->estado->value);
@@ -337,7 +339,8 @@ class CambiarEstadoEstudianteTest extends TestCase
         Livewire::test(EstudiantesCurso::class, ['curso' => $this->cursoSinExamen()])
             ->call('abrirModalHabilitar', self::SIS)
             ->call('confirmarHabilitar')
-            ->assertSet('mensajeErrorModal', 'El curso no tiene un examen actual');
+            ->assertSet('mensajeErrorModal', 'El curso no tiene un examen actual')
+            ->assertSet('mensajeExito', '');
     }
 
     public function test_inhabilitar_sin_examen_actual_muestra_error(): void
