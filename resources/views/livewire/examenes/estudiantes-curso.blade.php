@@ -10,13 +10,17 @@
     contadores y tabla de estudiantes con su estado de habilitación y
     observaciones de la central de riesgos. Incluye la integración del
     modal de deshabilitación de estudiantes.
-
     @changelog
     - 2026-09-24  [Diego Tejerina]  feat: creación inicial del componente.
     - 2026-09-25  [Diego Tejerina]  refactor: ajustes en la paginación y diseño responsivo.
     - 2026-09-26  [Alisson D. Alvarado]  feat: conexión del modal de deshabilitar estudiantes.
+    - 2026-09-26  [Alisson D. Alvarado]  feat: el buscador adopta el parcial
+      resources/views/partials/busqueda-estudiante.blade.php para sanear la entrada
+      según el modo, compartido con la vista mock.
+
     @see  App\Livewire\Examenes\EstudiantesCurso
     @see  resources/views/components/ui/modal-deshabilitar.blade.php
+    @see  resources/views/partials/busqueda-estudiante.blade.php
 --}}
 
 @php
@@ -141,7 +145,7 @@
         : '';
 @endphp
 
-<div class="flex flex-col lg:h-full lg:overflow-hidden">
+<div class="flex flex-col lg:h-full lg:overflow-hidden" x-data="@include('partials.busqueda-estudiante')">
     {{-- Encabezado --}}
     <div class="shrink-0 flex items-start sm:items-center justify-between gap-3 px-4 sm:px-6 pb-4 border-b border-default bg-neutral-primary-soft" style="padding-top: max(1rem, env(safe-area-inset-top));">
         <div class="flex items-center gap-3 min-w-0">
@@ -174,6 +178,8 @@
                     pill
                     wire:model.lazy="busqueda"
                     wireSubmit="buscar"
+                    @input="$event.target.value = sanitizarBusqueda($event.target.value)"
+                    x-bind:maxlength="maximoBusqueda()"
                 />
             </div>
 
