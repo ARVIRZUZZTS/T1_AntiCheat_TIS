@@ -19,6 +19,9 @@ Route::view('/reportes', 'pages.reportes')->name('reportes');
 Route::get('/cursos/{curso}/estudiantes/estado', EstudiantesCurso::class)
     ->name('cursos.estudiantes.estado');
 
+Route::get('/materias/{materia}', fn (string $codigo) => view('pages.materia-estudiantes', ['codigo' => $codigo]))
+    ->name('materias.detalle');
+
 // TODO(@valerydariana98, 2026-09-25): proteger con el middleware de rol que
 // restringe el registro de incidencias a docentes y auxiliares (#69).
 Route::get('/registrar-incidencia', RegistrarIncidencia::class)->name('registrar-incidencia');
