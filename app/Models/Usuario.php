@@ -3,46 +3,30 @@
 /**
  * @file    Usuario.php
  *
-<<<<<<< HEAD
  * @author  OchoaCesar <cesareduardonick@gmail.com>
  *
  * @created 2026-09-25
  *
- * @updated 2026-09-25
+ * @updated 2026-09-26
  *
  * @description
- * Modelo Eloquent de la tabla `usuario`. Representa a un usuario del sistema
- * (docente o auxiliar) y permite acceder a los registros de asistencia que
- * realizó como registrador.
+ * Modelo Eloquent de la tabla `usuario`: mapea docentes y auxiliares del
+ * sistema, con sus roles (para el control de permisos) y los registros de
+ * asistencia que realizó como registrador.
  *
  * @changelog
- * - 2026-09-25  [OchoaCesar]  feat:  creación inicial del modelo.
+ * - 2026-09-25  [OchoaCesar]    feat: creación inicial del modelo.
+ * - 2026-09-26  [Diego Tejerina] feat: anotaciones @property y relación roles().
  *
+ * @see  Rol
  * @see  RegistroAsistencia
-=======
- * @author  Diego Tejerina <josediegotejerinamolina@gmail.com>
- *
- * @created 2026-09-24
- *
- * @updated 2026-09-24
- *
- * @description
- * Modelo de la tabla `usuario`: mapea docentes y auxiliares del sistema con
- * sus roles (sirve para el control de permisos por rol).
- *
- * @changelog
- * - 2026-09-24  [T1]  feat: creación inicial del modelo.
->>>>>>> 62d652c84c74e17637946104814b5ef94b449701
  */
 
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-<<<<<<< HEAD
-use Illuminate\Database\Eloquent\Relations\HasMany;
-
-=======
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * @property int $id_usuario
@@ -51,7 +35,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
  * @property string $nombre_usuario
  * @property string $apellido
  */
->>>>>>> 62d652c84c74e17637946104814b5ef94b449701
 class Usuario extends Model
 {
     protected $table = 'usuario';
@@ -60,13 +43,10 @@ class Usuario extends Model
 
     public $timestamps = false;
 
-<<<<<<< HEAD
-=======
     public $incrementing = false;
 
     protected $keyType = 'int';
 
->>>>>>> 62d652c84c74e17637946104814b5ef94b449701
     protected $fillable = [
         'id_usuario',
         'cod_sis',
@@ -75,11 +55,6 @@ class Usuario extends Model
         'apellido',
     ];
 
-<<<<<<< HEAD
-    public function registrosAsistencia(): HasMany
-    {
-        return $this->hasMany(RegistroAsistencia::class, 'id_registrador');
-=======
     /** @return BelongsToMany<Rol, $this> */
     public function roles(): BelongsToMany
     {
@@ -89,6 +64,11 @@ class Usuario extends Model
             'id_usuario',
             'id_rol'
         );
->>>>>>> 62d652c84c74e17637946104814b5ef94b449701
+    }
+
+    /** @return HasMany<RegistroAsistencia, $this> */
+    public function registrosAsistencia(): HasMany
+    {
+        return $this->hasMany(RegistroAsistencia::class, 'id_registrador');
     }
 }

@@ -33,6 +33,7 @@
 
 namespace App\Services\Monitoreo;
 
+use App\Enums\EstadoEstudianteExamen;
 use App\Models\EstudianteExamen;
 use App\Models\Examen;
 use App\Models\RegistroAsistencia;
@@ -86,7 +87,7 @@ class GenerarReporteAsistenciaService
 
     private function resolverAsistencia(EstudianteExamen $inscripcion, ?RegistroAsistencia $registro, Carbon $ahora, Carbon $inicio, Carbon $fin): array
     {
-        $observacion = $inscripcion->estado === 'deshabilitado' ? 'deshabilitado' : 'habilitado';
+        $observacion = $inscripcion->estado === EstadoEstudianteExamen::Deshabilitado ? 'deshabilitado' : 'habilitado';
 
         if ($ahora->lt($inicio)) {
             return ['ausente', $observacion];
