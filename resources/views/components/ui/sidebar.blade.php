@@ -15,7 +15,7 @@
 
     @changelog
     - 2026-09-24  [Valery D. Ortuno P.]  feat:  creaciA3n inicial del componente.
-    - 2026-09-25  [OchoaCesar]  feat:  el A-tem activo tambiA(C)n se resalta en
+    - 2026-09-25  [OchoaCesar]  feat:  el item activo tambien se resalta en
                                         rutas hijas (routeName.*) para vistas de detalle.
 --}}
 

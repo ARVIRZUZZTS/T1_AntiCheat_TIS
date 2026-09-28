@@ -7,13 +7,12 @@
     @description
     Vista de detalle de una materia (vista mock): muestra las cards resumen y
     las pestañas Estudiantes / Habilitación / Exámenes / Auxiliares. La
-    pestaña Estudiantes (principal) es una calca de pages/monitoreo[.blade].php
-    con la columna "Registrar" reemplazada por "Motivo" y "Acciones"
+    pestaña Estudiantes presenta la tabla de estudiantes
+    con las columna de "Motivo" y "Acciones"
     (Editar / Deshabilitar). Todo con datos mockeados hasta que existan los
     endpoints correspondientes.
 
     @see  pages/materias.blade.php
-    @see  pages/monitoreo.blade.php
 --}}
 
 @php
