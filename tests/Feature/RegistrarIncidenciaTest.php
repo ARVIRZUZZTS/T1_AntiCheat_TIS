@@ -50,6 +50,10 @@
  *   merge: `sis_estudiante`, `id_examen` y el enum `motivo`; la materia del
  *   examen del monitor, el rechazo de un SIS que no está en la base y el resumen
  *   con el número del registro (#70).
+ * - 2026-09-28  [Valery D. Ortuno P]  feat: pruebas del aviso de codigo SIS
+ *   duplicado escrito a mano, con la excepcion del estudiante precargado del
+ *   monitor y del elegido con la lupa. La prueba de la semilla ahora precarga
+ *   tambien `sisPrecargado`, como hace mount() con lo que llega por la URL.
  */
 
 namespace Tests\Feature;
@@ -579,11 +583,15 @@ class RegistrarIncidenciaTest extends TestCase
         $this->assertGreaterThan(0, $estudiantes->count(), 'La semilla debe traer estudiantes de prueba.');
 
         foreach ($estudiantes as $estudiante) {
+            /* El monitor precarga el codigo SIS por la URL, y mount() guarda
+               ese mismo valor en `sisPrecargado` para distinguirlo de lo que se
+               escribe a mano; hay que setear los dos, como hace el monitor. */
             $componente = Livewire::test(RegistrarIncidencia::class)
                 ->set('origen', RegistrarIncidencia::ORIGEN_MONITOREO)
                 ->set('nombreEstudiante', $estudiante->nombre_estudiante)
                 ->set('apellidoEstudiante', $estudiante->apellido_estudiante)
                 ->set('codigoSis', $estudiante->sis_estudiante)
+                ->set('sisPrecargado', $estudiante->sis_estudiante)
                 ->set('materia', self::MATERIA_EJEMPLO)
                 ->set('tipoIncidencia', Motivo::IntentoDeIngresoNoAutorizado->value)
                 ->call('registrar');
@@ -1063,6 +1071,96 @@ class RegistrarIncidenciaTest extends TestCase
         foreach ($patrones as $patron => $existe) {
             $this->assertTrue($existe, 'La semilla no tiene ningun estudiante con el patron: '.$patron);
         }
+    }
+
+    /**
+     * Verifica que se avise cuando el codigo SIS escrito a mano corresponde a un
+     * estudiante que ya estaba ingresado.
+     */
+    public function test_avisa_si_el_codigo_sis_escrito_a_ya_esta_ingresado(): void
+    {
+        $ingresado = $this->estudianteDeLaSemilla();
+
+        Livewire::test(RegistrarIncidencia::class)
+            ->set('nombreEstudiante', $ingresado->nombre_estudiante)
+            ->set('apellidoEstudiante', $ingresado->apellido_estudiante)
+            ->set('codigoSis', $ingresado->sis_estudiante)
+            ->set('materia', self::MATERIA_EJEMPLO)
+            ->set('tipoIncidencia', Motivo::CopiaOIntercambioDeRespuestas->value)
+            ->call('registrar')
+            ->assertHasErrors('codigoSis')
+            ->assertSee('Ese código SIS ya está registrado', escape: false);
+    }
+
+    /**
+     * Verifica que no se avise cuando el codigo SIS escrito a mano todavia no
+     * esta en la base: es el caso legitimo de reportar a un alumno nuevo.
+     */
+    public function test_no_avisa_si_el_codigo_sis_escrito_a_no_esta_ingresado(): void
+    {
+        Livewire::test(RegistrarIncidencia::class)
+            ->set('nombreEstudiante', self::NOMBRE)
+            ->set('apellidoEstudiante', self::APELLIDO)
+            ->set('codigoSis', self::SIS_INEXISTENTE)
+            ->set('materia', self::MATERIA_EJEMPLO)
+            ->set('tipoIncidencia', Motivo::CopiaOIntercambioDeRespuestas->value)
+            ->call('registrar')
+            ->assertHasNoErrors();
+    }
+
+    /**
+     * Verifica que el estudiante que llega precargado desde el monitor no se
+     * bloquee: ese SIS ya esta en la base, pero no lo escribio la persona, asi
+     * que el aviso de duplicado no aplica.
+     */
+    public function test_no_avisa_con_el_estudiante_precargado_del_monitor(): void
+    {
+        $ingresado = $this->estudianteDeLaSemilla();
+
+        Livewire::withQueryParams([
+            'origen' => RegistrarIncidencia::ORIGEN_MONITOREO,
+            'nombre' => $ingresado->nombre_estudiante.' '.$ingresado->apellido_estudiante,
+            'sis' => $ingresado->sis_estudiante,
+            'materia' => self::MATERIA_EJEMPLO,
+            'rol' => Rol::NOMBRE_DOCENTE,
+        ])
+            ->test(RegistrarIncidencia::class)
+            ->set('tipoIncidencia', Motivo::CopiaOIntercambioDeRespuestas->value)
+            ->call('registrar')
+            ->assertHasNoErrors();
+    }
+
+    /**
+     * Verifica lo mismo para el estudiante elegido con la lupa, que es la via
+     * que el propio aviso le indica al usuario para resolver el duplicado.
+     */
+    public function test_no_avisa_con_el_estudiante_elegido_con_la_lupa(): void
+    {
+        $ingresado = $this->estudianteDeLaSemilla();
+
+        Livewire::test(RegistrarIncidencia::class)
+            ->set('busqueda', $ingresado->nombre_estudiante)
+            ->call('buscarEstudiantes')
+            ->call('seleccionarEstudiante', $ingresado->sis_estudiante)
+            ->set('materia', self::MATERIA_EJEMPLO)
+            ->set('tipoIncidencia', Motivo::CopiaOIntercambioDeRespuestas->value)
+            ->call('registrar')
+            ->assertHasNoErrors();
+    }
+
+    /**
+     * Un estudiante de la semilla, excluyendo el rango 900000+ de los tests.
+     */
+    private function estudianteDeLaSemilla(): Estudiante
+    {
+        $estudiante = Estudiante::query()
+            ->where('sis_estudiante', 'not like', '9%')
+            ->orderBy('sis_estudiante')
+            ->first();
+
+        $this->assertNotNull($estudiante, 'La semilla debe traer estudiantes de prueba.');
+
+        return $estudiante;
     }
 
     /**

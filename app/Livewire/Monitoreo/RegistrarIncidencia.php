@@ -35,6 +35,9 @@
  *   ser editables para poder registrar a un estudiante que no esté en la base,
  *   con validación de solo letras para el nombre y el apellido y de 9 dígitos
  *   para el código SIS (#66).
+ * - 2026-09-28  [Valery D. Ortuno P]  feat: aviso de código SIS duplicado cuando
+ *   el campo se escribe a mano, comparando contra el valor precargado desde el
+ *   monitor o elegido con la lupa para no bloquear esos dos caminos.
  * - 2026-09-28  [Valery D. Ortuno P]  fix: mensajes de validación propios para
  *   cada campo, porque la aplicación está en inglés y Laravel respondía "The
  *   nombre field is required" (#66).
@@ -224,6 +227,17 @@ class RegistrarIncidencia extends Component
      * @var string
      */
     public string $codigoSis = '';
+
+    /**
+     * Código SIS con el que se precargó el campo, para distinguir lo que llega de
+     * una fuente confiable de lo que la persona escribe a mano.
+     *
+     * Es público a propósito: si fuera privado, Livewire lo reiniciaría a vacío en
+     * cada petición posterior y se perdería la diferencia con el valor original.
+     *
+     * @var string
+     */
+    public string $sisPrecargado = '';
  
     /**
      * Materia del examen en el que se observa la anomalía, precargada desde el
@@ -307,6 +321,7 @@ class RegistrarIncidencia extends Component
         $this->nombreEstudiante = $nombre;
         $this->apellidoEstudiante = $apellido;
         $this->codigoSis = (string) request()->query('sis', '');
+        $this->sisPrecargado = $this->codigoSis;
         $this->materia = (string) request()->query('materia', '');
     }
 
@@ -551,6 +566,7 @@ class RegistrarIncidencia extends Component
         }
 
         $this->codigoSis = $estudiante->sis_estudiante;
+        $this->sisPrecargado = $estudiante->sis_estudiante;
         $this->nombreEstudiante = $estudiante->nombre_estudiante;
         $this->apellidoEstudiante = $estudiante->apellido_estudiante;
         $this->busqueda = '';
@@ -601,6 +617,31 @@ class RegistrarIncidencia extends Component
                 'max:'.self::DESCRIPCION_MAXIMO,
             ],
         ];
+    }
+
+    /**
+     * Reglas del código SIS, con el aviso de duplicado cuando el valor se
+     * escribió a mano.
+     *
+     * El aviso aplica solo a lo que la persona teclea. El estudiante que llega
+     * precargado desde el monitor y el que se elige con la lupa ya están
+     * ingresados en la base, así que se compara el valor actual contra el
+     * precargado y el duplicado se busca únicamente cuando difieren.
+     *
+     * @return array<int, mixed>  Reglas de validación del código SIS.
+     *
+     * @author Valery D. Ortuno P. <valerydariana98@gmail.com>
+     * @since  2026-09-28
+     */
+    private function reglasCodigoSis(): array
+    {
+        $reglas = ['required', 'digits:9'];
+
+        if ($this->codigoSis !== $this->sisPrecargado) {
+            $reglas[] = Rule::unique('estudiante', 'sis_estudiante');
+        }
+
+        return $reglas;
     }
 
     /**
