@@ -1,3 +1,16 @@
+{{--
+    @file    materias.blade.php
+    @author  David E. Chavez T. <virzuzz12345@gmail.com>
+    @created 2026-09-29
+    @updated 2026-09-29
+
+    @description
+    Vista de gestión de materias. Muestra la lista de materias con sus secciones.
+
+    @changelog
+    - 2026-09-29  [David E. Chavez T.]  feat: vista de materias.
+--}}
+
 @extends('layouts.app')
 
 @section('title', 'Materias')
@@ -8,7 +21,7 @@
         <code class="text-fg-brand">/materias</code>.
     </p>
 
-    <div class="mt-6">
+    <div class="mt-6 px-[2vh]">
         <x-ui.card title="Materias (mock)">
             <ul class="divide-y divide-default">
                 @foreach ([

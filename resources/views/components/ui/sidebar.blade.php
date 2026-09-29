@@ -61,7 +61,7 @@
     </div>
 @endif
 
-<aside id="{{ $id }}" class="fixed top-0 left-0 z-40 h-full w-72 lg:w-[15%] bg-surface-sidebar text-neutral-primary transition-transform -translate-x-full lg:translate-x-0" aria-label="Sidebar">
+<aside id="{{ $id }}" class="shrink-0 sticky top-0 h-screen w-72 lg:w-[15%] bg-surface-sidebar text-neutral-primary transition-transform -translate-x-full lg:translate-x-0" aria-label="Sidebar">
     <button type="button" data-drawer-hide="{{ $id }}" aria-controls="{{ $id }}"
             class="lg:hidden absolute top-2.5 end-2.5 flex items-center justify-center text-neutral-primary hover:bg-brand-strong rounded-base w-9 h-9">
         <span class="sr-only">Close sidebar</span>

@@ -1,3 +1,16 @@
+{{--
+    @file    central-riesgo.blade.php
+    @author  David E. Chavez T. <virzuzz12345@gmail.com>
+    @created 2026-09-29
+    @updated 2026-09-29
+
+    @description
+    Vista de central de riesgo. Muestra las alertas y casos de riesgo.
+
+    @changelog
+    - 2026-09-29  [David E. Chavez T.]  feat: vista de central de riesgo.
+--}}
+
 @extends('layouts.app')
 
 @section('title', 'Central de riesgo')
@@ -8,7 +21,7 @@
         <code class="text-fg-brand">/central-de-riesgo</code>.
     </p>
 
-    <div class="mt-6">
+    <div class="mt-6 px-[2vh]">
         <x-ui.card title="Alertas de riesgo (mock)">
             <ul class="divide-y divide-default">
                 @foreach ([

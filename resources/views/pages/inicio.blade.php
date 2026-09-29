@@ -1,3 +1,16 @@
+{{--
+    @file    inicio.blade.php
+    @author  David E. Chavez T. <virzuzz12345@gmail.com>
+    @created 2026-09-29
+    @updated 2026-09-29
+
+    @description
+    Vista de inicio del panel. Muestra estadísticas generales y próximos exámenes.
+
+    @changelog
+    - 2026-09-29  [David E. Chavez T.]  feat: vista de inicio.
+--}}
+
 @extends('layouts.app')
 
 @section('title', 'Inicio')
@@ -8,7 +21,7 @@
         (<code class="text-fg-brand">/dashboard/stats</code>, <code class="text-fg-brand">/examenes</code>).
     </p>
 
-    <div class="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <div class="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4 px-[2vh]">
         <div class="bg-neutral-primary-soft p-6 border border-default rounded-base shadow-xs">
             <p class="text-sm text-body">Exámenes programados</p>
             <p class="mt-1 text-3xl font-semibold text-fg-brand">3</p>
@@ -27,7 +40,7 @@
         </div>
     </div>
 
-    <div class="mt-6">
+    <div class="mt-6 px-[2vh]">
         <x-ui.card title="Próximos exámenes (mock)">
             <ul class="divide-y divide-default">
                 @foreach ([
