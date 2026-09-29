@@ -1,8 +1,8 @@
 {{--
     @file    pagination.blade.php
-    @author  OchoaCesar
+    @author  OchoaCesar <cesareduardonick@gmail.com>
     @created 2026-09-23
-    @updated 2026-09-23
+    @updated 2026-09-29
 
     @description
     Paginación de números con anterior/siguiente. Variantes de tamaño
@@ -10,6 +10,10 @@
     (w-9) y large (w-10). Página activa resaltada con marca. Por defecto
     los controles son enlaces; con $interactive se vuelven botones que
     disparan Livewire (método irPagina(número)).
+
+    @changelog
+    - 2026-09-23  [OchoaCesar]  feat: creación inicial del componente UI.
+    - 2026-09-29  [David E. Chavez T.]  fix: agregar @changelog y email del autor.
 --}}
 
 @props([
@@ -44,7 +48,7 @@
                     <svg class="w-4 h-4 rtl:rotate-180" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m15 19-7-7 7-7"/></svg>
                 </button>
             @else
-                <a href="{{ $href ?? '#' }}" class="{{ $btnClass }} rounded-s-base">
+                <a href="{{ $href ?? '#' }}?page={{ $prev }}" class="{{ $btnClass }} rounded-s-base">
                     <span class="sr-only">Previous</span>
                     <svg class="w-4 h-4 rtl:rotate-180" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m15 19-7-7 7-7"/></svg>
                 </a>
@@ -63,7 +67,7 @@
                         {{ $page }}
                     </button>
                 @else
-                    <a href="{{ $href ?? '#' }}"
+                    <a href="{{ $href ?? '#' }}?page={{ $page }}"
                        @class([
                            $btnClass,
                            $activeClass => $page === $current,
@@ -82,7 +86,7 @@
                     <svg class="w-4 h-4 rtl:rotate-180" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m9 5 7 7-7 7"/></svg>
                 </button>
             @else
-                <a href="{{ $href ?? '#' }}" class="{{ $btnClass }} rounded-e-base">
+                <a href="{{ $href ?? '#' }}?page={{ $next }}" class="{{ $btnClass }} rounded-e-base">
                     <span class="sr-only">Next</span>
                     <svg class="w-4 h-4 rtl:rotate-180" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m9 5 7 7-7 7"/></svg>
                 </a>
