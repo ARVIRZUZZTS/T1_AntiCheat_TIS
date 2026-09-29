@@ -2,7 +2,7 @@
     @file    registrar-incidencia.blade.php
     @author  Valery D. Ortuno P. <valerydariana98@gmail.com>
     @created 2026-09-25
-    @updated 2026-09-26
+    @updated 2026-09-28
 
     @description
     Vista del formulario de registro de una incidencia en la central de riesgos.
@@ -15,6 +15,9 @@
     Los campos de solo lectura conservan el fondo gris de fábrica y los
     editables se ponen en blanco, para que se distingan sin textos de ayuda.
 
+    El enlace de la cabecera y el botón de cancelar devuelven a la pantalla desde
+    la que se abrió el formulario: el monitor en vivo o la central de riesgo.
+
     @see  \App\Livewire\Monitoreo\RegistrarIncidencia
 
     @changelog
@@ -22,6 +25,9 @@
     - 2026-09-26  [Valery D. Ortuno P]  feat: buscador de estudiantes, motivos del
       equipo, vista responsive de escritorio y móvil, y estado derivado del rol
       recibido por la URL; se quitan los textos de ayuda de cada campo.
+    - 2026-09-28  [Candy]  feat: el enlace de vuelta sigue a la pantalla desde la
+      que se abrió el formulario, para que al entrar desde la central de riesgo
+      no devuelva al monitor en vivo.
 --}}
 
 @section('title', 'Registrar incidencia')
@@ -32,10 +38,10 @@
 
 <div class="mx-auto w-full max-w-4xl space-y-5 sm:space-y-6">
     <nav aria-label="Ruta de navegación">
-        <a href="{{ route('monitoreo') }}"
+        <a href="{{ $this->rutaVolver }}"
            class="inline-flex items-center gap-1.5 text-sm font-medium text-fg-brand hover:underline">
             <svg class="w-4 h-4" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m15 19-7-7 7-7"/></svg>
-            Volver al monitor en vivo
+            {{ $this->etiquetaVolver }}
         </a>
     </nav>
 

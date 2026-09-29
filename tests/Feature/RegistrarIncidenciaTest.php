@@ -4,12 +4,13 @@
  * @file    RegistrarIncidenciaTest.php
  * @author  Valery D. Ortuno P. <valerydariana98@gmail.com>
  * @created 2026-09-25
- * @updated 2026-09-26
+ * @updated 2026-09-28
  *
  * @description
  * Pruebas del formulario de registro de incidencias: precarga desde el monitor,
- * búsqueda del estudiante en la base de datos, motivos, obligatoriedad de la
- * descripción y estado derivado del rol de quien registra.
+ * entrada en blanco desde la central de riesgo, búsqueda del estudiante en la
+ * base de datos, motivos, obligatoriedad de la descripción y estado derivado
+ * del rol de quien registra.
  *
  * El esquema de estas tablas no tiene migraciones Eloquent (se crea vía
  * docker/postgres/init/001_create_schema.sql), por eso se usa
@@ -27,6 +28,9 @@
  *   cambio de RefreshDatabase a DatabaseTransactions para no borrar el esquema.
  * - 2026-09-26  [Amiddala]  fix: la etiqueta del auxiliar pasa de "En revisión" a
  *   "Sospechoso", para calzar literal con el criterio de aceptación de la #68.
+ * - 2026-09-28  [Candy]  feat: pruebas de la entrada desde la central de riesgo,
+ *   que abre el formulario en blanco, y del enlace de vuelta y el cancelar
+ *   según la pantalla de origen.
  */
 
 namespace Tests\Feature;
@@ -289,6 +293,71 @@ class RegistrarIncidenciaTest extends TestCase
         Livewire::test(RegistrarIncidencia::class)
             ->set('descripcion', $escrito)
             ->assertSee(mb_strlen($escrito).' / 300', escape: false);
+    }
+
+    /**
+     * Verifica que la central de riesgo ofrezca el enlace al formulario de
+     * registro de incidencia y que lo abra sin datos precargados.
+     */
+    public function test_desde_la_central_de_riesgo_el_formulario_se_abre_vacio(): void
+    {
+        $this->get('/central-riesgo')
+            ->assertOk()
+            ->assertSee(route('registrar-incidencia', ['origen' => 'central-riesgo']), escape: false);
+
+        $this->get('/registrar-incidencia?origen=central-riesgo')
+            ->assertOk()
+            ->assertSee('Volver a la central de riesgo')
+            ->assertDontSee('Ana López');
+
+        Livewire::withQueryParams(['origen' => 'central-riesgo'])
+            ->test(RegistrarIncidencia::class)
+            ->assertSet('origen', RegistrarIncidencia::ORIGEN_CENTRAL_RIESGO)
+            ->assertSet('nombreEstudiante', '')
+            ->assertSet('codigoSis', '')
+            ->assertSet('materia', '');
+    }
+
+    /**
+     * Verifica que el estudiante y la materia que viajan en la URL se ignoren
+     * cuando el origen no es el monitor: desde la central de riesgo el
+     * estudiante se busca a mano.
+     */
+    public function test_la_central_de_riesgo_no_precarga_el_estudiante_que_viaje_en_la_url(): void
+    {
+        Livewire::withQueryParams([
+            'origen' => 'central-riesgo',
+            'nombre' => 'Ana López',
+            'sis' => '202201013',
+            'materia' => 'Curso de Prueba',
+        ])->test(RegistrarIncidencia::class)
+            ->assertSet('nombreEstudiante', '')
+            ->assertSet('codigoSis', '')
+            ->assertSet('materia', '');
+    }
+
+    /**
+     * Verifica que el enlace de vuelta y el cancelar devuelvan a la central de
+     * riesgo cuando el formulario se abrió desde ahí.
+     */
+    public function test_cancelar_desde_la_central_de_riesgo_regresa_a_la_central(): void
+    {
+        Livewire::test(RegistrarIncidencia::class)
+            ->set('origen', RegistrarIncidencia::ORIGEN_CENTRAL_RIESGO)
+            ->assertSee(route('central-riesgo'), escape: false)
+            ->call('cancelar')
+            ->assertRedirect(route('central-riesgo'));
+    }
+
+    /**
+     * Verifica que sin origen conocido el enlace de vuelta apunte al monitor en
+     * vivo, que es la pantalla desde la que se entra al formulario hoy.
+     */
+    public function test_sin_origen_el_enlace_de_vuelta_apunta_al_monitor(): void
+    {
+        Livewire::test(RegistrarIncidencia::class)
+            ->assertSee('Volver al monitor en vivo')
+            ->assertSee(route('monitoreo'), escape: false);
     }
 
     /**

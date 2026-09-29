@@ -4,13 +4,15 @@
  * @file    RegistrarIncidencia.php
  * @author  Valery D. Ortuno P. <valerydariana98@gmail.com>
  * @created 2026-09-25
- * @updated 2026-09-26
+ * @updated 2026-09-28
  *
  * @description
  * Componente de página con el formulario de registro de una incidencia en la
  * central de riesgos. Precarga el estudiante y la materia que llegan desde el
  * monitor en vivo, permite reemplazarlos con el buscador de estudiantes de la
  * base de datos y deriva el estado del registro del rol de quien lo realiza.
+ * Desde la central de riesgo se abre sin datos precargados y el estudiante se
+ * busca a mano.
  *
  * @changelog
  * - 2026-09-25  [Valery D. Ortuno P]  feat: creación inicial del formulario desktop.
@@ -21,6 +23,10 @@
  *   Rol::DOCENTE` que ya no compila, porque `Rol` pasó de ser un enum a un
  *   modelo Eloquent sin ese caso/constante. Se quita el parámetro y la
  *   asignación duplicada; el rol se sigue leyendo únicamente de la URL (#68).
+ * - 2026-09-28  [Candy]  feat: segunda entrada al formulario, la central de
+ *   riesgo, que abre el formulario en blanco para que la persona busque al
+ *   estudiante; el enlace de vuelta y el cancelar siguen a la pantalla de
+ *   origen.
  */
 
 namespace App\Livewire\Monitoreo;
@@ -88,6 +94,14 @@ class RegistrarIncidencia extends Component
      * @var string
      */
     public const ORIGEN_MONITOREO = 'monitoreo';
+
+    /**
+     * Pantalla desde la que se abrió el formulario sin datos precargados: la
+     * central de riesgo, donde el estudiante se busca a mano.
+     *
+     * @var string
+     */
+    public const ORIGEN_CENTRAL_RIESGO = 'central-riesgo';
 
     /**
      * Motivos de incidencia que se ofrecen en el selector, con el valor que se
@@ -174,10 +188,11 @@ class RegistrarIncidencia extends Component
     /**
      * Precarga el estudiante, la materia y la fecha con lo que llega por la URL.
      *
-     * El monitor es la única entrada por ahora: si no viaja el contexto, el
-     * formulario se abre en blanco para completarlo a mano. El rol también
-     * llega por la URL como texto (uno de `Rol::NOMBRE_*`), porque `Rol` es un
-     * modelo de la tabla `rol` y no un enum con casos fijos.
+     * El monitor es la única entrada que precarga datos: si el origen no es el
+     * monitor —como pasa al entrar desde la central de riesgo— el formulario se
+     * abre en blanco para que la persona busque al estudiante y escriba el
+     * motivo. El rol también llega por la URL como texto (uno de `Rol::NOMBRE_*`),
+     * porque `Rol` es un modelo de la tabla `rol` y no un enum con casos fijos.
      *
      * @author Valery D. Ortuno P. <valerydariana98@gmail.com>
      * @author Amiddala
@@ -197,7 +212,41 @@ class RegistrarIncidencia extends Component
         $this->codigoSis = (string) request()->query('sis', '');
         $this->materia = (string) request()->query('materia', '');
     }
- 
+
+    /**
+     * Pantalla a la que vuelve el formulario, según desde dónde se abrió.
+     *
+     * @return string  URL de la pantalla de origen.
+     *
+     * @author Candy
+     * @since  2026-09-28
+     */
+    #[Computed]
+    public function rutaVolver(): string
+    {
+        return match ($this->origen) {
+            self::ORIGEN_CENTRAL_RIESGO => route('central-riesgo'),
+            default => route('monitoreo'),
+        };
+    }
+
+    /**
+     * Texto del enlace que regresa a la pantalla desde la que se abrió el
+     * formulario.
+     *
+     * @return string  Etiqueta del enlace de vuelta.
+     *
+     * @author Candy
+     * @since  2026-09-28
+     */
+    #[Computed]
+    public function etiquetaVolver(): string
+    {
+        return $this->origen === self::ORIGEN_CENTRAL_RIESGO
+            ? 'Volver a la central de riesgo'
+            : 'Volver al monitor en vivo';
+    }
+
     /**
      * Tipo de infracción con el que se persiste el registro, derivado del rol
      * de quien lo realiza: un docente confirma y un auxiliar deja el caso en
@@ -468,9 +517,9 @@ class RegistrarIncidencia extends Component
     }
  
     /**
-     * Cancela el registro y regresa al monitor en vivo.
+     * Cancela el registro y regresa a la pantalla desde la que se abrió.
      *
-     * @return RedirectResponse  Redirección al monitor o a la pantalla anterior.
+     * @return RedirectResponse  Redirección a la pantalla de origen.
      *
      * @author Valery D. Ortuno P. <valerydariana98@gmail.com>
      * @since  2026-09-25
@@ -479,6 +528,10 @@ class RegistrarIncidencia extends Component
     {
         if ($this->origen === self::ORIGEN_MONITOREO) {
             return redirect()->route('monitoreo');
+        }
+
+        if ($this->origen === self::ORIGEN_CENTRAL_RIESGO) {
+            return redirect()->route('central-riesgo');
         }
 
         return redirect()->back();
