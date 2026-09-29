@@ -18,11 +18,15 @@
             default => '<span class="text-xs font-medium px-1.5 py-0.5 rounded-full bg-status-central-riesgos-bg text-status-central-riesgos-fg">Tramposo</span>',
         };
 
+        /* El monitor sigue una sola materia en curso, por eso la comparten el
+           titulo de la tabla y todos los botones de reporte. */
+        $materiaActual = 'Introduccion a la Programacion';
+
         /* Boton de reporte de una fila: lleva al formulario de registro de
-           incidencias con el estudiante y el rol de quien lo registro, que es
-           el dato que decide si la incidencia queda confirmada o en revision.
-           La materia no viaja porque el monitor no la muestra. */
-        $registrarBtn = function (string $nombre, string $sis, string $registro): string {
+           incidencias con el estudiante, la materia del examen y el rol de
+           quien lo registro, que es el dato que decide si la incidencia queda
+           confirmada o en revision. */
+        $registrarBtn = function (string $nombre, string $sis, string $registro) use ($materiaActual): string {
             $clases = 'inline-flex items-center justify-center box-border border border-transparent focus:ring-4 focus:ring-brand-medium shadow-xs font-medium leading-5 rounded-base focus:outline-none text-white bg-brand hover:bg-brand-strong px-3 py-1.5 text-xs';
 
             return sprintf(
@@ -31,6 +35,7 @@
                     'origen' => 'monitoreo',
                     'nombre' => $nombre,
                     'sis' => $sis,
+                    'materia' => $materiaActual,
                     'rol' => str_starts_with($registro, 'Aux.') ? 'auxiliar' : 'docente',
                 ])),
                 $clases,
@@ -110,7 +115,12 @@
             </div>
         </div>
 
-        <h2 class="mt-6 text-lg font-semibold text-heading">Registro de ingresos</h2>
+        <div class="mt-6 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+            <h2 class="text-lg font-semibold text-heading">Registro de ingresos</h2>
+            <p class="text-sm text-heading">
+                Materia: <span class="font-medium">{{ $materiaActual }}</span>
+            </p>
+        </div>
 
         <div class="mt-4">
             <x-ui.table
