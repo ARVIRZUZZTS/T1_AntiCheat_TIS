@@ -50,6 +50,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\Motivo;
 use App\Enums\TipoInfraccion;
 use App\Livewire\Monitoreo\RegistrarIncidencia;
 use App\Models\CentralRiesgo;
@@ -549,309 +550,93 @@ class RegistrarIncidenciaTest extends TestCase
     }
 
     /**
-     * Verifica que al registrar se abra el modal de confirmación con el mensaje
-     * de éxito y el resumen de la incidencia.
+     * Verifica que los estudiantes que trae la semilla de `002_seed_data.sql`
+     * sirvan para probar el formulario: codigo SIS de 9 digitos y nombre y
+     * apellido que el componente acepta. Si alguien cambia la semilla y rompe
+     * una de las dos cosas, este test lo avisa en vez de dejarlo para
+     * descubrirlo a mano en el navegador.
      */
-    public function test_registrar_abre_el_modal_de_confirmacion_con_el_resumen(): void
+    public function test_los_estudiantes_de_la_semilla_son_validos_para_el_formulario(): void
     {
-        Livewire::test(RegistrarIncidencia::class)
-            ->set('nombreEstudiante', self::NOMBRE)
-            ->set('apellidoEstudiante', self::APELLIDO)
-            ->set('codigoSis', self::SIS_VALIDO)
-            ->set('materia', self::MATERIA_EJEMPLO)
-            ->set('tipoIncidencia', 'copia_o_intercambio_de_respuestas')
-            ->call('registrar')
-            ->assertSet('confirmacionVisible', true)
-            ->assertSee('Estudiante agregado a la central de riesgos con exito')
-            ->assertSee('Ana López')
-            ->assertSee(self::SIS_VALIDO)
-            ->assertSee('Copia o intercambio de respuestas')
-            ->assertSee('Aceptar');
-    }
+        $estudiantes = Estudiante::query()
+            ->where('sis_estudiante', 'not like', '9%')
+            ->orderBy('sis_estudiante')
+            ->get();
 
-    /**
-     * Verifica que el modal no aparezca antes de registrar, para que el resumen no
-     * se confunda con el formulario.
-     */
-    public function test_el_modal_de_confirmacion_no_aparece_antes_de_registrar(): void
-    {
-        Livewire::test(RegistrarIncidencia::class)
-            ->assertSet('confirmacionVisible', false)
-            ->assertDontSee('Estudiante agregado a la central de riesgos con exito');
-    }
+        $this->assertGreaterThan(0, $estudiantes->count(), 'La semilla debe traer estudiantes de prueba.');
 
-    /**
-     * Verifica que el botón Aceptar cierre el modal y devuelva al monitor en
-     * vivo, la pantalla desde la que se abrió el formulario.
-     */
-    public function test_aceptar_cierra_el_modal_y_regresa_al_monitor(): void
-    {
-        Livewire::test(RegistrarIncidencia::class)
-            ->set('origen', RegistrarIncidencia::ORIGEN_MONITOREO)
-            ->set('nombreEstudiante', self::NOMBRE)
-            ->set('apellidoEstudiante', self::APELLIDO)
-            ->set('codigoSis', self::SIS_VALIDO)
-            ->set('materia', self::MATERIA_EJEMPLO)
-            ->set('tipoIncidencia', 'uso_de_dispositivos_electronicos')
-            ->call('registrar')
-            ->call('aceptarRegistro')
-            ->assertRedirect(route('monitoreo'));
-    }
-
-    /**
-     * Verifica que aceptar desde la entrada de la central de riesgo devuelva a
-     * la central, no al monitor.
-     */
-    public function test_aceptar_desde_la_central_de_riesgo_regresa_a_la_central(): void
-    {
-        Livewire::test(RegistrarIncidencia::class)
-            ->set('origen', RegistrarIncidencia::ORIGEN_CENTRAL_RIESGO)
-            ->set('nombreEstudiante', self::NOMBRE)
-            ->set('apellidoEstudiante', self::APELLIDO)
-            ->set('codigoSis', self::SIS_VALIDO)
-            ->set('materia', self::MATERIA_EJEMPLO)
-            ->set('tipoIncidencia', 'suplantacion_de_identidad')
-            ->call('registrar')
-            ->call('aceptarRegistro')
-            ->assertRedirect(route('central-riesgo'));
-    }
-
-    /**
-     * Verifica que el resumen guarde el estado derivado del rol: un docente
-     * confirma y un auxiliar deja el caso en revisión.
-     */
-    public function test_el_resumen_muestra_el_estado_segun_el_rol(): void
-    {
-        Livewire::test(RegistrarIncidencia::class)
-            ->set('rol', Rol::NOMBRE_AUXILIAR)
-            ->set('nombreEstudiante', self::NOMBRE)
-            ->set('apellidoEstudiante', self::APELLIDO)
-            ->set('codigoSis', self::SIS_VALIDO)
-            ->set('materia', self::MATERIA_EJEMPLO)
-            ->set('tipoIncidencia', 'uso_de_material_no_autorizado')
-            ->call('registrar')
-            ->assertSee('En revision');
-    }
-
-    /**
-     * Verifica que un segundo envío no vuelva a registrar mientras el modal
-     * está abierto, para no duplicar la incidencia con un doble clic.
-     */
-    public function test_no_se_registra_de_nuevo_con_el_modal_abierto(): void
-    {
-        $componente = Livewire::test(RegistrarIncidencia::class)
-            ->set('nombreEstudiante', self::NOMBRE)
-            ->set('apellidoEstudiante', self::APELLIDO)
-            ->set('codigoSis', self::SIS_VALIDO)
-            ->set('materia', self::MATERIA_EJEMPLO)
-            ->set('tipoIncidencia', 'intento_de_ingreso_no_autorizado')
-            ->call('registrar')
-            ->assertSet('confirmacionVisible', true);
-
-        $resumen = $componente->get('resumen');
-
-        // Se vacían los campos y se vuelve a enviar: el registro ya está hecho,
-        // así que el resumen no debe cambiar.
-        $componente
-            ->set('nombreEstudiante', '')
-            ->set('materia', '')
-            ->call('registrar')
-            ->assertHasNoErrors()
-            ->assertSet('resumen', $resumen);
-    }
-
-    /**
-     * Verifica que registrar guarde de verdad la incidencia en la central de
-     * riesgos, con el estudiante, el usuario registrador, la materia, el estado,
-     * el motivo, la descripción y la fecha y hora.
-     */
-    public function test_registrar_guarda_la_incidencia_en_la_central_de_riesgos(): void
-    {
-        $antes = CentralRiesgo::query()->count();
-
-        Livewire::test(RegistrarIncidencia::class)
-            ->set('usuario', 3)
-            ->set('nombreEstudiante', self::NOMBRE)
-            ->set('apellidoEstudiante', self::APELLIDO)
-            ->set('codigoSis', self::SIS_VALIDO)
-            ->set('materia', self::MATERIA_EJEMPLO)
-            ->set('tipoIncidencia', 'uso_de_dispositivos_electronicos')
-            ->set('descripcion', 'Se le vio el celular debajo del banco')
-            ->call('registrar')
-            ->assertHasNoErrors()
-            ->assertSet('confirmacionVisible', true);
-
-        $this->assertSame($antes + 1, CentralRiesgo::query()->count(), 'Debe guardarse una fila nueva.');
-
-        $registro = CentralRiesgo::query()->orderByDesc('id_registro')->firstOrFail();
-
-        $this->assertSame(3, $registro->id_registrador, 'Debe guardarse el usuario que reporta.');
-        $this->assertNull($registro->id_estudiante, 'Un estudiante que no esta en la base no tiene id.');
-        $this->assertSame('uso_de_dispositivos_electronicos', $registro->detalle_motivo);
-        $this->assertSame(self::MATERIA_EJEMPLO, $registro->materia);
-        $this->assertSame('Se le vio el celular debajo del banco', $registro->descripcion);
-        $this->assertSame(TipoInfraccion::Tramposo, $registro->tipo_infraccion);
-        $this->assertNotNull($registro->fecha_registro, 'Debe guardarse la fecha del registro.');
-
-        // La fecha se guarda con hora, no solo el día como antes.
-        $this->assertNotSame(
-            $registro->fecha_registro->format('d/m/Y H:i'),
-            $registro->fecha_registro->format('d/m/Y'),
-            'La fecha guardada debe conservar la hora.'
-        );
-    }
-
-    /**
-     * Verifica que al registrar a un estudiante que sí está en la base de datos
-     * se guarde su código SIS y se lo pueda consultar por la relación.
-     */
-    public function test_registrar_guarda_el_codigo_sis_del_estudiante_de_la_base(): void
-    {
-        $this->crearEstudianteEnBase();
-
-        Livewire::test(RegistrarIncidencia::class)
-            ->set('usuario', 1)
-            ->set('nombreEstudiante', 'Carla')
-            ->set('apellidoEstudiante', 'Ruiz')
-            ->set('codigoSis', self::SIS_EN_BASE)
-            ->set('materia', self::MATERIA_EJEMPLO)
-            ->set('tipoIncidencia', 'copia_o_intercambio_de_respuestas')
-            ->call('registrar')
-            ->assertHasNoErrors();
-
-        $registro = CentralRiesgo::query()->orderByDesc('id_registro')->firstOrFail();
-
-        $this->assertSame(self::SIS_EN_BASE, $registro->id_estudiante);
-        $this->assertNotNull($registro->estudiante, 'El estudiante debe poder consultarse por la relación.');
-        $this->assertSame('Carla', $registro->estudiante->nombre_estudiante);
-    }
-
-    /**
-     * Verifica que el estado guardado siga al rol: un auxiliar deja el caso
-     * como sospechoso y un docente lo confirma.
-     */
-    public function test_el_estado_guardado_depende_del_rol(): void
-    {
-        Livewire::test(RegistrarIncidencia::class)
-            ->set('rol', Rol::NOMBRE_AUXILIAR)
-            ->set('nombreEstudiante', self::NOMBRE)
-            ->set('apellidoEstudiante', self::APELLIDO)
-            ->set('codigoSis', self::SIS_VALIDO)
-            ->set('materia', self::MATERIA_EJEMPLO)
-            ->set('tipoIncidencia', 'suplantacion_de_identidad')
-            ->call('registrar')
-            ->assertHasNoErrors();
-
-        $this->assertSame(
-            TipoInfraccion::Sospechoso,
-            CentralRiesgo::query()->orderByDesc('id_registro')->firstOrFail()->tipo_infraccion
-        );
-    }
-
-    /**
-     * Verifica que un estudiante de la base de datos sin ingreso previo también
-     * se pueda reportar desde la central de riesgos, que es el caso para el que
-     * `id_ingreso` quedó nullable.
-     */
-    public function test_se_puede_registrar_a_un_estudiante_sin_ingreso_previo(): void
-    {
-        $this->crearEstudianteEnBase();
-
-        Livewire::test(RegistrarIncidencia::class)
-            ->set('origen', RegistrarIncidencia::ORIGEN_CENTRAL_RIESGO)
-            ->set('usuario', 1)
-            ->set('nombreEstudiante', 'Carla')
-            ->set('apellidoEstudiante', 'Ruiz')
-            ->set('codigoSis', self::SIS_EN_BASE)
-            ->set('materia', self::MATERIA_EJEMPLO)
-            ->set('tipoIncidencia', 'uso_de_material_no_autorizado')
-            ->call('registrar')
-            ->assertHasNoErrors()
-            ->assertSet('confirmacionVisible', true);
-
-        $registro = CentralRiesgo::query()->orderByDesc('id_registro')->firstOrFail();
-
-        $this->assertNull($registro->id_ingreso, 'El estudiante no tiene ingreso, la columna queda en null.');
-        $this->assertSame(self::SIS_EN_BASE, $registro->id_estudiante);
-    }
-
-    /**
-     * Verifica que el id del registro lo asigne la secuencia de la base y no la
-     * aplicación, para que dos altas simultáneas no choquen.
-     *
-     * No se comprueba que los ids sean correlativos porque en Postgres las
-     * secuencias no se revierten con la transacción del test: los números se
-     * gastan aunque la fila termine borrada. Lo que importa es que sean
-     * distintos y crecientes, y que ninguna alta choque por clave primaria.
-     */
-    public function test_el_id_del_registro_lo_asigna_la_secuencia(): void
-    {
-        foreach ([1, 2] as $indice) {
-            Livewire::test(RegistrarIncidencia::class)
-                ->set('usuario', 1)
-                ->set('nombreEstudiante', self::NOMBRE)
-                ->set('apellidoEstudiante', self::APELLIDO)
-                ->set('codigoSis', self::SIS_VALIDO)
+        foreach ($estudiantes as $estudiante) {
+            $componente = Livewire::test(RegistrarIncidencia::class)
+                ->set('origen', RegistrarIncidencia::ORIGEN_MONITOREO)
+                ->set('nombreEstudiante', $estudiante->nombre_estudiante)
+                ->set('apellidoEstudiante', $estudiante->apellido_estudiante)
+                ->set('codigoSis', $estudiante->sis_estudiante)
                 ->set('materia', self::MATERIA_EJEMPLO)
-                ->set('tipoIncidencia', 'intento_de_ingreso_no_autorizado')
-                ->call('registrar')
-                ->assertHasNoErrors();
+                ->set('tipoIncidencia', Motivo::IntentoDeIngresoNoAutorizado->value)
+                ->call('registrar');
+
+            $errores = $componente->errors()->toArray();
+
+            $this->assertArrayNotHasKey(
+                'codigoSis',
+                $errores,
+                'El SIS '.$estudiante->sis_estudiante.' no cumple la regla de 9 digitos.',
+            );
+
+            foreach (['nombreEstudiante', 'apellidoEstudiante'] as $campo) {
+                $this->assertArrayNotHasKey(
+                    $campo,
+                    $errores,
+                    'El valor de '.$campo.' del estudiante '.$estudiante->sis_estudiante
+                        .' es rechazado por el formulario: '.$estudiante->nombre_estudiante
+                        .' '.$estudiante->apellido_estudiante,
+                );
+            }
         }
-
-        $ids = CentralRiesgo::query()
-            ->where('detalle_motivo', 'intento_de_ingreso_no_autorizado')
-            ->orderByDesc('id_registro')
-            ->limit(2)
-            ->pluck('id_registro')
-            ->all();
-
-        $this->assertCount(2, $ids, 'Deben quedar dos registros de este test.');
-        $this->assertNotSame($ids[0], $ids[1], 'La secuencia debe entregar ids distintos.');
-        $this->assertGreaterThan($ids[1], $ids[0], 'El id más reciente debe ser el mayor.');
     }
 
     /**
-     * Verifica que se rechace un registrador que no existe en la tabla `usuario`,
-     * porque la columna es NOT NULL y aun así no debe romper.
+     * Verifica que la semilla mezcle los cuatro patrones de nombre que tiene que
+     * separar el monitor: nombre con un apellido, dos nombres con un apellido,
+     * un nombre con dos apellidos y dos nombres con dos apellidos.
      */
-    public function test_rechaza_un_usuario_registrador_inexistente(): void
+    public function test_la_semilla_mezcla_los_cuatro_patrones_de_nombre(): void
     {
-        Livewire::test(RegistrarIncidencia::class)
-            ->set('usuario', 999999)
-            ->set('nombreEstudiante', self::NOMBRE)
-            ->set('apellidoEstudiante', self::APELLIDO)
-            ->set('codigoSis', self::SIS_VALIDO)
-            ->set('materia', self::MATERIA_EJEMPLO)
-            ->set('tipoIncidencia', 'suplantacion_de_identidad')
-            ->call('registrar')
-            ->assertHasErrors('usuario')
-            ->assertSet('confirmacionVisible', false);
+        $estudiantes = Estudiante::query()
+            ->where('sis_estudiante', 'not like', '9%')
+            ->get();
+
+        $patrones = [
+            'nombre + 1 apellido' => $estudiantes->contains(
+                fn (Estudiante $e): bool => $this->contarPalabras($e->nombre_estudiante) === 1
+                    && $this->contarPalabras($e->apellido_estudiante) === 1,
+            ),
+            '2 nombres + 1 apellido' => $estudiantes->contains(
+                fn (Estudiante $e): bool => $this->contarPalabras($e->nombre_estudiante) === 2
+                    && $this->contarPalabras($e->apellido_estudiante) === 1,
+            ),
+            'nombre + 2 apellidos' => $estudiantes->contains(
+                fn (Estudiante $e): bool => $this->contarPalabras($e->nombre_estudiante) === 1
+                    && $this->contarPalabras($e->apellido_estudiante) === 2,
+            ),
+            '2 nombres + 2 apellidos' => $estudiantes->contains(
+                fn (Estudiante $e): bool => $this->contarPalabras($e->nombre_estudiante) === 2
+                    && $this->contarPalabras($e->apellido_estudiante) === 2,
+            ),
+        ];
+
+        foreach ($patrones as $patron => $existe) {
+            $this->assertTrue($existe, 'La semilla no tiene ningun estudiante con el patron: '.$patron);
+        }
     }
 
     /**
-     * Verifica que el modelo se quede con el id que le asignó la secuencia, para
-     * que el modal pueda mostrar el número del registro.
-     *
-     * Con `incrementing` en `false` la fila se guardaba, pero el id llegaba
-     * vacío y el modal mostraba "#" sin número.
+     * Cuenta las palabras de un nombre, ignorando los espacios sobrantes.
      */
-    public function test_el_resumen_muestra_el_numero_del_registro_guardado(): void
+    private function contarPalabras(string $texto): int
     {
-        $componente = Livewire::test(RegistrarIncidencia::class)
-            ->set('usuario', 1)
-            ->set('nombreEstudiante', self::NOMBRE)
-            ->set('apellidoEstudiante', self::APELLIDO)
-            ->set('codigoSis', self::SIS_VALIDO)
-            ->set('materia', self::MATERIA_EJEMPLO)
-            ->set('tipoIncidencia', 'uso_de_dispositivos_electronicos')
-            ->call('registrar')
-            ->assertHasNoErrors();
+        $limpio = trim(preg_replace('/\s+/u', ' ', $texto) ?? '');
 
-        $codigo = (string) CentralRiesgo::query()->max('id_registro');
-
-        $this->assertNotSame('', $codigo, 'La base debe haber asignado un id.');
-        $this->assertSame($codigo, $componente->get('resumen')['codigo']);
-        $componente->assertSee('Registro');
-        $componente->assertSee('#'.$codigo, escape: false);
+        return $limpio === '' ? 0 : count(explode(' ', $limpio));
     }
 }

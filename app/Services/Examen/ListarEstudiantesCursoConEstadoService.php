@@ -7,14 +7,14 @@
  *
  * @created 2026-09-24
  *
- * @updated 2026-09-25
+ * @updated 2026-09-29
  *
  * @description
  * Servicio de la feature Examen que lista los estudiantes de un curso con el
  * estado de habilitación en el examen actual (habilitado/deshabilitado) y su
- * observación de la central de riesgos (sospechoso/tramposo/pendiente/aula
- * equivocada). Soporta filtro por estado, búsqueda por nombre o código SIS y
- * paginación en la base. Es de solo lectura: nunca modifica estados.
+ * observación de la central de riesgos (sospechoso/tramposo). Soporta filtro
+ * por estado, búsqueda por nombre o código SIS y paginación en la base. Es de
+ * solo lectura: nunca modifica estados.
  *
  * El criterio de la búsqueda (qué se busca según el primer caracter del
  * término) ya no está en este servicio: lo aporta
@@ -30,7 +30,11 @@
  *   buscar por nombre y apellido juntos.
  * - 2026-09-26  [Alisson D. Alvarado]  refactor: delegar el criterio de la
  *   búsqueda a BusquedaEstudianteService; ahora un término que empieza con un
- *   dígito busca solo por código SIS y uno que empieza con letra solo por nombre.
+ *   dígito busca solo por código SIS y uno que empieza por letra solo por nombre.
+ * - 2026-09-29  [Valery D. Ortuno P]  fix: filtros, conteos y última infracción
+ *   se resuelven con `Estudiante::centralRiesgos()` en vez de pasar por
+ *   `registrosAsistencia`, porque desde #70 una incidencia se registra aunque el
+ *   estudiante no tenga fila de ingreso.
  */
 
 namespace App\Services\Examen;
@@ -42,7 +46,6 @@ use App\Models\Curso;
 use App\Models\Estudiante;
 use App\Models\EstudianteExamen;
 use App\Models\Examen;
-use App\Models\RegistroAsistencia;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -108,7 +111,7 @@ class ListarEstudiantesCursoConEstadoService
         $examen = $curso->examenActual();
 
         $query = $curso->estudiantes()
-            ->with(['estudianteExamenes', 'registrosAsistencia.centralRiesgos']);
+            ->with(['estudianteExamenes', 'centralRiesgos']);
 
         $this->busqueda->aplicar($query, $busqueda);
 
@@ -198,9 +201,11 @@ class ListarEstudiantesCursoConEstadoService
                 ? TipoInfraccion::Sospechoso->value
                 : TipoInfraccion::Tramposo->value;
 
-            $query->whereHas('registrosAsistencia', function (Builder $q) use ($idExamen, $infraccion) {
+            // La relación va directo del estudiante a `central_riesgo`: una
+            // incidencia se registra aunque el estudiante no tenga ingreso (#70).
+            $query->whereHas('centralRiesgos', function (Builder $q) use ($idExamen, $infraccion) {
                 $q->where('id_examen', $idExamen)
-                    ->whereHas('centralRiesgos', fn (Builder $q2) => $q2->where('tipo_infraccion', $infraccion));
+                    ->where('tipo_infraccion', $infraccion);
             });
         }
     }
@@ -233,9 +238,9 @@ class ListarEstudiantesCursoConEstadoService
     private function contarInfraccion(Curso $curso, ?int $idExamen, string $infraccion): int
     {
         return (int) $curso->estudiantes()
-            ->whereHas('registrosAsistencia', function (Builder $q) use ($idExamen, $infraccion) {
+            ->whereHas('centralRiesgos', function (Builder $q) use ($idExamen, $infraccion) {
                 $q->where('id_examen', $idExamen)
-                    ->whereHas('centralRiesgos', fn (Builder $q2) => $q2->where('tipo_infraccion', $infraccion));
+                    ->where('tipo_infraccion', $infraccion);
             })
             ->count();
     }
@@ -267,15 +272,14 @@ class ListarEstudiantesCursoConEstadoService
     /**
      * Obtiene el tipo de infracción más reciente de un estudiante en el examen.
      *
-     * @param  Estudiante  $estudiante  Estudiante con la relación registrosAsistencia.
+     * @param  Estudiante  $estudiante  Estudiante con la relación centralRiesgos.
      * @param  ?int  $idExamen  ID del examen actual (para filtrar los registros).
      * @return string|null Valor del tipo de infracción o null si no tiene observaciones.
      */
     private function ultimaInfraccionDe(Estudiante $estudiante, ?int $idExamen): ?string
     {
-        return $estudiante->registrosAsistencia
-            ->filter(fn (RegistroAsistencia $registro) => $registro->id_examen === $idExamen)
-            ->flatMap(fn (RegistroAsistencia $registro) => $registro->centralRiesgos)
+        return $estudiante->centralRiesgos
+            ->filter(fn (CentralRiesgo $riesgo) => $riesgo->id_examen === $idExamen)
             ->sortByDesc(fn (CentralRiesgo $riesgo) => $riesgo->id_registro)
             ->first()
             ?->tipo_infraccion

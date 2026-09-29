@@ -17,12 +17,16 @@ INSERT INTO rol (id_rol, nombre_rol) VALUES
 (1, 'docente'),
 (2, 'auxiliar');
 
+-- Los nombres mezclan a proposito los cuatro patrones que tiene que aguantar el
+-- formulario de incidencias: nombre y un apellido, dos nombres y un apellido,
+-- un nombre y dos apellidos, y dos nombres con dos apellidos. Los SIS son de 9
+-- digitos, que es lo que valida el formulario (`digits:9`).
 INSERT INTO estudiante (sis_estudiante, nombre_estudiante, apellido_estudiante, carrera) VALUES
-('20210001', 'Juan',   'Perez',     'Ingenieria de Sistemas'),
-('20210002', 'Maria',  'Lopez',     'Ingenieria Civil'),
-('20210003', 'Carlos', 'Gomez',     'Ingenieria Electronica'),
-('20210004', 'Ana',    'Martinez',  'Ingenieria Industrial'),
-('20210005', 'Luis',   'Fernandez', 'Ingenieria de Sistemas');
+('202100001', 'Juan',              'Pérez',              'Ingeniería de Sistemas'),    -- nombre + 1 apellido
+('202100002', 'María Fernanda',   'López',              'Ingeniería Civil'),          -- 2 nombres + 1 apellido
+('202100003', 'Carlos',           'Gómez Rivera',       'Ingeniería Electrónica'),    -- nombre + 2 apellidos
+('202100004', 'Ana',               'Martínez Pardo',     'Ingeniería Industrial'),     -- nombre + 2 apellidos
+('202100005', 'Luis Miguel',       'Fernández Chávez',   'Ingeniería de Sistemas');    -- 2 nombres + 2 apellidos
 
 INSERT INTO tipo_examen (id_tipo_examen, nombre_tipo_examen) VALUES
 (1, 'PP'),
@@ -92,11 +96,11 @@ INSERT INTO curso_tipo_gestion (id_curso, id_tg) VALUES
 (5, 3);
 
 INSERT INTO estudiante_curso (sis_estudiante, id_curso) VALUES
-('20210001', 1),
-('20210002', 2),
-('20210003', 3),
-('20210004', 4),
-('20210005', 5);
+('202100001', 1),
+('202100002', 2),
+('202100003', 3),
+('202100004', 4),
+('202100005', 5);
 
 INSERT INTO auxiliar_curso (id_auxiliar, id_curso, estado) VALUES
 (3, 1, 'Activo'),
@@ -134,11 +138,11 @@ INSERT INTO examen_curso (id_examen, id_curso) VALUES
 (5, 5);
 
 INSERT INTO estudiante_examen (id_estudiante_examen, sis_estudiante, id_examen, estado, motivo) VALUES
-(1, '20210001', 1, 'habilitado',    NULL),
-(2, '20210002', 2, 'habilitado',    NULL),
-(3, '20210003', 3, 'deshabilitado', 'No cumple requisitos'),
-(4, '20210004', 4, 'habilitado',    NULL),
-(5, '20210005', 5, 'habilitado',    NULL);
+(1, '202100001', 1, 'habilitado',    NULL),
+(2, '202100002', 2, 'habilitado',    NULL),
+(3, '202100003', 3, 'deshabilitado', 'No cumple requisitos'),
+(4, '202100004', 4, 'habilitado',    NULL),
+(5, '202100005', 5, 'habilitado',    NULL);
 
 INSERT INTO estudiante_examen_ambiente (id_ee, id_ambiente) VALUES
 (1, 1),
@@ -148,18 +152,20 @@ INSERT INTO estudiante_examen_ambiente (id_ee, id_ambiente) VALUES
 (5, 5);
 
 INSERT INTO registro_asistencia (id_ingreso, hora_ingreso, id_examen, id_estudiante, id_registrador) VALUES
-(1, '08:05', 1, '20210001', 3),
-(2, '10:03', 2, '20210002', 4),
-(3, '14:10', 3, '20210003', 3),
-(4, '08:02', 4, '20210004', 4),
-(5, '16:01', 5, '20210005', 3);
+(1, '08:05', 1, '202100001', 3),
+(2, '10:03', 2, '202100002', 4),
+(3, '14:10', 3, '202100003', 3),
+(4, '08:02', 4, '202100004', 4),
+(5, '16:01', 5, '202100005', 3);
 
-INSERT INTO central_riesgo (id_registro, id_ingreso, id_registrador, detalle_motivo, fecha_registro, tipo_infraccion) VALUES
-(1, 1, 3, 'Estudiante mirando hacia otro lado', '2024-06-10', 'sospechoso'),
-(2, 2, 4, 'Uso de celular durante el examen',   '2024-06-11', 'tramposo'),
-(3, 3, 3, 'Llegada tarde al examen',            '2024-06-12', 'pendiente'),
-(4, 4, 4, 'Estudiante en aula equivocada',      '2024-06-13', 'aula equivocada'),
-(5, 5, 3, 'Comportamiento sospechoso',          '2024-06-14', 'sospechoso');
+-- Las incidencias guardan su propio estudiante, examen, motivo y registrador;
+-- `id_ingreso` solo se llena cuando la incidencia se observo en el monitor.
+INSERT INTO central_riesgo (id_registro, sis_estudiante, id_examen, id_registrador, motivo, detalle_motivo, fecha_registro, tipo_infraccion, id_ingreso) VALUES
+(1, '202100001', 1, 3, 'otro',                                 'Estudiante mirando hacia otro lado', '2024-06-10 08:20:00', 'sospechoso', 1),
+(2, '202100002', 2, 4, 'uso_de_dispositivos_electronicos',   'Uso de celular durante el examen',   '2024-06-11 10:15:00', 'tramposo',   2),
+(3, '202100003', 3, 3, 'intento_de_ingreso_no_autorizado',    'Llegada tarde al examen',           '2024-06-12 14:20:00', 'sospechoso', 3),
+(4, '202100004', 4, 4, 'otro',                                 'Estudiante en aula equivocada',     '2024-06-13 08:10:00', 'sospechoso', 4),
+(5, '202100005', 5, 3, 'otro',                                 'Comportamiento sospechoso',         '2024-06-14 16:05:00', 'sospechoso', NULL);
 
 INSERT INTO notificacion_docente (id_notificacion, id_central_riesgo, id_curso, estado) VALUES
 (1, 1, 1, 'visto'),
