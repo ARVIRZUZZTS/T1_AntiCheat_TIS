@@ -7,17 +7,28 @@
  *
  * @created 2026-09-24
  *
- * @updated 2026-09-26
+ * @updated 2026-09-28
  *
  * @description
- * Modelo de la tabla `registro_asistencia`: mapea el ingreso de un estudiante
- * a un examen. Es el puente entre el estudiante y la central de riesgos.
+ * Modelo Eloquent de la tabla `registro_asistencia`: mapea el ingreso de un
+ * estudiante a un examen, con la hora de ingreso y el usuario que lo registró,
+ * como puente entre el estudiante y la central de riesgos.
  *
  * @changelog
  * - 2026-09-24  [T1]         feat: creación inicial del modelo.
+ * - 2026-09-25  [OchoaCesar] feat: creación inicial del modelo.
  * - 2026-09-25  [OchoaCesar] feat: agregar id_registrador y relación registrador().
+ * - 2026-09-26  [Diego Tejerina] feat: anotaciones @property y relación centralRiesgos().
  * - 2026-09-26  [T1]         fix: resolver conflicto de merge sin resolver
  *   dejado en dev por el commit e4ea2fd (marcadores <<<<<<< sin quitar).
+ * - 2026-09-28  [T1]         fix: resolver conflictos de merge al integrar
+ *   dev en feature/28 (#28): el @property de id_registrador y el owner key de
+ *   registrador() quedan como los define el esquema (NOT NULL / id_usuario).
+ *
+ * @see  Estudiante
+ * @see  Examen
+ * @see  Usuario
+ * @see  CentralRiesgo
  */
 
 namespace App\Models;

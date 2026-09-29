@@ -7,18 +7,27 @@
  *
  * @created 2026-09-24
  *
- * @updated 2026-09-26
+ * @updated 2026-09-28
  *
  * @description
- * Modelo de la tabla `estudiante_examen`: mapea el estado de habilitación
- * de un estudiante en un examen (estado + motivo), y quién hizo el último
- * cambio y cuándo (modificado_por/fecha_modificacion).
+ * Modelo Eloquent de la tabla `estudiante_examen`: mapea la inscripción de un
+ * estudiante en un examen con su estado de habilitación (`habilitado` /
+ * `deshabilitado`, como enum), el motivo de la deshabilitación cuando
+ * corresponde, y quién hizo el último cambio y cuándo
+ * (modificado_por/fecha_modificacion).
  *
  * @changelog
- * - 2026-09-24  [T1]  feat: creación inicial del modelo.
- * - 2026-09-26  [T1]  fix: resolver conflicto de merge sin resolver dejado en
+ * - 2026-09-24  [T1]             feat: creación inicial del modelo.
+ * - 2026-09-25  [OchoaCesar]     feat: creación inicial del modelo.
+ * - 2026-09-26  [Diego Tejerina] feat: cast del estado a enum y anotaciones @property.
+ * - 2026-09-26  [T1]             fix: resolver conflicto de merge sin resolver
  *   dev por el commit e4ea2fd (marcadores <<<<<<< sin quitar).
- * - 2026-09-26  [T1]  feat: agregar modificado_por y fecha_modificacion (#27).
+ * - 2026-09-26  [T1]             feat: agregar modificado_por y fecha_modificacion (#27).
+ * - 2026-09-28  [T1]             fix: resolver conflictos de merge al integrar
+ *   dev en feature/28 (#28).
+ *
+ * @see  Estudiante
+ * @see  Examen
  */
 
 namespace App\Models;
