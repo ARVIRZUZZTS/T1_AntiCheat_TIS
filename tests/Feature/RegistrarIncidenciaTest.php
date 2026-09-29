@@ -39,6 +39,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\Motivo;
 use App\Enums\TipoInfraccion;
 use App\Livewire\Monitoreo\RegistrarIncidencia;
 use App\Models\Estudiante;
@@ -445,5 +446,96 @@ class RegistrarIncidenciaTest extends TestCase
             ->assertSee('Uso de material no autorizado')
             ->assertSee('Suplantación de identidad')
             ->assertSee('Otro');
+    }
+
+    /**
+     * Verifica que los estudiantes que trae la semilla de `002_seed_data.sql`
+     * sirvan para probar el formulario: codigo SIS de 9 digitos y nombre y
+     * apellido que el componente acepta. Si alguien cambia la semilla y rompe
+     * una de las dos cosas, este test lo avisa en vez de dejarlo para
+     * descubrirlo a mano en el navegador.
+     */
+    public function test_los_estudiantes_de_la_semilla_son_validos_para_el_formulario(): void
+    {
+        $estudiantes = Estudiante::query()
+            ->where('sis_estudiante', 'not like', '9%')
+            ->orderBy('sis_estudiante')
+            ->get();
+
+        $this->assertGreaterThan(0, $estudiantes->count(), 'La semilla debe traer estudiantes de prueba.');
+
+        foreach ($estudiantes as $estudiante) {
+            $componente = Livewire::test(RegistrarIncidencia::class)
+                ->set('origen', RegistrarIncidencia::ORIGEN_MONITOREO)
+                ->set('nombreEstudiante', $estudiante->nombre_estudiante)
+                ->set('apellidoEstudiante', $estudiante->apellido_estudiante)
+                ->set('codigoSis', $estudiante->sis_estudiante)
+                ->set('materia', self::MATERIA_EJEMPLO)
+                ->set('tipoIncidencia', Motivo::IntentoDeIngresoNoAutorizado->value)
+                ->call('registrar');
+
+            $errores = $componente->errors()->toArray();
+
+            $this->assertArrayNotHasKey(
+                'codigoSis',
+                $errores,
+                'El SIS '.$estudiante->sis_estudiante.' no cumple la regla de 9 digitos.',
+            );
+
+            foreach (['nombreEstudiante', 'apellidoEstudiante'] as $campo) {
+                $this->assertArrayNotHasKey(
+                    $campo,
+                    $errores,
+                    'El valor de '.$campo.' del estudiante '.$estudiante->sis_estudiante
+                        .' es rechazado por el formulario: '.$estudiante->nombre_estudiante
+                        .' '.$estudiante->apellido_estudiante,
+                );
+            }
+        }
+    }
+
+    /**
+     * Verifica que la semilla mezcle los cuatro patrones de nombre que tiene que
+     * separar el monitor: nombre con un apellido, dos nombres con un apellido,
+     * un nombre con dos apellidos y dos nombres con dos apellidos.
+     */
+    public function test_la_semilla_mezcla_los_cuatro_patrones_de_nombre(): void
+    {
+        $estudiantes = Estudiante::query()
+            ->where('sis_estudiante', 'not like', '9%')
+            ->get();
+
+        $patrones = [
+            'nombre + 1 apellido' => $estudiantes->contains(
+                fn (Estudiante $e): bool => $this->contarPalabras($e->nombre_estudiante) === 1
+                    && $this->contarPalabras($e->apellido_estudiante) === 1,
+            ),
+            '2 nombres + 1 apellido' => $estudiantes->contains(
+                fn (Estudiante $e): bool => $this->contarPalabras($e->nombre_estudiante) === 2
+                    && $this->contarPalabras($e->apellido_estudiante) === 1,
+            ),
+            'nombre + 2 apellidos' => $estudiantes->contains(
+                fn (Estudiante $e): bool => $this->contarPalabras($e->nombre_estudiante) === 1
+                    && $this->contarPalabras($e->apellido_estudiante) === 2,
+            ),
+            '2 nombres + 2 apellidos' => $estudiantes->contains(
+                fn (Estudiante $e): bool => $this->contarPalabras($e->nombre_estudiante) === 2
+                    && $this->contarPalabras($e->apellido_estudiante) === 2,
+            ),
+        ];
+
+        foreach ($patrones as $patron => $existe) {
+            $this->assertTrue($existe, 'La semilla no tiene ningun estudiante con el patron: '.$patron);
+        }
+    }
+
+    /**
+     * Cuenta las palabras de un nombre, ignorando los espacios sobrantes.
+     */
+    private function contarPalabras(string $texto): int
+    {
+        $limpio = trim(preg_replace('/\s+/u', ' ', $texto) ?? '');
+
+        return $limpio === '' ? 0 : count(explode(' ', $limpio));
     }
 }
