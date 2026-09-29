@@ -2,59 +2,38 @@
     @file    materia-estudiantes.blade.php
     @author  OchoaCesar <cesareduardonick@gmail.com>
     @created 2026-09-25
-    @updated 2026-09-25
+    @updated 2026-09-28
 
     @description
-    Vista de detalle de una materia (vista mock): muestra las cards resumen y
-    las pestañas Estudiantes / Habilitación / Exámenes / Auxiliares. La
-    pestaña Estudiantes presenta la tabla de estudiantes
-    con las columna de "Motivo" y "Acciones"
-    (Editar / Deshabilitar). Todo con datos mockeados hasta que existan los
-    endpoints correspondientes.
+    Vista de detalle de una materia: muestra las cards resumen (conteos reales
+    del curso) y las pestañas Estudiantes / Habilitación / Exámenes /
+    Auxiliares. La pestaña Estudiantes incrusta el componente Livewire
+    EstudiantesCurso, que consume la misma fuente que el endpoint
+    GET /api/cursos/{idCurso}/estudiantes/estado (búsqueda, filtros con
+    contadores, paginación y los modales Habilitar/Deshabilitar conectados al
+    servicio de cambio de estado). Las demás pestañas quedan vacías a la espera
+    de sus endpoints.
 
+    @changelog
+    - 2026-09-25  [OchoaCesar]  feat: creación inicial de la vista (mock).
+    - 2026-09-26  [Alisson D. Alvarado]  feat: buscador y modales en la vista mock.
+    - 2026-09-28  [OchoaCesar]  refactor: conectar la pestaña Estudiantes al
+      componente Livewire (datos reales), quitar mocks y usar conteos reales en las cards.
+
+    @see  App\Livewire\Examenes\EstudiantesCurso
+    @see  App\Services\Examen\ListarEstudiantesCursoConEstadoService
     @see  pages/materias.blade.php
 --}}
 
-@php
-    // Misma lista mock que pages/materias.blade.php; el id llega por la URL.
-    $catalogo = [
-        'MAT-101' => ['codigo' => 'MAT-101', 'nombre' => 'Matemática I', 'seccion' => 'A'],
-        'FIS-201' => ['codigo' => 'FIS-201', 'nombre' => 'Física II', 'seccion' => 'B'],
-        'QUM-301' => ['codigo' => 'QUM-301', 'nombre' => 'Química Orgánica', 'seccion' => 'C'],
-        'INF-401' => ['codigo' => 'INF-401', 'nombre' => 'Programación IV', 'seccion' => 'A'],
-    ];
-    $materia = $catalogo[$codigo] ?? ['codigo' => $codigo, 'nombre' => $codigo, 'seccion' => '—'];
-
-    $estadoBadge = fn (string $estado) => match ($estado) {
-        'Habilitado' => '<span class="text-xs font-medium px-1.5 py-0.5 rounded-full bg-status-habilitado-bg text-status-habilitado-fg">Habilitado</span>',
-        'Deshabilitado' => '<span class="text-xs font-medium px-1.5 py-0.5 rounded-full bg-status-no-habilitado-bg text-status-no-habilitado-fg">Deshabilitado</span>',
-        'Pendiente' => '<span class="text-xs font-medium px-1.5 py-0.5 rounded-full bg-status-pendiente-bg text-status-pendiente-fg">Pendiente</span>',
-        'Ausente' => '<span class="text-xs font-medium px-1.5 py-0.5 rounded-full bg-neutral-tertiary-soft text-body">Ausente</span>',
-        'Sospechoso' => '<span class="text-xs font-medium px-1.5 py-0.5 rounded-full bg-status-en-revision-bg text-status-en-revision-fg">Sospechoso</span>',
-        default => '<span class="text-xs font-medium px-1.5 py-0.5 rounded-full bg-status-central-riesgos-bg text-status-central-riesgos-fg">Tramposo</span>',
-    };
-
-    // Acciones: Editar (#1B3A73 → token fg-brand) y Deshabilitar (#D32027 → token fg-danger).
-    $acciones = '<a href="#" class="font-medium text-fg-brand hover:underline">Editar</a>'
-        . '<span class="text-neutral-tertiary-medium mx-1.5">·</span>'
-        . '<a href="#" class="font-medium text-fg-danger hover:underline">Deshabilitar</a>';
-@endphp
-
 @extends('layouts.app')
 
-@section('title', $materia['nombre'])
+@section('title', $curso->nombre_curso)
 
 @section('content')
-    <p class="text-body">
-        Estudiantes de la materia {{ $materia['codigo'] }} — Sección {{ $materia['seccion'] }}.
-        Datos mockeados: vendrán del endpoint
-        <code class="text-fg-brand">/materias/{codigo}/estudiantes</code>.
-    </p>
-
     <div class="flex flex-wrap gap-[2vh]">
         <div class="flex-1 min-w-[200px] flex items-center justify-between gap-3 bg-neutral-primary-soft p-6 border border-default rounded-base shadow-xs">
             <div>
-                <p class="text-3xl font-semibold text-fg-brand">60</p>
+                <p class="text-3xl font-semibold text-fg-brand">{{ $conteos['todos'] }}</p>
                 <p class="text-sm text-body">Inscritos</p>
             </div>
             <span class="flex items-center justify-center w-12 h-12 rounded-base bg-neutral-secondary-soft text-fg-brand">
@@ -63,7 +42,7 @@
         </div>
         <div class="flex-1 min-w-[200px] flex items-center justify-between gap-3 bg-neutral-primary-soft p-6 border border-default rounded-base shadow-xs">
             <div>
-                <p class="text-3xl font-semibold text-fg-success">54</p>
+                <p class="text-3xl font-semibold text-fg-success">{{ $conteos['habilitados'] }}</p>
                 <p class="text-sm text-body">Habilitados</p>
             </div>
             <span class="flex items-center justify-center w-12 h-12 rounded-base bg-neutral-secondary-soft text-fg-success">
@@ -72,7 +51,7 @@
         </div>
         <div class="flex-1 min-w-[200px] flex items-center justify-between gap-3 bg-neutral-primary-soft p-6 border border-default rounded-base shadow-xs">
             <div>
-                <p class="text-3xl font-semibold text-fg-danger-strong">4</p>
+                <p class="text-3xl font-semibold text-fg-danger-strong">{{ $conteos['deshabilitados'] }}</p>
                 <p class="text-sm text-body">Deshabilitados</p>
             </div>
             <span class="flex items-center justify-center w-12 h-12 rounded-base bg-neutral-secondary-soft text-fg-danger-strong">
@@ -81,7 +60,7 @@
         </div>
         <div class="flex-1 min-w-[200px] flex items-center justify-between gap-3 bg-neutral-primary-soft p-6 border border-default rounded-base shadow-xs">
             <div>
-                <p class="text-3xl font-semibold text-fg-warning">2</p>
+                <p class="text-3xl font-semibold text-fg-warning">{{ $conteos['sospechosos'] }}</p>
                 <p class="text-sm text-body">Sospechosos</p>
             </div>
             <span class="flex items-center justify-center w-12 h-12 rounded-base bg-neutral-secondary-soft text-fg-warning">
@@ -90,7 +69,7 @@
         </div>
         <div class="flex-1 min-w-[200px] flex items-center justify-between gap-3 bg-neutral-primary-soft p-6 border border-default rounded-base shadow-xs">
             <div>
-                <p class="text-3xl font-semibold text-fg-danger-strong">1</p>
+                <p class="text-3xl font-semibold text-fg-danger-strong">{{ $conteos['tramposos'] }}</p>
                 <p class="text-sm text-body">Tramposos</p>
             </div>
             <span class="flex items-center justify-center w-12 h-12 rounded-base bg-neutral-secondary-soft text-fg-danger-strong">
@@ -100,7 +79,6 @@
     </div>
 
     <div x-data="{ tab: 'estudiantes' }" class="mt-6">
-        {{-- Pestañas de la materia (Alpine toggla el estado en runtime) --}}
         @php
             $tabClases = 'inline-flex items-center justify-center box-border border focus:ring-4 shadow-xs font-medium leading-5 rounded-base focus:outline-none px-4 py-2.5 text-sm';
             $tabActivo = 'text-white bg-brand border-transparent hover:bg-brand-strong focus:ring-brand-medium';
@@ -114,69 +92,14 @@
             <button type="button" @click="tab = 'auxiliares'" :class="tab === 'auxiliares' ? '{{ $tabActivo }}' : '{{ $tabInactivo }}'" class="{{ $tabClases }}">Auxiliares</button>
         </nav>
 
-        {{-- Pestaña principal: Estudiantes (calca de monitoreo) --}}
-        <section x-show="tab === 'estudiantes'" x-cloak class="mt-6 bg-neutral-primary-soft border border-default rounded-base shadow-xs p-6">
-            <div class="flex flex-wrap items-center justify-between gap-4">
-                <div class="w-full sm:max-w-md">
-                    <x-ui.search-input placeholder="Buscar por nombre o código SIS..." :show-button="false" />
-                </div>
-
-                <div class="flex flex-wrap gap-2">
-                    <x-ui.button variant="default">Todos (60)</x-ui.button>
-                    <x-ui.button variant="secondary">Habilitados (54)</x-ui.button>
-                    <x-ui.button variant="secondary">Deshabilitados (4)</x-ui.button>
-                    <x-ui.button variant="secondary">Sospechosos (2)</x-ui.button>
-                    <x-ui.button variant="secondary">Tramposos (1)</x-ui.button>
-                </div>
-            </div>
-
-            <h2 class="mt-6 text-lg font-semibold text-heading">Registro de ingresos</h2>
-
-            <div class="mt-4">
-                <x-ui.table
-                    :headers="['Estudiante', 'Código SIS', 'Hora', 'Registro', 'Estado', 'Motivo', 'Acciones']"
-                    :rows="[
-                        [['heading' => true, 'value' => 'Ana López'], '202201013', '08:12', 'Doc. Mariana G.', ['html' => $estadoBadge('Habilitado')], '—', ['html' => $acciones]],
-                        [['heading' => true, 'value' => 'Bruno Díaz'], '202101022', '08:20', 'Aux. Jorge S.', ['html' => $estadoBadge('Sospechoso')], '—', ['html' => $acciones]],
-                        [['heading' => true, 'value' => 'Carla Ruiz'], '202201031', '—', '—', ['html' => $estadoBadge('Pendiente')], '—', ['html' => $acciones]],
-                        [['heading' => true, 'value' => 'Diego Soto'], '202202045', '—', '—', ['html' => $estadoBadge('Ausente')], '—', ['html' => $acciones]],
-                        [['heading' => true, 'value' => 'Ernesto Vera'], '202002107', '07:58', 'Doc. Mariana G.', ['html' => $estadoBadge('Tramposo')], 'Suplantación de identidad', ['html' => $acciones]],
-                        [['heading' => true, 'value' => 'Fátima Quispe'], '202201056', '08:05', 'Aux. Jorge S.', ['html' => $estadoBadge('Deshabilitado')], 'No cumple requisitos', ['html' => $acciones]],
-                    ]"
-                />
-            </div>
-
-            <div class="mt-6 flex justify-end">
-                <x-ui.pagination :current="2" :total="5" />
-            </div>
+        {{-- Pestaña Estudiantes: componente Livewire con los datos reales. --}}
+        <section x-show="tab === 'estudiantes'" x-cloak class="mt-6">
+            @livewire(\App\Livewire\Examenes\EstudiantesCurso::class, ['curso' => $curso], key($curso->id_curso))
         </section>
 
-        {{-- Pestañas pendientes (mocks hasta tener endpoint) --}}
-        <div x-show="tab === 'habilitacion'" x-cloak class="mt-6">
-            <x-ui.card title="Habilitación (mock)">
-                <p class="text-body">
-                    Gestión de habilitación de estudiantes. Datos mockeados: vendrán del endpoint
-                    <code class="text-fg-brand">/materias/{codigo}/habilitacion</code>.
-                </p>
-            </x-ui.card>
-        </div>
-
-        <div x-show="tab === 'examenes'" x-cloak class="mt-6">
-            <x-ui.card title="Exámenes (mock)">
-                <p class="text-body">
-                    Exámenes de la materia. Datos mockeados: vendrán del endpoint
-                    <code class="text-fg-brand">/materias/{codigo}/examenes</code>.
-                </p>
-            </x-ui.card>
-        </div>
-
-        <div x-show="tab === 'auxiliares'" x-cloak class="mt-6">
-            <x-ui.card title="Auxiliares (mock)">
-                <p class="text-body">
-                    Auxiliares de la materia. Datos mockeados: vendrán del endpoint
-                    <code class="text-fg-brand">/materias/{codigo}/auxiliares</code>.
-                </p>
-            </x-ui.card>
-        </div>
+        {{-- Pestañas pendientes de endpoint: vacías por ahora. --}}
+        <section x-show="tab === 'habilitacion'" x-cloak class="mt-6"></section>
+        <section x-show="tab === 'examenes'" x-cloak class="mt-6"></section>
+        <section x-show="tab === 'auxiliares'" x-cloak class="mt-6"></section>
     </div>
 @endsection
