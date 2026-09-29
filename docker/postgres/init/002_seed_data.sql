@@ -167,6 +167,15 @@ INSERT INTO central_riesgo (id_registro, sis_estudiante, id_examen, id_registrad
 (4, '202100004', 4, 4, 'otro',                                 'Estudiante en aula equivocada',     '2024-06-13 08:10:00', 'sospechoso', 4),
 (5, '202100005', 5, 3, 'otro',                                 'Comportamiento sospechoso',         '2024-06-14 16:05:00', 'sospechoso', NULL);
 
+-- La semilla escribe los ids de `central_riesgo` a mano, asi que la secuencia
+-- sigue en 1 y el primer reporte chocaria contra la clave primaria. Se adelanta
+-- al mayor id sembrado.
+SELECT setval(
+  'central_riesgo_id_registro_seq',
+  (SELECT COALESCE(MAX(id_registro), 0) + 1 FROM central_riesgo),
+  false
+);
+
 INSERT INTO notificacion_docente (id_notificacion, id_central_riesgo, id_curso, estado) VALUES
 (1, 1, 1, 'visto'),
 (2, 2, 2, 'recibido'),

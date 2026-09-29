@@ -24,6 +24,9 @@
  * - 2026-09-29  [Valery D. Ortuno P]  fix: `id_ingreso` pasa a ser opcional y se
  *   agregan `sis_estudiante`, `id_examen` y `motivo`; `fecha_registro` pasa a
  *   `timestamp` y la infracción queda en tramposo o sospechoso (#70).
+ * - 2026-09-29  [Candy]  feat: `materia()` deriva la materia del examen, que ya
+ *   no se guarda en la tabla, y `fillable` queda con las columnas del esquema
+ *   nuevo; el id lo asigna la secuencia de la base (#70).
  */
 
 namespace App\Models;
@@ -52,12 +55,10 @@ class CentralRiesgo extends Model
     public $timestamps = false;
 
     /**
-     * La secuencia la crea la migración
-     * `2026_09_28_000001_ampliar_central_riesgo_para_el_reporte_de_incidencias`.
-     *
-     * Con esto en `true`, Eloquent recupera el id que le asignó la base y el
-     * resumen del modal puede mostrar el número del registro. En `false` la fila
-     * se guardaba igual, pero `$registro->id_registro` quedaba vacío.
+     * El id lo asigna la secuencia `central_riesgo_id_registro_seq` de la base,
+     * no la aplicación: así dos registros simultáneos no calculan el mismo y el
+     * número se le puede mostrar a quien registró la incidencia sin volver a
+     * consultarlo.
      *
      * @var bool
      */
@@ -66,15 +67,11 @@ class CentralRiesgo extends Model
     protected $keyType = 'int';
 
     protected $fillable = [
-        'id_registro',
         'sis_estudiante',
         'id_examen',
         'id_registrador',
         'motivo',
         'detalle_motivo',
-        'materia',
-        'descripcion',
-        'id_estudiante',
         'fecha_registro',
         'tipo_infraccion',
         'id_ingreso',
@@ -86,7 +83,6 @@ class CentralRiesgo extends Model
             'fecha_registro' => 'datetime',
             'motivo' => Motivo::class,
             'tipo_infraccion' => TipoInfraccion::class,
-            'fecha_registro' => 'datetime',
         ];
     }
 
@@ -120,5 +116,23 @@ class CentralRiesgo extends Model
     public function registroAsistencia(): BelongsTo
     {
         return $this->belongsTo(RegistroAsistencia::class, 'id_ingreso');
+    }
+    
+    /**
+     * Materia del examen en el que se observó la incidencia.
+     *
+     * No es una columna: se deriva con la cadena
+     * `id_examen -> examen_curso -> curso.nombre_curso`, que es la única fuente
+     * de verdad de la materia. Si el examen todavía no tiene curso asignado
+     * devuelve null en vez de fallar, porque es un dato que se puede auditar
+     * después sin perder la incidencia.
+     *
+     * @return ?string  Nombre del curso, o null si el examen no tiene curso.
+     */
+    public function materia(): ?string
+    {
+        $curso = $this->examen?->cursos->first();
+
+        return $curso?->nombre_curso;
     }
 }

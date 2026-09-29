@@ -41,6 +41,9 @@
  *   termina el proceso y vuelve a la pantalla de origen.
  * - 2026-09-28  [Candy]  feat: el resumen muestra también el número del registro
  *   y quién lo registró, que ya están guardados en la base de datos (#70).
+ * - 2026-09-29  [Candy]  feat: el modal toma las clases del design system, como
+ *   los demás modales de la aplicación, y muestra el número del registro y la
+ *   materia real del examen, que la base deriva de `id_examen` (#70).
 --}}
 
 @section('title', 'Registrar incidencia')
@@ -240,51 +243,62 @@
 
     Los datos se leen de `$resumen`, la copia que el componente guarda al validar,
     y no de los campos del formulario, que pueden haber cambiado mientras tanto.
+    La materia que aparece es la del examen registrado, no la escrita en el
+    formulario: la base la deriva de `id_examen` (#70).
 --}}
 @if ($confirmacionVisible)
-    <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+    <div class="overflow-y-auto overflow-x-hidden fixed top-0 right-0 left-0 z-50 flex justify-center items-center w-full md:inset-0 h-full max-h-full bg-overlay-modal/50"
          role="dialog" aria-modal="true" aria-labelledby="titulo-confirmacion">
-        <div class="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
-            <div class="mb-4 flex items-center gap-3">
-                <span class="flex h-10 w-10 items-center justify-center rounded-full bg-green-100 text-green-700">✓</span>
-                <h2 id="titulo-confirmacion" class="text-lg font-bold">
-                    Estudiante agregado a la central de riesgos con éxito
-                </h2>
-            </div>
+        <div class="relative p-4 w-full max-w-md max-h-full">
+            <div class="relative bg-neutral-primary-soft border border-default rounded-base shadow-sm p-4 md:p-6">
+                <div class="flex items-center gap-3">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-status-habilitado-bg text-status-habilitado-fg">
+                        <svg class="w-5 h-5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m5 13 4 4L19 7"/></svg>
+                    </span>
+                    <h3 id="titulo-confirmacion" class="text-lg font-medium text-heading">
+                        Estudiante agregado a la central de riesgos con éxito
+                    </h3>
+                </div>
 
-            <dl class="grid grid-cols-3 gap-x-3 gap-y-2 rounded-lg bg-slate-50 p-4 text-sm">
-                <dt class="font-semibold">Estudiante</dt>
-                <dd class="col-span-2">{{ $resumen['estudiante'] }}</dd>
+                <dl class="grid grid-cols-3 gap-x-3 gap-y-2 py-4 text-sm">
+                    <dt class="font-medium text-heading">N° de registro</dt>
+                    <dd class="col-span-2 text-body">{{ $resumen['codigo'] }}</dd>
 
-                <dt class="font-semibold">Código SIS</dt>
-                <dd class="col-span-2">{{ $resumen['codigoSis'] }}</dd>
+                    <dt class="font-medium text-heading">Estudiante</dt>
+                    <dd class="col-span-2 text-body">{{ $resumen['estudiante'] }}</dd>
 
-                <dt class="font-semibold">Materia</dt>
-                <dd class="col-span-2">{{ $resumen['materia'] }}</dd>
+                    <dt class="font-medium text-heading">Código SIS</dt>
+                    <dd class="col-span-2 text-body">{{ $resumen['codigoSis'] }}</dd>
 
-                <dt class="font-semibold">Motivo</dt>
-                <dd class="col-span-2">{{ $resumen['motivo'] }}</dd>
+                    <dt class="font-medium text-heading">Materia</dt>
+                    <dd class="col-span-2 text-body">{{ $resumen['materia'] }}</dd>
 
-                <dt class="font-semibold">Estado</dt>
-                <dd class="col-span-2">{{ $resumen['estado'] }}</dd>
+                    <dt class="font-medium text-heading">Motivo</dt>
+                    <dd class="col-span-2 text-body">{{ $resumen['motivo'] }}</dd>
 
-                <dt class="font-semibold">Registrado por</dt>
-                <dd class="col-span-2">{{ $resumen['registrador'] }}</dd>
+                    <dt class="font-medium text-heading">Estado</dt>
+                    <dd class="col-span-2 text-body">{{ $resumen['estado'] }}</dd>
 
-                <dt class="font-semibold">Fecha y hora</dt>
-                <dd class="col-span-2">{{ $resumen['fechaHora'] }}</dd>
+                    <dt class="font-medium text-heading">Registrado por</dt>
+                    <dd class="col-span-2 text-body">{{ $resumen['registrador'] }}</dd>
 
-                @if ($resumen['descripcion'] !== '')
-                    <dt class="font-semibold">Descripción</dt>
-                    <dd class="col-span-2">{{ $resumen['descripcion'] }}</dd>
-                @endif
-            </dl>
+                    <dt class="font-medium text-heading">Fecha y hora</dt>
+                    <dd class="col-span-2 text-body">{{ $resumen['fechaHora'] }}</dd>
 
-            <div class="mt-6 flex justify-end">
-                <button type="button" wire:click="aceptarRegistro" wire:loading.attr="disabled"
-                        class="rounded-lg bg-[#1e3a6e] px-5 py-2 font-semibold text-white">
-                    Aceptar
-                </button>
+                    {{-- El detalle solo se escribe con el motivo "Otro", que es el
+                         único que obliga a describirlo. --}}
+                    @if ($resumen['descripcion'] !== '')
+                        <dt class="font-medium text-heading">Descripción</dt>
+                        <dd class="col-span-2 text-body">{{ $resumen['descripcion'] }}</dd>
+                    @endif
+                </dl>
+
+                <div class="flex items-center justify-end border-t border-default pt-4">
+                    <x-ui.button wire:click="aceptarRegistro" wire:loading.attr="disabled">
+                        <span wire:loading.remove wire:target="aceptarRegistro">Aceptar</span>
+                        <span wire:loading wire:target="aceptarRegistro">Volviendo…</span>
+                    </x-ui.button>
+                </div>
             </div>
         </div>
     </div>

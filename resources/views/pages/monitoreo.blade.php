@@ -46,11 +46,15 @@
            titulo de la tabla y todos los botones de reporte. */
         $materiaActual = 'Introduccion a la Programacion';
 
+        /* Examen en curso, que es de donde se deriva la materia al guardar la
+           incidencia: `central_riesgo.id_examen` no admite null (#70). */
+        $examenActual = 3;
+
         /* Boton de reporte de una fila: lleva al formulario de registro de
-           incidencias con el estudiante, la materia del examen y el rol de
-           quien lo registro, que es el dato que decide si la incidencia queda
-           confirmada o en revision. */
-        $registrarBtn = function (string $nombre, string $sis, string $registro) use ($materiaActual): string {
+           incidencias con el estudiante, la materia del examen, el examen en
+           curso y el rol de quien lo registro, que es el dato que decide si la
+           incidencia queda confirmada o en revision. */
+        $registrarBtn = function (string $nombre, string $sis, string $registro) use ($materiaActual, $examenActual): string {
             $clases = 'inline-flex items-center justify-center box-border border border-transparent focus:ring-4 focus:ring-brand-medium shadow-xs font-medium leading-5 rounded-base focus:outline-none text-white bg-brand hover:bg-brand-strong px-3 py-1.5 text-xs';
 
             return sprintf(
@@ -60,6 +64,7 @@
                     'nombre' => $nombre,
                     'sis' => $sis,
                     'materia' => $materiaActual,
+                    'examen' => $examenActual,
                     'rol' => str_starts_with($registro, 'Aux.') ? 'auxiliar' : 'docente',
                     'usuario' => str_starts_with($registro, 'Aux.') ? 3 : 1,
                 ])),
