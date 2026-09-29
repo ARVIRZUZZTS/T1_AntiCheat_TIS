@@ -25,9 +25,20 @@
     - 2026-09-26  [Valery D. Ortuno P]  feat: buscador de estudiantes, motivos del
       equipo, vista responsive de escritorio y móvil, y estado derivado del rol
       recibido por la URL; se quitan los textos de ayuda de cada campo.
+<<<<<<< HEAD
     - 2026-09-28  [Candy]  feat: el enlace de vuelta sigue a la pantalla desde la
       que se abrió el formulario, para que al entrar desde la central de riesgo
       no devuelva al monitor en vivo.
+=======
+    - 2026-09-28  [Valery D. Ortuno P]  fix: nombre y apellido en campos
+      separados, materia precargada del monitor como solo lectura (o texto libre
+      si no llega), motivos acordados con el equipo y textos sin acentos
+      pedidos; más espacio entre tarjetas, campos y botones, materia junto a la
+      fecha del registro y estado como insignia compacta (#66).
+    - 2026-09-28  [Valery D. Ortuno P]  fix: nombre, apellido y código SIS
+      editables (fondo blanco) para registrar estudiantes que no estén en la
+      base, con indicación de "solo letras" y de "9 números" (#66).
+>>>>>>> feature/hu-5-fixes
 --}}
 
 @section('title', 'Registrar incidencia')
@@ -36,6 +47,7 @@
     $resultados = $this->resultadosBusqueda;
 @endphp
 
+<<<<<<< HEAD
 <div class="mx-auto w-full max-w-4xl space-y-5 sm:space-y-6">
     <nav aria-label="Ruta de navegación">
         <a href="{{ $this->rutaVolver }}"
@@ -54,9 +66,15 @@
          de un vistazo. El `!` es necesario porque los componentes de `x-ui`
          fijan el fondo con su propia utilidad de Tailwind. --}}
     <section class="bg-neutral-primary-soft border border-default rounded-base shadow-xs p-4 sm:p-6">
+=======
+{{-- El hueco entre las dos tarjetas es el mismo `mt-6` que usa el monitor en
+     vivo entre sus tarjetas, para que las dos pantallas se vean parejas. --}}
+<div class="mx-auto w-full max-w-4xl space-y-6">
+    <section class="bg-neutral-primary-soft border border-default rounded-base shadow-xs p-6 sm:p-8">
+>>>>>>> feature/hu-5-fixes
         <h2 class="text-lg font-semibold text-heading">Datos del estudiante</h2>
 
-        <div class="mt-4">
+        <div class="mt-6">
             <x-ui.search-input
                 name="busqueda"
                 id="busqueda"
@@ -91,42 +109,73 @@
             @endif
         </div>
 
-        <div class="mt-4 grid gap-4 sm:grid-cols-2">
+        <div class="mt-6 grid gap-5 sm:grid-cols-3">
+            {{-- Precargados desde el monitor o desde el buscador, pero editables:
+                 si el estudiante no está en la base de datos se escribe a mano. --}}
             <x-ui.input
-                label="Nombre"
+                label="Nombres *"
                 name="nombreEstudiante"
                 :value="$nombreEstudiante"
                 wire:model="nombreEstudiante"
-                readonly
+                :error="$errors->first('nombreEstudiante')"
+                maxlength="50"
+                placeholder="Nombres del estudiante"
+                class="bg-neutral-primary-soft!"
             />
 
             <x-ui.input
-                label="Código SIS"
+                label="Apellidos *"
+                name="apellidoEstudiante"
+                :value="$apellidoEstudiante"
+                wire:model="apellidoEstudiante"
+                :error="$errors->first('apellidoEstudiante')"
+                maxlength="50"
+                placeholder="Apellidos del estudiante"
+                class="bg-neutral-primary-soft!"
+            />
+
+            <x-ui.input
+                label="Código SIS *"
                 name="codigoSis"
                 :value="$codigoSis"
                 wire:model="codigoSis"
                 :error="$errors->first('codigoSis')"
-                readonly
+                maxlength="9"
+                inputmode="numeric"
+                placeholder="SIS del estudiante"
+                class="bg-neutral-primary-soft!"
             />
         </div>
     </section>
 
     {{-- Tarjeta 2: qué pasó. --}}
     <form wire:submit="registrar"
-          class="bg-neutral-primary-soft border border-default rounded-base shadow-xs p-4 sm:p-6">
+          class="bg-neutral-primary-soft border border-default rounded-base shadow-xs p-6 sm:p-8">
         <h2 class="text-lg font-semibold text-heading">Detalles de la incidencia</h2>
 
-        <div class="mt-4 grid gap-4 sm:grid-cols-2">
-            <div>
-                <span class="block mb-2.5 text-sm font-medium text-heading">Estado de la incidencia</span>
-                {{-- La insignia ocupa todo el ancho de la columna y replica el
-                     alto de los campos vecinos (`py-2.5 text-sm` mas el borde)
-                     para que no se vea mas pequena que ellos. --}}
-                <x-ui.badge
-                    :type="$this->tipoEstado"
-                    class="w-full! justify-center! px-3! py-2.5! text-sm!"
-                >{{ $this->etiquetaEstado }}</x-ui.badge>
-            </div>
+        <div class="mt-6 grid gap-5 sm:grid-cols-2">
+            @if ($this->materiaEsSoloLectura)
+                {{-- La materia precargada desde el monitor en vivo es un dato de
+                     solo lectura: no se puede cambiar en el formulario. --}}
+                <x-ui.input
+                    label="Materia"
+                    name="materia"
+                    :value="$materia"
+                    readonly
+                />
+            @else
+                {{-- Sin materia del monitor (acceso directo, por ejemplo desde
+                     la central de riesgos) se escribe a mano: solo letras,
+                     números y espacios. --}}
+                <x-ui.input
+                    label="Materia *"
+                    name="materia"
+                    wire:model.live="materia"
+                    :error="$errors->first('materia')"
+                    placeholder="Escriba la materia del examen"
+                    class="bg-neutral-primary-soft!"
+                />
+            @endif
 
             <x-ui.input
                 label="Fecha y hora del registro"
@@ -136,7 +185,7 @@
             />
         </div>
 
-        <div class="mt-4 grid gap-4 sm:grid-cols-2">
+        <div class="mt-6 grid gap-5 sm:grid-cols-2">
             <x-ui.select
                 label="Motivo de la incidencia *"
                 name="tipoIncidencia"
@@ -144,38 +193,33 @@
                 :options="$this->tiposIncidencia"
                 :selected="$tipoIncidencia"
                 :error="$errors->first('tipoIncidencia')"
-                placeholder="Seleccione un motivo"
+                placeholder="Seleccione el motivo de la incidencia"
                 class="bg-neutral-primary-soft!"
             />
 
-            <x-ui.select
-                label="Materia *"
-                name="materia"
-                wire:model.live="materia"
-                :options="$this->materias"
-                :selected="$materia"
-                :error="$errors->first('materia')"
-                placeholder="Seleccione una materia"
-                class="bg-neutral-primary-soft!"
-            />
+            <div>
+                <span class="block mb-2.5 text-sm font-medium text-heading">Estado de la incidencia</span>
+                {{-- Insignia compacta, como en el resto del sistema. --}}
+                <x-ui.badge :type="$this->tipoEstado">{{ $this->etiquetaEstado }}</x-ui.badge>
+            </div>
         </div>
 
-        <div class="mt-4">
+        <div class="mt-6">
             <x-ui.textarea
-                :label="$this->descripcionEsObligatoria ? 'Descripción del hecho *' : 'Descripción del hecho'"
+                :label="$this->descripcionEsObligatoria ? 'Descripcion del hecho *' : 'Descripcion del hecho'"
                 name="descripcion"
                 rows="4"
                 maxlength="300"
                 wire:model.live="descripcion"
                 :error="$errors->first('descripcion')"
-                placeholder="Cuente la anomalía observada durante el examen."
+                placeholder="Describa la incidencia observada durante el examen"
                 class="bg-neutral-primary-soft!"
             />
 
             <p class="mt-1 text-end text-sm text-body" aria-live="polite">{{ $this->contadorDescripcion }}</p>
         </div>
 
-        <div class="mt-5 flex flex-col-reverse gap-3 border-t border-default pt-5 sm:flex-row sm:items-center sm:justify-end">
+        <div class="mt-8 flex flex-col-reverse gap-4 border-t border-default pt-6 sm:flex-row sm:items-center sm:justify-end">
             <x-ui.button variant="secondary" wire:click="cancelar" wire:loading.attr="disabled">
                 Cancelar
             </x-ui.button>

@@ -10,9 +10,14 @@
  * Componente de página con el formulario de registro de una incidencia en la
  * central de riesgos. Precarga el estudiante y la materia que llegan desde el
  * monitor en vivo, permite reemplazarlos con el buscador de estudiantes de la
+<<<<<<< HEAD
  * base de datos y deriva el estado del registro del rol de quien lo realiza.
  * Desde la central de riesgo se abre sin datos precargados y el estudiante se
  * busca a mano.
+=======
+ * base de datos, escribir el estudiante a mano cuando no está en la base y
+ * deriva el estado del registro del rol de quien lo realiza.
+>>>>>>> feature/hu-5-fixes
  *
  * @changelog
  * - 2026-09-25  [Valery D. Ortuno P]  feat: creación inicial del formulario desktop.
@@ -23,16 +28,29 @@
  *   Rol::DOCENTE` que ya no compila, porque `Rol` pasó de ser un enum a un
  *   modelo Eloquent sin ese caso/constante. Se quita el parámetro y la
  *   asignación duplicada; el rol se sigue leyendo únicamente de la URL (#68).
+<<<<<<< HEAD
  * - 2026-09-28  [Candy]  feat: segunda entrada al formulario, la central de
  *   riesgo, que abre el formulario en blanco para que la persona busque al
  *   estudiante; el enlace de vuelta y el cancelar siguen a la pantalla de
  *   origen.
+=======
+ * - 2026-09-28  [Valery D. Ortuno P]  fix: nombre y apellido por separado,
+ *   motivos actualizados a los acordados por el equipo, materia precargada del
+ *   monitor como solo lectura o texto libre con solo letras, números y espacios
+ *   (#66).
+ * - 2026-09-28  [Valery D. Ortuno P]  fix: nombre, apellido y código SIS pasan a
+ *   ser editables para poder registrar a un estudiante que no esté en la base,
+ *   con validación de solo letras para el nombre y el apellido y de 9 dígitos
+ *   para el código SIS (#66).
+ * - 2026-09-28  [Valery D. Ortuno P]  fix: mensajes de validación propios para
+ *   cada campo, porque la aplicación está en inglés y Laravel respondía "The
+ *   nombre field is required" (#66).
+>>>>>>> feature/hu-5-fixes
  */
 
 namespace App\Livewire\Monitoreo;
 
 use App\Enums\TipoInfraccion;
-use App\Models\Curso;
 use App\Models\Estudiante;
 use App\Models\Rol;
 use Illuminate\Contracts\View\View;
@@ -66,6 +84,21 @@ class RegistrarIncidencia extends Component
      * @var int
      */
     public const DESCRIPCION_MAXIMO = 300;
+
+    /**
+     * Caracteres admitidos en el nombre y el apellido del estudiante, el mismo
+     * ancho que sus columnas en la tabla `estudiante`.
+     *
+     * @var int
+     */
+    public const NOMBRE_MAXIMO = 50;
+
+    /**
+     * Caracteres admitidos en la materia escrita a mano.
+     *
+     * @var int
+     */
+    public const MATERIA_MAXIMO = 100;
  
     /**
      * Caracteres mínimos antes de consultar estudiantes en la base de datos.
@@ -107,16 +140,16 @@ class RegistrarIncidencia extends Component
      * Motivos de incidencia que se ofrecen en el selector, con el valor que se
      * persiste y la etiqueta que ve el usuario.
      *
-     * TODO(@valerydariana98, 2026-09-26): reemplazar el catálogo por los tipos
-     * de incidencia registrados en la base de datos (#70). Hoy no existe la
-     * tabla que los almacene, solo el campo de texto libre `detalle_motivo`.
+     * TODO(@valerydariana98, 2026-09-28): al persistir, guardar el valor elegido
+     * en `detalle_motivo` de la central de riesgos (#70).
      *
      * @var array<string, string>
      */
     private const TIPOS_INCIDENCIA = [
-        'uso_de_dispositivo' => 'Uso de dispositivo electrónico',
-        'ingreso_no_autorizado' => 'Ingreso a examen no autorizado',
-        'copia_o_ayuda_externa' => 'Copia o ayuda externa',
+        'intento_de_ingreso_no_autorizado' => 'Intento de Ingreso a examen no autorizado',
+        'uso_de_dispositivos_electronicos' => 'Uso de dispositivos electrónicos no autorizados',
+        'copia_o_intercambio_de_respuestas' => 'Copia o intercambio de respuestas',
+        'uso_de_material_no_autorizado' => 'Uso de material no autorizado',
         'suplantacion_de_identidad' => 'Suplantación de identidad',
         self::MOTIVO_OTRO => 'Otro',
     ];
@@ -149,6 +182,13 @@ class RegistrarIncidencia extends Component
      * @var string
      */
     public string $nombreEstudiante = '';
+
+    /**
+     * Apellido del estudiante sobre el que se registra la incidencia.
+     *
+     * @var string
+     */
+    public string $apellidoEstudiante = '';
  
     /**
      * Código SIS del estudiante sobre el que se registra la incidencia.
@@ -158,7 +198,8 @@ class RegistrarIncidencia extends Component
     public string $codigoSis = '';
  
     /**
-     * Materia del examen en el que se observa la anomalía.
+     * Materia del examen en el que se observa la anomalía, precargada desde el
+     * monitor o escrita a mano cuando no viaja por la URL.
      *
      * @var string
      */
@@ -208,12 +249,15 @@ class RegistrarIncidencia extends Component
             return;
         }
 
-        $this->nombreEstudiante = (string) request()->query('nombre', '');
+        [$nombre, $apellido] = $this->separarNombre((string) request()->query('nombre', ''));
+        $this->nombreEstudiante = $nombre;
+        $this->apellidoEstudiante = $apellido;
         $this->codigoSis = (string) request()->query('sis', '');
         $this->materia = (string) request()->query('materia', '');
     }
 
     /**
+<<<<<<< HEAD
      * Pantalla a la que vuelve el formulario, según desde dónde se abrió.
      *
      * @return string  URL de la pantalla de origen.
@@ -247,6 +291,27 @@ class RegistrarIncidencia extends Component
             : 'Volver al monitor en vivo';
     }
 
+=======
+     * Divide el nombre completo que llega del monitor en nombre y apellido.
+     *
+     * El monitor envía "Nombres Apellidos" en un solo parámetro y el formulario
+     * los muestra por separado; si la persona tiene más de una palabra, el resto
+     * se acumula en el apellido.
+     *
+     * @param  string  $completo  Nombre recibido desde la pantalla de origen.
+     * @return array{0: string, 1: string}  Nombre y apellido por separado.
+     *
+     * @author Valery D. Ortuno P. <valerydariana98@gmail.com>
+     * @since  2026-09-28
+     */
+    private function separarNombre(string $completo): array
+    {
+        $partes = explode(' ', trim($completo), 2);
+
+        return [trim($partes[0] ?? ''), trim($partes[1] ?? '')];
+    }
+ 
+>>>>>>> feature/hu-5-fixes
     /**
      * Tipo de infracción con el que se persiste el registro, derivado del rol
      * de quien lo realiza: un docente confirma y un auxiliar deja el caso en
@@ -299,7 +364,7 @@ class RegistrarIncidencia extends Component
     }
  
     /**
-     * Motivos disponibles para el selector de la vista.
+     * Los motivos disponibles para el selector de la vista.
      *
      * @return array<string, string>  Motivos indexados por valor persistible.
      *
@@ -311,27 +376,26 @@ class RegistrarIncidencia extends Component
     {
         return self::TIPOS_INCIDENCIA;
     }
- 
+
     /**
-     * Materias que se ofrecen en el selector, tomadas de la tabla `curso`.
+     * Si la materia llegó precargada desde el monitor en vivo y, por lo tanto,
+     * no se puede modificar en el formulario.
      *
-     * TODO(@valerydariana98, 2026-09-26): acotar a los cursos del estudiante
-     * elegido y a los que siguen en curso (`curso.estado = 'EnCurso'`) cuando
-     * el grupo defina esa regla (#67).
+     * La distinción la da la pantalla de origen, no que el campo tenga texto:
+     * cuando el formulario se abre sin monitor (central de riesgos, por
+     * ejemplo), la materia se escribe a mano.
      *
-     * @return Collection<int, string>  Materias indexadas por su nombre.
+     * @return bool  Verdadero cuando la materia viene del monitor.
      *
      * @author Valery D. Ortuno P. <valerydariana98@gmail.com>
-     * @since  2026-09-26
+     * @since  2026-09-28
      */
     #[Computed]
-    public function materias(): Collection
+    public function materiaEsSoloLectura(): bool
     {
-        return Curso::query()
-            ->orderBy('nombre_curso')
-            ->pluck('nombre_curso', 'nombre_curso');
+        return $this->origen === self::ORIGEN_MONITOREO;
     }
-
+ 
     /**
      * Estudiantes que coinciden con lo escrito en el buscador, por nombre,
      * apellido o código SIS.
@@ -425,7 +489,8 @@ class RegistrarIncidencia extends Component
         }
 
         $this->codigoSis = $estudiante->sis_estudiante;
-        $this->nombreEstudiante = trim($estudiante->nombre_estudiante.' '.$estudiante->apellido_estudiante);
+        $this->nombreEstudiante = $estudiante->nombre_estudiante;
+        $this->apellidoEstudiante = $estudiante->apellido_estudiante;
         $this->busqueda = '';
         $this->resetErrorBag('codigoSis');
     }
@@ -442,8 +507,25 @@ class RegistrarIncidencia extends Component
     protected function rules(): array
     {
         return [
-            'codigoSis' => ['required', 'string'],
-            'materia' => ['required', 'string'],
+            'nombreEstudiante' => [
+                'required',
+                'string',
+                'max:'.self::NOMBRE_MAXIMO,
+                'regex:/^[\p{L}\s]+$/u',
+            ],
+            'apellidoEstudiante' => [
+                'required',
+                'string',
+                'max:'.self::NOMBRE_MAXIMO,
+                'regex:/^[\p{L}\s]+$/u',
+            ],
+            'codigoSis' => ['required', 'digits:9'],
+            'materia' => [
+                'required',
+                'string',
+                'max:'.self::MATERIA_MAXIMO,
+                'regex:/^[\p{L}\p{N}\s]+$/u',
+            ],
             'tipoIncidencia' => ['required', Rule::in(array_keys(self::TIPOS_INCIDENCIA))],
             'descripcion' => [
                 Rule::requiredIf(fn (): bool => $this->descripcionEsObligatoria()),
@@ -465,13 +547,18 @@ class RegistrarIncidencia extends Component
     protected function validationAttributes(): array
     {
         return [
+            'nombreEstudiante' => 'nombre',
+            'apellidoEstudiante' => 'apellido',
             'codigoSis' => 'código SIS',
             'tipoIncidencia' => 'motivo',
         ];
     }
  
     /**
-     * Mensajes de validación personalizados para los campos obligatorios.
+     * Mensajes de validación en el idioma de la interfaz.
+     *
+     * Todos los campos llevan su propio mensaje: la aplicación corre en inglés,
+     * así que sin esto Laravel respondería "The nombre field is required".
      *
      * @return array<string, string>  Mensaje por regla incumplida.
      *
@@ -481,6 +568,17 @@ class RegistrarIncidencia extends Component
     protected function messages(): array
     {
         return [
+            'nombreEstudiante.required' => 'Ingrese el nombre del estudiante.',
+            'nombreEstudiante.regex' => 'El nombre solo puede contener letras.',
+            'nombreEstudiante.max' => 'El nombre admite un máximo de '.self::NOMBRE_MAXIMO.' caracteres.',
+            'apellidoEstudiante.required' => 'Ingrese el apellido del estudiante.',
+            'apellidoEstudiante.regex' => 'El apellido solo puede contener letras.',
+            'apellidoEstudiante.max' => 'El apellido admite un máximo de '.self::NOMBRE_MAXIMO.' caracteres.',
+            'codigoSis.required' => 'Ingrese el código SIS del estudiante.',
+            'codigoSis.digits' => 'El código SIS debe tener 9 números.',
+            'materia.required' => 'Ingrese la materia del examen.',
+            'materia.regex' => 'La materia solo puede contener letras, números y espacios.',
+            'materia.max' => 'La materia admite un máximo de '.self::MATERIA_MAXIMO.' caracteres.',
             'tipoIncidencia.required' => 'Seleccione el motivo de la incidencia.',
             'tipoIncidencia.in' => 'Seleccione un motivo válido de la lista.',
             'descripcion.required' => 'Describa el hecho observado.',
