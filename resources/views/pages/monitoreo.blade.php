@@ -1,3 +1,27 @@
+{{--
+    @file    monitoreo.blade.php
+    @author  David E. Chavez T. <virzuzz12345@gmail.com>
+    @author  Candy <camitkdos@gmail.com>
+    @created 2026-09-24
+    @updated 2026-09-28
+
+    @description
+    Pantalla del monitor en vivo con las sesiones de los exámenes (vista mock):
+    lista los estudiantes con su estado actual y el botón de cada fila que abre
+    el formulario de registro de incidencia. Desde aquí la entrada precarga
+    estudiante y rol en la URL, que es lo que distingue esta pantalla de la
+    central de riesgo, donde el estudiante se busca a mano.
+
+    @changelog
+    - 2026-09-24  [David E. Chavez T.]  feat: creación inicial de la vista.
+    - 2026-09-28  [Candy]  fix: la etiqueta del botón de la fila pasa de "Reporte"
+      a "Reportar", para que sea el verbo de la acción y no se lea como el
+      nombre de un documento.
+
+    @see  \App\Livewire\Monitoreo\RegistrarIncidencia
+    @see  resources/views/components/ui/table.blade.php
+--}}
+
 @extends('layouts.app')
 
 @section('title', 'Monitor en vivo')
@@ -22,21 +46,27 @@
            titulo de la tabla y todos los botones de reporte. */
         $materiaActual = 'Introduccion a la Programacion';
 
+        /* Examen en curso, que es de donde se deriva la materia al guardar la
+           incidencia: `central_riesgo.id_examen` no admite null (#70). */
+        $examenActual = 3;
+
         /* Boton de reporte de una fila: lleva al formulario de registro de
-           incidencias con el estudiante, la materia del examen y el rol de
-           quien lo registro, que es el dato que decide si la incidencia queda
-           confirmada o en revision. */
-        $registrarBtn = function (string $nombre, string $sis, string $registro) use ($materiaActual): string {
+           incidencias con el estudiante, la materia del examen, el examen en
+           curso y el rol de quien lo registro, que es el dato que decide si la
+           incidencia queda confirmada o en revision. */
+        $registrarBtn = function (string $nombre, string $sis, string $registro) use ($materiaActual, $examenActual): string {
             $clases = 'inline-flex items-center justify-center box-border border border-transparent focus:ring-4 focus:ring-brand-medium shadow-xs font-medium leading-5 rounded-base focus:outline-none text-white bg-brand hover:bg-brand-strong px-3 py-1.5 text-xs';
 
             return sprintf(
-                '<a href="%s" class="%s">Reporte</a>',
+                '<a href="%s" class="%s">Reportar</a>',
                 e(route('registrar-incidencia', [
                     'origen' => 'monitoreo',
                     'nombre' => $nombre,
                     'sis' => $sis,
                     'materia' => $materiaActual,
+                    'examen' => $examenActual,
                     'rol' => str_starts_with($registro, 'Aux.') ? 'auxiliar' : 'docente',
+                    'usuario' => str_starts_with($registro, 'Aux.') ? 3 : 1,
                 ])),
                 $clases,
             );

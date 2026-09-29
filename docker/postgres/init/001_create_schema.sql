@@ -257,8 +257,16 @@ CREATE TABLE registro_asistencia (
 --
 -- La materia NO se guarda: se deriva con
 -- `id_examen -> examen_curso -> curso.nombre_curso`.
+--
+-- `id_registro` recibe su valor de una secuencia y no de la aplicacion: asi
+-- dos registros simultaneos no calculan el mismo id, y el numero se le puede
+-- mostrar a quien registro la incidencia sin volver a consultarlo (#70). La
+-- secuencia se deja en 1 porque la semilla escribe los ids a mano; `002_seed_
+-- data.sql` la adelanta al final para que el primer reporte no choque.
+CREATE SEQUENCE central_riesgo_id_registro_seq;
+
 CREATE TABLE central_riesgo (
-  id_registro     integer PRIMARY KEY,
+  id_registro     integer PRIMARY KEY DEFAULT nextval('central_riesgo_id_registro_seq'),
   sis_estudiante  varchar(20) NOT NULL,     -- el estudiante, exista o no antes en la base
   id_examen       integer NOT NULL,         -- de aqui sale la materia
   id_registrador  integer NOT NULL,         -- docente o auxiliar que registro la incidencia
@@ -298,4 +306,25 @@ CREATE TABLE invitacion_examen_compartido (
   estado               invitacion_estado NOT NULL,
   CONSTRAINT fk_iec_docente FOREIGN KEY (id_docente_invitado) REFERENCES usuario(id_usuario),
   CONSTRAINT fk_iec_examen  FOREIGN KEY (id_examen)           REFERENCES examen(id_examen)
+);
+
+CREATE TABLE sessions (
+    id VARCHAR(255) PRIMARY KEY,
+    user_id BIGINT NULL,
+    ip_address VARCHAR(45) NULL,
+    user_agent TEXT NULL,
+    payload TEXT NOT NULL,
+    last_activity INT NOT NULL
+);
+
+CREATE TABLE cache (
+    key VARCHAR(255) PRIMARY KEY,
+    value TEXT NOT NULL,
+    expiration INT NOT NULL
+);
+
+CREATE TABLE cache_locks (
+    key VARCHAR(255) PRIMARY KEY,
+    owner VARCHAR(255) NOT NULL,
+    expiration INT NOT NULL
 );

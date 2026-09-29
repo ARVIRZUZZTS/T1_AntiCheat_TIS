@@ -24,6 +24,9 @@
  * - 2026-09-29  [Valery D. Ortuno P]  fix: `id_ingreso` pasa a ser opcional y se
  *   agregan `sis_estudiante`, `id_examen` y `motivo`; `fecha_registro` pasa a
  *   `timestamp` y la infracción queda en tramposo o sospechoso (#70).
+ * - 2026-09-29  [Candy]  feat: `materia()` deriva la materia del examen, que ya
+ *   no se guarda en la tabla, y `fillable` queda con las columnas del esquema
+ *   nuevo; el id lo asigna la secuencia de la base (#70).
  */
 
 namespace App\Models;
@@ -32,7 +35,6 @@ use App\Enums\Motivo;
 use App\Enums\TipoInfraccion;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-
 /**
  * @property int $id_registro
  * @property string $sis_estudiante
@@ -52,12 +54,19 @@ class CentralRiesgo extends Model
 
     public $timestamps = false;
 
-    public $incrementing = false;
+    /**
+     * El id lo asigna la secuencia `central_riesgo_id_registro_seq` de la base,
+     * no la aplicación: así dos registros simultáneos no calculan el mismo y el
+     * número se le puede mostrar a quien registró la incidencia sin volver a
+     * consultarlo.
+     *
+     * @var bool
+     */
+    public $incrementing = true;
 
     protected $keyType = 'int';
 
     protected $fillable = [
-        'id_registro',
         'sis_estudiante',
         'id_examen',
         'id_registrador',
@@ -107,5 +116,23 @@ class CentralRiesgo extends Model
     public function registroAsistencia(): BelongsTo
     {
         return $this->belongsTo(RegistroAsistencia::class, 'id_ingreso');
+    }
+    
+    /**
+     * Materia del examen en el que se observó la incidencia.
+     *
+     * No es una columna: se deriva con la cadena
+     * `id_examen -> examen_curso -> curso.nombre_curso`, que es la única fuente
+     * de verdad de la materia. Si el examen todavía no tiene curso asignado
+     * devuelve null en vez de fallar, porque es un dato que se puede auditar
+     * después sin perder la incidencia.
+     *
+     * @return ?string  Nombre del curso, o null si el examen no tiene curso.
+     */
+    public function materia(): ?string
+    {
+        $curso = $this->examen?->cursos->first();
+
+        return $curso?->nombre_curso;
     }
 }

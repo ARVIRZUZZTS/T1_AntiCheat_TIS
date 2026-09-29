@@ -11,7 +11,8 @@
  * central de riesgos. Precarga el estudiante y la materia que llegan desde el
  * monitor en vivo, permite reemplazarlos con el buscador de estudiantes de la
  * base de datos, escribir el estudiante a mano cuando no está en la base y
- * deriva el estado del registro del rol de quien lo realiza.
+ * deriva el estado del registro del rol de quien lo realiza. Desde la central de
+ * riesgo se abre sin datos precargados y el estudiante se busca a mano.
  *
  * @changelog
  * - 2026-09-25  [Valery D. Ortuno P]  feat: creación inicial del formulario desktop.
@@ -22,6 +23,10 @@
  *   Rol::DOCENTE` que ya no compila, porque `Rol` pasó de ser un enum a un
  *   modelo Eloquent sin ese caso/constante. Se quita el parámetro y la
  *   asignación duplicada; el rol se sigue leyendo únicamente de la URL (#68).
+ * - 2026-09-28  [Candy]  feat: segunda entrada al formulario, la central de
+ *   riesgo, que abre el formulario en blanco para que la persona busque al
+ *   estudiante; el enlace de vuelta y el cancelar siguen a la pantalla de
+ *   origen.
  * - 2026-09-28  [Valery D. Ortuno P]  fix: nombre y apellido por separado,
  *   motivos actualizados a los acordados por el equipo, materia precargada del
  *   monitor como solo lectura o texto libre con solo letras, números y espacios
@@ -36,17 +41,32 @@
  * - 2026-09-28  [Valery D. Ortuno P]  fix: mensajes de validación propios para
  *   cada campo, porque la aplicación está en inglés y Laravel respondía "The
  *   nombre field is required" (#66).
+ * - 2026-09-28  [Candy]  feat: al registrar se guarda la incidencia en
+ *   `central_riesgo` con el estudiante, el usuario registrador, la materia, el
+ *   estado, el motivo, la descripción y la fecha con hora, y se abre un modal de
+ *   confirmación con el resumen de lo guardado, cuyo botón Aceptar termina el
+ *   proceso y devuelve a la pantalla de origen (#70).
+ * - 2026-09-29  [Candy]  feat: el registro se alinea con el esquema de
+ *   `central_riesgo` que quedó tras el merge: se guarda `sis_estudiante`,
+ *   `id_examen`, el motivo del enum `Motivo` y el detalle en `detalle_motivo`.
+ *   La materia ya no es columna, sale del examen, y el modal muestra la del
+ *   examen registrado. El código SIS tiene que existir en la base, porque la
+ *   columna tiene llave foránea (#70).
  */
-
 namespace App\Livewire\Monitoreo;
 
+use App\Enums\Motivo;
 use App\Enums\TipoInfraccion;
+use App\Models\CentralRiesgo;
 use App\Models\Estudiante;
+use App\Models\Examen;
 use App\Models\Rol;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
  
@@ -107,6 +127,9 @@ class RegistrarIncidencia extends Component
     /**
      * Motivo que obliga a describir el hecho, porque no encaja en los demás.
      *
+     * Es el valor del caso `Motivo::Otro`, que se escribe literal para no
+     * arrastrar el enum a los tests.
+     *
      * @var string
      */
     public const MOTIVO_OTRO = 'otro';
@@ -119,23 +142,24 @@ class RegistrarIncidencia extends Component
     public const ORIGEN_MONITOREO = 'monitoreo';
 
     /**
-     * Motivos de incidencia que se ofrecen en el selector, con el valor que se
-     * persiste y la etiqueta que ve el usuario.
+     * Pantalla desde la que se abrió el formulario sin datos precargados: la
+     * central de riesgo, donde el estudiante se busca a mano.
      *
-     * TODO(@valerydariana98, 2026-09-28): al persistir, guardar el valor elegido
-     * en `detalle_motivo` de la central de riesgos (#70).
-     *
-     * @var array<string, string>
+     * @var string
      */
-    private const TIPOS_INCIDENCIA = [
-        'intento_de_ingreso_no_autorizado' => 'Intento de Ingreso a examen no autorizado',
-        'uso_de_dispositivos_electronicos' => 'Uso de dispositivos electrónicos no autorizados',
-        'copia_o_intercambio_de_respuestas' => 'Copia o intercambio de respuestas',
-        'uso_de_material_no_autorizado' => 'Uso de material no autorizado',
-        'suplantacion_de_identidad' => 'Suplantación de identidad',
-        self::MOTIVO_OTRO => 'Otro',
-    ];
- 
+    public const ORIGEN_CENTRAL_RIESGO = 'central-riesgo';
+
+    /**
+     * Registrador usado cuando la pantalla de origen no envía ninguno.
+     *
+     * Es el primer usuario de `docker/postgres/init/002_seed_data.sql`. Existe
+     * solo para que el registro se pueda guardar sin login; en cuanto la
+     * aplicación tenga autenticación (#69) deja de usarse.
+     *
+     * @var int
+     */
+    public const USUARIO_POR_DEFECTO = 1;
+
     /**
      * Pantalla desde la que se abrió el formulario.
      *
@@ -150,6 +174,31 @@ class RegistrarIncidencia extends Component
      * @var string  Uno de los valores de \App\Models\Rol::NOMBRE_*.
      */
     public string $rol = Rol::NOMBRE_DOCENTE;
+
+    /**
+     * Usuario de la tabla `usuario` que queda como registrador de la incidencia.
+     *
+     * No hay autenticación en la aplicación, así que el id viaja por la URL junto
+     * al rol, igual que este. Si no llega ninguno se usa el primer usuario
+     * sembrado, para que la columna `id_registrador`, que es NOT NULL, nunca
+     * deje la incidences sin poder guardar.
+     *
+     * @var int
+     */
+    public int $usuario = self::USUARIO_POR_DEFECTO;
+
+    /**
+     * Examen en el que se observó la incidencia, del que se deriva la materia.
+     *
+     * `central_riesgo.id_examen` es NOT NULL porque la materia ya no se guarda:
+     * sale de `id_examen -> examen_curso -> curso.nombre_curso`. El monitor en
+     * vivo, que sigue un solo examen, lo manda por la URL; desde la central de
+     * riesgo, donde no hay un examen en curso, se resuelve con
+     * `resolverExamen()` al validar.
+     *
+     * @var int
+     */
+    public int $idExamen = 0;
 
     /**
      * Texto escrito en el buscador de estudiantes.
@@ -199,14 +248,17 @@ class RegistrarIncidencia extends Component
     public string $materia = '';
  
     /**
-     * Motivo de la incidencia, con un valor de `TIPOS_INCIDENCIA`.
+     * Motivo de la incidencia, con el valor de un caso de `Motivo`.
      *
      * @var string
      */
     public string $tipoIncidencia = '';
- 
+
     /**
      * Detalle de lo ocurrido, con un máximo de `DESCRIPCION_MAXIMO` caracteres.
+     *
+     * Se guarda en `detalle_motivo`, que es la columna que la base reserva para
+     * el texto libre del motivo.
      *
      * @var string
      */
@@ -218,14 +270,36 @@ class RegistrarIncidencia extends Component
      * @var string
      */
     public string $fechaHoraRegistro = '';
+
+    /**
+     * Si el modal de confirmación ya está abierto, es decir, si la incidencia
+     * quedó registrada y solo falta que la persona lo acepte para volver a la
+     * pantalla de origen.
+     *
+     * @var bool
+     */
+    public bool $confirmacionVisible = false;
+
+    /**
+     * Copia de los datos validados en el momento del registro, para que el modal
+     * muestre siempre lo que se acaba de guardar y no lo que el formulario
+     * tuviera escrito después.
+     *
+     * @var array<string, string>
+     */
+    public array $resumen = [];
  
     /**
      * Precarga el estudiante, la materia y la fecha con lo que llega por la URL.
      *
-     * El monitor es la única entrada por ahora: si no viaja el contexto, el
-     * formulario se abre en blanco para completarlo a mano. El rol también
-     * llega por la URL como texto (uno de `Rol::NOMBRE_*`), porque `Rol` es un
-     * modelo de la tabla `rol` y no un enum con casos fijos.
+     * El monitor es la única entrada que precarga datos: si el origen no es el
+     * monitor —como pasa al entrar desde la central de riesgo— el formulario se
+     * abre en blanco para que la persona busque al estudiante y escriba el
+     * motivo. El rol también llega por la URL como texto (uno de `Rol::NOMBRE_*`),
+     * porque `Rol` es un modelo de la tabla `rol` y no un enum con casos fijos.
+     *
+     * El id del examen llega siempre por la URL, venga del monitor o no, porque
+     * la materia se deriva de él y `central_riesgo.id_examen` no admite null.
      *
      * @author Valery D. Ortuno P. <valerydariana98@gmail.com>
      * @author Amiddala
@@ -236,6 +310,8 @@ class RegistrarIncidencia extends Component
         $this->fechaHoraRegistro = now()->format('d/m/Y H:i');
         $this->origen = (string) request()->query('origen', '');
         $this->rol = (string) request()->query('rol', Rol::NOMBRE_DOCENTE);
+        $this->usuario = (int) request()->query('usuario', self::USUARIO_POR_DEFECTO);
+        $this->idExamen = (int) request()->query('examen', 0);
 
         if ($this->origen !== self::ORIGEN_MONITOREO) {
             return;
@@ -247,6 +323,41 @@ class RegistrarIncidencia extends Component
         $this->codigoSis = (string) request()->query('sis', '');
         $this->sisPrecargado = $this->codigoSis;
         $this->materia = (string) request()->query('materia', '');
+    }
+
+    /**
+    /**
+     * Pantalla a la que vuelve el formulario, según desde dónde se abrió.
+     *
+     * @return string  URL de la pantalla de origen.
+     *
+     * @author Candy
+     * @since  2026-09-28
+     */
+    #[Computed]
+    public function rutaVolver(): string
+    {
+        return match ($this->origen) {
+            self::ORIGEN_CENTRAL_RIESGO => route('central-riesgo'),
+            default => route('monitoreo'),
+        };
+    }
+
+    /**
+     * Texto del enlace que regresa a la pantalla desde la que se abrió el
+     * formulario.
+     *
+     * @return string  Etiqueta del enlace de vuelta.
+     *
+     * @author Candy
+     * @since  2026-09-28
+     */
+    #[Computed]
+    public function etiquetaVolver(): string
+    {
+        return $this->origen === self::ORIGEN_CENTRAL_RIESGO
+            ? 'Volver a la central de riesgo'
+            : 'Volver al monitor en vivo';
     }
 
     /**
@@ -264,11 +375,12 @@ class RegistrarIncidencia extends Component
      */
     private function separarNombre(string $completo): array
     {
+        // `explode` siempre devuelve al menos un elemento, así que solo el
+        // segundo —el apellido— puede faltar cuando no hay espacio.
         $partes = explode(' ', trim($completo), 2);
 
-        return [trim($partes[0] ?? ''), trim($partes[1] ?? '')];
+        return [trim($partes[0]), trim($partes[1] ?? '')];
     }
- 
     /**
      * Tipo de infracción con el que se persiste el registro, derivado del rol
      * de quien lo realiza: un docente confirma y un auxiliar deja el caso en
@@ -321,7 +433,9 @@ class RegistrarIncidencia extends Component
     }
  
     /**
-     * Los motivos disponibles para el selector de la vista.
+     * Los motivos disponibles para el selector de la vista, tomados del enum
+     * `Motivo` para que el valor que se guarda y la etiqueta que se ve no se
+     * dupliquen en la aplicación.
      *
      * @return array<string, string>  Motivos indexados por valor persistible.
      *
@@ -331,7 +445,13 @@ class RegistrarIncidencia extends Component
     #[Computed]
     public function tiposIncidencia(): array
     {
-        return self::TIPOS_INCIDENCIA;
+        $motivos = [];
+
+        foreach (Motivo::cases() as $motivo) {
+            $motivos[$motivo->value] = $motivo->etiqueta();
+        }
+
+        return $motivos;
     }
 
     /**
@@ -352,7 +472,7 @@ class RegistrarIncidencia extends Component
     {
         return $this->origen === self::ORIGEN_MONITOREO;
     }
- 
+
     /**
      * Estudiantes que coinciden con lo escrito en el buscador, por nombre,
      * apellido o código SIS.
@@ -477,14 +597,19 @@ class RegistrarIncidencia extends Component
                 'max:'.self::NOMBRE_MAXIMO,
                 'regex:/^[\p{L}\s]+$/u',
             ],
-            'codigoSis' => $this->reglasCodigoSis(),
+            // La columna `sis_estudiante` tiene llave foránea contra
+            // `estudiante`, así que el código escrito tiene que existir en la
+            // base: registrar a alguien que no está en la tabla ya no es
+            // posible (#70).
+            'codigoSis' => ['required', 'digits:9', Rule::exists('estudiante', 'sis_estudiante')],
             'materia' => [
                 'required',
                 'string',
                 'max:'.self::MATERIA_MAXIMO,
                 'regex:/^[\p{L}\p{N}\s]+$/u',
             ],
-            'tipoIncidencia' => ['required', Rule::in(array_keys(self::TIPOS_INCIDENCIA))],
+            'tipoIncidencia' => ['required', Rule::in(array_keys($this->tiposIncidencia))],
+            'usuario' => ['required', 'integer', Rule::exists('usuario', 'id_usuario')],
             'descripcion' => [
                 Rule::requiredIf(fn (): bool => $this->descripcionEsObligatoria()),
                 'nullable',
@@ -559,29 +684,36 @@ class RegistrarIncidencia extends Component
             'apellidoEstudiante.max' => 'El apellido admite un máximo de '.self::NOMBRE_MAXIMO.' caracteres.',
             'codigoSis.required' => 'Ingrese el código SIS del estudiante.',
             'codigoSis.digits' => 'El código SIS debe tener 9 números.',
-            'codigoSis.unique' => 'Este código SIS ya está registrado.',
+            'codigoSis.exists' => 'El código SIS no corresponde a un estudiante de la base de datos.',
             'materia.required' => 'Ingrese la materia del examen.',
             'materia.regex' => 'La materia solo puede contener letras, números y espacios.',
             'materia.max' => 'La materia admite un máximo de '.self::MATERIA_MAXIMO.' caracteres.',
             'tipoIncidencia.required' => 'Seleccione el motivo de la incidencia.',
             'tipoIncidencia.in' => 'Seleccione un motivo válido de la lista.',
+            'usuario.required' => 'No se identificó al usuario que registra la incidencia.',
+            'usuario.exists' => 'El usuario que registra la incidencia no existe.',
             'descripcion.required' => 'Describa el hecho observado.',
             'descripcion.max' => 'La descripción admite un máximo de '.self::DESCRIPCION_MAXIMO.' caracteres.',
         ];
     }
  
     /**
-     * Registra la incidencia con los datos ingresados en el formulario.
+     * Registra la incidencia con los datos ingresados en el formulario y abre el
+     * modal de confirmación con el resumen de lo guardado.
      *
-     * Valida los campos obligatorios y calcula el estado del registro según el
-     * rol de quien lo realiza; el guardado en la central de riesgos queda a
-     * cargo de la tarea #70.
+     * La materia del formulario no se persiste: la base la deriva de
+     * `id_examen -> examen_curso -> curso.nombre_curso`. El campo sigue en
+     * pantalla porque es el dato que la persona ve y con el que reconoce el
+     * examen, pero el resumen del modal muestra la materia real del examen
+     * registrado, no la escrita.
      *
      * @return void
      *
      * @throws \Illuminate\Validation\ValidationException  Si falta el estudiante,
      *                                                       la materia o el motivo,
-     *                                                       si la descripción es
+     *                                                       si el estudiante no
+     *                                                       está en la base, si la
+     *                                                       descripción es
      *                                                       obligatoria y está vacía,
      *                                                       o si excede el límite.
      *
@@ -591,17 +723,167 @@ class RegistrarIncidencia extends Component
      */
     public function registrar(): void
     {
+        // Con el modal abierto la incidencia ya quedó registrada: un segundo
+        // envío (doble clic, Enter repetido) no debe volver a pasar por aquí.
+        if ($this->confirmacionVisible) {
+            return;
+        }
+
         $this->validate();
- 
-        // TODO(@Amiddala, 2026-09-25): persistir los datos validados junto con
-        // $this->tipoInfraccion en la central de riesgos y refrescar la
-        // lista de incidencias recientes (#70).
+
+        $estudiante = $this->resolverEstudiante();
+
+        $registro = CentralRiesgo::create([
+            'sis_estudiante' => (string) $estudiante?->sis_estudiante,
+            'id_examen' => $this->resolverExamen($estudiante),
+            'id_registrador' => $this->usuario,
+            'motivo' => Motivo::from($this->tipoIncidencia),
+            // La descripción es opcional con los motivos del catálogo, así que
+            // vacía se guarda como null y no como cadena en blanco.
+            'detalle_motivo' => $this->descripcion === '' ? null : $this->descripcion,
+            'fecha_registro' => now(),
+            'tipo_infraccion' => $this->tipoInfraccion,
+            'id_ingreso' => $this->ingresoDelEstudiante($estudiante?->sis_estudiante),
+        ]);
+
+        $nombreEnBase = $registro->estudiante === null
+            ? ''
+            : trim($registro->estudiante->nombre_estudiante.' '.$registro->estudiante->apellido_estudiante);
+
+        $nombreRegistrador = $registro->registrador === null
+            ? ''
+            : trim($registro->registrador->nombre_usuario.' '.$registro->registrador->apellido);
+
+        $this->resumen = [
+            'codigo' => (string) $registro->id_registro,
+            'estudiante' => $nombreEnBase !== ''
+                ? $nombreEnBase
+                : trim($this->nombreEstudiante.' '.$this->apellidoEstudiante),
+            'codigoSis' => (string) $registro->sis_estudiante,
+            'registrador' => $nombreRegistrador,
+            'materia' => (string) $registro->materia(),
+            'motivo' => $registro->motivo->etiqueta(),
+            'estado' => $this->etiquetaEstado,
+            'fechaHora' => $registro->fecha_registro->format('d/m/Y H:i'),
+            'descripcion' => (string) $registro->detalle_motivo,
+        ];
+
+        $this->confirmacionVisible = true;
+    }
+
+    /**
+     * Estudiante de la base de datos al que pertenece el código SIS escrito, o
+     * null cuando no hay ninguno con ese código.
+     *
+     * @return ?Estudiante
+     */
+    private function resolverEstudiante(): ?Estudiante
+    {
+        return Estudiante::query()->find($this->codigoSis);
+    }
+
+    /**
+     * Examen al que se cuelga la incidencia, que es de donde sale la materia.
+     *
+     * `central_riesgo.id_examen` es NOT NULL, así que tiene que haber uno. Se
+     * busca en este orden:
+     *
+     * 1. El que manda el monitor en vivo por la URL, que es el examen que está
+     *    siguiendo en ese momento.
+     * 2. El último examen en el que el estudiante tiene fila de asistencia,
+     *    que es el examen del que viene la sospecha cuando la incidencia se
+     *    reporta desde la central de riesgos.
+     * 3. El primer examen disponible, para que el registro nunca se quede sin
+     *    guardar por un dato que la persona no elige.
+     *
+     * @param  ?Estudiante  $estudiante  Estudiante del registro, si se encontró.
+     * @return int  Id de un examen existente.
+     */
+    private function resolverExamen(?Estudiante $estudiante): int
+    {
+        $examen = $this->buscarExamen($this->idExamen);
+
+        if ($examen === null && $estudiante !== null) {
+            $examen = Examen::query()
+                ->whereIn('id_examen', DB::table('registro_asistencia')
+                    ->select('id_examen')
+                    ->where('id_estudiante', $estudiante->sis_estudiante))
+                ->orderByDesc('id_examen')
+                ->first();
+        }
+
+        $examen ??= Examen::query()->orderBy('id_examen')->first();
+
+        if ($examen === null) {
+            // Sin ningún examen en la base no hay registro posible: la materia se
+            // deriva del examen y la columna no admite null.
+            throw ValidationException::withMessages([
+                'materia' => 'No hay ningún examen registrado para asociar la incidencia.',
+            ]);
+        }
+
+        return (int) $examen->id_examen;
+    }
+
+    /**
+     * Examen con el id indicado, o null si no existe o no se indicó ninguno.
+     *
+     * @param  int  $idExamen  Id recibido por la URL.
+     * @return ?Examen
+     */
+    private function buscarExamen(int $idExamen): ?Examen
+    {
+        if ($idExamen <= 0) {
+            return null;
+        }
+
+        return Examen::query()->find($idExamen);
+    }
+
+    /**
+     * Último ingreso del estudiante, que es el que se enlaza al registro de la
+     * incidencia.
+     *
+     * Puede ser null: desde la central de riesgos se reporta a estudiantes que
+     * nunca ingressaron, y `id_ingreso` es nullable justamente para eso.
+     *
+     * @param  ?string  $sis  Código SIS del estudiante, si está en la base.
+     * @return ?int  Id del ingreso, o null si no tiene ninguno.
+     */
+    private function ingresoDelEstudiante(?string $sis): ?int
+    {
+        if ($sis === null) {
+            return null;
+        }
+
+        $ingreso = DB::table('registro_asistencia')
+            ->where('id_estudiante', $sis)
+            ->orderByDesc('hora_ingreso')
+            ->value('id_ingreso');
+
+        return $ingreso === null ? null : (int) $ingreso;
+    }
+
+    /**
+     * Cierra el modal de confirmación y devuelve a la persona a la pantalla desde
+     * la que se abrió el formulario, dando por terminado el registro.
+     *
+     * @return RedirectResponse  Redirección a la pantalla de origen.
+     *
+     * @author Candy
+     * @since  2026-09-28
+     */
+    public function aceptarRegistro(): RedirectResponse
+    {
+        $this->confirmacionVisible = false;
+
+        return redirect()->to($this->rutaVolver);
     }
  
     /**
-     * Cancela el registro y regresa al monitor en vivo.
+     * Cancela el registro y regresa a la pantalla desde la que se abrió.
      *
-     * @return RedirectResponse  Redirección al monitor o a la pantalla anterior.
+     * @return RedirectResponse  Redirección a la pantalla de origen.
      *
      * @author Valery D. Ortuno P. <valerydariana98@gmail.com>
      * @since  2026-09-25
@@ -610,6 +892,10 @@ class RegistrarIncidencia extends Component
     {
         if ($this->origen === self::ORIGEN_MONITOREO) {
             return redirect()->route('monitoreo');
+        }
+
+        if ($this->origen === self::ORIGEN_CENTRAL_RIESGO) {
+            return redirect()->route('central-riesgo');
         }
 
         return redirect()->back();
