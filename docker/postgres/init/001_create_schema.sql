@@ -307,3 +307,24 @@ CREATE TABLE invitacion_examen_compartido (
   CONSTRAINT fk_iec_docente FOREIGN KEY (id_docente_invitado) REFERENCES usuario(id_usuario),
   CONSTRAINT fk_iec_examen  FOREIGN KEY (id_examen)           REFERENCES examen(id_examen)
 );
+
+CREATE TABLE sessions (
+    id VARCHAR(255) PRIMARY KEY,
+    user_id BIGINT NULL,
+    ip_address VARCHAR(45) NULL,
+    user_agent TEXT NULL,
+    payload TEXT NOT NULL,
+    last_activity INT NOT NULL
+);
+
+CREATE TABLE cache (
+    key VARCHAR(255) PRIMARY KEY,
+    value TEXT NOT NULL,
+    expiration INT NOT NULL
+);
+
+CREATE TABLE cache_locks (
+    key VARCHAR(255) PRIMARY KEY,
+    owner VARCHAR(255) NOT NULL,
+    expiration INT NOT NULL
+);
