@@ -38,8 +38,20 @@ use App\Models\Examen;
 use App\Models\RegistroAsistencia;
 use Carbon\Carbon;
 
+/**
+ * @package App\Services\Monitoreo
+ * @author  OchoaCesar <cesareduardonick@gmail.com>
+ * @since   2026-09-25
+ */
 class GenerarReporteAsistenciaService
 {
+    /**
+     * Genera el reporte de asistencia de un examen.
+     *
+     * @param  int  $idExamen  ID del examen
+     * @param  Carbon|null  $ahora  Fecha/hora actual (para testing)
+     * @return array{examen: Examen, estudiantes: Collection}
+     */
     public function ejecutar(int $idExamen, ?Carbon $ahora = null): array
     {
         $examen = Examen::findOrFail($idExamen);
@@ -84,22 +96,28 @@ class GenerarReporteAsistenciaService
         ];
     }
 
+    /**
+     * Resuelve el estado de asistencia de un estudiante.
+     *
+     * @param  EstudianteExamen  $inscripcion  Inscripción del estudiante
+     * @param  RegistroAsistencia|null  $registro  Registro de asistencia
+     * @param  Carbon  $ahora  Fecha/hora actual
+     * @param  Carbon  $inicio  Hora de inicio del examen
+     * @param  Carbon  $fin  Hora de fin del examen
+     * @return array{0: string, 1: string} [estado, observación]
+     */
     private function resolverAsistencia(EstudianteExamen $inscripcion, ?RegistroAsistencia $registro, Carbon $ahora, Carbon $inicio, Carbon $fin): array
     {
         $observacion = $inscripcion->estado === 'deshabilitado' ? 'deshabilitado' : 'habilitado';
 
         if ($ahora->lt($inicio)) {
-            return ['ausente', $observacion];
+            return ['pendiente', $observacion];
         }
 
         if ($registro !== null) {
             return ['presente', $observacion];
         }
 
-        if ($ahora->lte($fin)) {
-            return ['pendiente', $observacion];
-        }
-
-        return ['ausente', $observacion];
+        return ['pendiente', $observacion];
     }
 }
