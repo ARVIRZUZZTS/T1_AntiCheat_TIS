@@ -3,9 +3,9 @@
 /**
  * @file    Examen.php
  *
- * @author  OchoaCesar <cesareduardonick@gmail.com>
+ * @author  Diego Tejerina <josediegotejerinamolina@gmail.com>
  *
- * @created 2026-09-25
+ * @created 2026-09-24
  *
  * @updated 2026-09-26
  *
@@ -16,10 +16,13 @@
  * registros de asistencia.
  *
  * @changelog
- * - 2026-09-25  [OchoaCesar]    feat: creación inicial del modelo.
+ * - 2026-09-24  [T1]         feat: creación inicial del modelo.
+ * - 2026-09-25  [OchoaCesar] feat: creación inicial del modelo.
+ * - 2026-09-25  [OchoaCesar] feat: agregar relación registrosAsistencia().
  * - 2026-09-26  [Diego Tejerina] feat: anotaciones @property y relación cursos().
+ * - 2026-09-26  [T1]         fix: resolver conflicto de merge sin resolver
+ *   dejado en dev por el commit e4ea2fd (marcadores <<<<<<< sin quitar).
  *
- * @see  Curso
  * @see  EstudianteExamen
  * @see  RegistroAsistencia
  */
@@ -78,7 +81,14 @@ class Examen extends Model
         return $this->hasMany(EstudianteExamen::class, 'id_examen');
     }
 
-    /** @return HasMany<EstudianteExamen, $this> */
+    /**
+     * Alias de estudianteExamenes(), con el nombre que ya usa la feature
+     * #28 (lista de estudiantes por materia). Se mantienen los dos nombres
+     * para no romper ese código ya mergeado a dev; unificar en una limpieza
+     * posterior.
+     *
+     * @return HasMany<EstudianteExamen, $this>
+     */
     public function inscripciones(): HasMany
     {
         return $this->hasMany(EstudianteExamen::class, 'id_examen');

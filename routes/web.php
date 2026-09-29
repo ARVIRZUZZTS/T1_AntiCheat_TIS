@@ -1,6 +1,7 @@
 <?php
 
 use App\Livewire\Examenes\EstudiantesCurso;
+use App\Livewire\Monitoreo\RegistrarIncidencia;
 use App\Models\Curso;
 use App\Services\Examen\ListarEstudiantesCursoConEstadoService;
 use Illuminate\Support\Facades\Route;
@@ -31,3 +32,7 @@ Route::get('/materias/{curso}', function (Curso $curso) {
         'conteos' => $conteos,
     ]);
 })->name('materias.detalle');
+
+// TODO(@valerydariana98, 2026-09-25): proteger con el middleware de rol que
+// restringe el registro de incidencias a docentes y auxiliares (#69).
+Route::get('/registrar-incidencia', RegistrarIncidencia::class)->name('registrar-incidencia');

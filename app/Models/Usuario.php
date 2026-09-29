@@ -3,9 +3,9 @@
 /**
  * @file    Usuario.php
  *
- * @author  OchoaCesar <cesareduardonick@gmail.com>
+ * @author  Diego Tejerina <josediegotejerinamolina@gmail.com>
  *
- * @created 2026-09-25
+ * @created 2026-09-24
  *
  * @updated 2026-09-26
  *
@@ -15,10 +15,13 @@
  * asistencia que realizó como registrador.
  *
  * @changelog
- * - 2026-09-25  [OchoaCesar]    feat: creación inicial del modelo.
+ * - 2026-09-24  [T1]         feat: creación inicial del modelo.
+ * - 2026-09-25  [OchoaCesar] feat: creación inicial del modelo.
+ * - 2026-09-25  [OchoaCesar] feat: agregar relación registrosAsistencia().
  * - 2026-09-26  [Diego Tejerina] feat: anotaciones @property y relación roles().
+ * - 2026-09-26  [T1]         fix: resolver conflicto de merge sin resolver
+ *   dejado en dev por el commit e4ea2fd (marcadores <<<<<<< sin quitar).
  *
- * @see  Rol
  * @see  RegistroAsistencia
  */
 

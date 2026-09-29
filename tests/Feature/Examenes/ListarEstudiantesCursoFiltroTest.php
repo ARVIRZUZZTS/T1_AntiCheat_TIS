@@ -7,7 +7,7 @@
  *
  * @created 2026-09-25
  *
- * @updated 2026-09-25
+ * @updated 2026-09-26
  *
  * @description
  * Pruebas de integración del filtrado de estudiantes por estado (issue #29),
@@ -20,10 +20,13 @@
  * levantado (ver INSTALACION_DOCKER.md).
  *
  * @see  App\Services\Examen\ListarEstudiantesCursoConEstadoService
+ * @see  App\Services\Examen\BusquedaEstudianteService
  * @see  App\Http\Controllers\Api\EstudianteExamenController
  *
  * @changelog
  * - 2026-09-25  [T1]  test: creación inicial.
+ * - 2026-09-26  [Alisson D. Alvarado]  test: cobertura del criterio de búsqueda
+ *   por modo (cifra, letra).
  */
 
 namespace Tests\Feature\Examenes;
@@ -138,6 +141,7 @@ class ListarEstudiantesCursoFiltroTest extends TestCase
                 'hora_ingreso' => '08:05',
                 'id_examen' => self::ID_EXAMEN,
                 'id_estudiante' => $sis,
+                'id_registrador' => self::ID_DOCENTE,
             ]);
 
             $idRiesgo++;
@@ -252,6 +256,35 @@ class ListarEstudiantesCursoFiltroTest extends TestCase
     public function test_busqueda_invalida_devuelve_422(): void
     {
         $this->getJson($this->endpoint('busqueda='.urlencode('a@b')))->assertStatus(422);
+    }
+
+    /**
+     * El criterio de la búsqueda lo decide el primer caracter: uno que empieza
+     * con cifra va solo por código SIS, así que no debe encontrar a un
+     * estudiante cuyo nombre tenga esa cifra aunque su SIS sea otro.
+     */
+    public function test_busqueda_que_empieza_con_cifra_solo_busca_por_codigo_sis(): void
+    {
+        $this->crearEstudiante('90000007', null, null, null);
+        DB::table('estudiante')
+            ->where('sis_estudiante', '90000007')
+            ->update(['nombre_estudiante' => '2021']);
+
+        $response = $this->getJson($this->endpoint('busqueda=2021'));
+
+        $response->assertOk();
+        $this->assertEmpty($response->json('datos'));
+    }
+
+    public function test_busqueda_alfanumerica_que_empieza_con_cifra_devuelve_422(): void
+    {
+        $this->getJson($this->endpoint('busqueda=2021a'))->assertStatus(422);
+    }
+
+    public function test_codigo_sis_de_mas_de_nueve_digitos_devuelve_422(): void
+    {
+        $this->getJson($this->endpoint('busqueda=900000011'))->assertOk();
+        $this->getJson($this->endpoint('busqueda=9000000111'))->assertStatus(422);
     }
 
     public function test_busqueda_por_nombre_y_apellido_juntos_encuentra_al_estudiante(): void

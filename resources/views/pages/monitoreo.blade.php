@@ -18,7 +18,24 @@
             default => '<span class="text-xs font-medium px-1.5 py-0.5 rounded-full bg-status-central-riesgos-bg text-status-central-riesgos-fg">Tramposo</span>',
         };
 
-        $registrarBtn = '<button type="button" class="inline-flex items-center justify-center box-border border border-transparent focus:ring-4 focus:ring-brand-medium shadow-xs font-medium leading-5 rounded-base focus:outline-none text-white bg-brand hover:bg-brand-strong px-3 py-1.5 text-xs">Reporte</button>';
+        /* Boton de reporte de una fila: lleva al formulario de registro de
+           incidencias con el estudiante y el rol de quien lo registro, que es
+           el dato que decide si la incidencia queda confirmada o en revision.
+           La materia no viaja porque el monitor no la muestra. */
+        $registrarBtn = function (string $nombre, string $sis, string $registro): string {
+            $clases = 'inline-flex items-center justify-center box-border border border-transparent focus:ring-4 focus:ring-brand-medium shadow-xs font-medium leading-5 rounded-base focus:outline-none text-white bg-brand hover:bg-brand-strong px-3 py-1.5 text-xs';
+
+            return sprintf(
+                '<a href="%s" class="%s">Reporte</a>',
+                e(route('registrar-incidencia', [
+                    'origen' => 'monitoreo',
+                    'nombre' => $nombre,
+                    'sis' => $sis,
+                    'rol' => str_starts_with($registro, 'Aux.') ? 'auxiliar' : 'docente',
+                ])),
+                $clases,
+            );
+        };
     @endphp
 
     <div class="flex flex-wrap gap-[2vh]">
@@ -99,12 +116,12 @@
             <x-ui.table
                 :headers="['Estudiante', 'Código SIS', 'Hora', 'Registro', 'Estado', 'Registrar']"
                 :rows="[
-                    [['heading' => true, 'value' => 'Ana López'], '202201013', '08:12', 'Doc. Mariana G.', ['html' => $estadoBadge('Habilitado')], ['html' => $registrarBtn]],
-                    [['heading' => true, 'value' => 'Bruno Díaz'], '202101022', '08:20', 'Aux. Jorge S.', ['html' => $estadoBadge('Sospechoso')], ['html' => $registrarBtn]],
-                    [['heading' => true, 'value' => 'Carla Ruiz'], '202201031', '—', '—', ['html' => $estadoBadge('Pendiente')], ['html' => $registrarBtn]],
-                    [['heading' => true, 'value' => 'Diego Soto'], '202202045', '—', '—', ['html' => $estadoBadge('Ausente')], ['html' => $registrarBtn]],
-                    [['heading' => true, 'value' => 'Ernesto Vera'], '202002107', '07:58', 'Doc. Mariana G.', ['html' => $estadoBadge('Tramposo')], ['html' => $registrarBtn]],
-                    [['heading' => true, 'value' => 'Fátima Quispe'], '202201056', '08:05', 'Aux. Jorge S.', ['html' => $estadoBadge('Deshabilitado')], ['html' => $registrarBtn]],
+                    [['heading' => true, 'value' => 'Ana López'], '202201013', '08:12', 'Doc. Mariana G.', ['html' => $estadoBadge('Habilitado')], ['html' => $registrarBtn('Ana López', '202201013', 'Doc. Mariana G.')]],
+                    [['heading' => true, 'value' => 'Bruno Díaz'], '202101022', '08:20', 'Aux. Jorge S.', ['html' => $estadoBadge('Sospechoso')], ['html' => $registrarBtn('Bruno Díaz', '202101022', 'Aux. Jorge S.')]],
+                    [['heading' => true, 'value' => 'Carla Ruiz'], '202201031', '—', '—', ['html' => $estadoBadge('Pendiente')], ['html' => $registrarBtn('Carla Ruiz', '202201031', '—')]],
+                    [['heading' => true, 'value' => 'Diego Soto'], '202202045', '—', '—', ['html' => $estadoBadge('Ausente')], ['html' => $registrarBtn('Diego Soto', '202202045', '—')]],
+                    [['heading' => true, 'value' => 'Ernesto Vera'], '202002107', '07:58', 'Doc. Mariana G.', ['html' => $estadoBadge('Tramposo')], ['html' => $registrarBtn('Ernesto Vera', '202002107', 'Doc. Mariana G.')]],
+                    [['heading' => true, 'value' => 'Fátima Quispe'], '202201056', '08:05', 'Aux. Jorge S.', ['html' => $estadoBadge('Deshabilitado')], ['html' => $registrarBtn('Fátima Quispe', '202201056', 'Aux. Jorge S.')]],
                 ]"
             />
         </div>

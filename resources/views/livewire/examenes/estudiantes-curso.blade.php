@@ -2,25 +2,40 @@
     @file    estudiantes-curso.blade.php
     @author  Diego Tejerina <josediegotejerinamolina@gmail.com>
     @created 2026-09-24
-    @updated 2026-09-25
+    @updated 2026-09-26
 
     @description
     Vista del componente Livewire EstudiantesCurso: encabezado del curso,
     buscador por nombre/código SIS, botones de filtro por estado con
     contadores y tabla de estudiantes con su estado de habilitación y
-    observaciones de la central de riesgos. Toda la interacción ocurre
-    vía Livewire sin recargar la página. En desktop la vista completa
-    cabe en el viewport (h-screen/overflow-hidden heredado del layout);
-    en mobile se mantiene el scroll natural de la lista.
+    observaciones de la central de riesgos. Incluye la integración del
+    modal de deshabilitación de estudiantes.
+    @changelog
+    - 2026-09-24  [Diego Tejerina]  feat: creación inicial del componente.
+    - 2026-09-25  [Diego Tejerina]  refactor: ajustes en la paginación y diseño responsivo.
+    - 2026-09-26  [Alisson D. Alvarado]  feat: conexión del modal de deshabilitar estudiantes.
+    - 2026-09-26  [Diego Tejerina]  feat: conexión del modal de habilitar estudiantes (#25).
+    @see  App\Livewire\Examenes\EstudiantesCurso
+    @see  resources/views/components/ui/modal-deshabilitar.blade.php
+    @see  resources/views/components/ui/modal-habilitar.blade.php
+    - 2026-09-26  [Alisson D. Alvarado]  feat: el buscador adopta el parcial
+      resources/views/partials/busqueda-estudiante.blade.php para sanear la entrada
+      según el modo, compartido con la vista mock.
 
     @see  App\Livewire\Examenes\EstudiantesCurso
+    @see  resources/views/components/ui/modal-deshabilitar.blade.php
+    @see  resources/views/partials/busqueda-estudiante.blade.php
 --}}
 
 @php
-    use Illuminate\Support\Facades\Blade;
+    use Illuminate\View\ComponentAttributeBag;
+    use Illuminate\View\ComponentSlot;
 
     $entradasValidas = $mensajeError === '';
     $sinResultados = $entradasValidas && $busqueda !== '' && $this->estudiantes->total() === 0;
+
+    // Solo el docente (no auxiliar) puede cambiar el estado de habilitacion.
+    $esDocente = ! $this->esAuxiliar;
 
     $docenteNombre = trim(($curso->docente?->nombre_usuario ?? '') . ' ' . ($curso->docente?->apellido ?? ''));
     $subtitulo = collect([
@@ -42,16 +57,58 @@
         'aula equivocada' => ['gray', 'Aula equivocada'],
     ];
 
+    // Renderiza la vista de un componente anonimo a HTML usando el factory de
+    // vistas, que ya tiene la plantilla cacheada. NO se usa `Blade::render()`
+    // porque compila un archivo nuevo por llamada: dejaba `.blade.php` a medio
+    // compilar en `storage/framework/views` y anadia trabajo en cada fila.
     $badge = function (?string $clave, array $mapa, string $vacio = 'Ninguna', string $tipoVacio = 'status-ya-registrado'): string {
+        static $cache = [];
+
         [$tipo, $texto] = ($clave !== null && isset($mapa[$clave])) ? $mapa[$clave] : [$tipoVacio, $vacio];
 
-        return Blade::render('<x-ui.badge type="' . e($tipo) . '">' . e($texto) . '</x-ui.badge>');
+        // `ComponentSlot` implementa `Htmlable`, asi que `{{ $slot }}` no vuelve
+        // a escapar el texto: hay que escaparlo antes de construirlo.
+        return $cache[$tipo . '|' . $texto] ??= view('components.ui.badge', [
+            'type' => $tipo,
+            'slot' => new ComponentSlot(e($texto)),
+            'attributes' => new ComponentAttributeBag(),
+        ])->render();
+    };
+
+    $avatar = function (string $nombre, string $tono, string $tamanio = 'sm', string $clase = 'shrink-0'): string {
+        static $cache = [];
+
+        return $cache[$nombre . '|' . $tono . '|' . $tamanio . '|' . $clase] ??= view('components.ui.avatar', [
+            'name' => $nombre,
+            'src' => null,
+            'size' => $tamanio,
+            'alt' => null,
+            'tone' => $tono,
+            'attributes' => new ComponentAttributeBag(['class' => $clase]),
+        ])->render();
+    };
+
+    // Deshabilitado -> ofrece "Habilitar" (issue #25). Cualquier otro estado
+    // (incluido null / sin fila todavia) -> ofrece "Deshabilitar" (issue #26),
+    // igual que ya hacia antes de agregar el caso de #25.
+    $acciones = function (string $sis, ?string $estado, bool $esDocente): string {
+        if (! $esDocente) {
+            $etiqueta = $estado === 'deshabilitado' ? 'Habilitar' : 'Deshabilitar';
+
+            return '<span class="text-fg-disabled">' . $etiqueta . '</span>';
+        }
+
+        if ($estado === 'deshabilitado') {
+            return '<button type="button" wire:click="abrirModalHabilitar(\'' . e($sis) . '\')" class="font-medium text-fg-brand hover:underline bg-transparent border-0 p-0 cursor-pointer text-sm">Habilitar</button>';
+        }
+
+        return '<button type="button" wire:click="abrirModalInhabilitar(\'' . e($sis) . '\')" class="font-medium text-fg-danger hover:underline bg-transparent border-0 p-0 cursor-pointer text-sm">Deshabilitar</button>';
     };
 
     $filas = [];
     if ($entradasValidas) {
-        $filas = collect($this->estudiantes->items())
-            ->map(function (array $estudiante, int $indice) use ($badge, $estadoBadges, $observacionBadges): array {
+                $filas = collect($this->estudiantes->items())
+                    ->map(function (array $estudiante, int $indice) use ($badge, $avatar, $acciones, $estadoBadges, $observacionBadges, $esDocente): array {
                 $nombreCompleto = trim(($estudiante['nombre'] ?? '') . ' ' . ($estudiante['apellido'] ?? ''));
                 $observacion = $estudiante['observacion'] ?? null;
 
@@ -67,8 +124,11 @@
                     default => null,
                 };
 
-                $avatar = Blade::render(
-                    '<x-ui.avatar name="' . e($nombreCompleto !== '' ? $nombreCompleto : 'na') . '" tone="' . e($tono) . '" size="sm" class="shrink-0" />'
+                $avatarHtml = $avatar(
+                    $nombreCompleto !== '' ? $nombreCompleto : 'na',
+                    $tono,
+                    'sm',
+                    'shrink-0'
                 );
 
                 return [
@@ -76,20 +136,29 @@
                     ['value' => (string) ($this->estudiantes->firstItem() + $indice)],
                     [
                         'heading' => true,
-                        'html' => '<span class="inline-flex items-center gap-3">' . $avatar . '<span class="font-semibold text-heading">' . e($nombreCompleto) . '</span></span>',
+                        'html' => '<span class="inline-flex items-center gap-3">' . $avatarHtml . '<span class="font-semibold text-heading">' . e($nombreCompleto) . '</span></span>',
                     ],
                     ['html' => '<span class="font-mono">' . e($estudiante['sis'] ?? '—') . '</span>'],
                     ['html' => $badge($estudiante['estado'] ?? null, $estadoBadges, 'Sin estado', 'status-pendiente')],
                     $estudiante['motivo'] ?? '—',
                     ['html' => $badge($observacion, $observacionBadges)],
+                    ['html' => $acciones((string) ($estudiante['sis'] ?? ''), $estudiante['estado'] ?? null, $esDocente)],
                 ];
             })
             ->values()
             ->all();
     }
+
+    $estudianteModal = $sisModalAbierto
+        ? collect($this->estudiantes->items())->first(fn ($e) => ($e['sis'] ?? '') === $sisModalAbierto)
+        : null;
+
+    $nombreModal = $estudianteModal
+        ? trim(($estudianteModal['nombre'] ?? '') . ' ' . ($estudianteModal['apellido'] ?? ''))
+        : '';
 @endphp
 
-<div class="flex flex-col lg:h-full lg:overflow-hidden">
+<div class="flex flex-col lg:h-full lg:overflow-hidden" x-data="@include('partials.busqueda-estudiante')">
     {{-- Encabezado --}}
     <div class="shrink-0 flex items-start sm:items-center justify-between gap-3 px-4 sm:px-6 pb-4 border-b border-default bg-neutral-primary-soft" style="padding-top: max(1rem, env(safe-area-inset-top));">
         <div class="flex items-center gap-3 min-w-0">
@@ -122,6 +191,8 @@
                     pill
                     wire:model.lazy="busqueda"
                     wireSubmit="buscar"
+                    @input="$event.target.value = sanitizarBusqueda($event.target.value)"
+                    x-bind:maxlength="maximoBusqueda()"
                 />
             </div>
 
@@ -140,9 +211,15 @@
             </div>
         </div>
 
-        @if ($this->esAuxiliar)
+        @if (! $esDocente)
             <x-ui.alert type="warning" title="Modo solo lectura" class="shrink-0">
                 Como auxiliar puedes consultar los filtros; el estado se edita desde la vista de examen.
+            </x-ui.alert>
+        @endif
+
+        @if ($mensajeExito !== '')
+            <x-ui.alert type="success" title="Listo" class="shrink-0">
+                {{ $mensajeExito }}
             </x-ui.alert>
         @endif
 
@@ -160,7 +237,7 @@
             <div class="flex-1 lg:min-h-0 lg:overflow-y-auto">
                 <x-ui.table
                     compact
-                    :headers="['#', 'ESTUDIANTE', 'CÓDIGO SIS', 'ESTADO (EXAMEN ACTUAL)', 'MOTIVO', 'OBSERVACIONES']"
+                    :headers="['#', 'ESTUDIANTE', 'CÓDIGO SIS', 'ESTADO (EXAMEN ACTUAL)', 'MOTIVO', 'OBSERVACIONES', 'ACCIONES']"
                     :rows="$filas"
                 />
 
@@ -190,5 +267,27 @@
                 </div>
             @endif
         @endif
+
+        {{-- Modal de deshabilitar estudiante (#26) --}}
+        <x-ui.modal-deshabilitar
+            :show="$sisModalAbierto !== null && $tipoModal === 'inhabilitar'"
+            :nombre="$nombreModal"
+            :sis="$sisModalAbierto ?? ''"
+            :motivo="$motivoInhabilitacion"
+            :error="$mensajeErrorModal"
+            wire-model="motivoInhabilitacion"
+            wire-close="cerrarModal"
+            wire-confirm="confirmarInhabilitar"
+        />
+
+        {{-- Modal de habilitar estudiante (#25) --}}
+        <x-ui.modal-habilitar
+            :show="$sisModalAbierto !== null && $tipoModal === 'habilitar'"
+            :nombre="$nombreModal"
+            :sis="$sisModalAbierto ?? ''"
+            :error="$mensajeErrorModal"
+            wire-close="cerrarModal"
+            wire-confirm="confirmarHabilitar"
+        />
     </div>
 </div>
