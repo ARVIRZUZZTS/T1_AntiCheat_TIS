@@ -154,12 +154,14 @@ INSERT INTO registro_asistencia (id_ingreso, hora_ingreso, id_examen, id_estudia
 (4, '08:02', 4, '20210004', 4),
 (5, '16:01', 5, '20210005', 3);
 
-INSERT INTO central_riesgo (id_registro, id_ingreso, id_registrador, detalle_motivo, fecha_registro, tipo_infraccion) VALUES
-(1, 1, 3, 'Estudiante mirando hacia otro lado', '2024-06-10', 'sospechoso'),
-(2, 2, 4, 'Uso de celular durante el examen',   '2024-06-11', 'tramposo'),
-(3, 3, 3, 'Llegada tarde al examen',            '2024-06-12', 'pendiente'),
-(4, 4, 4, 'Estudiante en aula equivocada',      '2024-06-13', 'aula equivocada'),
-(5, 5, 3, 'Comportamiento sospechoso',          '2024-06-14', 'sospechoso');
+-- Las incidencias guardan su propio estudiante, examen, motivo y registrador;
+-- `id_ingreso` solo se llena cuando la incidencia se observo en el monitor.
+INSERT INTO central_riesgo (id_registro, sis_estudiante, id_examen, id_registrador, motivo, detalle_motivo, fecha_registro, tipo_infraccion, id_ingreso) VALUES
+(1, '20210001', 1, 3, 'otro',                               'Estudiante mirando hacia otro lado', '2024-06-10 08:20:00', 'sospechoso', 1),
+(2, '20210002', 2, 4, 'uso_de_dispositivos_electronicos', 'Uso de celular durante el examen',   '2024-06-11 10:15:00', 'tramposo',   2),
+(3, '20210003', 3, 3, 'intento_de_ingreso_no_autorizado',  'Llegada tarde al examen',           '2024-06-12 14:20:00', 'sospechoso', 3),
+(4, '20210004', 4, 4, 'otro',                               'Estudiante en aula equivocada',     '2024-06-13 08:10:00', 'sospechoso', 4),
+(5, '20210005', 5, 3, 'otro',                               'Comportamiento sospechoso',         '2024-06-14 16:05:00', 'sospechoso', NULL);
 
 INSERT INTO notificacion_docente (id_notificacion, id_central_riesgo, id_curso, estado) VALUES
 (1, 1, 1, 'visto'),

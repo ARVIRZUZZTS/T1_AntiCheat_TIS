@@ -11,11 +11,25 @@ CREATE TYPE registrador_tipo AS ENUM (
   'auxiliar'
 );
 
+-- La infraccion solo tiene dos valores; el motivo de la incidencia vive en el
+-- enum `motivo` (#70).
 CREATE TYPE tipo_infraccion AS ENUM (
   'tramposo',
-  'sospechoso',
-  'pendiente',
-  'aula equivocada'
+  'sospechoso'
+);
+
+-- Motivos acordados por el equipo para una incidencia en la central de riesgos
+-- (#70). El valor es un codigo estable (lo que viaja en el formulario) y la
+-- etiqueta que ve la persona la resuelve la aplicacion, igual que
+-- `tipo_infraccion`. El ultimo es el motivo generico: cuando se elige, hay que
+-- escribir el detalle en `central_riesgo.detalle_motivo`.
+CREATE TYPE motivo AS ENUM (
+  'intento_de_ingreso_no_autorizado',
+  'uso_de_dispositivos_electronicos',
+  'copia_o_intercambio_de_respuestas',
+  'uso_de_material_no_autorizado',
+  'suplantacion_de_identidad',
+  'otro'
 );
 
 CREATE TYPE curso_estado AS ENUM (
@@ -236,15 +250,27 @@ CREATE TABLE registro_asistencia (
   CONSTRAINT fk_ra_registrador FOREIGN KEY (id_registrador) REFERENCES usuario(id_usuario)
 );
 
+-- La incidencia se sostiene sola: guarda su propio estudiante, examen y
+-- registrador, para que tambien se pueda registrar a alguien que todavia no
+-- tiene fila de ingreso (o que no estaba en la base de datos). `id_ingreso`
+-- queda solo como trazabilidad del monitor en vivo (#70).
+--
+-- La materia NO se guarda: se deriva con
+-- `id_examen -> examen_curso -> curso.nombre_curso`.
 CREATE TABLE central_riesgo (
   id_registro     integer PRIMARY KEY,
-  id_ingreso      integer NOT NULL,
-  id_registrador  integer NOT NULL,
-  detalle_motivo  varchar(255),
-  fecha_registro  date,
-  tipo_infraccion tipo_infraccion NOT NULL,
-  CONSTRAINT fk_cr_ingreso     FOREIGN KEY (id_ingreso)     REFERENCES registro_asistencia(id_ingreso),
-  CONSTRAINT fk_cr_registrador FOREIGN KEY (id_registrador) REFERENCES usuario(id_usuario)
+  sis_estudiante  varchar(20) NOT NULL,     -- el estudiante, exista o no antes en la base
+  id_examen       integer NOT NULL,         -- de aqui sale la materia
+  id_registrador  integer NOT NULL,         -- docente o auxiliar que registro la incidencia
+  motivo          motivo NOT NULL,          -- del enum `motivo`; "otro" se apoya en detalle_motivo
+  detalle_motivo  varchar(300),             -- obligatorio cuando el motivo es "otro"; mismo maximo que el formulario
+  fecha_registro  timestamp NOT NULL DEFAULT now(),
+  tipo_infraccion tipo_infraccion NOT NULL, -- tramposo o sospechoso
+  id_ingreso      integer,                  -- solo si la incidencia se observo en el monitor
+  CONSTRAINT fk_cr_estudiante FOREIGN KEY (sis_estudiante) REFERENCES estudiante(sis_estudiante),
+  CONSTRAINT fk_cr_examen     FOREIGN KEY (id_examen)     REFERENCES examen(id_examen),
+  CONSTRAINT fk_cr_registrador FOREIGN KEY (id_registrador) REFERENCES usuario(id_usuario),
+  CONSTRAINT fk_cr_ingreso    FOREIGN KEY (id_ingreso)    REFERENCES registro_asistencia(id_ingreso)
 );
 
 CREATE TABLE notificacion_docente (

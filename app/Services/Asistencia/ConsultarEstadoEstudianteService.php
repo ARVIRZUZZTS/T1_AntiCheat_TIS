@@ -6,13 +6,16 @@
  *
  * @created 2026-09-26
  *
- * @updated 2026-09-26
+ * @updated 2026-09-29
  *
  * @description
  * Servicio para consultar el estado de un estudiante para el registro de asistencia en un examen.
  *
  * @changelog
  * - 2026-09-26  [T1]  feat: creación inicial del Servicio.
+ * - 2026-09-29  [Valery D. Ortuno P]  fix: la incidencia se busca por
+ *   `central_riesgo.sis_estudiante` en vez de unir con `registro_asistencia`,
+ *   para que también se encuentre si el estudiante no tiene ingreso (#70).
  */
 namespace App\Services\Asistencia;
 
@@ -73,13 +76,22 @@ class ConsultarEstadoEstudianteService
             ->first();
     }
 
+    /**
+     * Obtiene la incidencia más reciente del estudiante, si tiene alguna.
+     *
+     * Filtra por `central_riesgo.sis_estudiante` y no por un join con
+     * `registro_asistencia`, porque desde #70 una incidencia se puede registrar
+     * sin que el estudiante tenga fila de ingreso.
+     *
+     * @param  string  $sis  Código SIS del estudiante.
+     * @return ?CentralRiesgo  La incidencia más reciente o null si no tiene ninguna.
+     */
     private function obtenerRiesgoActivo(string $sis): ?CentralRiesgo
     {
         return CentralRiesgo::query()
-            ->join('registro_asistencia', 'registro_asistencia.id_ingreso', '=', 'central_riesgo.id_ingreso')
-            ->where('registro_asistencia.id_estudiante', $sis)
-            ->orderByDesc('central_riesgo.fecha_registro')
-            ->select('central_riesgo.*')
+            ->where('sis_estudiante', $sis)
+            ->orderByDesc('fecha_registro')
+            ->orderByDesc('id_registro')
             ->first();
     }
 

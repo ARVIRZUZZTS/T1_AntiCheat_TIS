@@ -53,4 +53,17 @@ class Estudiante extends Model
     {
         return $this->hasMany(RegistroAsistencia::class, 'id_estudiante', 'sis_estudiante');
     }
+
+    /**
+     * Incidencias de la central de riesgos del estudiante.
+     *
+     * Se relación por `sis_estudiante` y no por el ingreso porque una incidencia
+     * se puede registrar sin que el estudiante tenga fila de asistencia (#70).
+     *
+     * @return HasMany<CentralRiesgo, $this>
+     */
+    public function centralRiesgos(): HasMany
+    {
+        return $this->hasMany(CentralRiesgo::class, 'sis_estudiante', 'sis_estudiante');
+    }
 }
