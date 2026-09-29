@@ -25,20 +25,22 @@
     - 2026-09-26  [Valery D. Ortuno P]  feat: buscador de estudiantes, motivos del
       equipo, vista responsive de escritorio y móvil, y estado derivado del rol
       recibido por la URL; se quitan los textos de ayuda de cada campo.
-<<<<<<< HEAD
-    - 2026-09-28  [Candy]  feat: el enlace de vuelta sigue a la pantalla desde la
-      que se abrió el formulario, para que al entrar desde la central de riesgo
-      no devuelva al monitor en vivo.
-=======
-    - 2026-09-28  [Valery D. Ortuno P]  fix: nombre y apellido en campos
-      separados, materia precargada del monitor como solo lectura (o texto libre
-      si no llega), motivos acordados con el equipo y textos sin acentos
-      pedidos; más espacio entre tarjetas, campos y botones, materia junto a la
-      fecha del registro y estado como insignia compacta (#66).
-    - 2026-09-28  [Valery D. Ortuno P]  fix: nombre, apellido y código SIS
-      editables (fondo blanco) para registrar estudiantes que no estén en la
-      base, con indicación de "solo letras" y de "9 números" (#66).
->>>>>>> feature/hu-5-fixes
+ * - 2026-09-28  [Candy]  feat: el enlace de vuelta sigue a la pantalla desde la
+ *   que se abrió el formulario, para que al entrar desde la central de riesgo
+ *   no devuelva al monitor en vivo.
+ * - 2026-09-28  [Valery D. Ortuno P]  fix: nombre y apellido en campos
+ *   separados, materia precargada del monitor como solo lectura (o texto libre
+ *   si no llega), motivos acordados con el equipo y textos sin acentos
+ *   pedidos; más espacio entre tarjetas, campos y botones, materia junto a la
+ *   fecha del registro y estado como insignia compacta (#66).
+ * - 2026-09-28  [Valery D. Ortuno P]  fix: nombre, apellido y código SIS
+ *   editables (fondo blanco) para registrar estudiantes que no estén en la
+ *   base, con indicación de "solo letras" y de "9 números" (#66).
+ * - 2026-09-28  [Candy]  feat: modal de confirmación tras registrar, con el
+ *   resumen del estudiante y de la incidencia y un único botón Aceptar que
+ *   termina el proceso y vuelve a la pantalla de origen.
+ * - 2026-09-28  [Candy]  feat: el resumen muestra también el número del registro
+ *   y quién lo registró, que ya están guardados en la base de datos (#70).
 --}}
 
 @section('title', 'Registrar incidencia')
@@ -47,8 +49,9 @@
     $resultados = $this->resultadosBusqueda;
 @endphp
 
-<<<<<<< HEAD
-<div class="mx-auto w-full max-w-4xl space-y-5 sm:space-y-6">
+{{-- El hueco entre las dos tarjetas es el mismo `space-y-6` que usa el monitor
+     en vivo entre las suyas, para que las dos pantallas se vean parejas. --}}
+<div class="mx-auto w-full max-w-4xl space-y-6">
     <nav aria-label="Ruta de navegación">
         <a href="{{ $this->rutaVolver }}"
            class="inline-flex items-center gap-1.5 text-sm font-medium text-fg-brand hover:underline">
@@ -65,13 +68,7 @@
          `bg-neutral-primary-soft!` para ponerse en blanco y así distinguirse
          de un vistazo. El `!` es necesario porque los componentes de `x-ui`
          fijan el fondo con su propia utilidad de Tailwind. --}}
-    <section class="bg-neutral-primary-soft border border-default rounded-base shadow-xs p-4 sm:p-6">
-=======
-{{-- El hueco entre las dos tarjetas es el mismo `mt-6` que usa el monitor en
-     vivo entre sus tarjetas, para que las dos pantallas se vean parejas. --}}
-<div class="mx-auto w-full max-w-4xl space-y-6">
     <section class="bg-neutral-primary-soft border border-default rounded-base shadow-xs p-6 sm:p-8">
->>>>>>> feature/hu-5-fixes
         <h2 class="text-lg font-semibold text-heading">Datos del estudiante</h2>
 
         <div class="mt-6">
@@ -231,3 +228,64 @@
         </div>
     </form>
 </div>
+
+{{--
+    Modal de confirmación del registro.
+
+    A diferencia de `x-ui.modal-habilitar` y `x-ui.modal-deshabilitar`, este NO
+    se cierra con clic fuera ni con Esc: la incidencia ya quedó registrada, así
+    que la única salida es el botón Aceptar, que termina el proceso y devuelve a
+    la pantalla desde la que se abrió el formulario. Cerrarlo por otra vía dejaría
+    el registro hecho sin avisar a la persona.
+
+    Los datos se leen de `$resumen`, la copia que el componente guarda al validar,
+    y no de los campos del formulario, que pueden haber cambiado mientras tanto.
+--}}
+@if ($confirmacionVisible)
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+         role="dialog" aria-modal="true" aria-labelledby="titulo-confirmacion">
+        <div class="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
+            <div class="mb-4 flex items-center gap-3">
+                <span class="flex h-10 w-10 items-center justify-center rounded-full bg-green-100 text-green-700">✓</span>
+                <h2 id="titulo-confirmacion" class="text-lg font-bold">
+                    Estudiante agregado a la central de riesgos con éxito
+                </h2>
+            </div>
+
+            <dl class="grid grid-cols-3 gap-x-3 gap-y-2 rounded-lg bg-slate-50 p-4 text-sm">
+                <dt class="font-semibold">Estudiante</dt>
+                <dd class="col-span-2">{{ $resumen['estudiante'] }}</dd>
+
+                <dt class="font-semibold">Código SIS</dt>
+                <dd class="col-span-2">{{ $resumen['codigoSis'] }}</dd>
+
+                <dt class="font-semibold">Materia</dt>
+                <dd class="col-span-2">{{ $resumen['materia'] }}</dd>
+
+                <dt class="font-semibold">Motivo</dt>
+                <dd class="col-span-2">{{ $resumen['motivo'] }}</dd>
+
+                <dt class="font-semibold">Estado</dt>
+                <dd class="col-span-2">{{ $resumen['estado'] }}</dd>
+
+                <dt class="font-semibold">Registrado por</dt>
+                <dd class="col-span-2">{{ $resumen['registrador'] }}</dd>
+
+                <dt class="font-semibold">Fecha y hora</dt>
+                <dd class="col-span-2">{{ $resumen['fechaHora'] }}</dd>
+
+                @if ($resumen['descripcion'] !== '')
+                    <dt class="font-semibold">Descripción</dt>
+                    <dd class="col-span-2">{{ $resumen['descripcion'] }}</dd>
+                @endif
+            </dl>
+
+            <div class="mt-6 flex justify-end">
+                <button type="button" wire:click="aceptarRegistro" wire:loading.attr="disabled"
+                        class="rounded-lg bg-[#1e3a6e] px-5 py-2 font-semibold text-white">
+                    Aceptar
+                </button>
+            </div>
+        </div>
+    </div>
+@endif

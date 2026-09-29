@@ -33,7 +33,7 @@
     <div class="mt-6 flex flex-wrap justify-end">
         {{-- Sin `origen=monitoreo` el formulario se abre en blanco: el
              estudiante se busca a mano en lugar de venir precargado. --}}
-        <x-ui.button :href="route('registrar-incidencia', ['origen' => 'central-riesgo'])">
+        <x-ui.button :href="route('registrar-incidencia', ['origen' => 'central-riesgo', 'usuario' => 1])">
             Registrar incidencia
         </x-ui.button>
     </div>

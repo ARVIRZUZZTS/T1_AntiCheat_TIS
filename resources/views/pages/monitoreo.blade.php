@@ -61,6 +61,7 @@
                     'sis' => $sis,
                     'materia' => $materiaActual,
                     'rol' => str_starts_with($registro, 'Aux.') ? 'auxiliar' : 'docente',
+                    'usuario' => str_starts_with($registro, 'Aux.') ? 3 : 1,
                 ])),
                 $clases,
             );
