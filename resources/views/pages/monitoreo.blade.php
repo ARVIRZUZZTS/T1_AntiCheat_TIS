@@ -1,29 +1,44 @@
+{{--
+    @file    monitoreo.blade.php
+    @author  David E. Chavez T. <virzuzz12345@gmail.com>
+    @created 2026-09-29
+    @updated 2026-09-29
+
+    @description
+    Vista de monitoreo en vivo. Muestra las estadísticas del examen,
+    el registro de ingresos de estudiantes y el modal de registro de ingreso.
+
+    @changelog
+    - 2026-09-29  [David E. Chavez T.]  feat: vista de monitoreo en vivo.
+--}}
+
 @extends('layouts.app')
 
 @section('title', 'Monitor en vivo')
 
 @section('content')
-    <p class="text-body">
-        Sesiones de monitoreo del proctor. Datos mockeados: vendrán del endpoint
-        <code class="text-fg-brand">/monitoreo</code> (con <code class="text-fg-brand">wire:poll</code> en vivo).
-    </p>
-
     @php
         $estadoBadge = fn (string $estado) => match ($estado) {
-            'Habilitado' => '<span class="text-xs font-medium px-1.5 py-0.5 rounded-full bg-status-habilitado-bg text-status-habilitado-fg">Habilitado</span>',
-            'Deshabilitado' => '<span class="text-xs font-medium px-1.5 py-0.5 rounded-full bg-status-no-habilitado-bg text-status-no-habilitado-fg">Deshabilitado</span>',
-            'Pendiente' => '<span class="text-xs font-medium px-1.5 py-0.5 rounded-full bg-status-pendiente-bg text-status-pendiente-fg">Pendiente</span>',
-            'Ausente' => '<span class="text-xs font-medium px-1.5 py-0.5 rounded-full bg-neutral-tertiary-soft text-body">Ausente</span>',
-            'Sospechoso' => '<span class="text-xs font-medium px-1.5 py-0.5 rounded-full bg-status-en-revision-bg text-status-en-revision-fg">Sospechoso</span>',
-            default => '<span class="text-xs font-medium px-1.5 py-0.5 rounded-full bg-status-central-riesgos-bg text-status-central-riesgos-fg">Tramposo</span>',
+            'Pendiente' => '<span class="text-xs font-medium px-2 py-1 rounded-full border-2 border-gray-400 bg-gray-100 text-gray-400">Pendiente</span>',
+            'Ingresó' => '<span class="text-xs font-medium px-2 py-1 rounded-full border-2 border-blue-300 bg-blue-50 text-blue-300">Ingresó</span>',
+            'Sospechoso' => '<span class="text-xs font-medium px-2 py-1 rounded-full border-2 border-yellow-400 bg-yellow-100 text-yellow-400">Sospechoso</span>',
+            'Rechazado' => '<span class="text-xs font-medium px-2 py-1 rounded-full border-2 border-red-300 bg-red-50 text-red-300">Rechazado</span>',
+            'C. de Riesgos' => '<span class="text-xs font-medium px-2 py-1 rounded-full border-2 border-red-500 bg-red-100 text-red-500">C. de Riesgos</span>',
+            'Ausente' => '<span class="text-xs font-medium px-2 py-1 rounded-full border-2 border-gray-500 bg-gray-100 text-gray-500">Ausente</span>',
+            default => '<span class="text-xs font-medium px-2 py-1 rounded-full border-2 border-gray-400 bg-gray-100 text-gray-400">'.$estado.'</span>',
         };
 
-        /* Boton de reporte de una fila: lleva al formulario de registro de
-           incidencias con el estudiante y el rol de quien lo registro, que es
-           el dato que decide si la incidencia queda confirmada o en revision.
-           La materia no viaja porque el monitor no la muestra. */
-        $registrarBtn = function (string $nombre, string $sis, string $registro): string {
+        $registrarBtn = function (string $nombre, string $sis, string $registro, string $estado): string {
             $clases = 'inline-flex items-center justify-center box-border border border-transparent focus:ring-4 focus:ring-brand-medium shadow-xs font-medium leading-5 rounded-base focus:outline-none text-white bg-brand hover:bg-brand-strong px-3 py-1.5 text-xs';
+
+            if ($estado === 'Pendiente') {
+                return sprintf(
+                    '<button type="button" class="%s" @click="$dispatch(\'abrir-modal-ingreso\', { nombre: \'%s\', sis: \'%s\' })">Ingreso</button>',
+                    $clases,
+                    e($nombre),
+                    e($sis),
+                );
+            }
 
             return sprintf(
                 '<a href="%s" class="%s">Reporte</a>',
@@ -38,11 +53,11 @@
         };
     @endphp
 
-    <div class="flex flex-wrap gap-[2vh]">
+    <div class="flex flex-wrap gap-[2vh] px-[2vh]">
         <div class="flex-1 min-w-[200px] flex-1 min-w-[220px] flex items-center justify-between gap-3 bg-neutral-primary-soft p-6 border border-default rounded-base shadow-xs">
             <div>
-                <p class="text-xl font-semibold text-fg-brand">08:00 – 11:00</p>
                 <p class="text-sm text-body">En curso</p>
+                <p class="text-3xl font-semibold text-fg-brand">{{ substr($examen->hora_inicio, 0, 5) }} – {{ substr($examen->hora_fin, 0, 5) }}</p>
             </div>
             <span class="flex items-center justify-center w-12 h-12 rounded-base bg-neutral-secondary-soft text-fg-brand">
                 <svg class="w-6 h-6" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
@@ -50,7 +65,7 @@
         </div>
         <div class="flex-1 min-w-[200px] flex items-center justify-between gap-3 bg-neutral-primary-soft p-6 border border-default rounded-base shadow-xs">
             <div>
-                <p class="text-3xl font-semibold text-fg-brand">60</p>
+                <p class="text-3xl font-semibold text-fg-brand">{{ $conteos['inscritos'] }}</p>
                 <p class="text-sm text-body">Inscritos</p>
             </div>
             <span class="flex items-center justify-center w-12 h-12 rounded-base bg-neutral-secondary-soft text-fg-brand">
@@ -59,7 +74,7 @@
         </div>
         <div class="flex-1 min-w-[200px] flex items-center justify-between gap-3 bg-neutral-primary-soft p-6 border border-default rounded-base shadow-xs">
             <div>
-                <p class="text-3xl font-semibold text-fg-success">54</p>
+                <p class="text-3xl font-semibold text-fg-success">{{ $conteos['habilitados'] }}</p>
                 <p class="text-sm text-body">Habilitados</p>
             </div>
             <span class="flex items-center justify-center w-12 h-12 rounded-base bg-neutral-secondary-soft text-fg-success">
@@ -68,7 +83,7 @@
         </div>
         <div class="flex-1 min-w-[200px] flex items-center justify-between gap-3 bg-neutral-primary-soft p-6 border border-default rounded-base shadow-xs">
             <div>
-                <p class="text-3xl font-semibold text-fg-danger-strong">4</p>
+                <p class="text-3xl font-semibold text-fg-danger-strong">{{ $conteos['deshabilitados'] }}</p>
                 <p class="text-sm text-body">Deshabilitados</p>
             </div>
             <span class="flex items-center justify-center w-12 h-12 rounded-base bg-neutral-secondary-soft text-fg-danger-strong">
@@ -77,7 +92,7 @@
         </div>
         <div class="flex-1 min-w-[200px] flex items-center justify-between gap-3 bg-neutral-primary-soft p-6 border border-default rounded-base shadow-xs">
             <div>
-                <p class="text-3xl font-semibold text-fg-warning">2</p>
+                <p class="text-3xl font-semibold text-fg-warning">{{ $conteos['sospechosos'] }}</p>
                 <p class="text-sm text-body">Sospechosos</p>
             </div>
             <span class="flex items-center justify-center w-12 h-12 rounded-base bg-neutral-secondary-soft text-fg-warning">
@@ -86,7 +101,7 @@
         </div>
         <div class="flex-1 min-w-[200px] flex items-center justify-between gap-3 bg-neutral-primary-soft p-6 border border-default rounded-base shadow-xs">
             <div>
-                <p class="text-3xl font-semibold text-fg-danger-strong">1</p>
+                <p class="text-3xl font-semibold text-fg-danger-strong">{{ $conteos['tramposos'] }}</p>
                 <p class="text-sm text-body">Tramposos</p>
             </div>
             <span class="flex items-center justify-center w-12 h-12 rounded-base bg-neutral-secondary-soft text-fg-danger-strong">
@@ -95,39 +110,75 @@
         </div>
     </div>
 
-    <div class="mt-6 bg-neutral-primary-soft border border-default rounded-base shadow-xs p-6">
+    <div class="mt-6 mx-[2vh] bg-neutral-primary-soft border border-default rounded-base shadow-xs p-6 px-[2vh]"
+        x-data="{
+            showModalIngreso: false,
+            nombreIngreso: '',
+            sisIngreso: '',
+            horaIngreso: '',
+            errorIngreso: '',
+            abrirModalIngreso(nombre, sis) {
+                this.nombreIngreso = nombre;
+                this.sisIngreso = sis;
+                this.horaIngreso = '';
+                this.errorIngreso = '';
+                this.showModalIngreso = true;
+            }
+        }"
+        @cerrar-modal-ingreso.window="showModalIngreso = false"
+        @confirmar-ingreso.window="showModalIngreso = false; alert('Ingreso registrado para ' + nombreIngreso)"
+    >
         <div class="flex flex-wrap items-center justify-between gap-4">
             <div class="w-full sm:max-w-md">
                 <x-ui.search-input placeholder="Buscar por nombre o código SIS..." :show-button="false" />
             </div>
 
             <div class="flex flex-wrap gap-2">
-                <x-ui.button variant="default">Todos (60)</x-ui.button>
-                <x-ui.button variant="secondary">Habilitados (54)</x-ui.button>
-                <x-ui.button variant="secondary">Deshabilitados (4)</x-ui.button>
-                <x-ui.button variant="secondary">Sospechosos (2)</x-ui.button>
-                <x-ui.button variant="secondary">Tramposos (1)</x-ui.button>
+                <x-ui.button variant="default">Todos</x-ui.button>
+                <x-ui.button variant="secondary">Habilitados</x-ui.button>
+                <x-ui.button variant="secondary">Deshabilitados</x-ui.button>
+                <x-ui.button variant="secondary">Sospechosos</x-ui.button>
+                <x-ui.button variant="secondary">Tramposos</x-ui.button>
             </div>
         </div>
 
         <h2 class="mt-6 text-lg font-semibold text-heading">Registro de ingresos</h2>
 
         <div class="mt-4">
+            @php
+                $filas = [];
+                foreach ($estudiantes as $estudiante) {
+                    $estadoVisual = match ($estudiante['estado_asistencia']) {
+                        'presente' => $estudiante['observaciones'] === 'deshabilitado' ? 'Rechazado' : 'Ingresó',
+                        'pendiente' => 'Pendiente',
+                        'ausente' => $estudiante['observaciones'] === 'deshabilitado' ? 'Rechazado' : 'Ausente',
+                        default => 'C. de Riesgos',
+                    };
+                    $filas[] = [
+                        ['heading' => true, 'value' => $estudiante['nombre'].' '.$estudiante['apellido']],
+                        $estudiante['sis'],
+                        $estudiante['hora_ingreso'] ? substr($estudiante['hora_ingreso'], 0, 5) : '—',
+                        $estudiante['registrador'] ?? '—',
+                        ['html' => $estadoBadge($estadoVisual)],
+                        ['html' => $registrarBtn($estudiante['nombre'].' '.$estudiante['apellido'], $estudiante['sis'], $estudiante['registrador'] ?? '—', $estadoVisual)],
+                    ];
+                }
+            @endphp
             <x-ui.table
                 :headers="['Estudiante', 'Código SIS', 'Hora', 'Registro', 'Estado', 'Registrar']"
-                :rows="[
-                    [['heading' => true, 'value' => 'Ana López'], '202201013', '08:12', 'Doc. Mariana G.', ['html' => $estadoBadge('Habilitado')], ['html' => $registrarBtn('Ana López', '202201013', 'Doc. Mariana G.')]],
-                    [['heading' => true, 'value' => 'Bruno Díaz'], '202101022', '08:20', 'Aux. Jorge S.', ['html' => $estadoBadge('Sospechoso')], ['html' => $registrarBtn('Bruno Díaz', '202101022', 'Aux. Jorge S.')]],
-                    [['heading' => true, 'value' => 'Carla Ruiz'], '202201031', '—', '—', ['html' => $estadoBadge('Pendiente')], ['html' => $registrarBtn('Carla Ruiz', '202201031', '—')]],
-                    [['heading' => true, 'value' => 'Diego Soto'], '202202045', '—', '—', ['html' => $estadoBadge('Ausente')], ['html' => $registrarBtn('Diego Soto', '202202045', '—')]],
-                    [['heading' => true, 'value' => 'Ernesto Vera'], '202002107', '07:58', 'Doc. Mariana G.', ['html' => $estadoBadge('Tramposo')], ['html' => $registrarBtn('Ernesto Vera', '202002107', 'Doc. Mariana G.')]],
-                    [['heading' => true, 'value' => 'Fátima Quispe'], '202201056', '08:05', 'Aux. Jorge S.', ['html' => $estadoBadge('Deshabilitado')], ['html' => $registrarBtn('Fátima Quispe', '202201056', 'Aux. Jorge S.')]],
-                ]"
+                :rows="$filas"
             />
         </div>
 
         <div class="mt-6 flex justify-end">
-            <x-ui.pagination :current="2" :total="5" />
+            <x-ui.pagination
+                :current="$estudiantes->currentPage()"
+                :total="$estudiantes->lastPage()"
+                :href="request()->url()"
+            />
         </div>
+
+        <x-ui.modal-registro-ingreso />
     </div>
+</div>
 @endsection
