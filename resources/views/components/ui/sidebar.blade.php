@@ -2,7 +2,7 @@
     @file    sidebar.blade.php
 @author  Valery D. Ortuno P. <valerydariana98@gmail.com>
     @created 2026-09-24
-    @updated 2026-09-26
+    @updated 2026-09-28
 
     @description
     Sidebar de navegación del panel. $items es un arreglo de ítems:
@@ -24,6 +24,8 @@
     - 2026-09-26  [Valery D. Ortuno P]  fix: ancho del cajón y posición del
       botón hamburguesa en móvil; se corrigen también los acentos del
       comentario de cabecera, que quedaron como "A3" al escribir el archivo.
+    - 2026-09-28  [T1]  chore: resolver el conflicto de merge del changelog al
+      integrar dev en feature/28 (#28).
 --}}
 
 @props([

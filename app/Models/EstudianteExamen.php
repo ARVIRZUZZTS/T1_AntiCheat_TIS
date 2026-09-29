@@ -7,7 +7,7 @@
  *
  * @created 2026-09-24
  *
- * @updated 2026-09-26
+ * @updated 2026-09-28
  *
  * @description
  * Modelo Eloquent de la tabla `estudiante_examen`: mapea la inscripción de un
@@ -23,6 +23,8 @@
  * - 2026-09-26  [T1]             fix: resolver conflicto de merge sin resolver
  *   dev por el commit e4ea2fd (marcadores <<<<<<< sin quitar).
  * - 2026-09-26  [T1]             feat: agregar modificado_por y fecha_modificacion (#27).
+ * - 2026-09-28  [T1]             fix: resolver conflictos de merge al integrar
+ *   dev en feature/28 (#28).
  *
  * @see  Estudiante
  * @see  Examen

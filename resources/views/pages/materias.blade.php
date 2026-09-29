@@ -1,3 +1,24 @@
+{{--
+    @file    materias.blade.php
+    @author  ARVIRZUZZTS <virzuzz12345@gmail.com>
+    @created 2026-09-24
+    @updated 2026-09-28
+
+    @description
+    Vista de la lista de materias: los cursos de la tabla `curso`, cada uno
+    enlazado a su detalle (`materias.detalle`) con su id_curso numérico. Ya no
+    usa códigos mock del tipo MAT-101: la ruta `materias` le entrega los cursos
+    de la base y la ruta `materias.detalle` los conteos del detalle.
+
+    @changelog
+    - 2026-09-24  [ARVIRZUZZTS]  feat: creación inicial de la vista.
+    - 2026-09-28  [T1]  feat: listar los cursos reales de la base y enlazar cada
+      uno a su detalle por id_curso (#28).
+
+    @see  resources/views/pages/materia-estudiantes.blade.php
+    @see  routes/web.php
+--}}
+
 @extends('layouts.app')
 
 @section('title', 'Materias')

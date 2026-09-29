@@ -7,7 +7,7 @@
  *
  * @created 2026-09-24
  *
- * @updated 2026-09-26
+ * @updated 2026-09-28
  *
  * @description
  * Modelo Eloquent de la tabla `registro_asistencia`: mapea el ingreso de un
@@ -21,6 +21,9 @@
  * - 2026-09-26  [Diego Tejerina] feat: anotaciones @property y relación centralRiesgos().
  * - 2026-09-26  [T1]         fix: resolver conflicto de merge sin resolver
  *   dejado en dev por el commit e4ea2fd (marcadores <<<<<<< sin quitar).
+ * - 2026-09-28  [T1]         fix: resolver conflictos de merge al integrar
+ *   dev en feature/28 (#28): el @property de id_registrador y el owner key de
+ *   registrador() quedan como los define el esquema (NOT NULL / id_usuario).
  *
  * @see  Estudiante
  * @see  Examen
