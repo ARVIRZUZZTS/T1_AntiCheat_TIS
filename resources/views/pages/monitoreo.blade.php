@@ -5,14 +5,22 @@
     @updated 2026-09-29
 
     @description
-    Vista de monitoreo en vivo. Muestra las estadísticas del examen,
-    el registro de ingresos de estudiantes y el modal de registro de ingreso.
+    Pantalla del monitor en vivo con las sesiones de los exámenes (vista mock):
+    lista los estudiantes con su estado actual y el botón de cada fila que abre
+    el formulario de registro de incidencia. Desde aquí la entrada precarga
+    estudiante y rol en la URL, que es lo que distingue esta pantalla de la
+    central de riesgo, donde el estudiante se busca a mano.
 
     @changelog
-    - 2026-09-29  [David E. Chavez T.]  feat: vista de monitoreo en vivo.
---}}
+    - 2026-09-24  [David E. Chavez T.]  feat: creación inicial de la vista.
+    - 2026-09-28  [Candy]  fix: la etiqueta del botón de la fila pasa de "Reporte"
+      a "Reportar", para que sea el verbo de la acción y no se lea como el
+      nombre de un documento.
+    - 2026-09-29  [David E. Chavez T.]  refactor: header, espaciado y modal de ingreso.
 
-@extends('layouts.app')
+    @see  \App\Livewire\Monitoreo\RegistrarIncidencia
+    @see  resources/views/components/ui/table.blade.php
+--}}
 
 @section('title', 'Monitor en vivo')
 
@@ -28,7 +36,10 @@
             default => '<span class="text-xs font-medium px-2 py-1 rounded-full border-2 border-gray-400 bg-gray-100 text-gray-400">'.$estado.'</span>',
         };
 
-        $registrarBtn = function (string $nombre, string $sis, string $registro, string $estado): string {
+        $materiaActual = 'Introduccion a la Programacion';
+        $examenActual = 3;
+
+        $registrarBtn = function (string $nombre, string $sis, string $registro, string $estado) use ($materiaActual, $examenActual): string {
             $clases = 'inline-flex items-center justify-center box-border border border-transparent focus:ring-4 focus:ring-brand-medium shadow-xs font-medium leading-5 rounded-base focus:outline-none text-white bg-brand hover:bg-brand-strong px-3 py-1.5 text-xs';
 
             if ($estado === 'Pendiente') {
@@ -41,12 +52,15 @@
             }
 
             return sprintf(
-                '<a href="%s" class="%s">Reporte</a>',
+                '<a href="%s" class="%s">Reportar</a>',
                 e(route('registrar-incidencia', [
                     'origen' => 'monitoreo',
                     'nombre' => $nombre,
                     'sis' => $sis,
+                    'materia' => $materiaActual,
+                    'examen' => $examenActual,
                     'rol' => str_starts_with($registro, 'Aux.') ? 'auxiliar' : 'docente',
+                    'usuario' => str_starts_with($registro, 'Aux.') ? 3 : 1,
                 ])),
                 $clases,
             );
@@ -110,7 +124,7 @@
         </div>
     </div>
 
-    <div class="mt-6 mx-[2vh] bg-neutral-primary-soft border border-default rounded-base shadow-xs p-6 px-[2vh]"
+    <div class="mt-6 mx-[2vh] bg-neutral-primary-soft border border-default rounded-base shadow-xs p-6"
         x-data="{
             showModalIngreso: false,
             nombreIngreso: '',
@@ -142,7 +156,12 @@
             </div>
         </div>
 
-        <h2 class="mt-6 text-lg font-semibold text-heading">Registro de ingresos</h2>
+        <div class="mt-6 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+            <h2 class="text-lg font-semibold text-heading">Registro de ingresos</h2>
+            <p class="text-sm text-heading">
+                Materia: <span class="font-medium">{{ $materiaActual }}</span>
+            </p>
+        </div>
 
         <div class="mt-4">
             @php

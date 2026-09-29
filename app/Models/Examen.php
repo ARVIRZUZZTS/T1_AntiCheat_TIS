@@ -7,17 +7,23 @@
  *
  * @created 2026-09-24
  *
- * @updated 2026-09-26
+ * @updated 2026-09-28
  *
  * @description
- * Modelo de la tabla `examen`: mapeo del examen y sus relaciones de
- * persistencia (cursos, estados de estudiantes y registros de asistencia).
+ * Modelo Eloquent de la tabla `examen`: representa un examen masivo con su
+ * ventana horaria (fecha, hora_inicio, hora_fin, duracion) y sus relaciones de
+ * persistencia: cursos asociados, inscripciones (estudiante_examen) y
+ * registros de asistencia.
  *
  * @changelog
  * - 2026-09-24  [T1]         feat: creación inicial del modelo.
+ * - 2026-09-25  [OchoaCesar] feat: creación inicial del modelo.
  * - 2026-09-25  [OchoaCesar] feat: agregar relación registrosAsistencia().
+ * - 2026-09-26  [Diego Tejerina] feat: anotaciones @property y relación cursos().
  * - 2026-09-26  [T1]         fix: resolver conflicto de merge sin resolver
  *   dejado en dev por el commit e4ea2fd (marcadores <<<<<<< sin quitar).
+ * - 2026-09-28  [T1]         fix: resolver conflictos de merge al integrar
+ *   dev en feature/28 (#28).
  *
  * @see  EstudianteExamen
  * @see  RegistroAsistencia

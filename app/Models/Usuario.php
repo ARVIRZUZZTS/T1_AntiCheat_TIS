@@ -7,18 +7,22 @@
  *
  * @created 2026-09-24
  *
- * @updated 2026-09-26
+ * @updated 2026-09-28
  *
  * @description
- * Modelo de la tabla `usuario`: mapea docentes y auxiliares del sistema con
- * sus roles (sirve para el control de permisos por rol) y los registros de
+ * Modelo Eloquent de la tabla `usuario`: mapea docentes y auxiliares del
+ * sistema, con sus roles (para el control de permisos) y los registros de
  * asistencia que realizó como registrador.
  *
  * @changelog
  * - 2026-09-24  [T1]         feat: creación inicial del modelo.
+ * - 2026-09-25  [OchoaCesar] feat: creación inicial del modelo.
  * - 2026-09-25  [OchoaCesar] feat: agregar relación registrosAsistencia().
+ * - 2026-09-26  [Diego Tejerina] feat: anotaciones @property y relación roles().
  * - 2026-09-26  [T1]         fix: resolver conflicto de merge sin resolver
  *   dejado en dev por el commit e4ea2fd (marcadores <<<<<<< sin quitar).
+ * - 2026-09-28  [T1]         fix: resolver conflictos de merge al integrar
+ *   dev en feature/28 (#28).
  *
  * @see  RegistroAsistencia
  */

@@ -31,6 +31,7 @@
 
 namespace Tests\Feature\Examenes;
 
+use App\Enums\Motivo;
 use App\Models\CentralRiesgo;
 use App\Models\Curso;
 use App\Models\Estudiante;
@@ -148,11 +149,14 @@ class ListarEstudiantesCursoFiltroTest extends TestCase
 
             CentralRiesgo::create([
                 'id_registro' => $idRiesgo,
-                'id_ingreso' => $idIngreso,
+                'sis_estudiante' => $sis,
+                'id_examen' => self::ID_EXAMEN,
                 'id_registrador' => self::ID_DOCENTE,
+                'motivo' => Motivo::Otro,
                 'detalle_motivo' => 'Motivo de prueba',
-                'fecha_registro' => now()->toDateString(),
+                'fecha_registro' => now(),
                 'tipo_infraccion' => $infraccion,
+                'id_ingreso' => $idIngreso,
             ]);
         }
     }

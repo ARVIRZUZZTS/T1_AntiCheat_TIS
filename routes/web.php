@@ -19,15 +19,16 @@
 use App\Http\Controllers\MonitoreoController;
 use App\Livewire\Examenes\EstudiantesCurso;
 use App\Livewire\Monitoreo\RegistrarIncidencia;
+use App\Models\Curso;
+use App\Services\Examen\ListarEstudiantesCursoConEstadoService;
 use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'pages.inicio')->name('inicio');
 
-Route::view('/inicio', 'pages.inicio');
-Route::view('/materias', 'pages.materias')->name('materias');
-Route::view('/materias/{codigo}', 'pages.materia-estudiantes')
-    ->defaults('codigo', 'MAT-101')
-    ->name('materias.detalle');
+Route::view('/inicio', 'pages.inicio')->name('inicio');
+Route::get('/materias', fn () => view('pages.materias', [
+    'cursos' => Curso::query()->orderBy('id_curso')->get(),
+]))->name('materias');
 Route::view('/examenes', 'pages.examenes')->name('examenes');
 Route::get('/monitoreo', MonitoreoController::class)->name('monitoreo');
 Route::view('/central-riesgo', 'pages.central-riesgo')->name('central-riesgo');
@@ -36,6 +37,16 @@ Route::view('/reportes', 'pages.reportes')->name('reportes');
 
 Route::get('/cursos/{curso}/estudiantes/estado', EstudiantesCurso::class)
     ->name('cursos.estudiantes.estado');
+
+Route::get('/materias/{curso}', function (Curso $curso) {
+    $conteos = app(ListarEstudiantesCursoConEstadoService::class)
+        ->conteosPorEstado($curso->id_curso);
+
+    return view('pages.materia-estudiantes', [
+        'curso' => $curso,
+        'conteos' => $conteos,
+    ]);
+})->name('materias.detalle');
 
 // TODO(@valerydariana98, 2026-09-25): proteger con el middleware de rol que
 // restringe el registro de incidencias a docentes y auxiliares (#69).

@@ -5,13 +5,20 @@
     @updated 2026-09-29
 
     @description
-    Vista de central de riesgo. Muestra las alertas y casos de riesgo.
+    Pantalla de la central de riesgo con las alertas abiertas. El botón de
+    registrar incidencia abre el formulario sin datos precargados: no viaja
+    ningún estudiante, así que quien lo usa busca al estudiante en la base de
+    datos y escribe el motivo. El monitor en vivo, en cambio, precarga el
+    estudiante de la fila desde la que se pulsa.
 
     @changelog
-    - 2026-09-29  [David E. Chavez T.]  feat: vista de central de riesgo.
---}}
+    - 2026-09-24  [David E. Chavez T.]  feat: creación inicial de la vista.
+    - 2026-09-28  [Candy]  feat: botón de registrar incidencia con entrada a
+      `origen=central-riesgo`, sin estudiante ni rol en la URL.
+    - 2026-09-29  [David E. Chavez T.]  refactor: header y espaciado consistente.
 
-@extends('layouts.app')
+    @see  \App\Livewire\Monitoreo\RegistrarIncidencia
+--}}
 
 @section('title', 'Central de riesgo')
 
@@ -20,6 +27,12 @@
         Alertas y casos de riesgo. Datos mockeados: vendrán del endpoint
         <code class="text-fg-brand">/central-de-riesgo</code>.
     </p>
+
+    <div class="mt-6 flex flex-wrap justify-end px-[2vh]">
+        <x-ui.button :href="route('registrar-incidencia', ['origen' => 'central-riesgo', 'usuario' => 1])">
+            Registrar incidencia
+        </x-ui.button>
+    </div>
 
     <div class="mt-6 px-[2vh]">
         <x-ui.card title="Alertas de riesgo (mock)">
