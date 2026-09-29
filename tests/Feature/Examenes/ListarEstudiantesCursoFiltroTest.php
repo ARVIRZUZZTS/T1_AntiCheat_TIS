@@ -12,12 +12,11 @@
  * @description
  * Pruebas de integración del filtrado de estudiantes por estado (issue #29),
  * contra el endpoint /api/cursos/{id}/estudiantes/estado. El esquema de estas
- * tablas no tiene migraciones Eloquent (se crea vía
- * docker/postgres/init/001_create_schema.sql), por eso se usa
- * DatabaseTransactions en vez de RefreshDatabase: cada test crea sus propios
- * datos con IDs dedicados (rango 900000+) y se revierten al terminar, sin
- * tocar los datos reales de desarrollo. Requiere el contenedor de Docker
- * levantado (ver INSTALACION_DOCKER.md).
+ * tablas viene de una migración con SQL crudo
+ * (database/migrations/2026_09_27_000001_migracion_servidor_oficial.php),
+ * por eso se usa DatabaseTransactions en vez de RefreshDatabase: cada test
+ * crea sus propios datos con IDs dedicados (rango 900000+) y se revierten al
+ * terminar, sin tocar los datos reales de desarrollo.
  *
  * @see  App\Services\Examen\ListarEstudiantesCursoConEstadoService
  * @see  App\Services\Examen\BusquedaEstudianteService
@@ -31,7 +30,7 @@
 
 namespace Tests\Feature\Examenes;
 
-use App\Enums\Motivo;
+use App\Enums\EstadoIncidencia;
 use App\Models\CentralRiesgo;
 use App\Models\Curso;
 use App\Models\Estudiante;
@@ -149,14 +148,12 @@ class ListarEstudiantesCursoFiltroTest extends TestCase
 
             CentralRiesgo::create([
                 'id_registro' => $idRiesgo,
-                'sis_estudiante' => $sis,
-                'id_examen' => self::ID_EXAMEN,
-                'id_registrador' => self::ID_DOCENTE,
-                'motivo' => Motivo::Otro,
-                'detalle_motivo' => 'Motivo de prueba',
-                'fecha_registro' => now(),
-                'tipo_infraccion' => $infraccion,
                 'id_ingreso' => $idIngreso,
+                'id_registrador' => self::ID_DOCENTE,
+                'detalle_motivo' => 'Motivo de prueba',
+                'fecha_registro' => now()->toDateString(),
+                'tipo_infraccion' => $infraccion,
+                'estado_incidencia' => EstadoIncidencia::Pendiente,
             ]);
         }
     }

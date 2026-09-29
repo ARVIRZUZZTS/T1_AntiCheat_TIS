@@ -293,13 +293,15 @@ class EstudiantesCurso extends Component
 
     /**
      * Usuario que hace el cambio, para auditoría (modificado_por). Mismo
-     * patrón de esAuxiliar(): busca el Usuario por cod_sis del autenticado.
+     * patrón que esAuxiliar(): busca el Usuario por cod_sis del autenticado.
      *
-     * TODO(@equipo, 2026-09-26): hoy siempre devuelve null en la práctica,
-     * porque auth() todavía no está conectado a la tabla `usuario` (ver
-     * revisión de #29) — no hay ningún login real implementado todavía.
-     * No bloquea el cambio de estado; solo el campo modificado_por queda
-     * vacío hasta que se resuelva esa brecha.
+     * Desde 2026-09-28 `auth()` sí apunta a la tabla `usuario`
+     * (`config/auth.php` -> `App\Models\Usuario`), así que esto resuelve el
+     * id real. Sigue devolviendo null cuando no hay sesion iniciada.
+     *
+     * TODO(@equipo, 2026-09-26): resolver #29 — today no hay ningún login
+     * implementado, así que en la práctica `modificado_por` sigue vacío
+     * porque casi nunca hay sesion. La brecha ya no es de configuracion.
      */
     private function idUsuarioActual(): ?int
     {

@@ -12,12 +12,12 @@
  * base de datos, motivos, obligatoriedad de la descripción y estado derivado
  * del rol de quien registra.
  *
- * El esquema de estas tablas no tiene migraciones Eloquent (se crea vía
- * docker/postgres/init/001_create_schema.sql), por eso se usa
- * DatabaseTransactions en vez de RefreshDatabase: cada test crea sus propios
- * datos con IDs dedicados (rango 900000+) y se revierten al terminar, sin
- * tocar los datos reales de desarrollo. Requiere el contenedor de Docker
- * levantado (ver INSTALACION_DOCKER.md).
+ * El esquema de estas tablas viene de una migración con SQL crudo
+ * (database/migrations/2026_09_27_000001_migracion_servidor_oficial.php,
+ * que a su vez es el mismo SQL de database/sql/001_schema.sql), por eso se
+ * usa DatabaseTransactions en vez de RefreshDatabase: cada test crea sus
+ * propios datos con IDs dedicados (rango 900000+) y se revierten al
+ * terminar, sin tocar los datos reales de desarrollo.
  *
  * @see  App\Livewire\Monitoreo\RegistrarIncidencia
  *

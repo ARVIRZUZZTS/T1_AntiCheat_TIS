@@ -1,6 +1,36 @@
--- ============================================================
--- SCRIPT DE CREACIÓN DE BASE DE DATOS (CORREGIDO)
--- ============================================================
+-- ============================================================================
+--  TECH ONE / T1 - ESQUEMA PARA EL SERVIDOR OFICIAL DE LA UNIVERSIDAD
+--  Motor: PostgreSQL
+--  Subir vía: https://techone.tis.cs.umss.edu.bo/phppgadmin/  ->  SQL
+--
+--  ------------------------------------------------------------------
+--  COMO USAR (importante)
+--  ------------------------------------------------------------------
+--  1. Desmarca la casilla "Paginar resultados" / "Paginate results".
+--     Si la dejas marcada, phpPgAdmin envuelve el script en
+--     SELECT COUNT(*) AS total FROM ( ... ) AS sub y TODO falla con
+--     "syntax error at or near CREATE", aunque el SQL este perfecto.
+--
+--  2. Pega este contenido completo en el textarea y dale "Ejecutar".
+--     (O usa el input "Cargar un archivo" de esa misma pagina y sube este .sql)
+--
+--  3. No cambies la base de datos seleccionada: debe ser la misma a la que
+--     apunta DB_DATABASE en el .env del servidor.
+--
+--  ------------------------------------------------------------------
+--  SI FALLA A LA MITAD
+--  ------------------------------------------------------------------
+--  Este script NO es idempotente: si se detiene en una sentencia, las
+--  anteriores ya quedaron creadas. Si eso ocurre, pide al administrador que
+--  recree la base vacia, o borra manualmente lo ya creado, antes de reintentar.
+--
+--  ------------------------------------------------------------------
+--  BASE YA EXISTENTE
+--  ------------------------------------------------------------------
+--  Si la base ya tiene las 25 tablas, NO uses este script: la base no se
+--  puede re-crear encima. Usa 004_actualizar_usuario.sql, que si es
+--  idempotente y aplica solo lo que falta.
+-- ============================================================================
 
 -- =====================
 -- TIPOS ENUM
@@ -11,25 +41,16 @@ CREATE TYPE registrador_tipo AS ENUM (
   'auxiliar'
 );
 
--- La infraccion solo tiene dos valores; el motivo de la incidencia vive en el
--- enum `motivo` (#70).
 CREATE TYPE tipo_infraccion AS ENUM (
   'tramposo',
-  'sospechoso'
+  'sospechoso',
+  'pendiente',
+  'aula equivocada'
 );
 
--- Motivos acordados por el equipo para una incidencia en la central de riesgos
--- (#70). El valor es un codigo estable (lo que viaja en el formulario) y la
--- etiqueta que ve la persona la resuelve la aplicacion, igual que
--- `tipo_infraccion`. El ultimo es el motivo generico: cuando se elige, hay que
--- escribir el detalle en `central_riesgo.detalle_motivo`.
-CREATE TYPE motivo AS ENUM (
-  'intento_de_ingreso_no_autorizado',
-  'uso_de_dispositivos_electronicos',
-  'copia_o_intercambio_de_respuestas',
-  'uso_de_material_no_autorizado',
-  'suplantacion_de_identidad',
-  'otro'
+CREATE TYPE estado_incidencia AS ENUM (
+  'Confirmado',
+  'Pendiente'
 );
 
 CREATE TYPE curso_estado AS ENUM (
@@ -86,7 +107,7 @@ CREATE TYPE roles AS ENUM (
 CREATE TABLE usuario (
   id_usuario     integer PRIMARY KEY,
   cod_sis        varchar(20) UNIQUE NOT NULL,
-  contraseña     varchar(100) NOT NULL,
+  password       varchar(100) NOT NULL,
   nombre_usuario varchar(50) NOT NULL,
   apellido       varchar(50) NOT NULL
 );
@@ -250,35 +271,16 @@ CREATE TABLE registro_asistencia (
   CONSTRAINT fk_ra_registrador FOREIGN KEY (id_registrador) REFERENCES usuario(id_usuario)
 );
 
--- La incidencia se sostiene sola: guarda su propio estudiante, examen y
--- registrador, para que tambien se pueda registrar a alguien que todavia no
--- tiene fila de ingreso (o que no estaba en la base de datos). `id_ingreso`
--- queda solo como trazabilidad del monitor en vivo (#70).
---
--- La materia NO se guarda: se deriva con
--- `id_examen -> examen_curso -> curso.nombre_curso`.
---
--- `id_registro` recibe su valor de una secuencia y no de la aplicacion: asi
--- dos registros simultaneos no calculan el mismo id, y el numero se le puede
--- mostrar a quien registro la incidencia sin volver a consultarlo (#70). La
--- secuencia se deja en 1 porque la semilla escribe los ids a mano; `002_seed_
--- data.sql` la adelanta al final para que el primer reporte no choque.
-CREATE SEQUENCE central_riesgo_id_registro_seq;
-
 CREATE TABLE central_riesgo (
-  id_registro     integer PRIMARY KEY DEFAULT nextval('central_riesgo_id_registro_seq'),
-  sis_estudiante  varchar(20) NOT NULL,     -- el estudiante, exista o no antes en la base
-  id_examen       integer NOT NULL,         -- de aqui sale la materia
-  id_registrador  integer NOT NULL,         -- docente o auxiliar que registro la incidencia
-  motivo          motivo NOT NULL,          -- del enum `motivo`; "otro" se apoya en detalle_motivo
-  detalle_motivo  varchar(300),             -- obligatorio cuando el motivo es "otro"; mismo maximo que el formulario
-  fecha_registro  timestamp NOT NULL DEFAULT now(),
-  tipo_infraccion tipo_infraccion NOT NULL, -- tramposo o sospechoso
-  id_ingreso      integer,                  -- solo si la incidencia se observo en el monitor
-  CONSTRAINT fk_cr_estudiante FOREIGN KEY (sis_estudiante) REFERENCES estudiante(sis_estudiante),
-  CONSTRAINT fk_cr_examen     FOREIGN KEY (id_examen)     REFERENCES examen(id_examen),
-  CONSTRAINT fk_cr_registrador FOREIGN KEY (id_registrador) REFERENCES usuario(id_usuario),
-  CONSTRAINT fk_cr_ingreso    FOREIGN KEY (id_ingreso)    REFERENCES registro_asistencia(id_ingreso)
+  id_registro     integer PRIMARY KEY,
+  id_ingreso      integer NOT NULL,
+  id_registrador  integer NOT NULL,
+  detalle_motivo  varchar(255),
+  fecha_registro  date,
+  tipo_infraccion tipo_infraccion NOT NULL,
+  estado_incidencia estado_incidencia NOT NULL DEFAULT 'Pendiente',
+  CONSTRAINT fk_cr_ingreso     FOREIGN KEY (id_ingreso)     REFERENCES registro_asistencia(id_ingreso),
+  CONSTRAINT fk_cr_registrador FOREIGN KEY (id_registrador) REFERENCES usuario(id_usuario)
 );
 
 CREATE TABLE notificacion_docente (
@@ -308,23 +310,30 @@ CREATE TABLE invitacion_examen_compartido (
   CONSTRAINT fk_iec_examen  FOREIGN KEY (id_examen)           REFERENCES examen(id_examen)
 );
 
-CREATE TABLE sessions (
-    id VARCHAR(255) PRIMARY KEY,
-    user_id BIGINT NULL,
-    ip_address VARCHAR(45) NULL,
-    user_agent TEXT NULL,
-    payload TEXT NOT NULL,
-    last_activity INT NOT NULL
-);
+-- =====================
+-- VERIFICACION (ejecutar al final)
+-- =====================
 
-CREATE TABLE cache (
-    key VARCHAR(255) PRIMARY KEY,
-    value TEXT NOT NULL,
-    expiration INT NOT NULL
-);
+-- Debe devolver 11 filas.
+SELECT COUNT(*) AS total_enums
+FROM pg_type
+WHERE typtype = 'e'
+  AND typname IN (
+    'registrador_tipo', 'tipo_infraccion', 'estado_incidencia', 'curso_estado',
+    'nombre_tipo_gestion', 'estado_notificacion', 'tipo_examen_nombre',
+    'estudiante_examen_estado', 'estado_usuario', 'invitacion_estado', 'roles'
+  );
 
-CREATE TABLE cache_locks (
-    key VARCHAR(255) PRIMARY KEY,
-    owner VARCHAR(255) NOT NULL,
-    expiration INT NOT NULL
-);
+-- Debe devolver 25 filas.
+SELECT COUNT(*) AS total_tablas
+FROM information_schema.tables
+WHERE table_schema = 'public'
+  AND table_type = 'BASE TABLE'
+  AND table_name IN (
+    'usuario', 'rol', 'estudiante', 'tipo_examen', 'tipo_gestion', 'ambiente',
+    'norma', 'material', 'curso', 'examen', 'rol_usuario', 'curso_tipo_gestion',
+    'estudiante_curso', 'auxiliar_curso', 'examen_ambiente', 'examen_norma',
+    'examen_material_permitido', 'examen_curso', 'estudiante_examen',
+    'estudiante_examen_ambiente', 'registro_asistencia', 'central_riesgo',
+    'notificacion_docente', 'notificacion_auxiliar', 'invitacion_examen_compartido'
+  );

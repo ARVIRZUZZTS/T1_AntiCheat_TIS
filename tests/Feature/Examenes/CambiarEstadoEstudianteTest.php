@@ -12,12 +12,12 @@
  * @description
  * Pruebas de integración del cambio de estado de un estudiante (issue #27),
  * contra el componente Livewire EstudiantesCurso (los modales de #25/#26
- * llaman a estos mismos métodos). El esquema no tiene migraciones Eloquent
- * (se crea vía docker/postgres/init/001_create_schema.sql), por eso se usa
- * DatabaseTransactions: cada test crea sus propios datos con IDs dedicados
- * (rango 900100+) y se revierten al terminar. Requiere el contenedor de
- * Docker levantado, con las columnas modificado_por/fecha_modificacion ya
- * agregadas a estudiante_examen (ver #27).
+ * llaman a estos mismos métodos). El esquema viene de una migración con SQL
+ * crudo (database/migrations/2026_09_27_000001_migracion_servidor_oficial.php),
+ * por eso se usa DatabaseTransactions: cada test crea sus propios datos con
+ * IDs dedicados (rango 900100+) y se revierten al terminar. Esa migración ya
+ * incluye las columnas modificado_por/fecha_modificacion de estudiante_examen
+ * (ver #27).
  *
  * @see  App\Livewire\Examenes\EstudiantesCurso
  * @see  App\Services\Examen\CambiarEstadoEstudianteService

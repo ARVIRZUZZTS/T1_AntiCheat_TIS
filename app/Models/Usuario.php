@@ -10,37 +10,41 @@
  * @updated 2026-09-28
  *
  * @description
- * Modelo Eloquent de la tabla `usuario`: mapea docentes y auxiliares del
- * sistema, con sus roles (para el control de permisos) y los registros de
+ * Modelo de la tabla `usuario`: mapea docentes y auxiliares del sistema con
+ * sus roles (sirve para el control de permisos por rol) y los registros de
  * asistencia que realizó como registrador.
+ *
+ * Es también la tabla de autenticación: `config/auth.php` apunta su proveedor
+ * a esta clase, así que el login es por `cod_sis` y no por email. La columna
+ * se llama `password` (no `contraseña`) para no depender del ENIE en el
+ * nombre y para que Laravel no necesite `getAuthPasswordName()`.
  *
  * @changelog
  * - 2026-09-24  [T1]         feat: creación inicial del modelo.
- * - 2026-09-25  [OchoaCesar] feat: creación inicial del modelo.
  * - 2026-09-25  [OchoaCesar] feat: agregar relación registrosAsistencia().
- * - 2026-09-26  [Diego Tejerina] feat: anotaciones @property y relación roles().
  * - 2026-09-26  [T1]         fix: resolver conflicto de merge sin resolver
  *   dejado en dev por el commit e4ea2fd (marcadores <<<<<<< sin quitar).
- * - 2026-09-28  [T1]         fix: resolver conflictos de merge al integrar
- *   dev en feature/28 (#28).
+ * - 2026-09-28  [T1]         feat: extender Authenticatable; `usuario` pasa a
+ *   ser la tabla de autenticación (login por `cod_sis`).
+ * - 2026-09-28  [T1]         fix: `contraseña` -> `password` (fuera el ENIE).
  *
  * @see  RegistroAsistencia
  */
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Foundation\Auth\User as Authenticatable;
 
 /**
  * @property int $id_usuario
  * @property string $cod_sis
- * @property string $contraseña
+ * @property string $password
  * @property string $nombre_usuario
  * @property string $apellido
  */
-class Usuario extends Model
+class Usuario extends Authenticatable
 {
     protected $table = 'usuario';
 
@@ -52,13 +56,25 @@ class Usuario extends Model
 
     protected $keyType = 'int';
 
+    /** @var list<string> */
     protected $fillable = [
         'id_usuario',
         'cod_sis',
-        'contraseña',
+        'password',
         'nombre_usuario',
         'apellido',
     ];
+
+    /**
+     * `usuario` no tiene columna `email`; el login es por `cod_sis`.
+     *
+     * La tabla `password_reset_tokens` guarda esta misma cadena en su
+     * columna `email`, que es lo que espera el broker por defecto.
+     */
+    public function getEmailForPasswordReset(): string
+    {
+        return $this->cod_sis;
+    }
 
     /** @return BelongsToMany<Rol, $this> */
     public function roles(): BelongsToMany
