@@ -107,15 +107,14 @@
                             <span wire:loading.remove wire:target="{{ $wireConfirm }}">Habilitar</span>
                             <span wire:loading wire:target="{{ $wireConfirm }}">Habilitando…</span>
                         </x-ui.button>
-                        <x-ui.button
-                            variant="default"
+                        <x-ui.button-cancelar
                             wire:click="{{ $wireClose }}"
                             wire:loading.attr="disabled"
                             wire:target="{{ $wireConfirm }}"
-                        >Cancelar</x-ui.button>
+                        >Cancelar</x-ui.button-cancelar>
                     @else
                         <x-ui.button variant="default" @click="confirmarHabilitar()">Habilitar</x-ui.button>
-                        <x-ui.button variant="default" @click="cerrarModalHabilitar()">Cancelar</x-ui.button>
+                        <x-ui.button-cancelar @click="cerrarModalHabilitar()">Cancelar</x-ui.button-cancelar>
                     @endif
                 </div>
             </div>
