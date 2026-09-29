@@ -311,6 +311,7 @@ class RegistrarIncidenciaTest extends TestCase
             ->set('nombreEstudiante', self::NOMBRE)
             ->set('apellidoEstudiante', self::APELLIDO)
             ->set('codigoSis', self::SIS_VALIDO)
+            ->set('sisPrecargado', self::SIS_VALIDO)
             ->set('tipoIncidencia', 'copia_o_intercambio_de_respuestas')
             ->set('materia', 'Fisica 1!')
             ->call('registrar')
@@ -321,6 +322,7 @@ class RegistrarIncidenciaTest extends TestCase
             ->set('nombreEstudiante', self::NOMBRE)
             ->set('apellidoEstudiante', self::APELLIDO)
             ->set('codigoSis', self::SIS_VALIDO)
+            ->set('sisPrecargado', self::SIS_VALIDO)
             ->set('tipoIncidencia', RegistrarIncidencia::MOTIVO_OTRO)
             ->set('materia', self::MATERIA_EJEMPLO)
             ->set('descripcion', 'Descripcion de prueba')
@@ -338,6 +340,7 @@ class RegistrarIncidenciaTest extends TestCase
             ->set('nombreEstudiante', 'Ana2')
             ->set('apellidoEstudiante', self::APELLIDO)
             ->set('codigoSis', self::SIS_VALIDO)
+            ->set('sisPrecargado', self::SIS_VALIDO)
             ->set('tipoIncidencia', 'copia_o_intercambio_de_respuestas')
             ->set('materia', self::MATERIA_EJEMPLO)
             ->call('registrar')
@@ -348,6 +351,7 @@ class RegistrarIncidenciaTest extends TestCase
             ->set('nombreEstudiante', self::NOMBRE)
             ->set('apellidoEstudiante', 'Lopez1')
             ->set('codigoSis', self::SIS_VALIDO)
+            ->set('sisPrecargado', self::SIS_VALIDO)
             ->set('tipoIncidencia', 'copia_o_intercambio_de_respuestas')
             ->set('materia', self::MATERIA_EJEMPLO)
             ->call('registrar')
@@ -383,6 +387,7 @@ class RegistrarIncidenciaTest extends TestCase
             ->set('nombreEstudiante', self::NOMBRE)
             ->set('apellidoEstudiante', self::APELLIDO)
             ->set('codigoSis', self::SIS_VALIDO)
+            ->set('sisPrecargado', self::SIS_VALIDO)
             ->set('tipoIncidencia', 'copia_o_intercambio_de_respuestas')
             ->set('materia', self::MATERIA_EJEMPLO)
             ->call('registrar')
@@ -417,6 +422,7 @@ class RegistrarIncidenciaTest extends TestCase
             ->set('nombreEstudiante', self::NOMBRE)
             ->set('apellidoEstudiante', self::APELLIDO)
             ->set('codigoSis', self::SIS_VALIDO)
+            ->set('sisPrecargado', self::SIS_VALIDO)
             ->set('materia', self::MATERIA_EJEMPLO)
             ->set('tipoIncidencia', 'copia_o_intercambio_de_respuestas')
             ->call('registrar')
@@ -426,6 +432,7 @@ class RegistrarIncidenciaTest extends TestCase
             ->set('nombreEstudiante', self::NOMBRE)
             ->set('apellidoEstudiante', self::APELLIDO)
             ->set('codigoSis', self::SIS_VALIDO)
+            ->set('sisPrecargado', self::SIS_VALIDO)
             ->set('materia', self::MATERIA_EJEMPLO)
             ->set('tipoIncidencia', RegistrarIncidencia::MOTIVO_OTRO)
             ->call('registrar')
@@ -454,6 +461,7 @@ class RegistrarIncidenciaTest extends TestCase
             ->set('nombreEstudiante', self::NOMBRE)
             ->set('apellidoEstudiante', self::APELLIDO)
             ->set('codigoSis', self::SIS_VALIDO)
+            ->set('sisPrecargado', self::SIS_VALIDO)
             ->set('materia', self::MATERIA_EJEMPLO)
             ->set('tipoIncidencia', 'copia_o_intercambio_de_respuestas')
             ->set('descripcion', str_repeat('a', RegistrarIncidencia::DESCRIPCION_MAXIMO + 1))
@@ -627,6 +635,7 @@ class RegistrarIncidenciaTest extends TestCase
             ->set('nombreEstudiante', self::NOMBRE)
             ->set('apellidoEstudiante', self::APELLIDO)
             ->set('codigoSis', self::SIS_VALIDO)
+            ->set('sisPrecargado', self::SIS_VALIDO)
             ->set('materia', self::MATERIA_EJEMPLO)
             ->set('tipoIncidencia', 'copia_o_intercambio_de_respuestas')
             ->call('registrar')
@@ -662,6 +671,7 @@ class RegistrarIncidenciaTest extends TestCase
             ->set('nombreEstudiante', self::NOMBRE)
             ->set('apellidoEstudiante', self::APELLIDO)
             ->set('codigoSis', self::SIS_VALIDO)
+            ->set('sisPrecargado', self::SIS_VALIDO)
             ->set('materia', self::MATERIA_EJEMPLO)
             ->set('tipoIncidencia', 'uso_de_dispositivos_electronicos')
             ->call('registrar')
@@ -680,6 +690,7 @@ class RegistrarIncidenciaTest extends TestCase
             ->set('nombreEstudiante', self::NOMBRE)
             ->set('apellidoEstudiante', self::APELLIDO)
             ->set('codigoSis', self::SIS_VALIDO)
+            ->set('sisPrecargado', self::SIS_VALIDO)
             ->set('materia', self::MATERIA_EJEMPLO)
             ->set('tipoIncidencia', 'suplantacion_de_identidad')
             ->call('registrar')
@@ -699,6 +710,7 @@ class RegistrarIncidenciaTest extends TestCase
             ->set('nombreEstudiante', self::NOMBRE)
             ->set('apellidoEstudiante', self::APELLIDO)
             ->set('codigoSis', self::SIS_VALIDO)
+            ->set('sisPrecargado', self::SIS_VALIDO)
             ->set('materia', self::MATERIA_EJEMPLO)
             ->set('tipoIncidencia', 'uso_de_material_no_autorizado')
             ->call('registrar')
@@ -716,6 +728,7 @@ class RegistrarIncidenciaTest extends TestCase
             ->set('nombreEstudiante', self::NOMBRE)
             ->set('apellidoEstudiante', self::APELLIDO)
             ->set('codigoSis', self::SIS_VALIDO)
+            ->set('sisPrecargado', self::SIS_VALIDO)
             ->set('materia', self::MATERIA_EJEMPLO)
             ->set('tipoIncidencia', 'intento_de_ingreso_no_autorizado')
             ->call('registrar')
@@ -747,6 +760,7 @@ class RegistrarIncidenciaTest extends TestCase
             ->set('nombreEstudiante', self::NOMBRE)
             ->set('apellidoEstudiante', self::APELLIDO)
             ->set('codigoSis', self::SIS_VALIDO)
+            ->set('sisPrecargado', self::SIS_VALIDO)
             ->set('materia', self::MATERIA_EJEMPLO)
             ->set('tipoIncidencia', 'uso_de_dispositivos_electronicos')
             ->set('descripcion', 'Se le vio el celular debajo del banco')
@@ -785,6 +799,7 @@ class RegistrarIncidenciaTest extends TestCase
             ->set('nombreEstudiante', self::NOMBRE)
             ->set('apellidoEstudiante', self::APELLIDO)
             ->set('codigoSis', self::SIS_VALIDO)
+            ->set('sisPrecargado', self::SIS_VALIDO)
             ->set('materia', self::MATERIA_EJEMPLO)
             ->set('tipoIncidencia', 'intento_de_ingreso_no_autorizado')
             ->call('registrar')
@@ -807,6 +822,7 @@ class RegistrarIncidenciaTest extends TestCase
             ->set('nombreEstudiante', self::NOMBRE)
             ->set('apellidoEstudiante', self::APELLIDO)
             ->set('codigoSis', self::SIS_VALIDO)
+            ->set('sisPrecargado', self::SIS_VALIDO)
             ->set('materia', self::MATERIA_EJEMPLO)
             ->set('tipoIncidencia', 'copia_o_intercambio_de_respuestas')
             ->call('registrar')
@@ -817,11 +833,11 @@ class RegistrarIncidenciaTest extends TestCase
     }
 
     /**
-     * Verifica que se rechace un código SIS que no está en la base de datos,
-     * porque `central_riesgo.sis_estudiante` tiene llave foránea contra
-     * `estudiante` y registrar a alguien que no existe no se puede guardar.
+     * Verifica que un código SIS escrito a mano que no está en la base se dé de
+     * alta al guardar la incidencia, en vez de rechazarse: reportar a un alumno
+     * que todavía no está cargado es un caso legítimo (#70).
      */
-    public function test_rechaza_un_codigo_sis_que_no_esta_en_la_base(): void
+    public function test_un_codigo_sis_nuevo_se_da_de_alta_al_guardar(): void
     {
         Livewire::test(RegistrarIncidencia::class)
             ->set('idExamen', self::EXAMEN_DEL_MONITOR)
@@ -831,9 +847,16 @@ class RegistrarIncidenciaTest extends TestCase
             ->set('materia', self::MATERIA_EJEMPLO)
             ->set('tipoIncidencia', 'copia_o_intercambio_de_respuestas')
             ->call('registrar')
-            ->assertHasErrors('codigoSis')
-            ->assertSee('El código SIS no corresponde a un estudiante de la base de datos.', escape: false)
-            ->assertSet('confirmacionVisible', false);
+            ->assertHasNoErrors()
+            ->assertSet('confirmacionVisible', true);
+
+        $this->assertDatabaseHas('estudiante', [
+            'sis_estudiante' => '111111111',
+            'nombre_estudiante' => self::NOMBRE,
+            'apellido_estudiante' => self::APELLIDO,
+        ]);
+
+        $this->assertDatabaseHas('central_riesgo', ['sis_estudiante' => '111111111']);
     }
 
     /**
@@ -871,6 +894,7 @@ class RegistrarIncidenciaTest extends TestCase
             ->set('nombreEstudiante', self::NOMBRE)
             ->set('apellidoEstudiante', self::APELLIDO)
             ->set('codigoSis', self::SIS_VALIDO)
+            ->set('sisPrecargado', self::SIS_VALIDO)
             ->set('materia', self::MATERIA_EJEMPLO)
             ->set('tipoIncidencia', 'uso_de_material_no_autorizado')
             ->call('registrar')
@@ -894,6 +918,7 @@ class RegistrarIncidenciaTest extends TestCase
             ->set('nombreEstudiante', self::NOMBRE)
             ->set('apellidoEstudiante', self::APELLIDO)
             ->set('codigoSis', self::SIS_VALIDO)
+            ->set('sisPrecargado', self::SIS_VALIDO)
             ->set('materia', self::MATERIA_EJEMPLO)
             ->set('tipoIncidencia', 'suplantacion_de_identidad')
             ->call('registrar')
@@ -918,6 +943,7 @@ class RegistrarIncidenciaTest extends TestCase
             ->set('nombreEstudiante', self::NOMBRE)
             ->set('apellidoEstudiante', self::APELLIDO)
             ->set('codigoSis', self::SIS_VALIDO)
+            ->set('sisPrecargado', self::SIS_VALIDO)
             ->set('materia', self::MATERIA_EJEMPLO)
             ->set('tipoIncidencia', 'uso_de_material_no_autorizado')
             ->call('registrar')
@@ -948,6 +974,7 @@ class RegistrarIncidenciaTest extends TestCase
                 ->set('nombreEstudiante', self::NOMBRE)
                 ->set('apellidoEstudiante', self::APELLIDO)
                 ->set('codigoSis', self::SIS_VALIDO)
+            ->set('sisPrecargado', self::SIS_VALIDO)
                 ->set('materia', self::MATERIA_EJEMPLO)
                 ->set('tipoIncidencia', 'intento_de_ingreso_no_autorizado')
                 ->call('registrar')
@@ -978,6 +1005,7 @@ class RegistrarIncidenciaTest extends TestCase
             ->set('nombreEstudiante', self::NOMBRE)
             ->set('apellidoEstudiante', self::APELLIDO)
             ->set('codigoSis', self::SIS_VALIDO)
+            ->set('sisPrecargado', self::SIS_VALIDO)
             ->set('materia', self::MATERIA_EJEMPLO)
             ->set('tipoIncidencia', 'suplantacion_de_identidad')
             ->call('registrar')
@@ -1000,6 +1028,7 @@ class RegistrarIncidenciaTest extends TestCase
             ->set('nombreEstudiante', self::NOMBRE)
             ->set('apellidoEstudiante', self::APELLIDO)
             ->set('codigoSis', self::SIS_VALIDO)
+            ->set('sisPrecargado', self::SIS_VALIDO)
             ->set('materia', self::MATERIA_EJEMPLO)
             ->set('tipoIncidencia', 'uso_de_dispositivos_electronicos')
             ->call('registrar')
@@ -1024,6 +1053,7 @@ class RegistrarIncidenciaTest extends TestCase
             ->set('nombreEstudiante', self::NOMBRE)
             ->set('apellidoEstudiante', self::APELLIDO)
             ->set('codigoSis', self::SIS_VALIDO)
+            ->set('sisPrecargado', self::SIS_VALIDO)
             ->set('materia', self::MATERIA_EJEMPLO)
             ->set('tipoIncidencia', RegistrarIncidencia::MOTIVO_OTRO)
             ->set('descripcion', 'Miraba hacia la puerta')
@@ -1101,7 +1131,7 @@ class RegistrarIncidenciaTest extends TestCase
         Livewire::test(RegistrarIncidencia::class)
             ->set('nombreEstudiante', self::NOMBRE)
             ->set('apellidoEstudiante', self::APELLIDO)
-            ->set('codigoSis', self::SIS_INEXISTENTE)
+            ->set('codigoSis', '202299887')
             ->set('materia', self::MATERIA_EJEMPLO)
             ->set('tipoIncidencia', Motivo::CopiaOIntercambioDeRespuestas->value)
             ->call('registrar')

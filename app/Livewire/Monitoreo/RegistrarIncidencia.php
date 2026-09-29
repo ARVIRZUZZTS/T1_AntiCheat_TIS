@@ -52,6 +52,9 @@
  *   La materia ya no es columna, sale del examen, y el modal muestra la del
  *   examen registrado. El código SIS tiene que existir en la base, porque la
  *   columna tiene llave foránea (#70).
+ * - 2026-09-29  [Valery D. Ortuno P]  fix: el código SIS escrito a mano se da de
+ *   alta al guardar en vez de rechazarse, porque reportar a un alumno que
+ *   todavía no está cargado es un caso legítimo (#70).
  */
 namespace App\Livewire\Monitoreo;
 
@@ -597,18 +600,14 @@ class RegistrarIncidencia extends Component
                 'max:'.self::NOMBRE_MAXIMO,
                 'regex:/^[\p{L}\s]+$/u',
             ],
-            // La columna `sis_estudiante` tiene llave foránea contra
-            // `estudiante`, así que el código escrito tiene que existir en la
-            // base: registrar a alguien que no está en la tabla ya no es
-            // posible (#70).
-            'codigoSis' => ['required', 'digits:9', Rule::exists('estudiante', 'sis_estudiante')],
+            'codigoSis' => $this->reglasCodigoSis(),
             'materia' => [
                 'required',
                 'string',
                 'max:'.self::MATERIA_MAXIMO,
                 'regex:/^[\p{L}\p{N}\s]+$/u',
             ],
-            'tipoIncidencia' => ['required', Rule::in(array_keys($this->tiposIncidencia))],
+            'tipoIncidencia' => ['required', Rule::in(array_keys($this->tiposIncidencia()))],
             'usuario' => ['required', 'integer', Rule::exists('usuario', 'id_usuario')],
             'descripcion' => [
                 Rule::requiredIf(fn (): bool => $this->descripcionEsObligatoria()),
@@ -684,7 +683,7 @@ class RegistrarIncidencia extends Component
             'apellidoEstudiante.max' => 'El apellido admite un máximo de '.self::NOMBRE_MAXIMO.' caracteres.',
             'codigoSis.required' => 'Ingrese el código SIS del estudiante.',
             'codigoSis.digits' => 'El código SIS debe tener 9 números.',
-            'codigoSis.exists' => 'El código SIS no corresponde a un estudiante de la base de datos.',
+            'codigoSis.unique' => 'Ese código SIS ya está registrado.',
             'materia.required' => 'Ingrese la materia del examen.',
             'materia.regex' => 'La materia solo puede contener letras, números y espacios.',
             'materia.max' => 'La materia admite un máximo de '.self::MATERIA_MAXIMO.' caracteres.',
@@ -731,20 +730,25 @@ class RegistrarIncidencia extends Component
 
         $this->validate();
 
-        $estudiante = $this->resolverEstudiante();
+        /* El alta del estudiante y la incidencia van juntas: si la segunda
+           falla, el primero tampoco debe quedar, o queda un alumno cargado sin
+           ninguna incidencia que lo justifique. */
+        $registro = DB::transaction(function (): CentralRiesgo {
+            $estudiante = $this->resolverEstudiante();
 
-        $registro = CentralRiesgo::create([
-            'sis_estudiante' => (string) $estudiante?->sis_estudiante,
-            'id_examen' => $this->resolverExamen($estudiante),
-            'id_registrador' => $this->usuario,
-            'motivo' => Motivo::from($this->tipoIncidencia),
-            // La descripción es opcional con los motivos del catálogo, así que
-            // vacía se guarda como null y no como cadena en blanco.
-            'detalle_motivo' => $this->descripcion === '' ? null : $this->descripcion,
-            'fecha_registro' => now(),
-            'tipo_infraccion' => $this->tipoInfraccion,
-            'id_ingreso' => $this->ingresoDelEstudiante($estudiante?->sis_estudiante),
-        ]);
+            return CentralRiesgo::create([
+                'sis_estudiante' => $estudiante->sis_estudiante,
+                'id_examen' => $this->resolverExamen($estudiante),
+                'id_registrador' => $this->usuario,
+                'motivo' => Motivo::from($this->tipoIncidencia),
+                // La descripción es opcional con los motivos del catálogo, así que
+                // vacía se guarda como null y no como cadena en blanco.
+                'detalle_motivo' => $this->descripcion === '' ? null : $this->descripcion,
+                'fecha_registro' => now(),
+                'tipo_infraccion' => $this->tipoInfraccion(),
+                'id_ingreso' => $this->ingresoDelEstudiante($estudiante->sis_estudiante),
+            ]);
+        });
 
         $nombreEnBase = $registro->estudiante === null
             ? ''
@@ -772,14 +776,32 @@ class RegistrarIncidencia extends Component
     }
 
     /**
-     * Estudiante de la base de datos al que pertenece el código SIS escrito, o
-     * null cuando no hay ninguno con ese código.
+     * Estudiante al que pertenece la incidencia, dado el código SIS escrito.
      *
-     * @return ?Estudiante
+     * Hay dos caminos distintos según de dónde venga el código. Del monitor o de
+     * la lupa llega un estudiante que ya está en la base y se usa tal cual: el
+     * nombre de un alumno cargado no se reescribe desde un reporte de incidencia.
+     * Escrito a mano, la regla de validación ya garantiza que el código no está
+     * en la base, así que hay que dar de alta a la persona:
+     * `central_riesgo` tiene llave foránea contra `estudiante` y reportar a
+     * alguien que todavía no está cargado es un caso legítimo, no un error.
+     *
+     * El alta no copia la carrera porque el formulario no la pide: un estudiante
+     * que entra por acá no viene de una lista oficial y queda con la carrera en
+     * null hasta que se concilie con la fuente (#70).
+     *
+     * @return Estudiante  Estudiante de la base, recien creado si no existia.
      */
-    private function resolverEstudiante(): ?Estudiante
+    private function resolverEstudiante(): Estudiante
     {
-        return Estudiante::query()->find($this->codigoSis);
+        return Estudiante::query()->firstOrCreate(
+            ['sis_estudiante' => $this->codigoSis],
+            [
+                'nombre_estudiante' => $this->nombreEstudiante,
+                'apellido_estudiante' => $this->apellidoEstudiante,
+                'carrera' => null,
+            ],
+        );
     }
 
     /**
