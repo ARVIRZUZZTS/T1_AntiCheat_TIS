@@ -54,6 +54,9 @@
  *   duplicado escrito a mano, con la excepcion del estudiante precargado del
  *   monitor y del elegido con la lupa. La prueba de la semilla ahora precarga
  *   tambien `sisPrecargado`, como hace mount() con lo que llega por la URL.
+ * - 2026-09-29  [Valery D. Ortuno P]  fix: pruebas de que el modal quede dentro
+ *   de la raiz del componente, de que no aparezca como raiz extra ni con el modal
+ *   abierto ni cerrado, y de que el resumen no muestre quien registro (#70).
  */
 
 namespace Tests\Feature;
@@ -660,6 +663,33 @@ class RegistrarIncidenciaTest extends TestCase
     }
 
     /**
+     * Verifica que el resumen no muestre quién registró.
+     *
+     * Todavía no hay login, así que lo que se guarda es siempre el usuario por
+     * defecto: mostrarlo daría un nombre que no es el de quien está frente a la
+     * pantalla (#70).
+     */
+    public function test_el_resumen_no_muestra_registrado_por(): void
+    {
+        $componente = Livewire::test(RegistrarIncidencia::class)
+            ->set('origen', RegistrarIncidencia::ORIGEN_MONITOREO)
+            ->set('idExamen', self::EXAMEN_DEL_MONITOR)
+            ->set('nombreEstudiante', self::NOMBRE)
+            ->set('apellidoEstudiante', self::APELLIDO)
+            ->set('codigoSis', self::SIS_VALIDO)
+            ->set('sisPrecargado', self::SIS_VALIDO)
+            ->set('materia', self::MATERIA_EJEMPLO)
+            ->set('tipoIncidencia', 'uso_de_dispositivos_electronicos')
+            ->call('registrar')
+            ->assertHasNoErrors();
+
+        $componente
+            ->assertDontSee('Registrado por')
+            ->assertDontSee('registrador');
+        $this->assertArrayNotHasKey('registrador', $componente->get('resumen'));
+    }
+
+    /**
      * Verifica que el botón Aceptar cierre el modal y devuelva al monitor en
      * vivo, la pantalla desde la que se abrió el formulario.
      */
@@ -1101,6 +1131,90 @@ class RegistrarIncidenciaTest extends TestCase
         foreach ($patrones as $patron => $existe) {
             $this->assertTrue($existe, 'La semilla no tiene ningun estudiante con el patron: '.$patron);
         }
+    }
+
+    /**
+     * Verifica que el modal de confirmación quede dentro del elemento raíz del
+     * componente y no sea un hermano suyo.
+     *
+     * Esto no es cosmético: Livewire 4 solo morfea el primer elemento del HTML
+     * que devuelve el componente. Con el modal como hermano de la raíz, el
+     * markup se renderiza bien (y por eso los demás tests de este archivo
+     * pasaban) pero se descarta al pintar el update, así que la confirmación
+     * nunca se ve. Además, con más de una raíz,
+     * `SupportMultipleRootElementDetection` lanza
+     * `MultipleRootElementsDetectedException` al montar con el modal abierto.
+     *
+     * El caso cerrado importa tanto como el abierto: la raíz no puede cambiar de
+     * cantidad entre renders, porque de eso depende el morph.
+     */
+    public function test_el_modal_queda_dentro_de_la_raiz_del_componente(): void
+    {
+        $cerrado = Livewire::test(RegistrarIncidencia::class)->html();
+
+        $this->assertCount(
+            1,
+            $this->raicesDelComponente($cerrado),
+            'El componente no debe tener más de una raíz con el modal cerrado.'
+        );
+
+        $abierto = Livewire::test(RegistrarIncidencia::class)
+            ->set('idExamen', self::EXAMEN_DEL_MONITOR)
+            ->set('nombreEstudiante', self::NOMBRE)
+            ->set('apellidoEstudiante', self::APELLIDO)
+            ->set('codigoSis', '777777777')
+            ->set('materia', self::MATERIA_EJEMPLO)
+            ->set('tipoIncidencia', Motivo::CopiaOIntercambioDeRespuestas->value)
+            ->call('registrar')
+            ->assertSet('confirmacionVisible', true)
+            ->html();
+
+        $this->assertCount(
+            1,
+            $this->raicesDelComponente($abierto),
+            'El modal no debe convertirse en una raíz extra al abrirse.'
+        );
+
+        // Y tiene que estar dentro de la raíz, no pegado después.
+        $this->assertStringContainsString('titulo-confirmacion', $abierto);
+        $this->assertLessThan(
+            strrpos($abierto, '</div>'),
+            strpos($abierto, 'titulo-confirmacion'),
+            'El modal se está renderizando después del cierre de la raíz.'
+        );
+    }
+
+    /**
+     * Elementos de nivel superior del HTML que devuelve el componente, que es lo
+     * que Livewire cuenta como raíces al morfear.
+     *
+     * @return list<string>  Etiqueta de cada raíz, para que el fallo las muestre.
+     */
+    private function raicesDelComponente(string $html): array
+    {
+        // Se quitan script y style porque las versiones de libxml los parsean
+        // de forma distinta y contaría nodos que el navegador no crea; es lo
+        // mismo que hace `SupportMultipleRootElementDetection` de Livewire.
+        $html = preg_replace('/<script\b[^>]*>.*?<\/script>/si', '', $html) ?? $html;
+        $html = preg_replace('/<style\b[^>]*>.*?<\/style>/si', '', $html) ?? $html;
+
+        $dom = new \DOMDocument();
+        @$dom->loadHTML($html, LIBXML_NOERROR);
+
+        $body = $dom->getElementsByTagName('body')->item(0);
+
+        if ($body === null) {
+            return [];
+        }
+
+        $raices = [];
+        foreach ($body->childNodes as $hijo) {
+            if ($hijo->nodeType === XML_ELEMENT_NODE) {
+                $raices[] = $hijo->nodeName.'.'.($hijo->getAttribute('class') ?: '(sin clase)');
+            }
+        }
+
+        return $raices;
     }
 
     /**

@@ -44,22 +44,26 @@
  * - 2026-09-29  [Candy]  feat: el modal toma las clases del design system, como
  *   los demás modales de la aplicación, y muestra el número del registro y la
  *   materia real del examen, que la base deriva de `id_examen` (#70).
+ * - 2026-09-29  [Valery D. Ortuno P]  fix: el modal se mueve dentro del elemento
+ *   raíz del componente, porque Livewire solo morfea el primer elemento del
+ *   HTML que devuelve y, siendo hermano de la raíz, nunca llegaba a pintarse
+ *   (#70).
 --}}
 
 @section('title', 'Registrar incidencia')
 
 @php
-    $resultados = $this->resultadosBusqueda;
+    $resultados = $this->resultadosBusqueda();
 @endphp
 
 {{-- El hueco entre las dos tarjetas es el mismo `space-y-6` que usa el monitor
      en vivo entre las suyas, para que las dos pantallas se vean parejas. --}}
 <div class="mx-auto w-full max-w-4xl space-y-6">
     <nav aria-label="Ruta de navegación">
-        <a href="{{ $this->rutaVolver }}"
+        <a href="{{ $this->rutaVolver() }}"
            class="inline-flex items-center gap-1.5 text-sm font-medium text-fg-brand hover:underline">
             <svg class="w-4 h-4" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m15 19-7-7 7-7"/></svg>
-            {{ $this->etiquetaVolver }}
+            {{ $this->etiquetaVolver() }}
         </a>
     </nav>
 
@@ -154,7 +158,7 @@
         <h2 class="text-lg font-semibold text-heading">Detalles de la incidencia</h2>
 
         <div class="mt-6 grid gap-5 sm:grid-cols-2">
-            @if ($this->materiaEsSoloLectura)
+            @if ($this->materiaEsSoloLectura())
                 {{-- La materia precargada desde el monitor en vivo es un dato de
                      solo lectura: no se puede cambiar en el formulario. --}}
                 <x-ui.input
@@ -190,7 +194,7 @@
                 label="Motivo de la incidencia *"
                 name="tipoIncidencia"
                 wire:model.live="tipoIncidencia"
-                :options="$this->tiposIncidencia"
+                :options="$this->tiposIncidencia()"
                 :selected="$tipoIncidencia"
                 :error="$errors->first('tipoIncidencia')"
                 placeholder="Seleccione el motivo de la incidencia"
@@ -200,13 +204,13 @@
             <div>
                 <span class="block mb-2.5 text-sm font-medium text-heading">Estado de la incidencia</span>
                 {{-- Insignia compacta, como en el resto del sistema. --}}
-                <x-ui.badge :type="$this->tipoEstado">{{ $this->etiquetaEstado }}</x-ui.badge>
+                <x-ui.badge :type="$this->tipoEstado()">{{ $this->etiquetaEstado() }}</x-ui.badge>
             </div>
         </div>
 
         <div class="mt-6">
             <x-ui.textarea
-                :label="$this->descripcionEsObligatoria ? 'Descripcion del hecho *' : 'Descripcion del hecho'"
+                :label="$this->descripcionEsObligatoria() ? 'Descripcion del hecho *' : 'Descripcion del hecho'"
                 name="descripcion"
                 rows="4"
                 maxlength="300"
@@ -216,7 +220,7 @@
                 class="bg-neutral-primary-soft!"
             />
 
-            <p class="mt-1 text-end text-sm text-body" aria-live="polite">{{ $this->contadorDescripcion }}</p>
+            <p class="mt-1 text-end text-sm text-body" aria-live="polite">{{ $this->contadorDescripcion() }}</p>
         </div>
 
         <div class="mt-8 flex flex-col-reverse gap-4 border-t border-default pt-6 sm:flex-row sm:items-center sm:justify-end">
@@ -230,10 +234,20 @@
             </x-ui.button>
         </div>
     </form>
-</div>
 
 {{--
     Modal de confirmación del registro.
+
+    Va DENTRO del `div` raíz del componente a propósito. Livewire 4 solo morfea
+    el primer elemento del HTML que devuelve: si el modal quedara como hermano
+    de ese `div`, el markup se renderizaría bien pero se descartaría al pintar
+    el update, y la confirmación nunca aparecería. Además, con más de un elemento
+    raíz, `SupportMultipleRootElementDetection` lanza
+    `MultipleRootElementsDetectedException` al montar con el modal abierto.
+
+    Como último hijo no recibe el margen de `space-y-6` (Tailwind lo aplica solo
+    a `:not(:last-child)`), y `position: fixed` lo ubica contra el viewport
+    igual que si estuviera fuera: no hay ancestro con `transform`.
 
     A diferencia de `x-ui.modal-habilitar` y `x-ui.modal-deshabilitar`, este NO
     se cierra con clic fuera ni con Esc: la incidencia ya quedó registrada, así
@@ -251,9 +265,9 @@
          role="dialog" aria-modal="true" aria-labelledby="titulo-confirmacion">
         <div class="relative p-4 w-full max-w-md max-h-full">
             <div class="relative bg-neutral-primary-soft border border-default rounded-base shadow-sm p-4 md:p-6">
-                <div class="flex items-center gap-3">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-status-habilitado-bg text-status-habilitado-fg">
-                        <svg class="w-5 h-5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m5 13 4 4L19 7"/></svg>
+                <div class="flex flex-col items-center gap-3 text-center">
+                    <span class="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-status-habilitado-bg text-status-habilitado-fg">
+                        <svg class="w-9 h-9" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m5 13 4 4L19 7"/></svg>
                     </span>
                     <h3 id="titulo-confirmacion" class="text-lg font-medium text-heading">
                         Estudiante agregado a la central de riesgos con éxito
@@ -279,9 +293,6 @@
                     <dt class="font-medium text-heading">Estado</dt>
                     <dd class="col-span-2 text-body">{{ $resumen['estado'] }}</dd>
 
-                    <dt class="font-medium text-heading">Registrado por</dt>
-                    <dd class="col-span-2 text-body">{{ $resumen['registrador'] }}</dd>
-
                     <dt class="font-medium text-heading">Fecha y hora</dt>
                     <dd class="col-span-2 text-body">{{ $resumen['fechaHora'] }}</dd>
 
@@ -303,3 +314,4 @@
         </div>
     </div>
 @endif
+</div>

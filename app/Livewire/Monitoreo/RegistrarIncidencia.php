@@ -55,6 +55,10 @@
  * - 2026-09-29  [Valery D. Ortuno P]  fix: el código SIS escrito a mano se da de
  *   alta al guardar en vez de rechazarse, porque reportar a un alumno que
  *   todavía no está cargado es un caso legítimo (#70).
+ * - 2026-09-29  [Valery D. Ortuno P]  fix: el resumen ya no muestra quién
+ *   registró. Todavía no hay login, así que lo que se guarda es siempre el
+ *   usuario por defecto y el modal daba un nombre que no era el de quien
+ *   estaba frente a la pantalla (#70).
  */
 namespace App\Livewire\Monitoreo;
 
@@ -754,20 +758,18 @@ class RegistrarIncidencia extends Component
             ? ''
             : trim($registro->estudiante->nombre_estudiante.' '.$registro->estudiante->apellido_estudiante);
 
-        $nombreRegistrador = $registro->registrador === null
-            ? ''
-            : trim($registro->registrador->nombre_usuario.' '.$registro->registrador->apellido);
-
+        // El resumen no incluye quién registró: todavía no hay login, así que el
+        // usuario guardado siempre es el por defecto y mostrarlo daría un nombre
+        // que no es el de quien está frente a la pantalla (#70).
         $this->resumen = [
             'codigo' => (string) $registro->id_registro,
             'estudiante' => $nombreEnBase !== ''
                 ? $nombreEnBase
                 : trim($this->nombreEstudiante.' '.$this->apellidoEstudiante),
             'codigoSis' => (string) $registro->sis_estudiante,
-            'registrador' => $nombreRegistrador,
             'materia' => (string) $registro->materia(),
             'motivo' => $registro->motivo->etiqueta(),
-            'estado' => $this->etiquetaEstado,
+            'estado' => $this->etiquetaEstado(),
             'fechaHora' => $registro->fecha_registro->format('d/m/Y H:i'),
             'descripcion' => (string) $registro->detalle_motivo,
         ];
@@ -899,7 +901,7 @@ class RegistrarIncidencia extends Component
     {
         $this->confirmacionVisible = false;
 
-        return redirect()->to($this->rutaVolver);
+        return redirect()->to($this->rutaVolver());
     }
  
     /**
