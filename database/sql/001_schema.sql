@@ -1,6 +1,36 @@
--- ============================================================
--- SCRIPT DE CREACIÓN DE BASE DE DATOS (CORREGIDO)
--- ============================================================
+-- ============================================================================
+--  TECH ONE / T1 - ESQUEMA PARA EL SERVIDOR OFICIAL DE LA UNIVERSIDAD
+--  Motor: PostgreSQL
+--  Subir vía: https://techone.tis.cs.umss.edu.bo/phppgadmin/  ->  SQL
+--
+--  ------------------------------------------------------------------
+--  COMO USAR (importante)
+--  ------------------------------------------------------------------
+--  1. Desmarca la casilla "Paginar resultados" / "Paginate results".
+--     Si la dejas marcada, phpPgAdmin envuelve el script en
+--     SELECT COUNT(*) AS total FROM ( ... ) AS sub y TODO falla con
+--     "syntax error at or near CREATE", aunque el SQL este perfecto.
+--
+--  2. Pega este contenido completo en el textarea y dale "Ejecutar".
+--     (O usa el input "Cargar un archivo" de esa misma pagina y sube este .sql)
+--
+--  3. No cambies la base de datos seleccionada: debe ser la misma a la que
+--     apunta DB_DATABASE en el .env del servidor.
+--
+--  ------------------------------------------------------------------
+--  SI FALLA A LA MITAD
+--  ------------------------------------------------------------------
+--  Este script NO es idempotente: si se detiene en una sentencia, las
+--  anteriores ya quedaron creadas. Si eso ocurre, pide al administrador que
+--  recree la base vacia, o borra manualmente lo ya creado, antes de reintentar.
+--
+--  ------------------------------------------------------------------
+--  BASE YA EXISTENTE
+--  ------------------------------------------------------------------
+--  Si la base ya tiene las 25 tablas, NO uses este script: la base no se
+--  puede re-crear encima. Usa 004_actualizar_usuario.sql, que si es
+--  idempotente y aplica solo lo que falta.
+-- ============================================================================
 
 -- =====================
 -- TIPOS ENUM
@@ -16,6 +46,11 @@ CREATE TYPE tipo_infraccion AS ENUM (
   'sospechoso',
   'pendiente',
   'aula equivocada'
+);
+
+CREATE TYPE estado_incidencia AS ENUM (
+  'Confirmado',
+  'Pendiente'
 );
 
 CREATE TYPE curso_estado AS ENUM (
@@ -72,7 +107,7 @@ CREATE TYPE roles AS ENUM (
 CREATE TABLE usuario (
   id_usuario     integer PRIMARY KEY,
   cod_sis        varchar(20) UNIQUE NOT NULL,
-  contraseña     varchar(100) NOT NULL,
+  password       varchar(100) NOT NULL,
   nombre_usuario varchar(50) NOT NULL,
   apellido       varchar(50) NOT NULL
 );
@@ -210,8 +245,11 @@ CREATE TABLE estudiante_examen (
   id_examen            integer NOT NULL,
   estado               estudiante_examen_estado NOT NULL,
   motivo               varchar(255),
+  modificado_por       integer,           -- usuario que hizo el ultimo cambio de estado (issue #27)
+  fecha_modificacion   timestamp,         -- cuando se hizo ese ultimo cambio (issue #27)
   CONSTRAINT fk_ee_estudiante FOREIGN KEY (sis_estudiante) REFERENCES estudiante(sis_estudiante),
-  CONSTRAINT fk_ee_examen     FOREIGN KEY (id_examen)      REFERENCES examen(id_examen)
+  CONSTRAINT fk_ee_examen     FOREIGN KEY (id_examen)      REFERENCES examen(id_examen),
+  CONSTRAINT fk_ee_modificador FOREIGN KEY (modificado_por) REFERENCES usuario(id_usuario)
 );
 
 CREATE TABLE estudiante_examen_ambiente (
@@ -223,12 +261,14 @@ CREATE TABLE estudiante_examen_ambiente (
 );
 
 CREATE TABLE registro_asistencia (
-  id_ingreso    integer PRIMARY KEY,
-  hora_ingreso  time,
-  id_examen     integer NOT NULL,
-  id_estudiante varchar(20) NOT NULL,       -- corregido: varchar (FK a estudiante.sis_estudiante)
-  CONSTRAINT fk_ra_examen     FOREIGN KEY (id_examen)     REFERENCES examen(id_examen),
-  CONSTRAINT fk_ra_estudiante FOREIGN KEY (id_estudiante) REFERENCES estudiante(sis_estudiante)
+  id_ingreso     integer PRIMARY KEY,
+  hora_ingreso   time,
+  id_examen      integer NOT NULL,
+  id_estudiante  varchar(20) NOT NULL,      -- corregido: varchar (FK a estudiante.sis_estudiante)
+  id_registrador integer NOT NULL,          -- quien registro la asistencia
+  CONSTRAINT fk_ra_examen      FOREIGN KEY (id_examen)      REFERENCES examen(id_examen),
+  CONSTRAINT fk_ra_estudiante  FOREIGN KEY (id_estudiante)  REFERENCES estudiante(sis_estudiante),
+  CONSTRAINT fk_ra_registrador FOREIGN KEY (id_registrador) REFERENCES usuario(id_usuario)
 );
 
 CREATE TABLE central_riesgo (
@@ -238,6 +278,7 @@ CREATE TABLE central_riesgo (
   detalle_motivo  varchar(255),
   fecha_registro  date,
   tipo_infraccion tipo_infraccion NOT NULL,
+  estado_incidencia estado_incidencia NOT NULL DEFAULT 'Pendiente',
   CONSTRAINT fk_cr_ingreso     FOREIGN KEY (id_ingreso)     REFERENCES registro_asistencia(id_ingreso),
   CONSTRAINT fk_cr_registrador FOREIGN KEY (id_registrador) REFERENCES usuario(id_usuario)
 );
@@ -268,3 +309,31 @@ CREATE TABLE invitacion_examen_compartido (
   CONSTRAINT fk_iec_docente FOREIGN KEY (id_docente_invitado) REFERENCES usuario(id_usuario),
   CONSTRAINT fk_iec_examen  FOREIGN KEY (id_examen)           REFERENCES examen(id_examen)
 );
+
+-- =====================
+-- VERIFICACION (ejecutar al final)
+-- =====================
+
+-- Debe devolver 11 filas.
+SELECT COUNT(*) AS total_enums
+FROM pg_type
+WHERE typtype = 'e'
+  AND typname IN (
+    'registrador_tipo', 'tipo_infraccion', 'estado_incidencia', 'curso_estado',
+    'nombre_tipo_gestion', 'estado_notificacion', 'tipo_examen_nombre',
+    'estudiante_examen_estado', 'estado_usuario', 'invitacion_estado', 'roles'
+  );
+
+-- Debe devolver 25 filas.
+SELECT COUNT(*) AS total_tablas
+FROM information_schema.tables
+WHERE table_schema = 'public'
+  AND table_type = 'BASE TABLE'
+  AND table_name IN (
+    'usuario', 'rol', 'estudiante', 'tipo_examen', 'tipo_gestion', 'ambiente',
+    'norma', 'material', 'curso', 'examen', 'rol_usuario', 'curso_tipo_gestion',
+    'estudiante_curso', 'auxiliar_curso', 'examen_ambiente', 'examen_norma',
+    'examen_material_permitido', 'examen_curso', 'estudiante_examen',
+    'estudiante_examen_ambiente', 'registro_asistencia', 'central_riesgo',
+    'notificacion_docente', 'notificacion_auxiliar', 'invitacion_examen_compartido'
+  );

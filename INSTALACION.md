@@ -28,14 +28,91 @@ Si ya bajaste el repo, asegúrate de cumplir con tener instalado PHP, Composer, 
 4. Verificar la instalación: composer --version
 
 ---
-## PostgreSQL 15.19
+## PostgreSQL 15.19 (base de datos local)
+
+Docker no se usa. El proyecto corre contra un **PostgreSQL instalado
+directamente en Windows**, que es lo mismo que corre en el servidor de la
+universidad. Asi el `.env` es identico en los dos lados y nunca hay que
+cambiar de archivo.
 
 1. Descargar el instalador de la versión **15.19** desde:  [https://www.enterprisedb.com/downloads/postgres-postgresql-downloads](https://www.enterprisedb.com/downloads/postgres-postgresql-downloads)
 2. Durante la instalación, mantener el puerto por defecto: **5432**
-3. Registrar la **contraseña del usuario `postgres`** (será necesaria para conectar Laravel).
-4. Verificar la instalación:
+3. **Registrar la contraseña del usuario `postgres`.** Es la del asistente de
+   instalación, no una que elija el proyecto. Si se te olvida, hay que
+   resetearla (ver abajo).
+4. Crear el rol y la base que usa la aplicación, con las mismas credenciales
+   que el servidor oficial:
 
-Nota: El puerto 5432 debe coincidir con el del resto del equipo para evitar conflictos al compartir el archivo
+```sql
+CREATE ROLE techone WITH LOGIN PASSWORD 'nFNiJunyQ9szGaE';
+CREATE DATABASE techone_db OWNER techone ENCODING 'UTF8';
+```
+
+5. Cargar el esquema. Local se hace por migraciones, que es lo que corre
+   Laravel de verdad:
+
+```bash
+php artisan migrate
+```
+
+Eso crea las 25 tablas del proyecto **y** las 8 de Laravel (`users`,
+`sessions`, `cache`, `jobs`, etc.).
+
+6. Cargar los datos de prueba. Las migraciones no siembran datos, y el seed es
+   SQL:
+
+```bash
+psql -U techone -h 127.0.0.1 -d techone_db -f database/sql/002_seed_data.sql
+```
+
+7. Comprobar:
+
+```bash
+psql -U techone -h 127.0.0.1 -d techone_db -f database/sql/verificar.sql
+php artisan db:show
+```
+
+Debe dar 34 tablas, 11 ENUM, 5 filas por tabla y 0 huerfanos.
+
+### Si te olvidaste la contraseña de `postgres`
+
+No se puede recuperar. Se resetea en cuatro pasos, con PowerShell **como
+administrador** (click derecho > Ejecutar como administrador):
+
+```powershell
+# 1. cambiar a trust las 2 lineas "host ... 127.0.0.1/32" y "::1/128"
+notepad "C:\Program Files\PostgreSQL\15\data\pg_hba.conf"
+# 2. aplicar el cambio sin reiniciar el servicio
+& "C:\Program Files\PostgreSQL\15\bin\pg_ctl.exe" reload -D "C:\Program Files\PostgreSQL\15\data"
+# 3. cambiar la clave y crear rol + base
+psql -U postgres -h 127.0.0.1 -d postgres -c "ALTER ROLE postgres PASSWORD 'tu-clave';"
+# 4. restaurar pg_hba.conf a scram-sha-256 y recargar otra vez
+```
+
+Devolve las dos lineas a `scram-sha-256` antes de seguir trabajando: con
+`trust`, cualquiera que se siente en la PC entra como cualquier usuario.
+
+### Cuidado con el seed
+
+`database/sql/002_seed_data.sql` **no es idempotente**: son 25 `INSERT` sin
+`ON CONFLICT`. Correrlo dos veces duplica todos los datos. Para empezar de
+cero:
+
+```sql
+DROP DATABASE techone_db;
+CREATE DATABASE techone_db OWNER techone ENCODING 'UTF8';
+```
+
+y volver a correr los pasos 5 y 6.
+
+### Detalle del `.env`
+
+`config/database.php` tiene `sqlite` como valor por defecto de `DB_CONNECTION`.
+Si el `.env` no carga, Laravel arranca igual y se conecta a SQLite **sin dar
+ningun error**. Si ves que una consulta falla con "no such table", revisá que
+`DB_CONNECTION=pgsql` esté en el `.env`.
+
+Nota: el puerto 5432 debe coincidir con el del resto del equipo para evitar conflictos al compartir el archivo.
 
 ---
 ## Laravel / Livewire

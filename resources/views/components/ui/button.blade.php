@@ -7,7 +7,8 @@
     @description
     Botón con variantes (default, secondary, tertiary, success, danger,
     warning, dark, ghost), tamaños, estado deshabilitado y carga (loader).
-    Si se pasa $href y no está deshabilitado, renderiza un <a>.
+    Si se pasa $href y no está deshabilitado, renderiza un <a>. Con
+    $pill, las esquinas pasan de rounded-base a rounded-full.
 --}}
 
 @props([
@@ -17,6 +18,7 @@
     'href' => null,
     'loading' => false,
     'disabled' => false,
+    'pill' => false,
 ])
 
 @php
@@ -41,7 +43,8 @@
         ? 'text-fg-disabled bg-disabled border-default-medium cursor-not-allowed'
         : ($variants[$variant] ?? $variants['default']);
 
-    $classes = 'inline-flex items-center justify-center box-border border focus:ring-4 shadow-xs font-medium leading-5 rounded-base focus:outline-none '
+    $classes = 'inline-flex items-center justify-center box-border border focus:ring-4 shadow-xs font-medium leading-5 focus:outline-none '
+        . ($pill ? 'rounded-full' : 'rounded-base') . ' '
         . $state . ' ' . ($sizes[$size] ?? $sizes['md']);
 @endphp
 

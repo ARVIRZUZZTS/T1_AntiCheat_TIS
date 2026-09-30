@@ -1,7 +1,56 @@
 <?php
 
+/**
+ * @file    web.php
+ *
+ * @author  David E. Chavez T. <virzuzz12345@gmail.com>
+ *
+ * @created 2026-09-29
+ *
+ * @updated 2026-09-29
+ *
+ * @description
+ * Definición de rutas web del panel. Incluye vistas estáticas y componentes Livewire.
+ *
+ * @changelog
+ * - 2026-09-29  [David E. Chavez T.]  feat: rutas web del panel.
+ */
+
+use App\Http\Controllers\MonitoreoController;
+use App\Livewire\Examenes\EstudiantesCurso;
+use App\Livewire\Monitoreo\RegistrarIncidencia;
+use App\Models\Curso;
+use App\Services\CentralRiesgo\ListarAlertasService;
+use App\Services\Examen\ListarEstudiantesCursoConEstadoService;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', function () {
-    return view('welcome');
-});
+Route::view('/', 'pages.inicio')->name('inicio');
+
+Route::view('/inicio', 'pages.inicio')->name('inicio');
+Route::get('/materias', fn () => view('pages.materias', [
+    'cursos' => Curso::query()->orderBy('id_curso')->get(),
+]))->name('materias');
+Route::view('/examenes', 'pages.examenes')->name('examenes');
+Route::get('/monitoreo', MonitoreoController::class)->name('monitoreo');
+Route::get('/central-riesgo', fn () => view('pages.central-riesgo', [
+    'alertas' => app(ListarAlertasService::class)->ejecutar(),
+]))->name('central-riesgo');
+Route::view('/usuarios', 'pages.usuarios')->name('usuarios');
+Route::view('/reportes', 'pages.reportes')->name('reportes');
+
+Route::get('/cursos/{curso}/estudiantes/estado', EstudiantesCurso::class)
+    ->name('cursos.estudiantes.estado');
+
+Route::get('/materias/{curso}', function (Curso $curso) {
+    $conteos = app(ListarEstudiantesCursoConEstadoService::class)
+        ->conteosPorEstado($curso->id_curso);
+
+    return view('pages.materia-estudiantes', [
+        'curso' => $curso,
+        'conteos' => $conteos,
+    ]);
+})->name('materias.detalle');
+
+// TODO(@valerydariana98, 2026-09-25): proteger con el middleware de rol que
+// restringe el registro de incidencias a docentes y auxiliares (#69).
+Route::get('/registrar-incidencia', RegistrarIncidencia::class)->name('registrar-incidencia');

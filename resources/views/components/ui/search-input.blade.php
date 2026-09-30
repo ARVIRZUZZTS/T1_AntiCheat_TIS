@@ -6,7 +6,13 @@
 
     @description
     Campo de búsqueda con icono de lupa y botón opcional. El botón y el
-    icono pueden deshabilitarse con las props correspondientes.
+    icono pueden deshabilitarse con las props correspondientes. Si se
+    provee $wireSubmit, el formulario se envía vía Livewire al método
+    indicado y el botón pasa a ser de tipo submit. El ancho lo define
+    quien lo usa (el contenedor externo), por eso el <form> ya no trae
+    max-w-md mx-auto de fábrica. Con $pill el input queda rounded-full
+    sobre fondo blanco (bg-neutral-primary-soft) en vez del rounded-base
+    gris de fábrica.
 --}}
 
 @props([
@@ -17,13 +23,19 @@
     'buttonLabel' => 'Search',
     'showButton' => true,
     'showIcon' => true,
+    'wireSubmit' => null,
+    'pill' => false,
 ])
 
 @php
     $inputId = $id ?? $name;
+    $inputStyle = $pill
+        ? 'rounded-full bg-neutral-primary-soft border-default'
+        : 'rounded-base bg-neutral-secondary-medium border-default-medium';
 @endphp
 
-<form class="max-w-md mx-auto">
+<form class="w-full"
+      @if ($wireSubmit) wire:submit.prevent="{{ $wireSubmit }}" @endif>
     @if ($label)
         <label for="{{ $inputId }}" class="block mb-2.5 text-sm font-medium text-heading">{{ $label }}</label>
     @endif
@@ -36,11 +48,11 @@
         @endif
 
         <input type="search" name="{{ $name }}" id="{{ $inputId }}"
-               {{ $attributes->merge(['class' => 'block w-full p-3 ' . ($showIcon ? 'ps-9' : '') . ' bg-neutral-secondary-medium border border-default-medium text-heading text-sm rounded-base focus:ring-brand focus:border-brand shadow-xs placeholder:text-body']) }}
+               {{ $attributes->merge(['class' => 'block w-full p-3 ' . ($showIcon ? 'ps-9' : '') . ' border text-heading text-sm focus:ring-brand focus:border-brand shadow-xs placeholder:text-body ' . $inputStyle]) }}
                placeholder="{{ $placeholder }}" />
 
         @if ($showButton)
-            <button type="button" class="absolute end-1.5 bottom-1.5 text-white bg-brand hover:bg-brand-strong box-border border border-transparent focus:ring-4 focus:ring-brand-medium shadow-xs font-medium leading-5 rounded text-xs px-3 py-1.5 focus:outline-none">
+            <button {{ $wireSubmit ? 'type=submit' : 'type=button' }} class="absolute end-1.5 bottom-1.5 text-white bg-brand hover:bg-brand-strong box-border border border-transparent focus:ring-4 focus:ring-brand-medium shadow-xs font-medium leading-5 rounded text-xs px-3 py-1.5 focus:outline-none">
                 {{ $buttonLabel }}
             </button>
         @endif
