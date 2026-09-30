@@ -26,12 +26,16 @@ enum TipoInfraccion: string
 {
     case Tramposo = 'tramposo';
     case Sospechoso = 'sospechoso';
+    case AulaEquivocada = 'aula equivocada';
+    case Pendiente = 'pendiente';
 
     public function etiqueta(): string
     {
         return match ($this) {
             self::Tramposo => 'Tramposo',
             self::Sospechoso => 'Sospechoso',
+            self::AulaEquivocada => 'Aula equivocada',
+            self::Pendiente => 'Pendiente',
         };
     }
 }

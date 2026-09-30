@@ -20,6 +20,7 @@ use App\Http\Controllers\MonitoreoController;
 use App\Livewire\Examenes\EstudiantesCurso;
 use App\Livewire\Monitoreo\RegistrarIncidencia;
 use App\Models\Curso;
+use App\Services\CentralRiesgo\ListarAlertasService;
 use App\Services\Examen\ListarEstudiantesCursoConEstadoService;
 use Illuminate\Support\Facades\Route;
 
@@ -31,7 +32,9 @@ Route::get('/materias', fn () => view('pages.materias', [
 ]))->name('materias');
 Route::view('/examenes', 'pages.examenes')->name('examenes');
 Route::get('/monitoreo', MonitoreoController::class)->name('monitoreo');
-Route::view('/central-riesgo', 'pages.central-riesgo')->name('central-riesgo');
+Route::get('/central-riesgo', fn () => view('pages.central-riesgo', [
+    'alertas' => app(ListarAlertasService::class)->ejecutar(),
+]))->name('central-riesgo');
 Route::view('/usuarios', 'pages.usuarios')->name('usuarios');
 Route::view('/reportes', 'pages.reportes')->name('reportes');
 

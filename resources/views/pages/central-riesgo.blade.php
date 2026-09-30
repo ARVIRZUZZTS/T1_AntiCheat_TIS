@@ -37,26 +37,24 @@
     </div>
 
     <div class="mt-6 px-[2vh]">
-        <x-ui.card title="Alertas de riesgo (mock)">
+        <x-ui.card title="Alertas de riesgo">
             <ul class="divide-y divide-default">
-                @foreach ([
-                    ['Bruno Díaz', 'Cambio de pestaña x3', 'Crítica'],
-                    ['Diego Soto', 'Pantalla extra detectada', 'Alta'],
-                    ['Ernesto Vera', 'Tiempos de respuesta anómalos', 'Media'],
-                ] as [$estudiante, $motivo, $severidad])
+                @forelse ($alertas as $alerta)
                     <li class="flex items-center justify-between py-3">
                         <div>
-                            <p class="font-medium text-heading">{{ $estudiante }}</p>
-                            <p class="text-sm text-body">{{ $motivo }}</p>
+                            <p class="font-medium text-heading">{{ $alerta->estudiante_nombre }}</p>
+                            <p class="text-sm text-body">{{ $alerta->detalle_motivo }}</p>
                         </div>
                         <span @class([
                             'text-xs font-medium px-1.5 py-0.5 rounded-full',
-                            'bg-danger-soft text-fg-danger-strong' => $severidad === 'Crítica',
-                            'bg-warning-soft text-fg-warning' => $severidad === 'Alta',
-                            'bg-status-en-revision-bg text-status-en-revision-fg' => $severidad === 'Media',
-                        ])>{{ $severidad }}</span>
+                            'bg-danger-soft text-fg-danger-strong' => $alerta->tipo_infraccion === 'Tramposo',
+                            'bg-warning-soft text-fg-warning' => $alerta->tipo_infraccion === 'Sospechoso',
+                            'bg-status-en-revision-bg text-status-en-revision-fg' => $alerta->tipo_infraccion === 'Pendiente',
+                        ])>{{ $alerta->tipo_infraccion }}</span>
                     </li>
-                @endforeach
+                @empty
+                    <li class="text-sm text-body">No hay alertas de riesgo.</li>
+                @endforelse
             </ul>
         </x-ui.card>
     </div>

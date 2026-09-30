@@ -70,4 +70,10 @@ class CentralRiesgo extends Model
     {
         return $this->belongsTo(RegistroAsistencia::class, 'id_ingreso');
     }
+
+    /** @return BelongsTo<Usuario, $this> */
+    public function registrador(): BelongsTo
+    {
+        return $this->belongsTo(Usuario::class, 'id_registrador', 'id_usuario');
+    }
 }
