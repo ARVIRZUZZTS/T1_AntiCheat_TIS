@@ -22,6 +22,8 @@
     @see  resources/views/components/ui/table.blade.php
 --}}
 
+@extends('layouts.app')
+
 @section('title', 'Monitor en vivo')
 
 @section('content')

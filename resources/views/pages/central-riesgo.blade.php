@@ -20,6 +20,8 @@
     @see  \App\Livewire\Monitoreo\RegistrarIncidencia
 --}}
 
+@extends('layouts.app')
+
 @section('title', 'Central de riesgo')
 
 @section('content')

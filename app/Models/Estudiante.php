@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
 /**
  * @property string $sis_estudiante
@@ -57,13 +58,20 @@ class Estudiante extends Model
     /**
      * Incidencias de la central de riesgos del estudiante.
      *
-     * Se relación por `sis_estudiante` y no por el ingreso porque una incidencia
+     * Se relación a través de `registro_asistencia` porque una incidencia
      * se puede registrar sin que el estudiante tenga fila de asistencia (#70).
      *
-     * @return HasMany<CentralRiesgo, $this>
+     * @return HasManyThrough<CentralRiesgo, RegistroAsistencia, $this>
      */
-    public function centralRiesgos(): HasMany
+    public function centralRiesgos(): HasManyThrough
     {
-        return $this->hasMany(CentralRiesgo::class, 'sis_estudiante', 'sis_estudiante');
+        return $this->hasManyThrough(
+            CentralRiesgo::class,
+            RegistroAsistencia::class,
+            'id_estudiante',
+            'id_ingreso',
+            'sis_estudiante',
+            'id_ingreso'
+        );
     }
 }

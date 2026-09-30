@@ -20,6 +20,8 @@
     @see  routes/web.php
 --}}
 
+@extends('layouts.app')
+
 @section('title', 'Materias')
 
 @section('content')
