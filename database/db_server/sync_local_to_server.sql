@@ -3,6 +3,18 @@
 -- Fecha: 2026-09-30 02:46:01
 -- ============================================
 
+-- 0. Actualizar estructura del servidor para que coincida con local
+ALTER TABLE usuario RENAME COLUMN "contraseña" TO password;
+
+ALTER TABLE central_riesgo ADD COLUMN IF NOT EXISTS sis_estudiante VARCHAR(20);
+ALTER TABLE central_riesgo ADD COLUMN IF NOT EXISTS id_examen INTEGER;
+ALTER TABLE central_riesgo ADD COLUMN IF NOT EXISTS motivo VARCHAR(50);
+
+ALTER TABLE central_riesgo ADD CONSTRAINT fk_cr_estudiante
+  FOREIGN KEY (sis_estudiante) REFERENCES estudiante(sis_estudiante);
+ALTER TABLE central_riesgo ADD CONSTRAINT fk_cr_examen
+  FOREIGN KEY (id_examen) REFERENCES examen(id_examen);
+
 -- 1. Limpiar tablas existentes
 TRUNCATE TABLE central_riesgo, notificacion_docente, notificacion_auxiliar,
   invitacion_examen_compartido, registro_asistencia, estudiante_examen_ambiente,
