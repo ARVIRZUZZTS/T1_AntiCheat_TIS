@@ -7,7 +7,7 @@
  *
  * @created 2026-09-29
  *
- * @updated 2026-09-29
+ * @updated 2026-10-01
  *
  * @description
  * Controlador HTTP de la página de monitoreo en vivo. Obtiene el examen
@@ -15,10 +15,14 @@
  *
  * @changelog
  * - 2026-09-29  [David E. Chavez T.]  feat: creación inicial del controlador.
+ * - 2026-10-01  [Alex Candia]  refactor: `registroIngreso()` se elimina; la pantalla
+ *   de registro de ingreso pasa a ser un componente Livewire de página completa
+ *   (`BuscadorRegistro`) enrutado directamente, como ya ocurre con
+ *   `EstudiantesCurso`. El controlador queda solo con el monitor en vivo.
  *
  * @see  GenerarReporteAsistenciaService
  */
-
+ 
 namespace App\Http\Controllers;
 
 use App\Models\Examen;
