@@ -20,7 +20,6 @@
         CRUD de exámenes masivos. Datos mockeados: vendrán del endpoint
         <code class="text-fg-brand">/examenes</code>.
     </p>
-    <x-ui.button variant="default" href="#" class="mt-4">Nuevo examen</x-ui.button>
 
     <div class="mt-6 px-[2vh]">
         <x-ui.table

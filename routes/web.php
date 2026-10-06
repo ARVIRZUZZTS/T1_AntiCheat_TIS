@@ -7,7 +7,7 @@
  *
  * @created 2026-09-29
  *
- * @updated 2026-10-01
+ * @updated 2026-10-05
  *
  * @description
  * Definición de rutas web del panel. Incluye vistas estáticas y componentes Livewire.
@@ -19,6 +19,8 @@
  *   enruta directo a su componente Livewire (`BuscadorRegistro`) en vez de pasar
  *   por `MonitoreoController`, con lo que el controlador deja de renderizar
  *   vistas de componentes y la ruta queda sin lógica.
+ * - 2026-10-05  [Alex Candia]  feat: el detalle de la materia también entrega los
+ *   exámenes del curso, para la pestaña Exámenes.
  */
 
 use App\Http\Controllers\MonitoreoController;
@@ -28,6 +30,7 @@ use App\Livewire\Monitoreo\RegistrarIncidencia;
 use App\Models\Curso;
 use App\Services\CentralRiesgo\ListarAlertasService;
 use App\Services\Examen\ListarEstudiantesCursoConEstadoService;
+use App\Services\Examen\ListarExamenesCursoService;
 use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'pages.inicio')->name('inicio');
@@ -55,6 +58,7 @@ Route::get('/materias/{curso}', function (Curso $curso) {
     return view('pages.materia-estudiantes', [
         'curso' => $curso,
         'conteos' => $conteos,
+        'examenes' => app(ListarExamenesCursoService::class)->ejecutar($curso->id_curso),
     ]);
 })->name('materias.detalle');
 

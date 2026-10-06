@@ -63,15 +63,12 @@ class Estudiante extends Model
      *
      * @return HasManyThrough<CentralRiesgo, RegistroAsistencia, $this>
      */
-    public function centralRiesgos(): HasManyThrough
-    {
-        return $this->hasManyThrough(
-            CentralRiesgo::class,
-            RegistroAsistencia::class,
-            'id_estudiante',
-            'id_ingreso',
-            'sis_estudiante',
-            'id_ingreso'
-        );
-    }
+    public function centralRiesgos(): HasMany
+{
+    return $this->hasMany(
+        CentralRiesgo::class,
+        'sis_estudiante',   // FK en central_riesgo
+        'sis_estudiante'   // PK local en estudiante
+    );
+}
 }

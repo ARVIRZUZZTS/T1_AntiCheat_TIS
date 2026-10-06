@@ -2,7 +2,7 @@
     @file    materia-estudiantes.blade.php
     @author  OchoaCesar <cesareduardonick@gmail.com>
     @created 2026-09-25
-    @updated 2026-09-28
+    @updated 2026-10-05
 
     @description
     Vista de detalle de una materia: muestra las cards resumen (conteos reales
@@ -11,17 +11,23 @@
     EstudiantesCurso, que consume la misma fuente que el endpoint
     GET /api/cursos/{idCurso}/estudiantes/estado (búsqueda, filtros con
     contadores, paginación y los modales Habilitar/Deshabilitar conectados al
-    servicio de cambio de estado). Las demás pestañas quedan vacías a la espera
-    de sus endpoints.
+    servicio de cambio de estado). La pestaña Exámenes incrusta el parcial
+    partials/materia-examenes, con el listado que resuelve
+    ListarExamenesCursoService y el botón "Crear examen". Las pestañas
+    Habilitación y Auxiliares quedan vacías a la espera de sus endpoints.
 
     @changelog
     - 2026-09-25  [OchoaCesar]  feat: creación inicial de la vista (mock).
     - 2026-09-26  [Alisson D. Alvarado]  feat: buscador y modales en la vista mock.
     - 2026-09-28  [OchoaCesar]  refactor: conectar la pestaña Estudiantes al
       componente Livewire (datos reales), quitar mocks y usar conteos reales en las cards.
+    - 2026-10-05  [Alex Candia]  feat: la pestaña Exámenes muestra el listado de
+      exámenes de la materia con el botón "Crear examen".
 
     @see  App\Livewire\Examenes\EstudiantesCurso
     @see  App\Services\Examen\ListarEstudiantesCursoConEstadoService
+    @see  App\Services\Examen\ListarExamenesCursoService
+    @see  resources/views/partials/materia-examenes.blade.php
     @see  pages/materias.blade.php
 --}}
 
@@ -97,9 +103,13 @@
             @livewire(\App\Livewire\Examenes\EstudiantesCurso::class, ['curso' => $curso], key($curso->id_curso))
         </section>
 
+        {{-- Pestaña Exámenes: listado del parcial, con el botón Crear examen. --}}
+        <section x-show="tab === 'examenes'" x-cloak class="mt-6">
+            @include('partials.materia-examenes', ['curso' => $curso, 'examenes' => $examenes])
+        </section>
+
         {{-- Pestañas pendientes de endpoint: vacías por ahora. --}}
         <section x-show="tab === 'habilitacion'" x-cloak class="mt-6"></section>
-        <section x-show="tab === 'examenes'" x-cloak class="mt-6"></section>
         <section x-show="tab === 'auxiliares'" x-cloak class="mt-6"></section>
     </div>
 @endsection
