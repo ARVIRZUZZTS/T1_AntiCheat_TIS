@@ -46,6 +46,11 @@
 @endphp
 
 <div class="flex flex-col gap-[2vh]">
+    {{-- Aviso de éxito del alta. Los errores de validación se muestran dentro
+         del modal, que además se reabre solo (ver `abrir` más abajo). --}}
+    @if (session('mensaje'))
+        <x-ui.alert type="success">{{ session('mensaje') }}</x-ui.alert>
+    @endif
 
     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div class="min-w-0">
@@ -114,5 +119,7 @@
         :ambientes="$ambientes"
         :materiales="$materiales"
         :normas="$normas"
+        :curso-id="$curso->id_curso"
+        :abrir="$errors->any()"
     />
 </div>

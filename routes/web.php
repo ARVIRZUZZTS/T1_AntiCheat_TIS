@@ -23,8 +23,11 @@
  *   exámenes del curso, para la pestaña Exámenes.
  * - 2026-10-05  [Alex Candia]  feat: el detalle entrega además el catálogo de
  *   ambientes, el de materiales y el de normas, que alimentan el modal de alta.
+ * - 2026-10-05  [Alex Candia]  feat: endpoint POST de alta de examen, que es a
+ *   donde envía el modal de la pestaña Exámenes.
  */
 
+use App\Http\Controllers\ExamenController;
 use App\Http\Controllers\MonitoreoController;
 use App\Livewire\Examenes\EstudiantesCurso;
 use App\Livewire\Monitoreo\BuscadorRegistro;
@@ -71,6 +74,11 @@ Route::get('/materias/{curso}', function (Curso $curso) {
         'normas' => app(ListarNormasService::class)->ejecutar(),
     ]);
 })->name('materias.detalle');
+
+// Alta de examen desde el modal de la pestaña Exámenes. La validación vive en
+// StoreExamenRequest y el alta en RegistrarExamenService; la ruta solo enruta.
+Route::post('/cursos/{curso}/examenes', [ExamenController::class, 'store'])
+    ->name('cursos.examenes.store');
 
 // TODO(@valerydariana98, 2026-09-25): proteger con el middleware de rol que
 // restringe el registro de incidencias a docentes y auxiliares (#69).

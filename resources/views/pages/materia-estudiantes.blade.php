@@ -36,6 +36,13 @@
 @section('title', $curso->nombre_curso)
 
 @section('content')
+    @php
+        // Después de crear un examen (o de fallar la validación) la página vuelve
+        // a cargar y, si arrancara siempre en Estudiantes, el aviso y el modal
+        // quedarían escondidos detrás de otra pestaña.
+        $tabInicial = ($errors->any() || session()->has('mensaje')) ? 'examenes' : 'estudiantes';
+    @endphp
+
     <div class="flex flex-wrap gap-[2vh]">
         <div class="flex-1 min-w-[200px] flex items-center justify-between gap-3 bg-neutral-primary-soft p-6 border border-default rounded-base shadow-xs">
             <div>
@@ -84,7 +91,7 @@
         </div>
     </div>
 
-    <div x-data="{ tab: 'estudiantes' }" class="mt-6">
+    <div x-data="{ tab: '{{ $tabInicial }}' }" class="mt-6">
         @php
             $tabClases = 'inline-flex items-center justify-center box-border border focus:ring-4 shadow-xs font-medium leading-5 rounded-base focus:outline-none px-4 py-2.5 text-sm';
             $tabActivo = 'text-white bg-brand border-transparent hover:bg-brand-strong focus:ring-brand-medium';

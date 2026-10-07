@@ -64,6 +64,8 @@
         'ambientes' => [],
         'materiales' => [],
         'normas' => [],
+        'cursoId' => null,
+        'abrir' => false,
     ])
 
     @changelog
@@ -99,24 +101,39 @@
     use App\Enums\TipoExamen;
 
     $opciones = $tipos ?? TipoExamen::opciones();
+
+    // Old input: si la validación falla, el formulario vuelve a mostrarse con lo
+    // que la persona ya había escrito. El estado de Alpine arranca con esos
+    // valores porque todos los campos están atados con x-model: si se pusieran en
+    // el HTML, Alpine los sobrescribiría con el estado al inicializar.
+    $catalogoAmbientes = collect($ambientes)->keyBy('id');
+
+    $ambientesElegidos = collect((array) old('ambientes', []))
+        ->map(fn (mixed $id) => $catalogoAmbientes->get((int) $id))
+        ->filter()
+        ->values()
+        ->all();
+
+    $materialesElegidos = array_map('intval', (array) old('materiales', []));
+    $normasElegidas = array_map('intval', (array) old('normas', []));
 @endphp
 
 <div
     x-data="{
-        show: false,
-        tipo: '',
-        fecha: '',
-        horaInicio: '',
-        duracion: '',
+        show: @js($abrir),
+        tipo: @js(old('tipo_examen', '')),
+        fecha: @js(old('fecha', '')),
+        horaInicio: @js(old('hora_inicio', '')),
+        duracion: @js(old('duracion', '')),
         busquedaAmbiente: '',
         indiceAmbientes: [],
-        ambientesElegidos: [],
+        ambientesElegidos: @js($ambientesElegidos),
         listaAbierta: false,
         indiceResaltado: -1,
-        materialesElegidos: [],
-        materialesPersonalizados: '',
-        normasElegidas: [],
-        normasPersonalizadas: '',
+        materialesElegidos: @js($materialesElegidos),
+        materialesPersonalizados: @js(old('materiales_personalizados', '')),
+        normasElegidas: @js($normasElegidas),
+        normasPersonalizadas: @js(old('normas_personalizadas', '')),
 
         // El catalogo de ambientes llega en el <script> de abajo. `termino` ya
         // viene en minusculas desde el servicio, asi que aca no se normaliza nada.
@@ -220,6 +237,24 @@
                 </button>
             </div>
 
+            {{-- Formulario real: va con POST y @csrf, sin wire: ni fetch. Si el
+                 navegador tiene JavaScript apagado igual se guarda; lo único que
+                 Alpine hace acá es la ergonomía del formulario y el combobox.
+                 El <form> envuelve los campos y el pie de botones, y el aviso de
+                 errores va arriba del todo para que se lea sin bajar. --}}
+            <form method="POST" action="{{ route('cursos.examenes.store', $cursoId) }}">
+                @csrf
+
+                @if ($errors->any())
+                    <x-ui.alert type="danger" title="Faltan datos para crear el examen">
+                        <ul class="list-disc list-outside space-y-1 ps-4">
+                            @foreach ($errors->all() as $error)
+                                <li>{{ $error }}</li>
+                            @endforeach
+                        </ul>
+                    </x-ui.alert>
+                @endif
+
             <div class="space-y-4 py-4">
                 @if ($materia)
                     <p class="text-sm text-body">
@@ -270,7 +305,7 @@
                         Ambientes
                     </label>
 
-                    <input type="text" name="busqueda_ambiente" id="busqueda_ambiente"
+                    <input type="text" id="busqueda_ambiente"
                            role="combobox"
                            aria-autocomplete="list"
                            aria-controls="lista-ambientes"
@@ -321,6 +356,12 @@
                             </li>
                         </template>
                     </ul>
+
+                    {{-- Los ambientes elegidos viajan al servidor como campos
+                         ocultos: la lista es de Alpine y no tiene inputs. --}}
+                    <template x-for="ambiente in ambientesElegidos" :key="'envio_' + ambiente.id">
+                        <input type="hidden" name="ambientes[]" :value="ambiente.id" />
+                    </template>
                 </div>
 
                 {{-- Material permitido: casillas del catalogo, todas desmarcadas.
@@ -342,9 +383,11 @@
                             <li>
                                 <x-ui.checkbox
                                     id="material_{{ $material['id'] }}"
+                                    name="materiales[]"
                                     label="{{ $material['descripcion'] }}"
                                     value="{{ $material['id'] }}"
                                     x-model="materialesElegidos"
+                                    :checked="in_array((int) $material['id'], $materialesElegidos, true)"
                                 />
                             </li>
                         @empty
@@ -379,9 +422,11 @@
                             <li>
                                 <x-ui.checkbox
                                     id="norma_{{ $norma['id'] }}"
+                                    name="normas[]"
                                     label="{{ $norma['detalle'] }}"
                                     value="{{ $norma['id'] }}"
                                     x-model="normasElegidas"
+                                    :checked="in_array((int) $norma['id'], $normasElegidas, true)"
                                 />
                             </li>
                         @empty
@@ -401,16 +446,15 @@
                     placeholder="Escribí las normas del examen..."
                     x-model="normasPersonalizadas"
                 />
-
-                <x-ui.alert type="brand">
-                    Todavía no hay endpoint de alta de exámenes: el formulario no guarda los datos.
-                </x-ui.alert>
             </div>
 
+            {{-- Mobile: los botones se apilan a lo ancho (stretch del column
+                 flex) y el de guardar queda arriba; desde sm: van en fila. --}}
             <div class="border-t border-default pt-4 flex flex-col-reverse gap-[2vh] sm:flex-row">
                 <x-ui.button-cancelar class="flex-1" @click="$dispatch('cerrar-modal-crear-examen')">Cancelar</x-ui.button-cancelar>
-                <x-ui.button variant="default" class="flex-1" disabled>Guardar examen</x-ui.button>
+                <x-ui.button type="submit" variant="default" class="flex-1">Guardar examen</x-ui.button>
             </div>
+            </form>
         </div>
     </div>
 
