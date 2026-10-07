@@ -28,18 +28,42 @@
     modal es el que tiene `overflow-y-auto`, así que un listbox flotante
     (`absolute`) quedaría recortado contra el borde del modal.
 
+    El material permitido y las normas tienen dos mitades cada uno: lo que sale
+    del catálogo, en casillas de verificación todas desmarcadas, y lo que la
+    persona escribe a mano, en un campo de texto con tope de 300 caracteres que
+    impone el `maxlength`. Las casillas usan un `x-model` que es un array: cada
+    una marcada empuja su id y la que se desmarca lo saca.
+
+    Ninguno de los tres bloques lleva contador: la lista de elegidos y los
+    propios campos ya dicen cuántos hay, y el contador ocupaba espacio sin
+    sumar.
+
+    El catálogo de ambientes lo arma App\Services\Ambiente\ListarAmbientesService
+    y viaja en un `<script type="application/json">`, igual que el índice de
+    estudiantes de livewire/monitoreo/buscador-registro.blade.php: se lee con
+    `JSON.parse` sobre `textContent` en vez de incrustarse como atributo, para no
+    pelearse con el escapado del HTML. El `termino` de cada ambiente ya viene en
+    minúsculas desde el servicio, así que cada tecla solo compara. Los catálogos
+    de materiales y de normas no pasan por ese script: los pinta Blade con
+    `@foreach`, porque no se filtran en el navegador y no hay nada que buscar.
+
     El guardado todavía no está conectado (no existe el servicio de alta de
     exámenes), así que el botón de guardar va deshabilitado y el formulario se
     presenta como pendiente.
 
     TODO(@equipo, 2026-10-05): reemplazar el aviso por el guardado real cuando
     exista el servicio de alta (`App\Services\Examen\RegistrarExamenService`),
-    que es quien tendrá que escribir los ambientes elegidos en `examen_ambiente`.
+    que es quien tendrá que escribir los ambientes elegidos en `examen_ambiente`,
+    las normas y los materiales del catálogo en `examen_norma` y
+    `examen_material_permitido`, y lo escrito a mano en las tablas que lo guarden
+    (todavía no existen).
 
     @props([
         'materia' => null,
         'tipos' => null,
         'ambientes' => [],
+        'materiales' => [],
+        'normas' => [],
     ])
 
     @changelog
@@ -48,14 +72,27 @@
       saneo en Alpine (el input date mostraba el formato del navegador), se quita
       la hora de fin —la duración ya la define— y la duración pasa a texto con
       solo dígitos, sin las flechitas del input number.
-    - 2026-10-05  [Alex Condia]  feat: selector de ambientes con buscador
+    - 2026-10-05  [Alex Candia]  feat: selector de ambientes con buscador
       dinámico, lista con scroll y papelera por cada ambiente elegido.
     - 2026-10-05  [Alex Candia]  refactor: el selector pasa a combobox: el input
       es el buscador y la lista es su listbox, que se abre al enfocarlo y se
       filtra mientras se escribe, con navegación por flechas y Enter para elegir.
+    - 2026-10-05  [Alex Candia]  feat: casillas del catálogo de material
+      permitido, todas desmarcadas, y campo de normas propias con tope de 300
+      caracteres. Sin guardado todavía.
+    - 2026-10-05  [Alex Candia]  refactor: se quitan los contadores de ambientes
+      elegidos y de caracteres escritos en las normas.
+    - 2026-10-05  [Alex Candia]  refactor: se saca también el contador de
+      materiales marcados.
+    - 2026-10-05  [Alex Candia]  feat: campo de materiales personalizados y
+      casillas del catálogo de normas, como las de materiales pero a una columna
+      porque cada norma es una regla entera. Sin guardado todavía.
 
     @see  resources/views/partials/materia-examenes.blade.php
     @see  App\Enums\TipoExamen
+    @see  App\Services\Ambiente\ListarAmbientesService
+    @see  App\Services\Material\ListarMaterialesService
+    @see  App\Services\Norma\ListarNormasService
 --}}
 
 @php
@@ -76,12 +113,22 @@
         ambientesElegidos: [],
         listaAbierta: false,
         indiceResaltado: -1,
-        init() {
-            const indice = document.getElementById('indice-ambientes-examen');
+        materialesElegidos: [],
+        materialesPersonalizados: '',
+        normasElegidas: [],
+        normasPersonalizadas: '',
 
-            this.indiceAmbientes = indice ? JSON.parse(indice.textContent) : [];
+        // El catalogo de ambientes llega en el <script> de abajo. `termino` ya
+        // viene en minusculas desde el servicio, asi que aca no se normaliza nada.
+        init() {
+            const ambientes = document.getElementById('indice-ambientes-examen');
+
+            this.indiceAmbientes = ambientes ? JSON.parse(ambientes.textContent) : [];
         },
 
+        // La fecha se escribe dd/mm/aaaa: se queda solo con digitos y los
+        // separadores se colocan solos, para que el formato no dependa del
+        // navegador ni de la configuracion regional del dispositivo.
         sanearFecha() {
             const digitos = this.fecha.replace(/\D/g, '').slice(0, 8);
 
@@ -92,6 +139,8 @@
                     : digitos.slice(0, 2) + '/' + digitos.slice(2, 4) + '/' + digitos.slice(4);
         },
 
+        // La duracion son minutos: solo digitos. Al ser type=text no aparecen
+        // las flechitas del input number, que en movil ocupan medio campo.
         sanearDuracion() {
             this.duracion = this.duracion.replace(/\D/g, '');
         },
@@ -152,7 +201,7 @@
     @click.self="$dispatch('cerrar-modal-crear-examen')"
     @keydown.escape.window="$dispatch('cerrar-modal-crear-examen')"
     @cerrar-modal-crear-examen.window="show = false"
-    @abrir-modal-crear-examen.window="show = true; tipo = ''; fecha = ''; horaInicio = ''; duracion = ''; busquedaAmbiente = ''; ambientesElegidos = []; listaAbierta = false; indiceResaltado = -1"
+    @abrir-modal-crear-examen.window="show = true; tipo = ''; fecha = ''; horaInicio = ''; duracion = ''; busquedaAmbiente = ''; ambientesElegidos = []; listaAbierta = false; indiceResaltado = -1; materialesElegidos = []; materialesPersonalizados = ''; normasElegidas = []; normasPersonalizadas = ''"
     class="overflow-y-auto overflow-x-hidden fixed top-0 right-0 left-0 z-50 flex justify-center items-center w-full md:inset-0 h-full max-h-full bg-overlay-modal/50"
 >
     <div class="relative p-4 w-full max-w-md max-h-full">
@@ -257,11 +306,9 @@
                             No hay ambientes que coincidan con la búsqueda.
                         </li>
                     </ul>
-                    <p class="mt-3 mb-1.5 text-xs text-muted">
-                        Ambientes del examen: <span x-text="ambientesElegidos.length"></span>
-                    </p>
 
-                    <ul class="flex flex-col gap-2">
+                    {{-- Elegidos: cada uno con su papelera para sacarlo. --}}
+                    <ul class="mt-3 flex flex-col gap-2">
                         <template x-for="ambiente in ambientesElegidos" :key="ambiente.id">
                             <li class="flex items-center justify-between gap-2 px-3 py-2 rounded-base border border-default bg-neutral-secondary-soft">
                                 <span class="truncate text-sm text-heading" x-text="ambiente.nombre"></span>
@@ -276,6 +323,85 @@
                     </ul>
                 </div>
 
+                {{-- Material permitido: casillas del catalogo, todas desmarcadas.
+                     El catalogo lo resuelve ListarMaterialesService y se recorre con
+                     Blade, no con x-for: los datos ya vienen del servidor y Alpine
+                     solo guarda la seleccion. El `x-model` es un array, asi que la
+                     casilla marcada empuja su id y la desmarcada lo saca.
+                     Ojo: los atributos van SIN `:` a proposito, porque en un tag de
+                     componente Blade un `:` delante del nombre hace que Blade
+                     evalue el valor como PHP y no como expresion de Alpine. --}}
+                <div>
+                    <p class="block mb-2.5 text-sm font-medium text-heading" id="materiales_examen">
+                        Material permitido
+                    </p>
+
+                    <ul class="flex flex-col gap-3 sm:grid sm:grid-cols-2 sm:gap-x-4"
+                        aria-labelledby="materiales_examen">
+                        @forelse ($materiales as $material)
+                            <li>
+                                <x-ui.checkbox
+                                    id="material_{{ $material['id'] }}"
+                                    label="{{ $material['descripcion'] }}"
+                                    value="{{ $material['id'] }}"
+                                    x-model="materialesElegidos"
+                                />
+                            </li>
+                        @empty
+                            <li class="text-sm text-body">Todavía no hay materiales cargados en el catálogo.</li>
+                        @endforelse
+                    </ul>
+                </div>
+
+                {{-- Materiales que no estan en el catalogo: texto libre. El
+                     maxlength del input es lo que corta a 300. --}}
+                <x-ui.input
+                    label="Materiales personalizados"
+                    id="materiales_personalizados_examen"
+                    name="materiales_personalizados"
+                    type="text"
+                    maxlength="300"
+                    placeholder="Ej. Calculadora no programable"
+                    x-model="materialesPersonalizados"
+                />
+
+                {{-- Normas del catalogo: mismas casillas desmarcadas que los
+                     materiales, pero cada una es una regla entera y por eso el
+                     texto puede ocupar el ancho completo. --}}
+                <div>
+                    <p class="block mb-2.5 text-sm font-medium text-heading" id="normas_examen">
+                        Normas
+                    </p>
+
+                    <ul class="flex flex-col gap-3"
+                        aria-labelledby="normas_examen">
+                        @forelse ($normas as $norma)
+                            <li>
+                                <x-ui.checkbox
+                                    id="norma_{{ $norma['id'] }}"
+                                    label="{{ $norma['detalle'] }}"
+                                    value="{{ $norma['id'] }}"
+                                    x-model="normasElegidas"
+                                />
+                            </li>
+                        @empty
+                            <li class="text-sm text-body">Todavía no hay normas cargadas en el catálogo.</li>
+                        @endforelse
+                    </ul>
+                </div>
+
+                {{-- Normas propias del examen. El maxlength del textarea es lo
+                     que corta a 300. --}}
+                <x-ui.textarea
+                    label="Normas personalizadas"
+                    id="normas_personalizadas_examen"
+                    name="normas_personalizadas"
+                    rows="3"
+                    maxlength="300"
+                    placeholder="Escribí las normas del examen..."
+                    x-model="normasPersonalizadas"
+                />
+
                 <x-ui.alert type="brand">
                     Todavía no hay endpoint de alta de exámenes: el formulario no guarda los datos.
                 </x-ui.alert>
@@ -288,8 +414,9 @@
         </div>
     </div>
 
-    {{-- Índice de ambientes para el buscador. Va como application/json y se lee
-         con JSON.parse sobre textContent (no como atributo) por el mismo motivo
-         que en el buscador de registro: el escapado del HTML no se mete en medio. --}}
+    {{-- Indice de ambientes para el buscador del modal. Va como application/json
+         y se lee con JSON.parse sobre textContent (no como atributo) por el mismo
+         motivo que en el buscador de registro: el escapado del HTML no se mete en
+         medio. Los materiales no viajan por aqui: los pinta Blade directo. --}}
     <script type="application/json" id="indice-ambientes-examen">@json($ambientes)</script>
 </div>

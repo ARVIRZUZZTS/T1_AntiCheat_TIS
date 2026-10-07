@@ -22,7 +22,7 @@
  * - 2026-10-05  [Alex Candia]  feat: el detalle de la materia también entrega los
  *   exámenes del curso, para la pestaña Exámenes.
  * - 2026-10-05  [Alex Candia]  feat: el detalle entrega además el catálogo de
- *   ambientes, que alimenta el buscador del modal de alta de examen.
+ *   ambientes, el de materiales y el de normas, que alimentan el modal de alta.
  */
 
 use App\Http\Controllers\MonitoreoController;
@@ -34,6 +34,8 @@ use App\Services\Ambiente\ListarAmbientesService;
 use App\Services\CentralRiesgo\ListarAlertasService;
 use App\Services\Examen\ListarEstudiantesCursoConEstadoService;
 use App\Services\Examen\ListarExamenesCursoService;
+use App\Services\Material\ListarMaterialesService;
+use App\Services\Norma\ListarNormasService;
 use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'pages.inicio')->name('inicio');
@@ -62,10 +64,11 @@ Route::get('/materias/{curso}', function (Curso $curso) {
         'curso' => $curso,
         'conteos' => $conteos,
         'examenes' => app(ListarExamenesCursoService::class)->ejecutar($curso->id_curso),
-        // Catálogo de ambientes para el buscador del modal de alta de examen.
-        // Lo resuelve el catálogo entero y no el curso: un examen puede tomar en
-        // más de una aula y el buscador filtra en el navegador.
+        // Catálogos del modal de alta de examen: el buscador de ambientes los
+        // filtra en el navegador, así que se resuelven enteros y no por curso.
         'ambientes' => app(ListarAmbientesService::class)->ejecutar(),
+        'materiales' => app(ListarMaterialesService::class)->ejecutar(),
+        'normas' => app(ListarNormasService::class)->ejecutar(),
     ]);
 })->name('materias.detalle');
 

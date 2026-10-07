@@ -13,16 +13,21 @@
 
     Los datos llegan por @include desde pages/materia-estudiantes.blade.php, que
     los recibe ya resueltos por App\Services\Examen\ListarExamenesCursoService:
-    la vista no consulta la base ni decide el estado de cada examen. El catálogo
-    de ambientes del modal llega igual, desde ListarAmbientesService.
+    la vista no consulta la base ni decide el estado de cada examen. Los catálogos
+    de ambientes, materiales y normas del modal llegan igual, desde
+    ListarAmbientesService, ListarMaterialesService y ListarNormasService.
 
     @changelog
     - 2026-10-05  [Alex Candia]  feat: creación inicial de la sección.
     - 2026-10-05  [Alex Candia]  feat: la sección pasa el catálogo de ambientes al
       modal de alta, que los carga en su buscador.
+    - 2026-10-05  [Alex Candia]  feat: la sección pasa también el catálogo de
+      materiales y el de normas, que el modal muestra como casillas.
 
     @see  App\Services\Examen\ListarExamenesCursoService
     @see  App\Services\Ambiente\ListarAmbientesService
+    @see  App\Services\Material\ListarMaterialesService
+    @see  App\Services\Norma\ListarNormasService
     @see  resources/views/components/ui/modal-crear-examen.blade.php
     @see  resources/views/pages/materia-estudiantes.blade.php
 --}}
@@ -104,5 +109,10 @@
         @endforelse
     </ul>
 
-    <x-ui.modal-crear-examen :materia="$curso->nombre_curso" :ambientes="$ambientes" />
+    <x-ui.modal-crear-examen
+        :materia="$curso->nombre_curso"
+        :ambientes="$ambientes"
+        :materiales="$materiales"
+        :normas="$normas"
+    />
 </div>
