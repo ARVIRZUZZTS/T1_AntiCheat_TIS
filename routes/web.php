@@ -21,6 +21,8 @@
  *   vistas de componentes y la ruta queda sin lógica.
  * - 2026-10-05  [Alex Candia]  feat: el detalle de la materia también entrega los
  *   exámenes del curso, para la pestaña Exámenes.
+ * - 2026-10-05  [Alex Candia]  feat: el detalle entrega además el catálogo de
+ *   ambientes, que alimenta el buscador del modal de alta de examen.
  */
 
 use App\Http\Controllers\MonitoreoController;
@@ -28,6 +30,7 @@ use App\Livewire\Examenes\EstudiantesCurso;
 use App\Livewire\Monitoreo\BuscadorRegistro;
 use App\Livewire\Monitoreo\RegistrarIncidencia;
 use App\Models\Curso;
+use App\Services\Ambiente\ListarAmbientesService;
 use App\Services\CentralRiesgo\ListarAlertasService;
 use App\Services\Examen\ListarEstudiantesCursoConEstadoService;
 use App\Services\Examen\ListarExamenesCursoService;
@@ -59,6 +62,10 @@ Route::get('/materias/{curso}', function (Curso $curso) {
         'curso' => $curso,
         'conteos' => $conteos,
         'examenes' => app(ListarExamenesCursoService::class)->ejecutar($curso->id_curso),
+        // Catálogo de ambientes para el buscador del modal de alta de examen.
+        // Lo resuelve el catálogo entero y no el curso: un examen puede tomar en
+        // más de una aula y el buscador filtra en el navegador.
+        'ambientes' => app(ListarAmbientesService::class)->ejecutar(),
     ]);
 })->name('materias.detalle');
 
