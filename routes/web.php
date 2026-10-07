@@ -7,7 +7,7 @@
  *
  * @created 2026-09-29
  *
- * @updated 2026-10-01
+ * @updated 2026-10-05
  *
  * @description
  * Definición de rutas web del panel. Incluye vistas estáticas y componentes Livewire.
@@ -19,15 +19,26 @@
  *   enruta directo a su componente Livewire (`BuscadorRegistro`) en vez de pasar
  *   por `MonitoreoController`, con lo que el controlador deja de renderizar
  *   vistas de componentes y la ruta queda sin lógica.
+ * - 2026-10-05  [Alex Candia]  feat: el detalle de la materia también entrega los
+ *   exámenes del curso, para la pestaña Exámenes.
+ * - 2026-10-05  [Alex Candia]  feat: el detalle entrega además el catálogo de
+ *   ambientes, el de materiales y el de normas, que alimentan el modal de alta.
+ * - 2026-10-05  [Alex Candia]  feat: endpoint POST de alta de examen, que es a
+ *   donde envía el modal de la pestaña Exámenes.
  */
 
+use App\Http\Controllers\ExamenController;
 use App\Http\Controllers\MonitoreoController;
 use App\Livewire\Examenes\EstudiantesCurso;
 use App\Livewire\Monitoreo\BuscadorRegistro;
 use App\Livewire\Monitoreo\RegistrarIncidencia;
 use App\Models\Curso;
+use App\Services\Ambiente\ListarAmbientesService;
 use App\Services\CentralRiesgo\ListarAlertasService;
 use App\Services\Examen\ListarEstudiantesCursoConEstadoService;
+use App\Services\Examen\ListarExamenesCursoService;
+use App\Services\Material\ListarMaterialesService;
+use App\Services\Norma\ListarNormasService;
 use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'pages.inicio')->name('inicio');
@@ -55,8 +66,19 @@ Route::get('/materias/{curso}', function (Curso $curso) {
     return view('pages.materia-estudiantes', [
         'curso' => $curso,
         'conteos' => $conteos,
+        'examenes' => app(ListarExamenesCursoService::class)->ejecutar($curso->id_curso),
+        // Catálogos del modal de alta de examen: el buscador de ambientes los
+        // filtra en el navegador, así que se resuelven enteros y no por curso.
+        'ambientes' => app(ListarAmbientesService::class)->ejecutar(),
+        'materiales' => app(ListarMaterialesService::class)->ejecutar(),
+        'normas' => app(ListarNormasService::class)->ejecutar(),
     ]);
 })->name('materias.detalle');
+
+// Alta de examen desde el modal de la pestaña Exámenes. La validación vive en
+// StoreExamenRequest y el alta en RegistrarExamenService; la ruta solo enruta.
+Route::post('/cursos/{curso}/examenes', [ExamenController::class, 'store'])
+    ->name('cursos.examenes.store');
 
 // TODO(@valerydariana98, 2026-09-25): proteger con el middleware de rol que
 // restringe el registro de incidencias a docentes y auxiliares (#69).

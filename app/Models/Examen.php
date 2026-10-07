@@ -7,7 +7,7 @@
  *
  * @created 2026-09-24
  *
- * @updated 2026-09-28
+ * @updated 2026-10-05
  *
  * @description
  * Modelo Eloquent de la tabla `examen`: representa un examen masivo con su
@@ -24,14 +24,22 @@
  *   dejado en dev por el commit e4ea2fd (marcadores <<<<<<< sin quitar).
  * - 2026-09-28  [T1]         fix: resolver conflictos de merge al integrar
  *   dev en feature/28 (#28).
+ * - 2026-10-05  [Alex Candia] feat: relación tipoExamen() con el catálogo, en
+ *   vez del join a mano que usaba el listado de exámenes de la materia.
+ * - 2026-10-05  [Alex Candia] feat: relaciones ambientes(), normas(),
+ *   materialesPermitidos(), materialesPersonalizados() y normasPersonalizadas(),
+ *   que son las que escribe RegistrarExamenService al crear un examen.
  *
  * @see  EstudianteExamen
  * @see  RegistroAsistencia
+ * @see  TipoExamen
+ * @see  App\Services\Examen\RegistrarExamenService
  */
 
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
@@ -100,5 +108,68 @@ class Examen extends Model
     public function registrosAsistencia(): HasMany
     {
         return $this->hasMany(RegistroAsistencia::class, 'id_examen');
+    }
+
+    /**
+     * Tipo de examen del catálogo (`tipo_examen`). La clave foránea se pasa
+     * explícita porque el nombre de la relación es `tipoExamen`: si se dejara
+     * que Eloquent la dedujera, buscaría la columna `tipo_examen_id`, que no
+     * existe en el esquema.
+     *
+     * @return BelongsTo<TipoExamen, $this>
+     */
+    public function tipoExamen(): BelongsTo
+    {
+        return $this->belongsTo(TipoExamen::class, 'tipo_examen');
+    }
+
+    /** @return BelongsToMany<Ambiente, $this> */
+    public function ambientes(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            Ambiente::class,
+            'examen_ambiente',
+            'id_examen',
+            'id_ambiente'
+        );
+    }
+
+    /** @return BelongsToMany<Norma, $this> */
+    public function normas(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            Norma::class,
+            'examen_norma',
+            'id_examen',
+            'id_norma'
+        );
+    }
+
+    /**
+     * Material del catálogo que se permite. La tabla puente llama a la FK
+     * `id_material_permitido`, no `id_material`, así que va explícita.
+     *
+     * @return BelongsToMany<Material, $this>
+     */
+    public function materialesPermitidos(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            Material::class,
+            'examen_material_permitido',
+            'id_examen',
+            'id_material_permitido'
+        );
+    }
+
+    /** @return HasMany<MaterialPersonalizado, $this> */
+    public function materialesPersonalizados(): HasMany
+    {
+        return $this->hasMany(MaterialPersonalizado::class, 'id_examen');
+    }
+
+    /** @return HasMany<NormaPersonalizada, $this> */
+    public function normasPersonalizadas(): HasMany
+    {
+        return $this->hasMany(NormaPersonalizada::class, 'id_examen');
     }
 }
