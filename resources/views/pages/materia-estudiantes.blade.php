@@ -23,6 +23,7 @@
       componente Livewire (datos reales), quitar mocks y usar conteos reales en las cards.
     - 2026-10-05  [Alex Candia]  feat: la pestaña Exámenes muestra el listado de
       exámenes de la materia con el botón "Crear examen".
+    - 2026-10-08  [OchoaCesar]  refactor: mover header a @section('header') y añadir margen superior al contenido para mantener espaciado.
 
     @see  App\Livewire\Examenes\EstudiantesCurso
     @see  App\Services\Examen\ListarEstudiantesCursoConEstadoService
@@ -43,7 +44,37 @@
         $tabInicial = ($errors->any() || session()->has('mensaje')) ? 'examenes' : 'estudiantes';
     @endphp
 
-    <div class="flex flex-wrap gap-[2vh]">
+    @php
+        $docenteNombre = trim(($curso->docente?->nombre_usuario ?? '') . ' ' . ($curso->docente?->apellido ?? ''));
+        $subtituloHeader = collect([
+            $docenteNombre !== '' ? 'Docente: ' . $docenteNombre : null,
+            $curso->estado === 'EnCurso' ? 'En curso' : 'Finalizado',
+        ])->filter()->implode(' — ');
+    @endphp
+
+    @section('header')
+        <header class="bg-neutral-primary-soft border-b border-default">
+            <div class="px-6 py-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div class="flex items-center gap-3 min-w-0">
+                    <a href="{{ route('materias') }}" class="shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-full text-body hover:bg-neutral-secondary-medium hover:text-heading focus:outline-none" aria-label="Volver a materias">
+                        <svg class="w-5 h-5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m15 19-7-7 7-7"/></svg>
+                    </a>
+                    <div class="min-w-0">
+                        <h1 class="text-xl sm:text-2xl font-semibold text-heading truncate">{{ $curso->nombre_curso }}</h1>
+                        @if ($subtituloHeader !== '')
+                            <p class="text-sm text-muted truncate">{{ $subtituloHeader }}</p>
+                        @endif
+                    </div>
+                </div>
+                <x-ui.button variant="tertiary" pill class="shrink-0">
+                    <svg class="w-4 h-4 me-1.5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 16V4m0 0L8 8m4-4 4 4M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+                    Cargar CSV
+                </x-ui.button>
+            </div>
+        </header>
+    @endsection
+
+    <div class="flex flex-wrap gap-[2vh] mt-[2vh]">
         <div class="flex-1 min-w-[200px] flex items-center justify-between gap-3 bg-neutral-primary-soft p-6 border border-default rounded-base shadow-xs">
             <div>
                 <p class="text-3xl font-semibold text-fg-brand">{{ $conteos['todos'] }}</p>
