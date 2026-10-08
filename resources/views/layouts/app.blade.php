@@ -10,6 +10,7 @@
 
     @changelog
     - 2026-09-29  [David E. Chavez T.]  feat: estructura flex con sidebar + main.
+    - 2026-10-08  [OchoaCesar]  refactor: permitir header custom vía @hasSection('header') para evitar header doble en detalle de materia.
 --}}
 
 <!DOCTYPE html>
@@ -34,11 +35,15 @@
                 </main>
             @else
                 <main class="flex-1">
-                    <header class="bg-neutral-primary-soft border-b border-default mb-[2vh]">
-                        <div class="px-6 py-4">
-                            <h1 class="text-2xl font-semibold text-heading">@yield('title', config('app.name'))</h1>
-                        </div>
-                    </header>
+                    @hasSection('header')
+                        @yield('header')
+                    @else
+                        <header class="bg-neutral-primary-soft border-b border-default mb-[2vh]">
+                            <div class="px-6 py-4">
+                                <h1 class="text-2xl font-semibold text-heading">@yield('title', config('app.name'))</h1>
+                            </div>
+                        </header>
+                    @endif
 
                     @yield('content')
                 </main>
