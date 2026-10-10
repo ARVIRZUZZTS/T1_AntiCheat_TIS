@@ -2,7 +2,7 @@
     @file    materia-estudiantes.blade.php
     @author  OchoaCesar <cesareduardonick@gmail.com>
     @created 2026-09-25
-    @updated 2026-10-05
+    @updated 2026-10-09
 
     @description
     Vista de detalle de una materia: muestra las cards resumen (conteos reales
@@ -12,8 +12,10 @@
     GET /api/cursos/{idCurso}/estudiantes/estado (búsqueda, filtros con
     contadores, paginación y los modales Habilitar/Deshabilitar conectados al
     servicio de cambio de estado). La pestaña Exámenes incrusta el parcial
-    partials/materia-examenes, con el listado que resuelve
-    ListarExamenesCursoService y el botón "Crear examen". Las pestañas
+    partials/materia-examenes, que consulta con fetch el endpoint
+    GET /api/cursos/{idCurso}/examenes al abrirse (la sección vive en un
+    template x-if, así que su contenido y su fetch solo existen con la
+    pestaña activa) y muestra el botón "Crear examen". Las pestañas
     Habilitación y Auxiliares quedan vacías a la espera de sus endpoints.
 
     @changelog
@@ -24,10 +26,12 @@
     - 2026-10-05  [Alex Candia]  feat: la pestaña Exámenes muestra el listado de
       exámenes de la materia con el botón "Crear examen".
     - 2026-10-08  [OchoaCesar]  refactor: mover header a @section('header') y añadir margen superior al contenido para mantener espaciado.
+    - 2026-10-09  [T1]  feat: la pestaña Exámenes pasa a template x-if y el
+      parcial consulta el listado al endpoint con fetch al abrirse.
 
     @see  App\Livewire\Examenes\EstudiantesCurso
     @see  App\Services\Examen\ListarEstudiantesCursoConEstadoService
-    @see  App\Services\Examen\ListarExamenesCursoService
+    @see  App\Http\Controllers\Api\CursoExamenController
     @see  resources/views/partials/materia-examenes.blade.php
     @see  pages/materias.blade.php
 --}}
@@ -141,10 +145,14 @@
             @livewire(\App\Livewire\Examenes\EstudiantesCurso::class, ['curso' => $curso], key($curso->id_curso))
         </section>
 
-        {{-- Pestaña Exámenes: listado del parcial, con el botón Crear examen. --}}
-        <section x-show="tab === 'examenes'" x-cloak class="mt-6">
-            @include('partials.materia-examenes', ['curso' => $curso, 'examenes' => $examenes])
-        </section>
+        {{-- Pestaña Exámenes: el parcial consulta el endpoint al abrirla. El
+             template x-if mantiene el contenido fuera del DOM (y su fetch
+             fuera de la carga inicial) hasta que la pestaña se activa. --}}
+        <template x-if="tab === 'examenes'">
+            <section class="mt-6">
+                @include('partials.materia-examenes', ['curso' => $curso])
+            </section>
+        </template>
 
         {{-- Pestañas pendientes de endpoint: vacías por ahora. --}}
         <section x-show="tab === 'habilitacion'" x-cloak class="mt-6"></section>

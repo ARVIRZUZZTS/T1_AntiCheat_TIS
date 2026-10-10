@@ -28,6 +28,9 @@
  * - 2026-10-09  [Alisson D. Alvarado]  feat: ruta de la pantalla de
  *   notificaciones del docente. Por ahora renderiza una vista con datos
  *   mockeados; el endpoint real se conecta en una iteración posterior.
+ * - 2026-10-09  [T1]  refactor: la pestaña Exámenes deja de recibir los
+ *   exámenes por la ruta; el parcial los consulta con fetch al endpoint
+ *   GET /api/cursos/{idCurso}/examenes cuando se abre.
  */
 
 use App\Http\Controllers\ExamenController;
@@ -39,7 +42,6 @@ use App\Models\Curso;
 use App\Services\Ambiente\ListarAmbientesService;
 use App\Services\CentralRiesgo\ListarAlertasService;
 use App\Services\Examen\ListarEstudiantesCursoConEstadoService;
-use App\Services\Examen\ListarExamenesCursoService;
 use App\Services\Material\ListarMaterialesService;
 use App\Services\Norma\ListarNormasService;
 use Illuminate\Support\Facades\Route;
@@ -70,7 +72,6 @@ Route::get('/materias/{curso}', function (Curso $curso) {
     return view('pages.materia-estudiantes', [
         'curso' => $curso,
         'conteos' => $conteos,
-        'examenes' => app(ListarExamenesCursoService::class)->ejecutar($curso->id_curso),
         // Catálogos del modal de alta de examen: el buscador de ambientes los
         // filtra en el navegador, así que se resuelven enteros y no por curso.
         'ambientes' => app(ListarAmbientesService::class)->ejecutar(),
