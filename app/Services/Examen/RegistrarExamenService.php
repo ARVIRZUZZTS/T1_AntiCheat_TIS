@@ -7,7 +7,7 @@
  *
  * @created 2026-10-05
  *
- * @updated 2026-10-05
+ * @updated 2026-10-10
  *
  * @description
  * Servicio de la feature Examen que da de alta un examen con todo lo que se
@@ -19,10 +19,9 @@
  *  1. `examen.id_examen` es un entero sin secuencia ni default, así que el id
  *     se calcula como max(id)+1 dentro de la transacción, con la tabla bloqueada
  *     para que dos altas simultáneas no se queden con el mismo.
- *  2. El formulario no pide hora de fin: se calcula sumando la duración a la hora
- *     de inicio, para que la ventana horaria del examen quede completa. Si el
- *     examen cruzara la medianoche la hora de fin quedaría en el día del inicio;
- *     es un caso que el formulario todavía no contempla.
+ *  2. La hora de fin no se guarda: es un dato derivado (hora de inicio más
+ *     duración) que calcula el propio modelo (`Examen::getHoraFinAttribute()`),
+ *     para que no pueda quedar desincronizada con la duración.
  *  3. `material_personalizado` y `norma_personalizada` guardan una fila por
  *     renglón escrito, numerada desde 1.
  *
@@ -32,6 +31,8 @@
  *
  * @changelog
  * - 2026-10-05  [Alex Candia]  feat: creación inicial del servicio.
+ * - 2026-10-10  [Alex Candia]  refactor: deja de calcular y escribir `hora_fin`;
+ *   la columna se eliminó y la hora de fin pasa a ser un accesor del modelo.
  */
 
 namespace App\Services\Examen;
@@ -49,7 +50,7 @@ class RegistrarExamenService
 {
     /**
      * Techo de minutos de la duración. No es una regla del dominio sino un
-     * tope contra un número sin sentido: nadie examina 600 minutos.
+     * tope contra un número sin sentido: nadie examina 300 minutos (5 horas).
      */
     public const DURACION_MAXIMA = 300;
 
@@ -72,7 +73,6 @@ class RegistrarExamenService
             $examen->id_examen = $this->siguienteIdExamen();
             $examen->fecha = $this->fechaIso($datos['fecha']);
             $examen->hora_inicio = $this->horaIso($datos['hora_inicio']);
-            $examen->hora_fin = $this->horaFin($datos['hora_inicio'], (int) $datos['duracion']);
             $examen->duracion = (int) $datos['duracion'];
             $examen->creador = $creador;
             $examen->tipo_examen = $this->idTipoExamen((string) $datos['tipo_examen']);
@@ -127,10 +127,10 @@ class RegistrarExamenService
     /**
      * Id del tipo de examen en el catálogo.
      *
-     * El formulario manda el código (PP, SP...) porque es lo que se muestra, y
-     * la columna guarda el id. Que el código sea válido lo controla el request;
-     * esto cubre el otro caso: que el código exista en el enum pero no tenga fila
-     * en `tipo_examen`.
+     * El formulario manda el nombre del tipo ('examen parcial', 'examen final'...)
+     * porque es lo que se muestra, y la columna guarda el id. Que el nombre sea
+     * válido lo controla el request; esto cubre el otro caso: que esté en el enum
+     * pero no tenga fila en `tipo_examen`.
      *
      * @throws InvalidArgumentException Si el catálogo no tiene ese tipo.
      */
@@ -194,19 +194,6 @@ class RegistrarExamenService
         }
 
         return $momento->format('H:i:s');
-    }
-
-    /**
-     * Hora de fin: la de inicio más la duración.
-     *
-     * @param  string  $horaInicio  Hora de inicio en hh:mm.
-     * @param  int  $duracion  Duración en minutos.
-     */
-    private function horaFin(string $horaInicio, int $duracion): string
-    {
-        return Carbon::parse('2000-01-01 '.$horaInicio)
-            ->addMinutes($duracion)
-            ->format('H:i:s');
     }
 
     /**
