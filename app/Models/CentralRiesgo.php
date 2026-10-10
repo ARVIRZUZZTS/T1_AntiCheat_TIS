@@ -11,7 +11,7 @@
  *
  * @description
  * Modelo de la tabla `central_riesgo`: mapea las infracciones registradas
- * durante un examen (tramposo, sospechoso, pendiente, aula equivocada).
+ * durante un examen (tramposo, sospechoso).
  *
  * @changelog
  * - 2026-09-24  [T1]  feat: creación inicial del modelo.

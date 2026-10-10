@@ -33,7 +33,11 @@
  *   BelongsToMany (este fija el select y `get([...])` descarta sus columnas),
  *   así que el tipo ahora viene de la relación `tipoExamen()`.
  * - 2026-10-05  [Alex Candia]  feat: `tipo` sale ya con el nombre legible
- *   ("Primer parcial" en vez de "PP"), resuelto por TipoExamen::etiquetaDe().
+ *   ("Examen parcial" en vez del código crudo de la base), resuelto por
+ *   TipoExamen::etiquetaDe().
+ * - 2026-10-10  [Alex Candia]  fix: el nombre legible cambia con el enum: la base
+ *   ahora guarda `examen parcial`/`examen final`/`segunda instancia` en vez de
+ *   los códigos PP/SP/FINAL/SI.
  * - 2026-10-09  [Diego Tejerina]  feat: ambientes e ingresos para el API #138;
  *   ordenar por fecha y hora descendentes, dejando los finalizados al final.
  */
@@ -82,7 +86,7 @@ class ListarExamenesCursoService
      *     ambientes: list<array{id: int, nombre: string}>,
      *     estado: string
      * }> Exámenes listos para la vista. `tipo` ya viene con el nombre legible
-     *             del tipo, no con el código de la base.
+     *             del tipo, no con el texto crudo de la base.
      *
      * @throws ModelNotFoundException Si el curso no existe.
      */
