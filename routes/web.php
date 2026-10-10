@@ -7,7 +7,7 @@
  *
  * @created 2026-09-29
  *
- * @updated 2026-10-05
+ * @updated 2026-10-09
  *
  * @description
  * Definición de rutas web del panel. Incluye vistas estáticas y componentes Livewire.
@@ -25,6 +25,9 @@
  *   ambientes, el de materiales y el de normas, que alimentan el modal de alta.
  * - 2026-10-05  [Alex Candia]  feat: endpoint POST de alta de examen, que es a
  *   donde envía el modal de la pestaña Exámenes.
+ * - 2026-10-09  [Alisson D. Alvarado]  feat: ruta de la pantalla de
+ *   notificaciones del docente. Por ahora renderiza una vista con datos
+ *   mockeados; el endpoint real se conecta en una iteración posterior.
  */
 
 use App\Http\Controllers\ExamenController;
@@ -55,6 +58,7 @@ Route::get('/central-riesgo', fn () => view('pages.central-riesgo', [
 ]))->name('central-riesgo');
 Route::view('/usuarios', 'pages.usuarios')->name('usuarios');
 Route::view('/reportes', 'pages.reportes')->name('reportes');
+Route::view('/notificaciones', 'pages.notificaciones')->name('notificaciones');
 
 Route::get('/cursos/{curso}/estudiantes/estado', EstudiantesCurso::class)
     ->name('cursos.estudiantes.estado');
