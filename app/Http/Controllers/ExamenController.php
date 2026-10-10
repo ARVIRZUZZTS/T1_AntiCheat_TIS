@@ -7,7 +7,7 @@
  *
  * @created 2026-10-05
  *
- * @updated 2026-10-05
+ * @updated 2026-10-10
  *
  * @description
  * Controlador HTTP del alta de exámenes del modal de la materia. Solo orquesta:
@@ -39,6 +39,6 @@ class ExamenController extends Controller
 
         return redirect()
             ->route('materias.detalle', $curso->id_curso)
-            ->with('mensaje', 'Examen creado correctamente.');
+            ->with('mensaje', 'Examen creado con éxito');
     }
 }

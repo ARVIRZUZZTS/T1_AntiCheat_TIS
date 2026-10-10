@@ -6,7 +6,7 @@
 
     @description
     Campo de texto con etiqueta, placeholder, estado de error (borde
-    danger) y texto de ayuda opcional.
+    danger), texto de ayuda opcional y marca de obligatorio (*) opcional.
 --}}
 
 @props([
@@ -18,6 +18,7 @@
     'value' => null,
     'error' => null,
     'helper' => null,
+    'required' => false,
 ])
 
 @php
@@ -29,7 +30,7 @@
 
 <div>
     @if ($label)
-        <label for="{{ $inputId }}" class="block mb-2.5 text-sm font-medium text-heading">{{ $label }}</label>
+        <label for="{{ $inputId }}" class="block mb-2.5 text-sm font-medium text-heading">{{ $label }}@if ($required) <span class="text-fg-danger-strong" aria-hidden="true">*</span>@endif</label>
     @endif
 
     <input type="{{ $type }}" name="{{ $name }}" id="{{ $inputId }}"

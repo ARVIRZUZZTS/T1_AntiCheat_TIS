@@ -11,13 +11,10 @@
  *
  * @description
  * Enum de dominio con los tipos de examen admitidos por la base de datos
- * (tipo `tipo_examen_nombre`, tabla `tipo_examen`).
- *
- * El `value` de cada caso es el texto exacto que guarda PostgreSQL, en
- * minúscula (`examen parcial`). Antes eran códigos de dos letras (`PP`, `SP`) que
- * la base ya no tiene: con esos valores el selector del modal ofrecía tipos
- * inexistentes y el alta fallaba siempre. `etiqueta()` devuelve el mismo texto con
- * mayúscula inicial, que es lo que se ve en las pantallas.
+ * (tipo `tipo_examen_nombre`, tabla `tipo_examen`). Es la única fuente de los
+ * valores válidos y de su significado: el listado de exámenes de la materia y
+ * el selector del formulario de alta toman de acá el nombre a mostrar, en vez
+ * de dejar los valores crudos del catálogo sueltos en las pantallas.
  *
  * Ojo con el nombre: este enum NO es {@see \App\Models\TipoExamen}, que mapea la
  * tabla `tipo_examen` para leerla con Eloquent.
@@ -28,10 +25,10 @@
  *   etiquetaDe() para mapear un valor de la base y opciones() con el nombre
  *   legible. Antes las etiquetas eran el propio código, que resultaba ambiguo
  *   en la lista de exámenes.
- * - 2026-10-10  [Alex Candia]  fix: los tres tipos pasan a ser los valores reales
- *   del enum `tipo_examen_nombre` (examen parcial, examen final, segunda
- *   instancia). Se caen los seis códigos anteriores, que la base ya no tiene, y
- *   con ellos `PP/SP/FINAL/SI/PARCIAL/PRACTICA` ya no se ofrecían en el alta.
+ * - 2026-10-10  [Valery D. Ortuno P]  fix: el enum queda con los tres tipos del
+ *   catálogo de Supabase (examen parcial, examen final, segunda instancia) y sus
+ *   etiquetas. Antes tenía seis códigos (PP, SP...) que no existían en la base,
+ *   así que el alta de examen fallaba al resolver el tipo.
  *
  * @see  App\Services\Examen\ListarExamenesCursoService
  * @see  resources/views/components/ui/modal-crear-examen.blade.php

@@ -7,7 +7,7 @@
  *
  * @created 2026-09-26
  *
- * @updated 2026-09-26
+ * @updated 2026-10-10
  *
  * @description
  * Pruebas de integración del cambio de estado de un estudiante (issue #27),
@@ -24,6 +24,8 @@
  *
  * @changelog
  * - 2026-09-26  [T1]  test: creación inicial.
+ * - 2026-10-10  [Valery D. Ortuno P]  test: el dato de tipo_examen usa un valor
+ *   real del catálogo (examen parcial); 'PP' ya no existe en el enum.
  */
 
 namespace Tests\Feature\Examenes;
@@ -62,13 +64,13 @@ class CambiarEstadoEstudianteTest extends TestCase
 
         DB::table('tipo_examen')->insert([
             'id_tipo_examen' => self::ID_TIPO_EXAMEN,
-            'nombre_tipo_examen' => 'PP',
+            'nombre_tipo_examen' => 'examen parcial',
         ]);
 
         DB::table('usuario')->insert([
             'id_usuario' => self::ID_DOCENTE,
             'cod_sis' => 'TESTDOC2',
-            'contraseña' => 'x',
+            'password' => 'x',
             'nombre_usuario' => 'Docente',
             'apellido' => 'De Prueba',
         ]);

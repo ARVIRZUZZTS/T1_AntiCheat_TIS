@@ -2,7 +2,7 @@
     @file    modal-crear-examen.blade.php
     @author  Alex Candia <alex.leonar.candia@gmail.com>
     @created 2026-10-05
-    @updated 2026-10-05
+    @updated 2026-10-10
 
     @description
     Componente UI Blade reutilizable para el modal de alta de un examen en una
@@ -89,6 +89,16 @@
     - 2026-10-05  [Alex Candia]  feat: campo de materiales personalizados y
       casillas del catálogo de normas, como las de materiales pero a una columna
       porque cada norma es una regla entera. Sin guardado todavía.
+    - 2026-10-10  [Valery D. Ortuno P]  feat: marca con asterisco los campos
+      obligatorios (Materia, Tipo de examen, Fecha, Hora de inicio, Duración y
+      Ambientes).
+    - 2026-10-10  [Valery D. Ortuno P]  feat: la materia se muestra como un campo
+      de solo lectura con el nombre, sin flechita; cuando un examen tenga varias
+      materias se cambia por un selector.
+    - 2026-10-10  [Valery D. Ortuno P]  fix: el buscador de ambientes cierra la
+      lista al elegir una opcion, en vez de quedar abierta.
+    - 2026-10-10  [Valery D. Ortuno P]  feat: los errores de validacion se
+      muestran debajo de cada campo en vez de una lista arriba del formulario.
 
     @see  resources/views/partials/materia-examenes.blade.php
     @see  App\Enums\TipoExamen
@@ -182,6 +192,7 @@
             this.ambientesElegidos = this.ambientesElegidos.concat(ambiente);
             this.busquedaAmbiente = '';
             this.indiceResaltado = -1;
+            this.listaAbierta = false;
         },
 
         quitarAmbiente(id) {
@@ -208,7 +219,6 @@
             }
 
             this.agregarAmbiente(ambiente.id);
-            this.listaAbierta = false;
         }
     }"
     x-show="show"
@@ -245,21 +255,21 @@
             <form method="POST" action="{{ route('cursos.examenes.store', $cursoId) }}">
                 @csrf
 
-                @if ($errors->any())
-                    <x-ui.alert type="danger" title="Faltan datos para crear el examen">
-                        <ul class="list-disc list-outside space-y-1 ps-4">
-                            @foreach ($errors->all() as $error)
-                                <li>{{ $error }}</li>
-                            @endforeach
-                        </ul>
-                    </x-ui.alert>
-                @endif
-
             <div class="space-y-4 py-4">
+                {{-- La materia se muestra como un campo de solo lectura: si el
+                     examen es de una sola materia va el nombre y listo, sin la
+                     flechita de desplegable. Cuando un examen pueda tener varias
+                     materias, aca va un selector con esas materias. --}}
                 @if ($materia)
-                    <p class="text-sm text-body">
-                        Materia: <span class="font-medium text-heading">{{ $materia }}</span>
-                    </p>
+                    <x-ui.input
+                        label="Materia"
+                        id="materia_examen"
+                        name="materia"
+                        :value="$materia"
+                        readonly
+                        required
+                        class="cursor-default"
+                    />
                 @endif
 
                 <x-ui.select
@@ -269,6 +279,8 @@
                     x-model="tipo"
                     :options="$opciones"
                     placeholder="Selecciona un tipo"
+                    :error="$errors->first('tipo_examen')"
+                    required
                 />
 
                 <x-ui.input
@@ -281,6 +293,8 @@
                     maxlength="10"
                     x-model="fecha"
                     @input="sanearFecha()"
+                    :error="$errors->first('fecha')"
+                    required
                 />
 
                 <x-ui.input
@@ -289,6 +303,8 @@
                     name="hora_inicio"
                     type="time"
                     x-model="horaInicio"
+                    :error="$errors->first('hora_inicio')"
+                    required
                 />
 
                 <x-ui.input
@@ -299,10 +315,12 @@
                     inputmode="numeric"
                     x-model="duracion"
                     @input="sanearDuracion()"
+                    :error="$errors->first('duracion')"
+                    required
                 />
                 <div @click.outside="listaAbierta = false">
                     <label for="busqueda_ambiente" class="block mb-2.5 text-sm font-medium text-heading">
-                        Ambientes
+                        Ambientes <span class="text-fg-danger-strong" aria-hidden="true">*</span>
                     </label>
 
                     <input type="text" id="busqueda_ambiente"
@@ -319,7 +337,8 @@
                            @keydown.enter.prevent="elegirResaltado()"
                            @keydown.escape="listaAbierta = false"
                            placeholder="Buscar ambiente..."
-                           class="block w-full p-3 border border-default-medium bg-neutral-secondary-medium text-heading text-sm rounded-base focus:ring-brand focus:border-brand shadow-xs placeholder:text-body" />
+                           @error('ambientes') aria-invalid="true" @enderror
+                           class="block w-full p-3 border text-sm rounded-base focus:ring-brand focus:border-brand shadow-xs placeholder:text-body @error('ambientes') border-danger-subtle bg-danger-soft text-fg-danger-strong focus:ring-danger focus:border-danger @else border-default-medium bg-neutral-secondary-medium text-heading @enderror" />
 
                     <ul id="lista-ambientes" role="listbox" aria-label="Ambientes disponibles"
                         x-show="listaAbierta" x-cloak
@@ -362,6 +381,10 @@
                     <template x-for="ambiente in ambientesElegidos" :key="'envio_' + ambiente.id">
                         <input type="hidden" name="ambientes[]" :value="ambiente.id" />
                     </template>
+
+                    @error('ambientes')
+                        <p class="mt-1 text-sm text-fg-danger-strong">{{ $message }}</p>
+                    @enderror
                 </div>
 
                 {{-- Material permitido: casillas del catalogo, todas desmarcadas.

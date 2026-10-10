@@ -14,6 +14,7 @@
     - 2026-09-25  [Valery D. Ortuno P]  feat: agregar estado de error.
     - 2026-09-28  [Valery D. Ortuno P]  fix: la opción de placeholder lleva
       value="" para que el selector arranque en ella y no en la primera opción.
+    - 2026-10-10  [Valery D. Ortuno P]  feat: marca de obligatorio (*) opcional.
 --}}
 
 @props([
@@ -24,6 +25,7 @@
     'selected' => null,
     'placeholder' => null,
     'error' => null,
+    'required' => false,
 ])
 
 @php
@@ -35,7 +37,7 @@
 
 <div>
     @if ($label)
-        <label for="{{ $inputId }}" class="block mb-2.5 text-sm font-medium text-heading">{{ $label }}</label>
+        <label for="{{ $inputId }}" class="block mb-2.5 text-sm font-medium text-heading">{{ $label }}@if ($required) <span class="text-fg-danger-strong" aria-hidden="true">*</span>@endif</label>
     @endif
 
     <select name="{{ $name }}" id="{{ $inputId }}"
