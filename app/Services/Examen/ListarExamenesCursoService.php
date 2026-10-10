@@ -7,12 +7,13 @@
  *
  * @created 2026-10-05
  *
- * @updated 2026-10-05
+ * @updated 2026-10-09
  *
  * @description
  * Servicio de la feature Examen que lista los exámenes de un curso con la
  * información que la vista necesita para cada uno: tipo, fecha, ventana horaria,
- * duración y cuántos estudiantes están inscritos. El estado (programado / en
+ * duración, ambientes y cuántos estudiantes están inscritos o ingresaron.
+ * El estado (programado / en
  * curso / finalizado) se resuelve comparando la ventana horaria del examen con
  * el momento actual, igual que hace GenerarReporteAsistenciaService para la
  * asistencia: la regla vive acá y no en la vista.
@@ -33,14 +34,20 @@
  *   así que el tipo ahora viene de la relación `tipoExamen()`.
  * - 2026-10-05  [Alex Candia]  feat: `tipo` sale ya con el nombre legible
  *   ("Primer parcial" en vez de "PP"), resuelto por TipoExamen::etiquetaDe().
+ * - 2026-10-09  [Diego Tejerina]  feat: ambientes e ingresos para el API #138;
+ *   ordenar por fecha y hora descendentes, dejando los finalizados al final.
  */
 
 namespace App\Services\Examen;
 
 use App\Enums\TipoExamen;
+use App\Models\Ambiente;
 use App\Models\Curso;
 use App\Models\Examen;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Facades\DB;
 
 class ListarExamenesCursoService
 {
@@ -59,7 +66,7 @@ class ListarExamenesCursoService
     private const HORA_FIN_POR_DEFECTO = '23:59:59';
 
     /**
-     * Exámenes del curso, del más reciente al más antiguo.
+     * Exámenes por fecha y hora descendentes, con los finalizados al final.
      *
      * @param  int  $idCurso  ID del curso.
      * @param  Carbon|null  $ahora  Momento de referencia (para testing).
@@ -71,9 +78,13 @@ class ListarExamenesCursoService
      *     hora_fin: string|null,
      *     duracion: int|null,
      *     inscritos: int,
+     *     ingresados: int,
+     *     ambientes: list<array{id: int, nombre: string}>,
      *     estado: string
      * }> Exámenes listos para la vista. `tipo` ya viene con el nombre legible
      *             del tipo, no con el código de la base.
+     *
+     * @throws ModelNotFoundException Si el curso no existe.
      */
     public function ejecutar(int $idCurso, ?Carbon $ahora = null): array
     {
@@ -81,12 +92,24 @@ class ListarExamenesCursoService
         $ahora ??= Carbon::now();
 
         return $curso->examenes()
-            ->with('tipoExamen')
-            ->withCount('estudianteExamenes')
-            ->orderByDesc('examen.fecha')
-            ->orderByDesc('examen.id_examen')
+            ->with(['tipoExamen', 'ambientes'])
+            ->withCount([
+                'estudianteExamenes',
+                // Un ingreso duplicado no representa un estudiante adicional.
+                'registrosAsistencia as ingresados' => function (Builder $consulta): Builder {
+                    return $consulta->select(DB::raw('COUNT(DISTINCT id_estudiante)'));
+                },
+            ])
             ->get()
             ->map(fn (Examen $examen): array => $this->mapearExamen($examen, $ahora))
+            ->sortBy([
+                fn (array $primero, array $segundo): int => ($primero['estado'] === self::ESTADO_FINALIZADO)
+                    <=> ($segundo['estado'] === self::ESTADO_FINALIZADO),
+                ['fecha', 'desc'],
+                ['hora_inicio', 'desc'],
+                ['id', 'desc'],
+            ])
+            ->values()
             ->all();
     }
 
@@ -94,7 +117,7 @@ class ListarExamenesCursoService
      * Convierte un examen en el arreglo de datos que consume la vista.
      *
      * @param  Examen  $examen  Examen con el tipo y el conteo de inscritos ya
-     *                           cargados por la consulta.
+     *                          cargados por la consulta.
      * @param  Carbon  $ahora  Momento de referencia para el estado.
      * @return array<string, mixed>
      */
@@ -108,6 +131,15 @@ class ListarExamenesCursoService
             'hora_fin' => $this->recortarHora($examen->hora_fin),
             'duracion' => $examen->duracion,
             'inscritos' => (int) $examen->getAttribute('estudiante_examenes_count'),
+            'ingresados' => (int) $examen->getAttribute('ingresados'),
+            'ambientes' => $examen->ambientes
+                ->sortBy('id_ambiente')
+                ->map(fn (Ambiente $ambiente): array => [
+                    'id' => $ambiente->id_ambiente,
+                    'nombre' => $ambiente->nombre_ambiente,
+                ])
+                ->values()
+                ->all(),
             'estado' => $this->resolverEstado($examen, $ahora),
         ];
     }
