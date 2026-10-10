@@ -36,9 +36,11 @@
 
 namespace App\Services\Examen;
 
+use App\Enums\EstadoEstudianteExamen;
 use App\Enums\TipoExamen;
 use App\Models\Curso;
 use App\Models\Examen;
+use App\Models\EstudianteExamen;
 use App\Models\TipoExamen as TipoExamenCatalogo;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -79,6 +81,7 @@ class RegistrarExamenService
             $examen->save();
 
             $examen->cursos()->attach($curso->id_curso);
+            $this->inscribirEstudiantes($examen, $curso);
             $examen->ambientes()->sync($datos['ambientes']);
             $examen->normas()->sync($datos['normas'] ?? []);
             $examen->materialesPermitidos()->sync($datos['materiales'] ?? []);
@@ -102,6 +105,37 @@ class RegistrarExamenService
         DB::statement('LOCK TABLE examen IN SHARE ROW EXCLUSIVE MODE');
 
         return (int) Examen::query()->max('id_examen') + 1;
+    }
+
+    /**
+     * Inscribe a todos los estudiantes del curso en el examen recién creado.
+     *
+     * Sin esto el monitor en vivo no muestra a nadie: `GenerarReporteAsistenciaService`
+     * lista `estudiante_examen` filtrado por examen, y esa tabla queda vacía si
+     * el alta no la puebla. El monitor no "hereda" estudiantes del curso.
+     *
+     * `id_estudiante_examen` es entero sin secuencia (como `id_examen`), así que
+     * el id se calcula como max()+1 dentro de la misma transacción que crea el
+     * examen.
+     */
+    private function inscribirEstudiantes(Examen $examen, Curso $curso): void
+    {
+        $siguienteId = (int) EstudianteExamen::query()->max('id_estudiante_examen') + 1;
+
+        $filas = $curso->estudiantes()
+            ->orderBy('sis_estudiante')
+            ->get()
+            ->map(fn (Estudiante $estudiante): array => [
+                'id_estudiante_examen' => $siguienteId++,
+                'sis_estudiante' => $estudiante->sis_estudiante,
+                'id_examen' => $examen->id_examen,
+                'estado' => EstadoEstudianteExamen::Habilitado->value,
+            ])
+            ->all();
+
+        if ($filas !== []) {
+            EstudianteExamen::query()->insert($filas);
+        }
     }
 
     /**
