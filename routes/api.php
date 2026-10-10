@@ -12,15 +12,13 @@
  * @description Rutas JSON del backend.
  *
  * @changelog
- * - 2026-10-09  [Diego Tejerina]  feat: confirmar y rechazar incidencias (#142).
- * @description Rutas de consulta JSON del backend.
- *
- * @changelog
  * - 2026-10-09  [Diego Tejerina]  feat: agregar listado de exámenes por curso (#138).
+ * - 2026-10-09  [Diego Tejerina]  feat: confirmar y rechazar incidencias (#142).
  * - 2026-10-09  [Alisson D. Alvarado]  feat: detalle de incidencia de la central
  *   de riesgos, con error controlado 404 si no existe.
  */
 
+use App\Http\Controllers\Api\CentralRiesgoController;
 use App\Http\Controllers\Api\CursoEstudianteController;
 use App\Http\Controllers\Api\CursoExamenController;
 use App\Http\Controllers\Api\DetalleIncidenciaController;
@@ -57,3 +55,6 @@ Route::get('/cursos/{idCurso}/estudiantes/estado', [EstudianteExamenController::
 
 Route::get('/examenes/{idExamen}/monitoreo', [ExamenMonitoreoController::class, 'asistencia'])
     ->name('api.examenes.monitoreo.asistencia');
+
+Route::get('/central-riesgo', [CentralRiesgoController::class, 'index'])
+    ->name('api.central-riesgo.listar');
