@@ -17,10 +17,13 @@
  *
  * @changelog
  * - 2026-10-09  [Diego Tejerina]  feat: agregar listado de exámenes por curso (#138).
+ * - 2026-10-09  [Alisson D. Alvarado]  feat: detalle de incidencia de la central
+ *   de riesgos, con error controlado 404 si no existe.
  */
 
 use App\Http\Controllers\Api\CursoEstudianteController;
 use App\Http\Controllers\Api\CursoExamenController;
+use App\Http\Controllers\Api\DetalleIncidenciaController;
 use App\Http\Controllers\Api\EstudianteExamenController;
 use App\Http\Controllers\Api\ExamenMonitoreoController;
 use App\Http\Controllers\Api\ResolverIncidenciaController;
@@ -35,6 +38,12 @@ Route::middleware(['web', 'auth:web'])->group(function (): void {
     Route::post('/incidencias/{idIncidencia}/rechazar', [ResolverIncidenciaController::class, 'rechazar'])
         ->whereNumber('idIncidencia')
         ->name('api.incidencias.rechazar');
+
+    // Detalle de una incidencia: lo consume la futura vista "ver detalle"
+    // de la central de riesgos. Requiere sesión porque expone datos del estudiante.
+    Route::get('/incidencias/{idIncidencia}', [DetalleIncidenciaController::class, 'index'])
+        ->whereNumber('idIncidencia')
+        ->name('api.incidencias.detalle');
 });
 Route::get('/cursos/{idCurso}/examenes', [CursoExamenController::class, 'index'])
     ->whereNumber('idCurso')
