@@ -8,6 +8,7 @@
  * @created 2026-09-24
  *
  * @updated 2026-10-09
+ * @updated 2026-10-09
  *
  * @description
  * Modelo de la tabla `central_riesgo`: mapea las infracciones registradas
@@ -28,6 +29,7 @@
  * - 2026-09-24  [T1]  feat: creación inicial del modelo.
  * - 2026-09-24  [T1]  fix: agregar `estado_incidencia` (columna NOT NULL en
  *                         la base, faltaba en fillable y casts).
+ * - 2026-10-09  [Diego Tejerina]  feat: registrar docente confirmador (#142).
  * - 2026-10-09  [T1]  feat: alinear el modelo con el esquema #70 de la base:
  *   `sis_estudiante`, `id_examen` y `motivo` como columnas propias; `id_ingreso`
  *   y `estado_incidencia` dejan de existir; `fecha_registro` pasa a timestamp y
@@ -46,6 +48,8 @@ use Illuminate\Support\Carbon;
  * @property string $sis_estudiante
  * @property int $id_examen
  * @property int $id_registrador
+ * @property ?int $id_confirmador
+ * @property ?int $id_examen
  * @property string $motivo
  * @property ?string $detalle_motivo
  * @property Carbon $fecha_registro
@@ -67,6 +71,7 @@ class CentralRiesgo extends Model
         'sis_estudiante',
         'id_examen',
         'id_registrador',
+        'id_confirmador',
         'motivo',
         'detalle_motivo',
         'fecha_registro',
