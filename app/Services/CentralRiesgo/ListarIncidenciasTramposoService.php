@@ -12,8 +12,9 @@
  * @description
  * Servicio de dominio que lista las incidencias de la central de riesgos con
  * tipo de infracción `tramposo`. Devuelve por registro el nombre y el código
- * SIS del estudiante, la materia, el motivo y la fecha/hora, con ordenamiento,
- * filtro por alcance, búsqueda y paginación de 8 en 8.
+ * SIS del estudiante, la materia, el motivo y la fecha/hora, siempre en orden
+ * alfabético (A-Z) por apellidos y nombre, con filtro por alcance y búsqueda.
+ * La respuesta es la lista completa, sin paginación.
  *
  * El estudiante y el examen son columnas propias de `central_riesgo`
  * (`sis_estudiante`, `id_examen`), así que no hace falta pasar por
@@ -34,6 +35,9 @@
  *
  * @changelog
  * - 2026-10-09  [T1]  feat: creación inicial del servicio.
+ * - 2026-10-09  [T1]  refactor: quitar la paginación (la API devuelve la
+ *   lista completa) y eliminar el parámetro de orden: el listado siempre es
+ *   A-Z por apellidos y nombre.
  */
 
 namespace App\Services\CentralRiesgo;
@@ -44,7 +48,7 @@ use App\Models\Curso;
 use App\Models\Examen;
 use App\Services\Examen\BusquedaEstudianteService;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Collection;
 use InvalidArgumentException;
 
 class ListarIncidenciasTramposoService
@@ -58,8 +62,6 @@ class ListarIncidenciasTramposoService
         self::ALCANCE_INSTITUCION,
     ];
 
-    private const POR_PAGINA = 8;
-
     /**
      * Criterio de búsqueda (modo, saneo y validación).
      */
@@ -71,24 +73,20 @@ class ListarIncidenciasTramposoService
     }
 
     /**
-     * Lista paginada de incidencias `tramposo` de la central de riesgos.
+     * Lista completa de incidencias `tramposo` de la central de riesgos.
      *
      * @param  ?int  $usuario  ID del usuario logueado, requerido con alcance mis-materias.
      * @param  ?string  $alcance  Alcance del listado (ver ALCANCES_VALIDOS).
-     * @param  bool  $ordenAz  Orden alfabético por apellidos y nombre cuando es true.
      * @param  ?string  $busqueda  Texto de búsqueda por nombre/código SIS.
-     * @param  int  $pagina  Número de página.
-     * @return LengthAwarePaginator<int, array<string, mixed>> Página de incidencias mapeadas.
+     * @return Collection<int, array<string, mixed>> Incidencias mapeadas, en orden A-Z.
      *
-     * @throws InvalidArgumentException Si el alcance, la búsqueda o el usuario no son válidos.
+     * @throws InvalidArgumentException Si el alcance o la búsqueda no son válidos.
      */
     public function ejecutar(
         ?int $usuario,
         ?string $alcance,
-        bool $ordenAz = false,
         ?string $busqueda = null,
-        int $pagina = 1,
-    ): LengthAwarePaginator {
+    ): Collection {
         $this->validarAlcance($alcance, $usuario);
 
         $query = CentralRiesgo::query()
@@ -102,23 +100,10 @@ class ListarIncidenciasTramposoService
         }
 
         $this->aplicarBusqueda($query, $busqueda);
-        $this->aplicarOrden($query, $ordenAz);
+        $this->aplicarOrden($query);
 
-        $paginador = $query->paginate(self::POR_PAGINA, ['*'], 'page', $pagina);
-
-        $datos = collect($paginador->items())
+        return $query->get()
             ->map(fn (CentralRiesgo $incidencia): array => $this->mapear($incidencia));
-
-        return new LengthAwarePaginator(
-            $datos,
-            $paginador->total(),
-            $paginador->perPage(),
-            $paginador->currentPage(),
-            [
-                'path' => LengthAwarePaginator::resolveCurrentPath(),
-                'pageName' => 'page',
-            ]
-        );
     }
 
     /**
@@ -196,26 +181,19 @@ class ListarIncidenciasTramposoService
     }
 
     /**
-     * Aplica el ordenamiento elegido a la consulta de incidencias.
+     * Ordena la consulta alfabéticamente: primer apellido, segundo apellido y
+     * luego nombre.
+     *
+     * `apellido_estudiante` guarda los dos apellidos en un campo; split_part
+     * resuelve cada posición por separado.
      *
      * @param  Builder<CentralRiesgo>  $query  Consulta de incidencias.
-     * @param  bool  $ordenAz  Verdadero para orden alfabético.
      */
-    private function aplicarOrden(Builder $query, bool $ordenAz): void
+    private function aplicarOrden(Builder $query): void
     {
-        if ($ordenAz) {
-            // `apellido_estudiante` guarda los dos apellidos en un campo; el
-            // orden pide primero el primer apellido, luego el segundo y después
-            // el nombre, que es lo que resuelve split_part en cada posición.
-            $query->orderByRaw("split_part(estudiante.apellido_estudiante, ' ', 1)")
-                ->orderByRaw("split_part(estudiante.apellido_estudiante, ' ', 2)")
-                ->orderBy('estudiante.nombre_estudiante');
-
-            return;
-        }
-
-        $query->orderByDesc('central_riesgo.fecha_registro')
-            ->orderByDesc('central_riesgo.id_registro');
+        $query->orderByRaw("split_part(estudiante.apellido_estudiante, ' ', 1)")
+            ->orderByRaw("split_part(estudiante.apellido_estudiante, ' ', 2)")
+            ->orderBy('estudiante.nombre_estudiante');
     }
 
     /**

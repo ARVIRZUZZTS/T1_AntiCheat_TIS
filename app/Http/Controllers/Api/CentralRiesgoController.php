@@ -11,21 +11,22 @@
  *
  * @description
  * Controlador HTTP del endpoint de la central de riesgos: lista las
- * incidencias `tramposo` con ordenamiento, filtro por alcance, búsqueda y
- * paginación de 8 en 8. Es delgado: solo orquesta los parámetros de query y
- * delega en el servicio de dominio.
+ * incidencias `tramposo` con filtro por alcance y búsqueda, en orden
+ * alfabético (A-Z) y sin paginación: la respuesta trae la lista completa.
+ * Es delgado: solo orquesta los parámetros de query y delega en el servicio
+ * de dominio.
  *
  * Query string:
  * - `usuario`  ID del usuario, obligatorio con alcance mis-materias.
  * - `alcance`  mis-materias | toda-la-institucion (por defecto toda-la-institucion).
- * - `orden`    az para orden alfabético; ausente ordena por fecha desc.
  * - `busqueda` término por nombre o código SIS.
- * - `pagina`   número de página, arranca en 1.
  *
  * @see  App\Services\CentralRiesgo\ListarIncidenciasTramposoService
  *
  * @changelog
  * - 2026-10-09  [T1]  feat: creación inicial del controlador.
+ * - 2026-10-09  [T1]  refactor: quitar la paginación y los parámetros de
+ *   orden; la respuesta es la lista completa en orden A-Z.
  */
 
 namespace App\Http\Controllers\Api;
@@ -49,26 +50,16 @@ class CentralRiesgoController extends Controller
             $incidencias = $servicio->ejecutar(
                 $usuario !== null && $usuario !== '' ? (int) $usuario : null,
                 $request->query('alcance') ?: null,
-                $request->query('orden') === 'az',
                 $busqueda ?: null,
-                max(1, (int) $request->query('pagina', 1)),
             );
         } catch (InvalidArgumentException $e) {
             return response()->json(['mensaje' => $e->getMessage()], 422);
         }
 
-        $sinResultados = $busqueda && $incidencias->total() === 0;
+        $sinResultados = $busqueda && $incidencias->isEmpty();
 
         return response()->json([
-            'datos' => $incidencias->items(),
-            'paginacion' => [
-                'pagina' => $incidencias->currentPage(),
-                'por_pagina' => $incidencias->perPage(),
-                'total' => $incidencias->total(),
-                'ultima_pagina' => $incidencias->lastPage(),
-                'de' => $incidencias->firstItem(),
-                'a' => $incidencias->lastItem(),
-            ],
+            'datos' => $incidencias->values(),
             'mensaje' => $sinResultados ? 'No se encontraron resultados para la búsqueda' : null,
         ]);
     }

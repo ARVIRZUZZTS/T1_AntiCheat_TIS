@@ -10,9 +10,9 @@
  * @updated 2026-10-09
  *
  * @description
- * Pruebas de integración del endpoint /api/central-riesgo: listado de
- * incidencias `tramposo` con orden por defecto, orden alfabético, filtro por
- * alcance, búsqueda y paginación de 8 en 8.
+ * Pruebas de integración del endpoint /api/central-riesgo: listado completo
+ * (sin paginación) de incidencias `tramposo` en orden alfabético, con filtro
+ * por alcance y búsqueda.
  *
  * El esquema de estas tablas viene de una migración con SQL crudo
  * (database/migrations/2026_09_27_000001_migracion_servidor_oficial.php),
@@ -29,6 +29,8 @@
  *
  * @changelog
  * - 2026-10-09  [T1]  test: creación inicial.
+ * - 2026-10-09  [T1]  test: adaptar a la eliminación de la paginación y al
+ *   orden alfabético fijo; la respuesta trae la lista completa.
  */
 
 namespace Tests\Feature\CentralRiesgo;
@@ -208,53 +210,42 @@ class ListarIncidenciasTramposoTest extends TestCase
         return '/api/central-riesgo'.($query !== '' ? '?'.$query : '');
     }
 
-    private function sisDeLaPagina(string $query = ''): array
+    private function sisDeLaRespuesta(string $query = ''): array
     {
         return collect($this->getJson($this->endpoint($query))->json('datos'))
             ->pluck('sis')
             ->all();
     }
 
-    public function test_por_defecto_ordena_del_mas_reciente_al_mas_antiguo(): void
+    public function test_por_defecto_ordena_az_por_primer_apellido_luego_segundo_y_nombre(): void
     {
         $response = $this->getJson($this->endpoint());
 
         $response->assertOk();
         $this->assertEquals(
-            ['900000002', '900000003', '900000001', '900000005', '900000006', '900000007'],
-            $this->sisDeLaPagina()
+            ['900000002', '900000003', '900000006', '900000007', '900000001', '900000005'],
+            $this->sisDeLaRespuesta()
         );
     }
 
     public function test_solo_devuelve_incidencias_tramposas(): void
     {
-        $this->assertNotContains('900000004', $this->sisDeLaPagina());
-    }
-
-    public function test_orden_az_ordena_por_primer_apellido_luego_segundo_y_nombre(): void
-    {
-        $response = $this->getJson($this->endpoint('orden=az'));
-
-        $response->assertOk();
-        $this->assertEquals(
-            ['900000002', '900000003', '900000006', '900000007', '900000001', '900000005'],
-            $this->sisDeLaPagina('orden=az')
-        );
+        $this->assertNotContains('900000004', $this->sisDeLaRespuesta());
     }
 
     public function test_alcance_mis_materias_solo_muestra_los_cursos_del_usuario(): void
     {
         $this->assertEquals(
-            ['900000002', '900000001', '900000005', '900000007'],
-            $this->sisDeLaPagina('alcance=mis-materias&usuario='.self::DOCENTE_A)
+            ['900000002', '900000007', '900000001', '900000005'],
+            $this->sisDeLaRespuesta('alcance=mis-materias&usuario='.self::DOCENTE_A)
         );
     }
 
     public function test_alcance_toda_la_institucion_muestra_todos(): void
     {
         $this->assertEquals(
-            ['900000002', '900000003', '900000001', '900000005', '900000006', '900000007'],
-            $this->sisDeLaPagina('alcance=toda-la-institucion')
+            ['900000002', '900000003', '900000006', '900000007', '900000001', '900000005'],
+            $this->sisDeLaRespuesta('alcance=toda-la-institucion')
         );
     }
 
@@ -273,12 +264,12 @@ class ListarIncidenciasTramposoTest extends TestCase
         $response = $this->getJson($this->endpoint('busqueda=900000002'));
 
         $response->assertOk();
-        $this->assertEquals(['900000002'], $this->sisDeLaPagina('busqueda=900000002'));
+        $this->assertEquals(['900000002'], $this->sisDeLaRespuesta('busqueda=900000002'));
     }
 
     public function test_busqueda_por_nombre(): void
     {
-        $this->assertEquals(['900000001'], $this->sisDeLaPagina('busqueda=Ana'));
+        $this->assertEquals(['900000001'], $this->sisDeLaRespuesta('busqueda=Ana'));
     }
 
     public function test_busqueda_sin_coincidencias_devuelve_lista_vacia(): void
@@ -287,7 +278,7 @@ class ListarIncidenciasTramposoTest extends TestCase
 
         $response->assertOk();
         $this->assertEquals([], $response->json('datos'));
-        $this->assertEquals(0, $response->json('paginacion.total'));
+        $this->assertArrayNotHasKey('paginacion', $response->json());
         $this->assertEquals('No se encontraron resultados para la búsqueda', $response->json('mensaje'));
     }
 
@@ -296,7 +287,7 @@ class ListarIncidenciasTramposoTest extends TestCase
         $this->getJson($this->endpoint('busqueda=2021a'))->assertStatus(422);
     }
 
-    public function test_paginacion_devuelve_maximo_ocho_por_pagina_y_total_de_paginas(): void
+    public function test_devuelve_la_lista_completa_sin_paginar(): void
     {
         $this->crearEstudiante('900000008', 'Sara', 'Mena Torres', [self::CURSO_A]);
         $this->crearIncidencia('900000008', self::EXAMEN_A, 'tramposo', '2026-09-27 08:00:00');
@@ -305,18 +296,19 @@ class ListarIncidenciasTramposoTest extends TestCase
         $this->crearEstudiante('900000010', 'Ivan', 'Soto Ramos', [self::CURSO_A]);
         $this->crearIncidencia('900000010', self::EXAMEN_A, 'tramposo', '2026-09-25 08:00:00');
 
-        $pagina1 = $this->getJson($this->endpoint());
+        $response = $this->getJson($this->endpoint());
 
-        $pagina1->assertOk();
-        $this->assertCount(8, $pagina1->json('datos'));
-        $this->assertEquals(9, $pagina1->json('paginacion.total'));
-        $this->assertEquals(2, $pagina1->json('paginacion.ultima_pagina'));
-
-        $pagina2 = $this->getJson($this->endpoint('pagina=2'));
-
-        $pagina2->assertOk();
-        $this->assertCount(1, $pagina2->json('datos'));
-        $this->assertEquals('900000010', $pagina2->json('datos.0.sis'));
+        $response->assertOk();
+        $this->assertCount(9, $response->json('datos'));
+        $this->assertArrayNotHasKey('paginacion', $response->json());
+        $this->assertEquals(
+            [
+                '900000002', '900000003', '900000006',
+                '900000009', '900000008', '900000007', '900000010',
+                '900000001', '900000005',
+            ],
+            $this->sisDeLaRespuesta()
+        );
     }
 
     public function test_materia_es_el_curso_del_estudiante_dentro_del_examen(): void
