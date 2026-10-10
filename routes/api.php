@@ -12,11 +12,8 @@
  * @description Rutas JSON del backend.
  *
  * @changelog
- * - 2026-10-09  [Diego Tejerina]  feat: confirmar y rechazar incidencias (#142).
- * @description Rutas de consulta JSON del backend.
- *
- * @changelog
  * - 2026-10-09  [Diego Tejerina]  feat: agregar listado de exámenes por curso (#138).
+ * - 2026-10-09  [Diego Tejerina]  feat: confirmar y rechazar incidencias (#142).
  */
 
 use App\Http\Controllers\Api\CentralRiesgoController;

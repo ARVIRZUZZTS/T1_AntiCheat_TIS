@@ -8,7 +8,6 @@
  * @created 2026-09-24
  *
  * @updated 2026-10-09
- * @updated 2026-10-09
  *
  * @description
  * Modelo de la tabla `central_riesgo`: mapea las infracciones registradas
@@ -49,7 +48,6 @@ use Illuminate\Support\Carbon;
  * @property int $id_examen
  * @property int $id_registrador
  * @property ?int $id_confirmador
- * @property ?int $id_examen
  * @property string $motivo
  * @property ?string $detalle_motivo
  * @property Carbon $fecha_registro
