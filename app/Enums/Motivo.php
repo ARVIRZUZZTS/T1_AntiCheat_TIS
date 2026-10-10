@@ -7,36 +7,40 @@
  *
  * @created 2026-09-29
  *
- * @updated 2026-09-29
+ * @updated 2026-10-10
  *
  * @description
  * Enum de dominio con los motivos por los que se puede registrar una incidencia
  * en la central de riesgos (tipo `motivo` de la base de datos).
  *
- * El `value` de cada caso es el código estable que viaja en el formulario y se
- * guarda en `central_riesgo.motivo`; `etiqueta()` devuelve el texto que ve la
- * persona. El motivo `Otro` es genérico: cuando se elige, la descripción del
- * hecho es obligatoria y va en `central_riesgo.detalle_motivo`.
+ * El `value` de cada caso es el texto exacto que guarda PostgreSQL, con
+ * espacios y en minúscula; `etiqueta()` devuelve el texto que ve la persona.
+ * El motivo `Otro` es genérico: cuando se elige, la descripción del hecho es
+ * obligatoria y va en `central_riesgo.detalle_motivo`.
  *
  * @see  App\Livewire\Monitoreo\RegistrarIncidencia
  *
  * @changelog
  * - 2026-09-29  [Valery D. Ortuno P]  feat: creación inicial del enum (#70).
+ * - 2026-10-10  [Alex Candia]  fix: los valores pasan a llevar espacios
+ *   (`intento de ingreso no autorizado`), que es como los guarda el enum `motivo`
+ *   de PostgreSQL. Con guiones bajos el registro de incidencias fallaba al
+ *   insertar, porque ningún valor del enum existía en la base.
  */
 
 namespace App\Enums;
 
 enum Motivo: string
 {
-    case IntentoDeIngresoNoAutorizado = 'intento_de_ingreso_no_autorizado';
+    case IntentoDeIngresoNoAutorizado = 'intento de ingreso no autorizado';
 
-    case UsoDeDispositivosElectronicos = 'uso_de_dispositivos_electronicos';
+    case UsoDeDispositivosElectronicos = 'uso de dispositivos electronicos';
 
-    case CopiaOIntercambioDeRespuestas = 'copia_o_intercambio_de_respuestas';
+    case CopiaOIntercambioDeRespuestas = 'copia o intercambio de respuestas';
 
-    case UsoDeMaterialNoAutorizado = 'uso_de_material_no_autorizado';
+    case UsoDeMaterialNoAutorizado = 'uso de material no autorizado';
 
-    case SuplantacionDeIdentidad = 'suplantacion_de_identidad';
+    case SuplantacionDeIdentidad = 'suplantacion de identidad';
 
     case Otro = 'otro';
 
