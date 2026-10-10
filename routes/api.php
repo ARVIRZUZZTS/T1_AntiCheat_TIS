@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\CentralRiesgoController;
 use App\Http\Controllers\Api\CursoEstudianteController;
 use App\Http\Controllers\Api\EstudianteExamenController;
 use App\Http\Controllers\Api\ExamenMonitoreoController;
@@ -13,3 +14,6 @@ Route::get('/cursos/{idCurso}/estudiantes/estado', [EstudianteExamenController::
 
 Route::get('/examenes/{idExamen}/monitoreo', [ExamenMonitoreoController::class, 'asistencia'])
     ->name('api.examenes.monitoreo.asistencia');
+
+Route::get('/central-riesgo', [CentralRiesgoController::class, 'index'])
+    ->name('api.central-riesgo.listar');
