@@ -7,7 +7,7 @@
  *
  * @created 2026-09-24
  *
- * @updated 2026-09-24
+ * @updated 2026-10-09
  *
  * @description
  * Modelo de la tabla `central_riesgo`: mapea las infracciones registradas
@@ -17,6 +17,7 @@
  * - 2026-09-24  [T1]  feat: creación inicial del modelo.
  * - 2026-09-24  [T1]  fix: agregar `estado_incidencia` (columna NOT NULL en
  *                         la base, faltaba en fillable y casts).
+ * - 2026-10-09  [Diego Tejerina]  feat: registrar docente confirmador (#142).
  */
 
 namespace App\Models;
@@ -30,6 +31,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $id_registro
  * @property int $id_ingreso
  * @property int $id_registrador
+ * @property ?int $id_confirmador
+ * @property ?int $id_examen
  * @property ?string $detalle_motivo
  * @property ?string $fecha_registro
  * @property TipoInfraccion $tipo_infraccion
@@ -51,6 +54,7 @@ class CentralRiesgo extends Model
         'id_registro',
         'id_ingreso',
         'id_registrador',
+        'id_confirmador',
         'detalle_motivo',
         'fecha_registro',
         'tipo_infraccion',

@@ -9,6 +9,10 @@
  *
  * @updated 2026-10-09
  *
+ * @description Rutas JSON del backend.
+ *
+ * @changelog
+ * - 2026-10-09  [Diego Tejerina]  feat: confirmar y rechazar incidencias (#142).
  * @description Rutas de consulta JSON del backend.
  *
  * @changelog
@@ -19,8 +23,19 @@ use App\Http\Controllers\Api\CursoEstudianteController;
 use App\Http\Controllers\Api\CursoExamenController;
 use App\Http\Controllers\Api\EstudianteExamenController;
 use App\Http\Controllers\Api\ExamenMonitoreoController;
+use App\Http\Controllers\Api\ResolverIncidenciaController;
 use Illuminate\Support\Facades\Route;
 
+// El proyecto autentica con sesiones Laravel: web aporta sesión y protección CSRF.
+Route::middleware(['web', 'auth:web'])->group(function (): void {
+    Route::post('/incidencias/{idIncidencia}/confirmar', [ResolverIncidenciaController::class, 'confirmar'])
+        ->whereNumber('idIncidencia')
+        ->name('api.incidencias.confirmar');
+
+    Route::post('/incidencias/{idIncidencia}/rechazar', [ResolverIncidenciaController::class, 'rechazar'])
+        ->whereNumber('idIncidencia')
+        ->name('api.incidencias.rechazar');
+});
 Route::get('/cursos/{idCurso}/examenes', [CursoExamenController::class, 'index'])
     ->whereNumber('idCurso')
     ->name('api.cursos.examenes.listar');
