@@ -13,9 +13,14 @@
  *
  * @changelog
  * - 2026-10-09  [Diego Tejerina]  feat: confirmar y rechazar incidencias (#142).
+ * @description Rutas de consulta JSON del backend.
+ *
+ * @changelog
+ * - 2026-10-09  [Diego Tejerina]  feat: agregar listado de exámenes por curso (#138).
  */
 
 use App\Http\Controllers\Api\CursoEstudianteController;
+use App\Http\Controllers\Api\CursoExamenController;
 use App\Http\Controllers\Api\EstudianteExamenController;
 use App\Http\Controllers\Api\ExamenMonitoreoController;
 use App\Http\Controllers\Api\ResolverIncidenciaController;
@@ -31,6 +36,9 @@ Route::middleware(['web', 'auth:web'])->group(function (): void {
         ->whereNumber('idIncidencia')
         ->name('api.incidencias.rechazar');
 });
+Route::get('/cursos/{idCurso}/examenes', [CursoExamenController::class, 'index'])
+    ->whereNumber('idCurso')
+    ->name('api.cursos.examenes.listar');
 
 Route::get('/cursos/{idCurso}/estudiantes', [CursoEstudianteController::class, 'index'])
     ->name('api.cursos.estudiantes.listar');
