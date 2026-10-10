@@ -79,18 +79,22 @@ return new class extends Migration
      * volcado previo al borrado de la tabla. Se insertan solo si la tabla
      * recreada queda vacía.
      *
-     * @var list<array{0: int, 1: int, 2: string}> id_examen, numero_norma, detalle.
+     * Las filas van con el nombre de la columna como clave porque `insert()`
+     * toma las claves como nombres de columna: con arrays `[1, 1, 'texto']`
+     * armaba un `insert into ... ("0", "1", "2")` y Postgres lo rechazaba.
+     *
+     * @var list<array{id_examen: int, numero_norma: int, descripcion_norma: string}>
      */
     private array $normasPersonalizadas = [
-        [1, 1, 'Se permite el uso de calculadora científica no programable.'],
-        [1, 2, 'No se permite hojas adicionales, usar el reverso del examen.'],
-        [2, 1, 'El código debe compilar sin errores para ser evaluado.'],
-        [2, 2, 'Prohibido el acceso a internet o repositorios externos.'],
-        [3, 1, 'Tiempo estricto de 45 minutos. No hay prórroga.'],
-        [4, 1, 'Uso obligatorio de bata de laboratorio y gafas de seguridad.'],
-        [4, 2, 'Entregar el reporte de datos antes de salir del aula.'],
-        [5, 1, 'Responder únicamente con bolígrafo de tinta negra o azul.'],
-        [5, 2, 'Desactivar y guardar teléfonos móviles en la mochila.'],
+        ['id_examen' => 1, 'numero_norma' => 1, 'descripcion_norma' => 'Se permite el uso de calculadora científica no programable.'],
+        ['id_examen' => 1, 'numero_norma' => 2, 'descripcion_norma' => 'No se permite hojas adicionales, usar el reverso del examen.'],
+        ['id_examen' => 2, 'numero_norma' => 1, 'descripcion_norma' => 'El código debe compilar sin errores para ser evaluado.'],
+        ['id_examen' => 2, 'numero_norma' => 2, 'descripcion_norma' => 'Prohibido el acceso a internet o repositorios externos.'],
+        ['id_examen' => 3, 'numero_norma' => 1, 'descripcion_norma' => 'Tiempo estricto de 45 minutos. No hay prórroga.'],
+        ['id_examen' => 4, 'numero_norma' => 1, 'descripcion_norma' => 'Uso obligatorio de bata de laboratorio y gafas de seguridad.'],
+        ['id_examen' => 4, 'numero_norma' => 2, 'descripcion_norma' => 'Entregar el reporte de datos antes de salir del aula.'],
+        ['id_examen' => 5, 'numero_norma' => 1, 'descripcion_norma' => 'Responder únicamente con bolígrafo de tinta negra o azul.'],
+        ['id_examen' => 5, 'numero_norma' => 2, 'descripcion_norma' => 'Desactivar y guardar teléfonos móviles en la mochila.'],
     ];
 
     /**
@@ -190,7 +194,7 @@ return new class extends Migration
 
         $filas = array_values(array_filter(
             $this->normasPersonalizadas,
-            fn (array $norma): bool => in_array($norma[0], $idsValidos, true)
+            fn (array $norma): bool => in_array($norma['id_examen'], $idsValidos, true)
         ));
 
         foreach (array_chunk($filas, 50) as $lote) {
