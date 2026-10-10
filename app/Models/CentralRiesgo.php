@@ -22,6 +22,9 @@
  *   `sis_estudiante`, `id_examen` y `motivo` como columnas propias; `id_ingreso`
  *   y `estado_incidencia` dejan de existir; `fecha_registro` pasa a timestamp y
  *   se agregan las relaciones estudiante(), examen() y materia().
+ * - 2026-10-10  [T1]  fix: `id_registro` entra a `$fillable`. El PK es un entero
+ *   NOT NULL sin secuencia, así que el servicio de ingreso lo asigna a mano
+ *   (max + 1); sin esto Eloquent lo dejaba en null y el INSERT fallaba.
  */
 
 namespace App\Models;
@@ -55,6 +58,7 @@ class CentralRiesgo extends Model
     protected $keyType = 'int';
 
     protected $fillable = [
+        'id_registro',
         'sis_estudiante',
         'id_examen',
         'id_registrador',
