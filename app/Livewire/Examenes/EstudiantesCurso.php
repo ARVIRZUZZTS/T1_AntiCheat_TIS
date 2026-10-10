@@ -12,8 +12,8 @@
  * @description
  * Componente Livewire de la feature Examenes: lista los estudiantes de un curso
  * con su estado de habilitación en el examen actual (habilitado/deshabilitado)
- * y las observaciones de la central de riesgos (sospechoso/tramposo/
- * pendiente/aula equivocada). Incluye búsqueda por nombre o código SIS (el
+ * y las observaciones de la central de riesgos (sospechoso/tramposo). Incluye
+ * búsqueda por nombre o código SIS (el
  * criterio lo decide el primer caracter del término), filtros por estado con
  * contadores, paginación y manejo de los modales de habilitación e
  * inhabilitación.

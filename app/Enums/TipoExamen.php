@@ -38,28 +38,29 @@ namespace App\Enums;
 
 enum TipoExamen: string
 {
-    case Parcial = 'examen parcial';
+    case ExamenParcial = 'examen parcial';
 
-    case Final = 'examen final';
+    case ExamenFinal = 'examen final';
 
-    case Instancia = 'segunda instancia';
+    case SegundaInstancia = 'segunda instancia';
 
     /**
-     * Nombre del tipo tal como se lo muestra a la persona usuaria.
+     * Nombre del tipo tal como se lo muestra a la persona usuaria: el valor de
+     * la base con mayúscula inicial.
      */
     public function etiqueta(): string
     {
         return match ($this) {
-            self::Parcial => 'Examen parcial',
-            self::Final => 'Examen final',
-            self::Instancia => 'Segunda instancia',
+            self::ExamenParcial => 'Examen parcial',
+            self::ExamenFinal => 'Examen final',
+            self::SegundaInstancia => 'Segunda instancia',
         };
     }
 
     /**
      * Nombre a mostrar para el tipo guardado en la base. Si el valor no está en
      * el enum se devuelve tal cual: la base manda y la pantalla nunca se queda
-     * sin typename.
+     * sin nombre de tipo.
      *
      * @param  ?string  $valor  Valor de `nombre_tipo_examen` (o null si el
      *                          examen no tiene tipo).
@@ -76,8 +77,8 @@ enum TipoExamen: string
 
     /**
      * Opciones del selector de tipo de examen, en el formato que espera
-     * `x-ui.select` (valor => etiqueta): se envía el código de la base y se
-     * muestra su significado.
+     * `x-ui.select` (valor => etiqueta): se envía el texto de la base y se
+     * muestra su versión legible.
      *
      * @return array<string, string>
      */

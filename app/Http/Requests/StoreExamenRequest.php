@@ -24,9 +24,11 @@
  *
  * @changelog
  * - 2026-10-05  [Alex Candia]  feat: creación inicial del request.
- * - 2026-10-10  [Valery D. Ortuno P]  fix: los mensajes pasan a un registro
- *   formal (Ingrese..., Seleccione...) porque el formulario los muestra debajo
- *   de cada campo.
+ * - 2026-10-10  [Alex Candia]  fix: el tipo pasa de `Rule::enum` a `in:` con los
+ *   valores del enum. La regla enum entrega la clave `validation.enum` al
+ *   traductor y nunca pasa por messages(), así que su mensaje salía en inglés.
+ * - 2026-10-10  [Alex Candia]  fix: la fecha exige cuatro dígitos de año.
+ *   `date_format:d/m/Y` acepta `10/12/262` y esa fecha se guardaba como 0262.
  */
 
 namespace App\Http\Requests;
@@ -54,8 +56,14 @@ class StoreExamenRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'tipo_examen' => ['required', Rule::enum(TipoExamen::class)],
-            'fecha' => ['required', 'date_format:d/m/Y'],
+            // `in:` y no `Rule::enum()` por un motivo concreto: la regla enum
+            // pasa la clave `validation.enum` al traductor y salta la búsqueda de
+            // messages(), así que el mensaje siempre salía en inglés. La lista
+            // sale igual del enum, que sigue siendo la única fuente de valores.
+            'tipo_examen' => ['required', 'in:'.implode(',', array_column(TipoExamen::cases(), 'value'))],
+            // El regex exige los cuatro dígitos del año: `date_format` acepta
+            // `10/12/262` y eso se guardaba como el año 0262.
+            'fecha' => ['required', 'regex:/^\d{2}\/\d{2}\/\d{4}$/', 'date_format:d/m/Y'],
             'hora_inicio' => ['required', 'date_format:H:i'],
             'duracion' => ['required', 'integer', 'min:1', 'max:'.RegistrarExamenService::DURACION_MAXIMA],
             // Sin ambiente el examen no se puede monitorear, así que se exige al

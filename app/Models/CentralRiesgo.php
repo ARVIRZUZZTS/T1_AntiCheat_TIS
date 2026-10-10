@@ -11,18 +11,7 @@
  *
  * @description
  * Modelo de la tabla `central_riesgo`: mapea las infracciones registradas
- * durante un examen (tramposo o sospechoso).
- *
- * Cada incidencia guarda su propio estudiante, examen y registrador, para que
- * también se pueda registrar a alguien que todavía no tiene fila de ingreso.
- * La materia no se guarda: se deriva con
- * `id_examen -> examen_curso -> curso.nombre_curso`.
- *
- * La columna `motivo` es un enum de la base que usa espacios
- * ('intento de ingreso no autorizado'), mientras que el enum de dominio
- * {@see \App\Enums\Motivo} usa guiones bajos. Mientras no se concilien, no se
- * castea a la clase enum: se lee y se escribe como string, o Eloquent lanza
- * ValueError al hidratar cualquier fila existente.
+ * durante un examen (tramposo, sospechoso).
  *
  * @changelog
  * - 2026-09-24  [T1]  feat: creación inicial del modelo.
