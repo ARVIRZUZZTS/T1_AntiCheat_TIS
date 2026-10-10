@@ -7,7 +7,7 @@
  *
  * @created 2026-09-25
  *
- * @updated 2026-09-26
+ * @updated 2026-10-10
  *
  * @description
  * Pruebas de integración del filtrado de estudiantes por estado (issue #29),
@@ -26,6 +26,8 @@
  * - 2026-09-25  [T1]  test: creación inicial.
  * - 2026-09-26  [Alisson D. Alvarado]  test: cobertura del criterio de búsqueda
  *   por modo (cifra, letra).
+ * - 2026-10-10  [Valery D. Ortuno P]  test: el dato de tipo_examen usa un valor
+ *   real del catálogo (examen parcial); 'PP' ya no existe en el enum.
  */
 
 namespace Tests\Feature\Examenes;
@@ -58,13 +60,13 @@ class ListarEstudiantesCursoFiltroTest extends TestCase
 
         DB::table('tipo_examen')->insert([
             'id_tipo_examen' => self::ID_TIPO_EXAMEN,
-            'nombre_tipo_examen' => 'PP',
+            'nombre_tipo_examen' => 'examen parcial',
         ]);
 
         DB::table('usuario')->insert([
             'id_usuario' => self::ID_DOCENTE,
             'cod_sis' => 'TESTDOC1',
-            'contraseña' => 'x',
+            'password' => 'x',
             'nombre_usuario' => 'Docente',
             'apellido' => 'De Prueba',
         ]);

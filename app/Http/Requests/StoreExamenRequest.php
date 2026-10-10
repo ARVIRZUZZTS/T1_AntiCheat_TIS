@@ -7,7 +7,7 @@
  *
  * @created 2026-10-05
  *
- * @updated 2026-10-05
+ * @updated 2026-10-10
  *
  * @description
  * Validación del alta de examen del modal de la materia. Los nombres de campo
@@ -24,6 +24,9 @@
  *
  * @changelog
  * - 2026-10-05  [Alex Candia]  feat: creación inicial del request.
+ * - 2026-10-10  [Valery D. Ortuno P]  fix: los mensajes pasan a un registro
+ *   formal (Ingrese..., Seleccione...) porque el formulario los muestra debajo
+ *   de cada campo.
  */
 
 namespace App\Http\Requests;
@@ -78,26 +81,26 @@ class StoreExamenRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'tipo_examen.required' => 'Elegí el tipo de examen.',
+            'tipo_examen.required' => 'Seleccione el tipo de examen.',
             // La regla enum de Laravel no acepta clave por campo, así que el
             // mensaje va con la clave suelta: si se pondría `tipo_examen.enum`
             // no aplicaría y saldría el mensaje en inglés.
             'enum' => 'El tipo de examen no es válido.',
-            'fecha.required' => 'Escribí la fecha de inicio.',
-            'fecha.date_format' => 'La fecha va en formato dd/mm/aaaa.',
-            'hora_inicio.required' => 'Escribí la hora de inicio.',
-            'hora_inicio.date_format' => 'La hora va en formato hh:mm.',
-            'duracion.required' => 'Escribí la duración del examen.',
-            'duracion.integer' => 'La duración va en minutos, solo números.',
-            'duracion.min' => 'La duración tiene que ser de al menos 1 minuto.',
-            'duracion.max' => 'La duración no puede superar los 600 minutos.',
-            'ambientes.required' => 'Elegí al menos un ambiente.',
-            'ambientes.min' => 'Elegí al menos un ambiente.',
-            'ambientes.*.exists' => 'Uno de los ambientes elegidos no existe.',
-            'materiales.*.exists' => 'Uno de los materiales elegidos no existe.',
-            'normas.*.exists' => 'Una de las normas elegidas no existe.',
-            'materiales_personalizados.max' => 'Los materiales personalizados van hasta 300 caracteres.',
-            'normas_personalizadas.max' => 'Las normas personalizadas van hasta 300 caracteres.',
+            'fecha.required' => 'Ingrese la fecha de inicio.',
+            'fecha.date_format' => 'La fecha debe estar en formato dd/mm/aaaa.',
+            'hora_inicio.required' => 'Ingrese la hora de inicio.',
+            'hora_inicio.date_format' => 'La hora debe estar en formato hh:mm.',
+            'duracion.required' => 'Ingrese la duración del examen.',
+            'duracion.integer' => 'La duración debe estar en minutos, solo números.',
+            'duracion.min' => 'La duración debe ser de al menos 1 minuto.',
+            'duracion.max' => 'La duración no debe superar los 300 minutos.',
+            'ambientes.required' => 'Seleccione al menos un ambiente.',
+            'ambientes.min' => 'Seleccione al menos un ambiente.',
+            'ambientes.*.exists' => 'Uno de los ambientes seleccionados no existe.',
+            'materiales.*.exists' => 'Uno de los materiales seleccionados no existe.',
+            'normas.*.exists' => 'Una de las normas seleccionadas no existe.',
+            'materiales_personalizados.max' => 'El material personalizado no debe superar los 300 caracteres.',
+            'normas_personalizadas.max' => 'La norma personalizada no debe superar los 300 caracteres.',
         ];
     }
 

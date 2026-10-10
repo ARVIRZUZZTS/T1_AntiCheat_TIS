@@ -51,7 +51,7 @@ class RegistrarExamenService
      * Techo de minutos de la duración. No es una regla del dominio sino un
      * tope contra un número sin sentido: nadie examina 600 minutos.
      */
-    public const DURACION_MAXIMA = 600;
+    public const DURACION_MAXIMA = 300;
 
     /**
      * Crea el examen y todo lo que se le eligió.
