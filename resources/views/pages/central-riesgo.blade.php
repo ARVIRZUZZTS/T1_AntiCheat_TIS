@@ -2,7 +2,7 @@
     @file    central-riesgo.blade.php
     @author  David E. Chavez T. <virzuzz12345@gmail.com>
     @created 2026-09-29
-    @updated 2026-10-09
+    @updated 2026-10-10
 
     @description
     Pantalla de la central de riesgos. Interfaz responsive: en móvil la lista
@@ -21,6 +21,8 @@
       tipo píldora, buscador (sin funcionalidad) y lista mock en cards (móvil)
       y tabla completa clickeable (desktop), con estados vacíos y banner de
       bloqueo automático.
+    - 2026-10-10  [T1]  fix: reponer el botón "Registrar incidencia" que se
+      perdió en el rediseño; abre el formulario con `origen=central-riesgo`.
 
     @see  App\Services\CentralRiesgo\ListarAlertasService
 --}}
@@ -53,18 +55,27 @@
     @endphp
 
     <div class="px-4 pt-[2vh] pb-8 sm:px-6 lg:px-[2vh]" x-data="{ tab: 'mis-materias' }">
-        {{-- Tabs tipo píldora: por ahora solo cambian el estado activo. --}}
-        <div class="flex gap-2" role="tablist" aria-label="Ámbito de la central">
-            <button type="button" role="tab" @click="tab = 'mis-materias'"
-                    :class="tab === 'mis-materias' ? 'bg-brand text-white border-transparent' : 'bg-neutral-secondary-medium text-body border-neutral-quaternary'"
-                    class="inline-flex items-center justify-center rounded-full border px-5 py-2.5 text-sm font-semibold shadow-xs focus:outline-none focus:ring-4 focus:ring-brand-medium">
-                Mis materias
-            </button>
-            <button type="button" role="tab" @click="tab = 'institucion'"
-                    :class="tab === 'institucion' ? 'bg-brand text-white border-transparent' : 'bg-neutral-secondary-medium text-body border-neutral-quaternary'"
-                    class="inline-flex items-center justify-center rounded-full border px-5 py-2.5 text-sm font-semibold shadow-xs focus:outline-none focus:ring-4 focus:ring-brand-medium">
-                Institución
-            </button>
+        <div class="flex flex-wrap items-center justify-between gap-3">
+            {{-- Tabs tipo píldora: por ahora solo cambian el estado activo. --}}
+            <div class="flex gap-2" role="tablist" aria-label="Ámbito de la central">
+                <button type="button" role="tab" @click="tab = 'mis-materias'"
+                        :class="tab === 'mis-materias' ? 'bg-brand text-white border-transparent' : 'bg-neutral-secondary-medium text-body border-neutral-quaternary'"
+                        class="inline-flex items-center justify-center rounded-full border px-5 py-2.5 text-sm font-semibold shadow-xs focus:outline-none focus:ring-4 focus:ring-brand-medium">
+                    Mis materias
+                </button>
+                <button type="button" role="tab" @click="tab = 'institucion'"
+                        :class="tab === 'institucion' ? 'bg-brand text-white border-transparent' : 'bg-neutral-secondary-medium text-body border-neutral-quaternary'"
+                        class="inline-flex items-center justify-center rounded-full border px-5 py-2.5 text-sm font-semibold shadow-xs focus:outline-none focus:ring-4 focus:ring-brand-medium">
+                    Institución
+                </button>
+            </div>
+
+            {{-- Acceso al registro de incidencia desde la central de riesgo: abre
+                 el formulario en blanco (origen=central-riesgo) para que la
+                 persona busque al estudiante con la lupa. --}}
+            <x-ui.button :href="route('registrar-incidencia', ['origen' => 'central-riesgo'])" size="sm">
+                Registrar incidencia
+            </x-ui.button>
         </div>
 
         {{-- Buscador: solo la interfaz, aún sin funcionalidad. --}}

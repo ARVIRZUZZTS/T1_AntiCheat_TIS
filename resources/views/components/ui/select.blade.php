@@ -9,12 +9,20 @@
     ['value' => ..., 'label' => ...]; $selected marca la opción activa.
     $error activa el borde de danger y muestra el mensaje bajo el campo.
 
+    El valor de cada opción sale de la clave cuando el arreglo es asociativo
+    (`[id => etiqueta]`, como los catálogos) y de la etiqueta cuando es una lista
+    simple sin claves propias (`['A', 'B']`). Así sirve tanto para mapas
+    id ⇒ nombre como para listas de texto.
+
     @changelog
     - 2026-09-24  [Valery D. Ortuno P]  feat: creación inicial del componente.
     - 2026-09-25  [Valery D. Ortuno P]  feat: agregar estado de error.
     - 2026-09-28  [Valery D. Ortuno P]  fix: la opción de placeholder lleva
       value="" para que el selector arranque en ella y no en la primera opción.
     - 2026-10-10  [Valery D. Ortuno P]  feat: marca de obligatorio (*) opcional.
+    - 2026-10-10  [T1]  fix: la clave se usa como valor en cualquier arreglo
+      asociativo, no solo cuando es texto; con claves numéricas (id de curso) el
+      selector mandaba la etiqueta en vez del id.
 --}}
 
 @props([
@@ -33,6 +41,10 @@
     $stateClass = $error
         ? 'bg-danger-soft border-danger-subtle text-fg-danger-strong focus:ring-danger focus:border-danger'
         : 'bg-neutral-secondary-medium border-default-medium text-heading focus:ring-brand focus:border-brand';
+
+    // Un arreglo asociativo usa su clave como valor de la opción (catálogos
+    // id ⇒ nombre); una lista simple sin claves propias usa la etiqueta.
+    $valorPorClave = ! array_is_list($options);
 @endphp
 
 <div>
@@ -48,7 +60,8 @@
         @endif
 
         @foreach ($options as $value => $label)
-            <option value="{{ is_string($value) ? $value : $label }}" @selected((string) $selected === (string) (is_string($value) ? $value : $label))>
+            @php $valorOpcion = $valorPorClave ? $value : $label; @endphp
+            <option value="{{ $valorOpcion }}" @selected((string) $selected === (string) $valorOpcion)>
                 {{ $label }}
             </option>
         @endforeach

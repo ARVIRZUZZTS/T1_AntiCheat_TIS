@@ -40,33 +40,28 @@
             default => '<span class="text-xs font-medium px-2 py-1 rounded-full border-2 border-gray-400 bg-gray-100 text-gray-400">'.$estado.'</span>',
         };
 
-        $materiaActual = 'Introduccion a la Programacion';
-        $examenActual = 3;
+        $cursosDelExamen = $examen->cursos->sortBy('id_curso');
+        $materiaActual = $cursosDelExamen->first()?->nombre_curso ?? '—';
+        $examenActual = $examen->id_examen;
+        // Con un solo curso se manda ya elegido; con varios decide la persona en
+        // el formulario, que muestra el selector.
+        $cursoActual = $cursosDelExamen->count() === 1 ? $cursosDelExamen->first()->id_curso : null;
 
-        $registrarBtn = function (string $nombre, string $sis, string $registro, string $estado) use ($materiaActual, $examenActual): string {
-            $clases = 'inline-flex items-center justify-center box-border border border-transparent focus:ring-4 focus:ring-brand-medium shadow-xs font-medium leading-5 rounded-base focus:outline-none text-white bg-brand hover:bg-brand-strong px-3 py-1.5 text-xs';
-
-            if ($estado === 'Pendiente') {
-                return sprintf(
-                    '<button type="button" class="%s" @click="$dispatch(\'abrir-modal-ingreso\', { nombre: \'%s\', sis: \'%s\' })">Ingreso</button>',
-                    $clases,
-                    e($nombre),
-                    e($sis),
-                );
+        $registrarBtn = function (string $nombre, string $sis, string $estado): string {
+            // La incidencia ya no se registra desde cada estudiante: el
+            // formulario se abre con el botón general y el estudiante se busca
+            // con la lupa. La fila solo conserva el ingreso de quien falta.
+            if ($estado !== 'Pendiente') {
+                return '';
             }
 
+            $clases = 'inline-flex items-center justify-center box-border border border-transparent focus:ring-4 focus:ring-brand-medium shadow-xs font-medium leading-5 rounded-base focus:outline-none text-white bg-brand hover:bg-brand-strong px-3 py-1.5 text-xs';
+
             return sprintf(
-                '<a href="%s" class="%s">Reportar</a>',
-                e(route('registrar-incidencia', [
-                    'origen' => 'monitoreo',
-                    'nombre' => $nombre,
-                    'sis' => $sis,
-                    'materia' => $materiaActual,
-                    'examen' => $examenActual,
-                    'rol' => str_starts_with($registro, 'Aux.') ? 'auxiliar' : 'docente',
-                    'usuario' => str_starts_with($registro, 'Aux.') ? 3 : 1,
-                ])),
+                '<button type="button" class="%s" @click="$dispatch(\'abrir-modal-ingreso\', { nombre: \'%s\', sis: \'%s\' })">Ingreso</button>',
                 $clases,
+                e($nombre),
+                e($sis),
             );
         };
     @endphp
@@ -81,6 +76,21 @@
                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
                     </svg>
                     Registrar ingreso
+                </a>
+
+                {{-- Acceso general al registro de incidencias: abre el formulario
+                     con el examen en curso y la persona busca al estudiante con la
+                     lupa. Sustituye al botón que estaba en cada fila. --}}
+                <a href="{{ route('registrar-incidencia', array_filter([
+                        'origen' => 'monitoreo',
+                        'examen' => $examenActual,
+                        'curso' => $cursoActual,
+                    ])) }}"
+                   class="inline-flex items-center justify-center gap-1.5 rounded-base border border-default bg-neutral-primary-soft px-3 py-1.5 text-xs font-medium leading-5 text-heading shadow-xs hover:bg-neutral-secondary-soft focus:outline-none focus:ring-4 focus:ring-brand-medium">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
+                    </svg>
+                    Registrar incidencia
                 </a>
             </div>
         </div>
@@ -198,7 +208,7 @@
                         $estudiante['hora_ingreso'] ? substr($estudiante['hora_ingreso'], 0, 5) : '—',
                         $estudiante['registrador'] ?? '—',
                         ['html' => $estadoBadge($estadoVisual)],
-                        ['html' => $registrarBtn($estudiante['nombre'].' '.$estudiante['apellido'], $estudiante['sis'], $estudiante['registrador'] ?? '—', $estadoVisual)],
+                        ['html' => $registrarBtn($estudiante['nombre'].' '.$estudiante['apellido'], $estudiante['sis'], $estadoVisual)],
                     ];
                 }
             @endphp
