@@ -20,26 +20,23 @@
     no se le generan ni se le muestran, así que la pantalla no consulta el
     endpoint y arranca en el estado vacío.
 
-    La X persiste: hace `PATCH /api/notificaciones/{id}/ocultar` (borrado lógico)
-    y, solo si el servidor responde bien, quita la tarjeta del DOM con una
-    transición suave. Si falla, la tarjeta se mantiene y se muestra un error
-    discreto. Al recargar, la notificación oculta ya no vuelve. No cambia el
-    estado del caso: el registro sigue "En revisión".
+    "Ver detalle" despacha el evento window 'abrir-detalle-incidencia' que abre
+    el modal `x-ui.modal-detalle-incidencia` (detalle + submodales de confirmar
+    y rechazar contra la API); sin JS conserva el href como respaldo. Nada se
+    confirma ni se rechaza hasta que el docente lo indique en ese modal.
 
     "Ver detalle" navega al detalle del registro (T4) sin confirmar ni rechazar
     nada.
 
     @changelog
     - 2026-10-09  [Alisson D. Alvarado]  feat: creación inicial de la pantalla.
-    - 2026-10-10  feat: "Ver detalle" apunta a la ruta del detalle (HU 12 · T4).
-    - 2026-10-11  [T1]  feat: conectar a `/api/notificaciones` y persistir el
-      ocultado con `PATCH /api/notificaciones/{id}/ocultar` (HU 12 · T1/T2).
-    - 2026-10-11  [T1]  feat: segundo tipo de tarjeta "Estudiante ingresado a
-      central de riesgo", descarte reactivo con transición y error discreto,
-      y ajustes responsive (HU 6 · T3/T5/T6).
+    - 2026-10-10  feat: "Ver detalle" apunta a la ruta del detalle del registro
+      (HU 12 · T4).
+    - 2026-10-11  [OchoaCesar]  feat: "Ver detalle" abre el modal de detalle de
+      incidencia con sus submodales de confirmación y rechazo (HU 12 · T4).
 
     @see  \resources\views\components\ui\notificacion-card.blade.php
-    @see  \App\Http\Controllers\Api\NotificacionController
+    @see  \resources\views\components\ui\modal-detalle-incidencia.blade.php
 --}}
 
 @extends('layouts.app')
@@ -107,6 +104,9 @@
             </div>
         </div>
     </div>
+
+    {{-- Modal de detalle de incidencia (con sus submodales de decisión y toast). --}}
+    <x-ui.modal-detalle-incidencia />
 
     <script>
         (function () {

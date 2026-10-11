@@ -2,7 +2,7 @@
     @file    app.blade.php
     @author  David E. Chavez T. <virzuzz12345@gmail.com>
     @created 2026-09-29
-    @updated 2026-09-29
+    @updated 2026-10-11
 
     @description
     Layout principal del panel. Estructura flex con sidebar + main.
@@ -11,6 +11,7 @@
     @changelog
     - 2026-09-29  [David E. Chavez T.]  feat: estructura flex con sidebar + main.
     - 2026-10-08  [OchoaCesar]  refactor: permitir header custom vía @hasSection('header') para evitar header doble en detalle de materia.
+    - 2026-10-11  [OchoaCesar]  feat: meta csrf-token para las peticiones fetch con token (modales de incidencia).
 --}}
 
 <!DOCTYPE html>

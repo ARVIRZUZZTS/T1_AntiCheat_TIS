@@ -7,7 +7,7 @@
  *
  * @created 2026-09-24
  *
- * @updated 2026-10-10
+ * @updated 2026-10-11
  *
  * @description
  * Modelo de la tabla `central_riesgo`: mapea las infracciones registradas
@@ -20,22 +20,29 @@
  * - 2026-10-09  [Diego Tejerina]  feat: registrar docente confirmador (#142).
  * - 2026-10-09  [T1]  feat: alinear el modelo con el esquema #70 de la base:
  *   `sis_estudiante`, `id_examen` y `motivo` como columnas propias; `id_ingreso`
- *   y `estado_incidencia` dejan de existir; `fecha_registro` pasa a timestamp y
- *   se agregan las relaciones estudiante(), examen() y materia().
+ *   deja de existir; `fecha_registro` pasa a timestamp y se agregan las
+ *   relaciones estudiante(), examen() y materia().
  * - 2026-10-10  [T1]  fix: `id_registro` entra a `$fillable`. El PK es un entero
  *   NOT NULL sin secuencia, así que el servicio de ingreso lo asigna a mano
  *   (max + 1); sin esto Eloquent lo dejaba en null y el INSERT fallaba.
- *   deja de existir; `fecha_registro` pasa a timestamp y se agregan las
- *   relaciones estudiante(), examen() y materia().
  * - 2026-10-10  [T1]  feat: `id_curso` nullable para guardar el curso elegido
  *   cuando el examen se comparte entre varios cursos; `materia()` lo prefiere
  *   sobre el primer curso del examen. `id_registro` entra a fillable porque la
  *   aplicación calcula el id (la tabla no tiene secuencia). Se castea `motivo` a
  *   `Motivo`, que `registrar()` ya usaba con `->etiqueta()`.
+ * - 2026-10-11  [OchoaCesar]  fix: se restauran el cast y el fillable de
+ *   `estado_incidencia`. La nota del esquema #70 de que la columna "deja de
+ *   existir" era incorrecta: el esquema real de Supabase sí la tiene (enum
+ *   `estado_incidencia`, default `Pendiente`; migración
+ *   2026_10_09_000001_agregar_revision_incidencia, ver bd.md). Sin el cast,
+ *   `ResolverIncidenciaService` comparaba un string contra
+ *   `EstadoIncidencia::Pendiente` y toda confirmación/rechazo devolvía 422, y
+ *   el detalle de la incidencia respondía `estado: null`.
  */
 
 namespace App\Models;
 
+use App\Enums\EstadoIncidencia;
 use App\Enums\Motivo;
 use App\Enums\TipoInfraccion;
 use Illuminate\Database\Eloquent\Model;
@@ -48,11 +55,12 @@ use Illuminate\Support\Carbon;
  * @property int $id_examen
  * @property ?int $id_curso
  * @property int $id_registrador
- * @property ?int $id_confirmador
+ * @property int $id_confirmador
  * @property Motivo $motivo
  * @property ?string $detalle_motivo
  * @property Carbon $fecha_registro
  * @property TipoInfraccion $tipo_infraccion
+ * @property EstadoIncidencia $estado_incidencia
  */
 class CentralRiesgo extends Model
 {
@@ -77,6 +85,7 @@ class CentralRiesgo extends Model
         'detalle_motivo',
         'fecha_registro',
         'tipo_infraccion',
+        'estado_incidencia',
     ];
 
     protected function casts(): array
@@ -85,6 +94,7 @@ class CentralRiesgo extends Model
             'fecha_registro' => 'datetime',
             'motivo' => Motivo::class,
             'tipo_infraccion' => TipoInfraccion::class,
+            'estado_incidencia' => EstadoIncidencia::class,
         ];
     }
 

@@ -25,9 +25,11 @@
 
     @changelog
     - 2026-10-09  [Alisson D. Alvarado]  feat: creación inicial del componente.
-    - 2026-10-10  feat: integración de la tarjeta de la HU 12 (T3/T4).
-    - 2026-10-11  [T1]  feat: tipo `central_riesgo` con icono rojo de
-      prohibición, sin acción, e icono/color/acciones según `tipo` (HU 6 · T3).
+    - 2026-10-10  feat: integración de la tarjeta de la HU 12 (T3/T4) sobre la
+      base de dev (descripción, layout responsive y acciones).
+    - 2026-10-11  [OchoaCesar]  feat: "Ver detalle" despacha el evento window
+      'abrir-detalle-incidencia' para abrir el modal del detalle en vez de
+      navegar (se conserva el href como respaldo sin JS).
 --}}
 
 @props([
@@ -86,15 +88,18 @@
             <div class="mt-3 flex items-center justify-between gap-3">
                 <span class="js-hace text-xs text-muted">{{ $hace }}</span>
 
-                {{-- El botón se declara aquí (no usa x-ui.button a propósito) porque la
-                     especificación pide texto semibold y el botón base del sistema va en
-                     font-medium; se usa la variante roja pedida por la HU 12. --}}
-                <a href="{{ $detalleHref }}"
-                   class="shrink-0 inline-flex items-center justify-center px-4 py-2 text-sm font-semibold text-white bg-danger rounded-base hover:bg-danger-strong focus:ring-4 focus:ring-danger-medium focus:outline-none">
-                    Ver detalle
-                </a>
-            </div>
-        @endif
+            {{-- El botón se declara aquí (no usa x-ui.button a propósito) porque la
+                 especificación pide texto semibold y el botón base del sistema va en
+                 font-medium; se usa la variante roja pedida por la HU 12. --}}
+            {{-- El dispatch es JS plano (igual que la X): Alpine no inicializa
+                 @click en elementos fuera de un alcance x-data, y la tarjeta
+                 se renderiza en una página Blade sin x-data. --}}
+            <a href="{{ $detalleHref }}"
+               onclick="event.preventDefault(); window.dispatchEvent(new CustomEvent('abrir-detalle-incidencia', { detail: { id: {{ $id }} } }))"
+               class="shrink-0 inline-flex items-center justify-center px-4 py-2 text-sm font-semibold text-white bg-danger rounded-base hover:bg-danger-strong focus:ring-4 focus:ring-danger-medium focus:outline-none">
+                Ver detalle
+            </a>
+        </div>
     </div>
 
     <button type="button" aria-label="Cerrar notificación" title="Cerrar"
