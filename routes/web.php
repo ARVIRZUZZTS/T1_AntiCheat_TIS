@@ -28,9 +28,13 @@
  * - 2026-10-09  [Alisson D. Alvarado]  feat: ruta de la pantalla de
  *   notificaciones del docente. Por ahora renderiza una vista con datos
  *   mockeados; el endpoint real se conecta en una iteración posterior.
- * - 2026-10-09  [T1]  refactor: la pestaña Exámenes deja de recibir los
+ * - 2026-10-09  [OchoaCesar]  refactor: la pestaña Exámenes deja de recibir los
  *   exámenes por la ruta; el parcial los consulta con fetch al endpoint
  *   GET /api/cursos/{idCurso}/examenes cuando se abre.
+ * - 2026-10-09  [Alisson D. Alvarado]  refactor: la ruta de la central de
+ *   riesgos pasa a ser una vista simple, ya que la pantalla es solo interfaz
+ *   (datos mockeados) y llamaba a ListarAlertasService, que fallaba al leer
+ *   `estado_incidencia`, columna aún no disponible en la base.
  */
 
 use App\Http\Controllers\ExamenController;
@@ -40,7 +44,6 @@ use App\Livewire\Monitoreo\BuscadorRegistro;
 use App\Livewire\Monitoreo\RegistrarIncidencia;
 use App\Models\Curso;
 use App\Services\Ambiente\ListarAmbientesService;
-use App\Services\CentralRiesgo\ListarAlertasService;
 use App\Services\Examen\ListarEstudiantesCursoConEstadoService;
 use App\Services\Material\ListarMaterialesService;
 use App\Services\Norma\ListarNormasService;
@@ -55,9 +58,9 @@ Route::get('/materias', fn () => view('pages.materias', [
 Route::view('/examenes', 'pages.examenes')->name('examenes');
 Route::get('/monitoreo', MonitoreoController::class)->name('monitoreo');
 Route::get('/monitoreo/registro-ingreso', BuscadorRegistro::class)->name('monitoreo.registro-ingreso');
-Route::get('/central-riesgo', fn () => view('pages.central-riesgo', [
-    'alertas' => app(ListarAlertasService::class)->ejecutar(),
-]))->name('central-riesgo');
+// Por ahora la central de riesgos es solo interfaz con datos mockeados: la
+// ruta renderiza la vista sin consultar la base, hasta que exista el endpoint.
+Route::view('/central-riesgo', 'pages.central-riesgo')->name('central-riesgo');
 Route::view('/usuarios', 'pages.usuarios')->name('usuarios');
 Route::view('/reportes', 'pages.reportes')->name('reportes');
 Route::view('/notificaciones', 'pages.notificaciones')->name('notificaciones');

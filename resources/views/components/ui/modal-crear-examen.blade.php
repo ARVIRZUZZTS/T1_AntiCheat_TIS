@@ -2,11 +2,11 @@
     @file    modal-crear-examen.blade.php
     @author  Alex Candia <alex.leonar.candia@gmail.com>
     @created 2026-10-05
-    @updated 2026-10-05
+    @updated 2026-10-10
 
     @description
     Componente UI Blade reutilizable para el modal de alta de un examen en una
-    materia. Muestra el formulario (tipo, fecha de inicio, hora de inicio y
+    materia. Muestra el formulario (tipo, fecha, hora de inicio y
     duración) y sigue el mismo patrón dual de Alpine que modal-registro-ingreso:
     se abre y se cierra con los eventos de ventana `abrir-modal-crear-examen` y
     `cerrar-modal-crear-examen`, sin estado en el servidor.
@@ -47,16 +47,11 @@
     de materiales y de normas no pasan por ese script: los pinta Blade con
     `@foreach`, porque no se filtran en el navegador y no hay nada que buscar.
 
-    El guardado todavía no está conectado (no existe el servicio de alta de
-    exámenes), así que el botón de guardar va deshabilitado y el formulario se
-    presenta como pendiente.
-
-    TODO(@equipo, 2026-10-05): reemplazar el aviso por el guardado real cuando
-    exista el servicio de alta (`App\Services\Examen\RegistrarExamenService`),
-    que es quien tendrá que escribir los ambientes elegidos en `examen_ambiente`,
-    las normas y los materiales del catálogo en `examen_norma` y
-    `examen_material_permitido`, y lo escrito a mano en las tablas que lo guarden
-    (todavía no existen).
+    El guardado ya está conectado: el formulario hace POST a
+    `cursos.examenes.store` y `App\Services\Examen\RegistrarExamenService` escribe
+    el examen, los ambientes elegidos en `examen_ambiente`, las normas y los
+    materiales del catálogo en `examen_norma` y `examen_material_permitido`, y lo
+    escrito a mano en `norma_personalizada` y `material_personalizado`.
 
     @props([
         'materia' => null,
@@ -89,6 +84,22 @@
     - 2026-10-05  [Alex Candia]  feat: campo de materiales personalizados y
       casillas del catálogo de normas, como las de materiales pero a una columna
       porque cada norma es una regla entera. Sin guardado todavía.
+    - 2026-10-10  [Valery D. Ortuno P]  feat: marca con asterisco los campos
+      obligatorios (Materia, Tipo de examen, Fecha, Hora de inicio, Duración y
+      Ambientes).
+    - 2026-10-10  [Valery D. Ortuno P]  feat: la materia se muestra como un campo
+      de solo lectura con el nombre, sin flechita; cuando un examen tenga varias
+      materias se cambia por un selector.
+    - 2026-10-10  [Valery D. Ortuno P]  fix: el buscador de ambientes cierra la
+      lista al elegir una opcion, en vez de quedar abierta.
+    - 2026-10-10  [Valery D. Ortuno P]  feat: los errores de validacion se
+      muestran debajo de cada campo en vez de una lista arriba del formulario.
+    - 2026-10-10  [Alex Candia]  refactor: la etiqueta pasa a "Fecha" (ya no
+      "Fecha de inicio"), los materiales del catálogo van a una sola columna,
+      los errores de materiales, normas y personalizados también se muestran, y
+      al reabrir el modal se conserva lo escrito en vez de vaciarlo.
+    - 2026-10-10  [Alex Candia]  refactor: los textos de ayuda de materiales y
+      normas pasan a "Ingrese materiales/normas personalizadas para el examen".
 
     @see  resources/views/partials/materia-examenes.blade.php
     @see  App\Enums\TipoExamen
@@ -143,17 +154,34 @@
             this.indiceAmbientes = ambientes ? JSON.parse(ambientes.textContent) : [];
         },
 
-        // La fecha se escribe dd/mm/aaaa: se queda solo con digitos y los
-        // separadores se colocan solos, para que el formato no dependa del
-        // navegador ni de la configuracion regional del dispositivo.
+        // La fecha se escribe dd/mm/aaaa: se queda solo con digitos, coloca los
+        // separadores solos y acota el dia a 31 y el mes a 12. El formato no
+        // depende del navegador ni de la configuracion regional del dispositivo.
         sanearFecha() {
             const digitos = this.fecha.replace(/\D/g, '').slice(0, 8);
 
-            this.fecha = digitos.length <= 2
-                ? digitos
-                : digitos.length <= 4
-                    ? digitos.slice(0, 2) + '/' + digitos.slice(2)
-                    : digitos.slice(0, 2) + '/' + digitos.slice(2, 4) + '/' + digitos.slice(4);
+            if (digitos.length <= 2) {
+                this.fecha = digitos;
+
+                return;
+            }
+
+            const dia = this.acotar(digitos.slice(0, 2), 31);
+            const mes = this.acotar(digitos.slice(2, 4), 12);
+            const anio = digitos.slice(4);
+
+            this.fecha = anio === '' ? dia + '/' + mes : dia + '/' + mes + '/' + anio;
+        },
+
+        // Limita un grupo de dos digitos a un maximo, solo cuando esta completo.
+        acotar(grupo, maximo) {
+            if (grupo.length < 2) {
+                return grupo;
+            }
+
+            const numero = Math.min(Math.max(parseInt(grupo, 10) || 1, 1), maximo);
+
+            return String(numero).padStart(2, '0');
         },
 
         // La duracion son minutos: solo digitos. Al ser type=text no aparecen
@@ -182,6 +210,7 @@
             this.ambientesElegidos = this.ambientesElegidos.concat(ambiente);
             this.busquedaAmbiente = '';
             this.indiceResaltado = -1;
+            this.listaAbierta = false;
         },
 
         quitarAmbiente(id) {
@@ -208,7 +237,6 @@
             }
 
             this.agregarAmbiente(ambiente.id);
-            this.listaAbierta = false;
         }
     }"
     x-show="show"
@@ -218,7 +246,7 @@
     @click.self="$dispatch('cerrar-modal-crear-examen')"
     @keydown.escape.window="$dispatch('cerrar-modal-crear-examen')"
     @cerrar-modal-crear-examen.window="show = false"
-    @abrir-modal-crear-examen.window="show = true; tipo = ''; fecha = ''; horaInicio = ''; duracion = ''; busquedaAmbiente = ''; ambientesElegidos = []; listaAbierta = false; indiceResaltado = -1; materialesElegidos = []; materialesPersonalizados = ''; normasElegidas = []; normasPersonalizadas = ''"
+    @abrir-modal-crear-examen.window="show = true; busquedaAmbiente = ''; listaAbierta = false; indiceResaltado = -1"
     class="overflow-y-auto overflow-x-hidden fixed top-0 right-0 left-0 z-50 flex justify-center items-center w-full md:inset-0 h-full max-h-full bg-overlay-modal/50"
 >
     <div class="relative p-4 w-full max-w-md max-h-full">
@@ -237,29 +265,28 @@
                 </button>
             </div>
 
-            {{-- Formulario real: va con POST y @csrf, sin wire: ni fetch. Si el
-                 navegador tiene JavaScript apagado igual se guarda; lo único que
-                 Alpine hace acá es la ergonomía del formulario y el combobox.
-                 El <form> envuelve los campos y el pie de botones, y el aviso de
-                 errores va arriba del todo para que se lea sin bajar. --}}
+            {{-- Formulario real: va con POST y @csrf, sin wire: ni fetch. El
+                 <form> envuelve los campos y el pie de botones. Alpine se encarga
+                 de la ergonomía del formulario y del combobox de ambientes, que sí
+                 necesita JavaScript: sin él no se pueden elegir ambientes. --}}
             <form method="POST" action="{{ route('cursos.examenes.store', $cursoId) }}">
                 @csrf
 
-                @if ($errors->any())
-                    <x-ui.alert type="danger" title="Faltan datos para crear el examen">
-                        <ul class="list-disc list-outside space-y-1 ps-4">
-                            @foreach ($errors->all() as $error)
-                                <li>{{ $error }}</li>
-                            @endforeach
-                        </ul>
-                    </x-ui.alert>
-                @endif
-
             <div class="space-y-4 py-4">
+                {{-- La materia se muestra como un campo de solo lectura: si el
+                     examen es de una sola materia va el nombre y listo, sin la
+                     flechita de desplegable. Cuando un examen pueda tener varias
+                     materias, aca va un selector con esas materias. --}}
                 @if ($materia)
-                    <p class="text-sm text-body">
-                        Materia: <span class="font-medium text-heading">{{ $materia }}</span>
-                    </p>
+                    <x-ui.input
+                        label="Materia"
+                        id="materia_examen"
+                        name="materia"
+                        :value="$materia"
+                        readonly
+                        required
+                        class="cursor-default"
+                    />
                 @endif
 
                 <x-ui.select
@@ -269,10 +296,12 @@
                     x-model="tipo"
                     :options="$opciones"
                     placeholder="Selecciona un tipo"
+                    :error="$errors->first('tipo_examen')"
+                    required
                 />
 
                 <x-ui.input
-                    label="Fecha de inicio"
+                    label="Fecha"
                     id="fecha_examen"
                     name="fecha"
                     type="text"
@@ -281,6 +310,8 @@
                     maxlength="10"
                     x-model="fecha"
                     @input="sanearFecha()"
+                    :error="$errors->first('fecha')"
+                    required
                 />
 
                 <x-ui.input
@@ -289,6 +320,8 @@
                     name="hora_inicio"
                     type="time"
                     x-model="horaInicio"
+                    :error="$errors->first('hora_inicio')"
+                    required
                 />
 
                 <x-ui.input
@@ -299,10 +332,12 @@
                     inputmode="numeric"
                     x-model="duracion"
                     @input="sanearDuracion()"
+                    :error="$errors->first('duracion')"
+                    required
                 />
                 <div @click.outside="listaAbierta = false">
                     <label for="busqueda_ambiente" class="block mb-2.5 text-sm font-medium text-heading">
-                        Ambientes
+                        Ambientes <span class="text-fg-danger-strong" aria-hidden="true">*</span>
                     </label>
 
                     <input type="text" id="busqueda_ambiente"
@@ -319,7 +354,8 @@
                            @keydown.enter.prevent="elegirResaltado()"
                            @keydown.escape="listaAbierta = false"
                            placeholder="Buscar ambiente..."
-                           class="block w-full p-3 border border-default-medium bg-neutral-secondary-medium text-heading text-sm rounded-base focus:ring-brand focus:border-brand shadow-xs placeholder:text-body" />
+                           @error('ambientes') aria-invalid="true" @enderror
+                           class="block w-full p-3 border text-sm rounded-base focus:ring-brand focus:border-brand shadow-xs placeholder:text-body @error('ambientes') border-danger-subtle bg-danger-soft text-fg-danger-strong focus:ring-danger focus:border-danger @else border-default-medium bg-neutral-secondary-medium text-heading @enderror" />
 
                     <ul id="lista-ambientes" role="listbox" aria-label="Ambientes disponibles"
                         x-show="listaAbierta" x-cloak
@@ -362,6 +398,10 @@
                     <template x-for="ambiente in ambientesElegidos" :key="'envio_' + ambiente.id">
                         <input type="hidden" name="ambientes[]" :value="ambiente.id" />
                     </template>
+
+                    @error('ambientes')
+                        <p class="mt-1 text-sm text-fg-danger-strong">{{ $message }}</p>
+                    @enderror
                 </div>
 
                 {{-- Material permitido: casillas del catalogo, todas desmarcadas.
@@ -377,7 +417,7 @@
                         Material permitido
                     </p>
 
-                    <ul class="flex flex-col gap-3 sm:grid sm:grid-cols-2 sm:gap-x-4"
+                    <ul class="flex flex-col gap-3"
                         aria-labelledby="materiales_examen">
                         @forelse ($materiales as $material)
                             <li>
@@ -394,6 +434,13 @@
                             <li class="text-sm text-body">Todavía no hay materiales cargados en el catálogo.</li>
                         @endforelse
                     </ul>
+
+                    @error('materiales')
+                        <p class="mt-1 text-sm text-fg-danger-strong">{{ $message }}</p>
+                    @enderror
+                    @error('materiales.*')
+                        <p class="mt-1 text-sm text-fg-danger-strong">{{ $message }}</p>
+                    @enderror
                 </div>
 
                 {{-- Materiales que no estan en el catalogo: texto libre. El
@@ -404,8 +451,9 @@
                     name="materiales_personalizados"
                     type="text"
                     maxlength="300"
-                    placeholder="Ej. Calculadora no programable"
+                    placeholder="Ingrese materiales personalizados para el examen"
                     x-model="materialesPersonalizados"
+                    :error="$errors->first('materiales_personalizados')"
                 />
 
                 {{-- Normas del catalogo: mismas casillas desmarcadas que los
@@ -433,6 +481,13 @@
                             <li class="text-sm text-body">Todavía no hay normas cargadas en el catálogo.</li>
                         @endforelse
                     </ul>
+
+                    @error('normas')
+                        <p class="mt-1 text-sm text-fg-danger-strong">{{ $message }}</p>
+                    @enderror
+                    @error('normas.*')
+                        <p class="mt-1 text-sm text-fg-danger-strong">{{ $message }}</p>
+                    @enderror
                 </div>
 
                 {{-- Normas propias del examen. El maxlength del textarea es lo
@@ -443,8 +498,9 @@
                     name="normas_personalizadas"
                     rows="3"
                     maxlength="300"
-                    placeholder="Escribí las normas del examen..."
+                    placeholder="Ingrese normas personalizadas para el examen"
                     x-model="normasPersonalizadas"
+                    :error="$errors->first('normas_personalizadas')"
                 />
             </div>
 

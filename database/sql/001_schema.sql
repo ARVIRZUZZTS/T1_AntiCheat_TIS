@@ -166,7 +166,6 @@ CREATE TABLE examen (
   id_examen   integer PRIMARY KEY,
   fecha       date,
   hora_inicio time,
-  hora_fin    time,
   duracion    integer,
   creador     integer NOT NULL,             -- corregido: integer (FK a usuario.id_usuario)
   tipo_examen integer NOT NULL,

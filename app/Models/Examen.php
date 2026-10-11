@@ -11,9 +11,14 @@
  *
  * @description
  * Modelo Eloquent de la tabla `examen`: representa un examen masivo con su
- * ventana horaria (fecha, hora_inicio, hora_fin, duracion) y sus relaciones de
+ * ventana horaria (fecha, hora_inicio, duracion) y sus relaciones de
  * persistencia: cursos asociados, inscripciones (estudiante_examen) y
  * registros de asistencia.
+ *
+ * La hora de fin NO es una columna: es un dato derivado (hora_inicio + duracion)
+ * que se calcula en `getHoraFinAttribute()`, para que no pueda quedar
+ * desincronizado con la duración y para que un examen que cruza la medianoche
+ * sume el día en vez de quedarse en la misma fecha.
  *
  * @changelog
  * - 2026-09-24  [T1]         feat: creación inicial del modelo.
@@ -29,6 +34,8 @@
  * - 2026-10-05  [Alex Candia] feat: relaciones ambientes(), normas(),
  *   materialesPermitidos(), materialesPersonalizados() y normasPersonalizadas(),
  *   que son las que escribe RegistrarExamenService al crear un examen.
+ * - 2026-10-10  [Alex Candia] refactor: `hora_fin` deja de ser columna y pasa a
+ *   ser un accesor derivado de la hora de inicio y la duración.
  *
  * @see  EstudianteExamen
  * @see  RegistroAsistencia
@@ -38,6 +45,7 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -47,7 +55,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int $id_examen
  * @property ?string $fecha
  * @property ?string $hora_inicio
- * @property ?string $hora_fin
+ * @property ?string $hora_fin Hora derivada (inicio + duración); no es columna.
  * @property ?int $duracion
  * @property int $creador
  * @property int $tipo_examen
@@ -68,11 +76,29 @@ class Examen extends Model
         'id_examen',
         'fecha',
         'hora_inicio',
-        'hora_fin',
         'duracion',
         'creador',
         'tipo_examen',
     ];
+
+    /**
+     * Hora de fin derivada: la de inicio más la duración.
+     *
+     * No se lee de la base porque la columna ya no existe: se construye con
+     * Carbon a partir de `hora_inicio`, que suma los minutos y, si el examen
+     * cruza la medianoche, avanza al día siguiente. Devuelve null cuando falta
+     * la hora de inicio o la duración.
+     */
+    public function getHoraFinAttribute(): ?string
+    {
+        if ($this->hora_inicio === null || $this->duracion === null) {
+            return null;
+        }
+
+        return Carbon::parse('2000-01-01 '.$this->hora_inicio)
+            ->addMinutes((int) $this->duracion)
+            ->format('H:i:s');
+    }
 
     /** @return BelongsToMany<Curso, $this> */
     public function cursos(): BelongsToMany

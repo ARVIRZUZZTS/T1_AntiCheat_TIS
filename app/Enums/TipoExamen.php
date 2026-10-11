@@ -7,14 +7,14 @@
  *
  * @created 2026-10-05
  *
- * @updated 2026-10-05
+ * @updated 2026-10-10
  *
  * @description
  * Enum de dominio con los tipos de examen admitidos por la base de datos
  * (tipo `tipo_examen_nombre`, tabla `tipo_examen`). Es la única fuente de los
  * valores válidos y de su significado: el listado de exámenes de la materia y
  * el selector del formulario de alta toman de acá el nombre a mostrar, en vez
- * de dejar los códigos (PP, SP...) sueltos en las pantallas.
+ * de dejar los valores crudos del catálogo sueltos en las pantallas.
  *
  * Ojo con el nombre: este enum NO es {@see \App\Models\TipoExamen}, que mapea la
  * tabla `tipo_examen` para leerla con Eloquent.
@@ -25,6 +25,10 @@
  *   etiquetaDe() para mapear un valor de la base y opciones() con el nombre
  *   legible. Antes las etiquetas eran el propio código, que resultaba ambiguo
  *   en la lista de exámenes.
+ * - 2026-10-10  [Valery D. Ortuno P]  fix: el enum queda con los tres tipos del
+ *   catálogo de Supabase (examen parcial, examen final, segunda instancia) y sus
+ *   etiquetas. Antes tenía seis códigos (PP, SP...) que no existían en la base,
+ *   así que el alta de examen fallaba al resolver el tipo.
  *
  * @see  App\Services\Examen\ListarExamenesCursoService
  * @see  resources/views/components/ui/modal-crear-examen.blade.php
@@ -34,37 +38,29 @@ namespace App\Enums;
 
 enum TipoExamen: string
 {
-    case Pp = 'PP';
+    case ExamenParcial = 'examen parcial';
 
-    case Sp = 'SP';
+    case ExamenFinal = 'examen final';
 
-    case Final = 'FINAL';
-
-    case Si = 'SI';
-
-    case Parcial = 'PARCIAL';
-
-    case Practica = 'PRACTICA';
+    case SegundaInstancia = 'segunda instancia';
 
     /**
-     * Nombre del tipo tal como se lo muestra a la persona usuaria.
+     * Nombre del tipo tal como se lo muestra a la persona usuaria: el valor de
+     * la base con mayúscula inicial.
      */
     public function etiqueta(): string
     {
         return match ($this) {
-            self::Pp => 'Primer parcial',
-            self::Sp => 'Segundo parcial',
-            self::Final => 'Examen final',
-            self::Si => 'Segunda Instancia',
-            self::Parcial => 'Parcial',
-            self::Practica => 'Práctica',
+            self::ExamenParcial => 'Examen parcial',
+            self::ExamenFinal => 'Examen final',
+            self::SegundaInstancia => 'Segunda instancia',
         };
     }
 
     /**
      * Nombre a mostrar para el tipo guardado en la base. Si el valor no está en
      * el enum se devuelve tal cual: la base manda y la pantalla nunca se queda
-     * sin typename.
+     * sin nombre de tipo.
      *
      * @param  ?string  $valor  Valor de `nombre_tipo_examen` (o null si el
      *                          examen no tiene tipo).
@@ -81,8 +77,8 @@ enum TipoExamen: string
 
     /**
      * Opciones del selector de tipo de examen, en el formato que espera
-     * `x-ui.select` (valor => etiqueta): se envía el código de la base y se
-     * muestra su significado.
+     * `x-ui.select` (valor => etiqueta): se envía el texto de la base y se
+     * muestra su versión legible.
      *
      * @return array<string, string>
      */

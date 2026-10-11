@@ -162,11 +162,11 @@ INSERT INTO estudiante_curso (sis_estudiante, id_curso) VALUES (20210004, 4);
 INSERT INTO estudiante_curso (sis_estudiante, id_curso) VALUES (20210005, 5);
 
 -- examen (5 registros)
-INSERT INTO examen (id_examen, fecha, hora_inicio, hora_fin, duracion, creador, tipo_examen) VALUES (1, '2024-06-10', '08:00:00', '10:00:00', 120, 1, 1);
-INSERT INTO examen (id_examen, fecha, hora_inicio, hora_fin, duracion, creador, tipo_examen) VALUES (2, '2024-06-11', '10:00:00', '12:00:00', 120, 2, 2);
-INSERT INTO examen (id_examen, fecha, hora_inicio, hora_fin, duracion, creador, tipo_examen) VALUES (3, '2024-06-12', '14:00:00', '16:00:00', 120, 5, 3);
-INSERT INTO examen (id_examen, fecha, hora_inicio, hora_fin, duracion, creador, tipo_examen) VALUES (4, '2024-06-13', '08:00:00', '09:30:00', 90, 1, 4);
-INSERT INTO examen (id_examen, fecha, hora_inicio, hora_fin, duracion, creador, tipo_examen) VALUES (5, '2024-06-14', '16:00:00', '18:00:00', 120, 2, 5);
+INSERT INTO examen (id_examen, fecha, hora_inicio, duracion, creador, tipo_examen) VALUES (1, '2024-06-10', '08:00:00', 120, 1, 1);
+INSERT INTO examen (id_examen, fecha, hora_inicio, duracion, creador, tipo_examen) VALUES (2, '2024-06-11', '10:00:00', 120, 2, 2);
+INSERT INTO examen (id_examen, fecha, hora_inicio, duracion, creador, tipo_examen) VALUES (3, '2024-06-12', '14:00:00', 120, 5, 3);
+INSERT INTO examen (id_examen, fecha, hora_inicio, duracion, creador, tipo_examen) VALUES (4, '2024-06-13', '08:00:00', 90, 1, 4);
+INSERT INTO examen (id_examen, fecha, hora_inicio, duracion, creador, tipo_examen) VALUES (5, '2024-06-14', '16:00:00', 120, 2, 5);
 
 -- examen_curso (5 registros)
 INSERT INTO examen_curso (id_examen, id_curso) VALUES (1, 1);

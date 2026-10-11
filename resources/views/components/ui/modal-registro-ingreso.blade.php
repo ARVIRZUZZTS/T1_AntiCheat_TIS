@@ -2,19 +2,24 @@
     @file    modal-registro-ingreso.blade.php
     @author  David E. Chavez T. <virzuzz12345@gmail.com>
     @created 2026-09-29
-    @updated 2026-09-29
+    @updated 2026-10-10
 
     @description
     Componente UI Blade reutilizable para el modal de registro de ingreso de
-    un estudiante a un examen. Muestra el nombre del estudiante, un campo
-    para la hora de ingreso y los botones Confirmar / Cancelar. Sigue el
-    patrón dual Livewire/Alpine de los otros modales del sistema.
+    un estudiante a un examen (M1). Muestra el banner de habilitación, la
+    ficha del estudiante y sus datos, y los botones Confirmar / Cancelar /
+    Rechazar. Se abre con el evento 'abrir-modal-ingreso' recibiendo un
+    objeto con los datos del estudiante. Sigue el patrón Alpine de los otros
+    modales del sistema.
 
     @changelog
-    - 2026-09-29  [David E. Chavez T.]  feat: creación inicial del componente UI.
+    - 2026-09-29  [David E. Chavez T.]  feat: creación inicial del componente.
+    - 2026-10-10  [David E. Chavez T.]  refactor: se reemplaza el input de
+      hora manual por banner de estado + ficha + filas de detalle, siguiendo
+      el diseño de plan_modales.md (sección 4).
 
     @see  resources/views/pages/monitoreo.blade.php
-    @see  resources/views/components/ui/modal-habilitar.blade.php
+    @see  resources/views/partials/modales/banner-estado.blade.php
 --}}
 
 @props([])
@@ -24,28 +29,48 @@
         show: false,
         nombre: '',
         sis: '',
-        hora: '',
-        error: ''
+        materia: '',
+        aula: '',
+        habilitacion: '',
+        aulaActual: '',
+        horaRegistro: '',
+        materialPermitido: '',
+        abrir(datos) {
+            datos = datos || {};
+            this.nombre = datos.nombre || '';
+            this.sis = datos.sis || '';
+            this.materia = datos.materia || '';
+            this.aula = datos.aula || '';
+            this.habilitacion = datos.habilitacion || 'Habilitada';
+            this.aulaActual = datos.aulaActual || datos.aula || '';
+            this.horaRegistro = datos.horaRegistro || '';
+            this.materialPermitido = datos.materialPermitido || '';
+            this.show = true;
+        }
     }"
     x-show="show"
     x-cloak
     tabindex="-1"
-    aria-hidden="true"
-    @click.self="$dispatch('cerrar-modal-ingreso')"
-    @keydown.escape.window="$dispatch('cerrar-modal-ingreso')"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="titulo-modal-ingreso"
+    @abrir-modal-ingreso.window="abrir($event.detail)"
     @cerrar-modal-ingreso.window="show = false"
-    @abrir-modal-ingreso.window="show = true; nombre = $event.detail.nombre; sis = $event.detail.sis; hora = ''; error = ''"
+    @click.self="show = false"
+    @keydown.escape.window="show = false"
     class="overflow-y-auto overflow-x-hidden fixed top-0 right-0 left-0 z-50 flex justify-center items-center w-full md:inset-0 h-full max-h-full bg-overlay-modal/50"
 >
     <div class="relative p-4 w-full max-w-md max-h-full">
         <div class="relative bg-neutral-primary-soft border border-default rounded-base shadow-sm p-4 md:p-6">
-            <div class="flex items-center justify-between border-b border-default pb-4 md:pb-5">
-                <h3 class="text-lg font-medium text-heading">
-                    Registrar Ingreso
-                </h3>
+            {{-- Cabecera --}}
+            <div class="flex items-start justify-between gap-3 border-b border-default pb-4 md:pb-5">
+                <div>
+                    <h3 id="titulo-modal-ingreso" class="text-lg font-medium text-heading">Registro de Ingreso</h3>
+                    <p class="text-sm text-muted"><span x-text="materia"></span> · aula <span x-text="aula"></span></p>
+                </div>
                 <button
                     type="button"
-                    @click="$dispatch('cerrar-modal-ingreso')"
+                    @click="show = false"
                     class="text-body bg-transparent hover:bg-neutral-tertiary hover:text-heading rounded-base text-sm w-9 h-9 ms-auto inline-flex justify-center items-center cursor-pointer"
                 >
                     <svg class="w-5 h-5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18 17.94 6M18 18 6.06 6"/></svg>
@@ -53,35 +78,45 @@
                 </button>
             </div>
 
+            {{-- Cuerpo --}}
             <div class="space-y-4 py-4">
-                <p class="text-sm text-body">
-                    Registrar el ingreso del estudiante al examen.
-                </p>
+                @include('partials.modales.banner-estado', [
+                    'variante' => 'puede-ingresar',
+                    'titulo' => 'Puede ingresar?',
+                    'subtitulo' => 'Habilitar a Estudiante para este examen?',
+                ])
 
-                <p x-show="nombre !== '' || sis !== ''" class="text-sm font-semibold text-heading">
-                    Estudiante: <span x-text="nombre"></span> (SIS: <span x-text="sis"></span>)
-                </p>
+                @include('partials.modales.ficha-estudiante', [
+                    'nombre' => 'nombre',
+                    'sis' => 'sis',
+                    'tone' => 'brand',
+                ])
 
-                <div>
-                    <label for="hora_ingreso" class="block text-sm font-medium text-body mb-1">
-                        Hora de ingreso
-                    </label>
-                    <input
-                        type="time"
-                        id="hora_ingreso"
-                        x-model="hora"
-                        class="w-full rounded-base border border-default bg-neutral-primary-soft px-3 py-2 text-sm text-heading focus:outline-none focus:ring-2 focus:ring-brand-medium"
-                    >
-                </div>
-
-                <p x-show="error" x-text="error" class="text-xs text-fg-danger font-medium"></p>
+                @include('partials.modales.filas-detalle', [
+                    'filas' => [
+                        ['label' => 'Habilitación', 'valor' => 'habilitacion'],
+                        ['label' => 'Aula asignada', 'valor' => 'aula'],
+                        ['label' => 'Aula actual', 'valor' => 'aulaActual'],
+                        ['label' => 'Hora de registro', 'valor' => 'horaRegistro'],
+                        ['label' => 'Material permitido', 'valor' => 'materialPermitido'],
+                    ],
+                ])
             </div>
 
+            {{-- Pie --}}
             <div class="border-t border-default pt-4 space-y-[2vh]">
-                <x-ui.button variant="default" class="w-full" @click="$dispatch('confirmar-ingreso', { hora: hora })">Confirmar</x-ui.button>
+                <x-ui.button
+                    variant="default"
+                    class="w-full"
+                    @click="$dispatch('confirmar-ingreso', { sis: sis, hora: horaRegistro }); show = false"
+                >Confirmar ingreso</x-ui.button>
                 <div class="flex gap-[2vh]">
-                    <x-ui.button-cancelar class="flex-1" @click="$dispatch('cerrar-modal-ingreso')">Cancelar</x-ui.button-cancelar>
-                    <x-ui.button variant="default" class="flex-1 bg-danger text-white" @click="$dispatch('cerrar-modal-ingreso')">Rechazar</x-ui.button>
+                    <x-ui.button-cancelar class="flex-1" @click="show = false">Cancelar</x-ui.button-cancelar>
+                    <x-ui.button
+                        variant="danger"
+                        class="flex-1"
+                        @click="$dispatch('rechazar-ingreso', { sis: sis }); show = false"
+                    >Rechazar</x-ui.button>
                 </div>
             </div>
         </div>

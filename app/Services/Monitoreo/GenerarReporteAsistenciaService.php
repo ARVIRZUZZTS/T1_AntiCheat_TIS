@@ -7,13 +7,13 @@
  *
  * @created 2026-09-25
  *
- * @updated 2026-09-25
+ * @updated 2026-10-10
  *
  * @description
  * Servicio de dominio que genera el reporte de asistencia de un examen.
  * Dado el id de un examen, resuelve el estado de asistencia de cada estudiante
  * inscrito (`presente` / `ausente` / `pendiente`) contrastando la hora actual
- * contra la ventana horaria del examen (fecha + hora_inicio / hora_fin), e
+ * contra la ventana horaria del examen (fecha + hora_inicio y la duración), e
  * incluye registrador, hora de ingreso y observaciones de cada estudiante.
  *
  * @changelog
@@ -25,6 +25,10 @@
  *                                    el ingreso rechazado se marca como 'ausente'.
  * - 2026-09-25  [OchoaCesar]  feat:  se agregó hora_ingreso a la respuesta
  *                                    (solo cuando el estado es 'presente').
+ * - 2026-10-10  [Alex Candia]  refactor: la hora de fin se deriva de la hora de
+ *                                    inicio más la duración (la columna se quitó),
+ *                                    así que un examen que cruza la medianoche
+ *                                    termina al día siguiente.
  *
  * @see  EstudianteExamen
  * @see  RegistroAsistencia
@@ -58,7 +62,7 @@ class GenerarReporteAsistenciaService
         $examen = Examen::findOrFail($idExamen);
         $ahora = $ahora ?? Carbon::now();
         $inicio = Carbon::parse($examen->fecha.' '.$examen->hora_inicio);
-        $fin = Carbon::parse($examen->fecha.' '.$examen->hora_fin);
+        $fin = $inicio->copy()->addMinutes((int) $examen->duracion);
 
         $registros = RegistroAsistencia::query()
             ->where('id_examen', $examen->id_examen)

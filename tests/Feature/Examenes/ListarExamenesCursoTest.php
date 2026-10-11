@@ -16,6 +16,10 @@
  *
  * @changelog
  * - 2026-10-09  [Diego Tejerina]  test: cubrir contrato, cursos y ordenamiento.
+ * - 2026-10-10  [Valery D. Ortuno P]  test: adaptar los tipos de examen al
+ *   catálogo real (examen parcial / examen final) tras alinear el enum.
+ * - 2026-10-10  [Alex Candia]  test: quitar la columna `hora_fin` (ahora es un
+ *   dato derivado de la hora de inicio y la duración).
  *
  * @see App\Http\Controllers\Api\CursoExamenController
  * @see App\Services\Examen\ListarExamenesCursoService
@@ -52,9 +56,8 @@ class ListarExamenesCursoTest extends TestCase
             ['id_curso' => 2, 'nombre_curso' => 'Otro curso'],
         ]);
         DB::table('tipo_examen')->insert([
-            ['id_tipo_examen' => 1, 'nombre_tipo_examen' => 'PP'],
-            // Valor que utiliza actualmente el catálogo de Supabase.
-            ['id_tipo_examen' => 2, 'nombre_tipo_examen' => 'examen parcial'],
+            ['id_tipo_examen' => 1, 'nombre_tipo_examen' => 'examen parcial'],
+            ['id_tipo_examen' => 2, 'nombre_tipo_examen' => 'examen final'],
         ]);
     }
 
@@ -96,7 +99,7 @@ class ListarExamenesCursoTest extends TestCase
         $this->getJson('/api/cursos/1/examenes')->assertOk()->assertExactJson([
             'datos' => [[
                 'id' => 1,
-                'tipo' => 'examen parcial',
+                'tipo' => 'Examen final',
                 'estado' => 'Programado',
                 'fecha' => '2026-10-10',
                 'hora_inicio' => '08:00',
@@ -118,14 +121,14 @@ class ListarExamenesCursoTest extends TestCase
     public function test_ordena_fecha_y_hora_descendentes_con_finalizados_al_final(): void
     {
         $this->crearExamen(1);
-        $this->crearExamen(2, ['hora_inicio' => '14:00:00', 'hora_fin' => '16:00:00']);
+        $this->crearExamen(2, ['hora_inicio' => '14:00:00']);
         $this->crearExamen(3, ['fecha' => '2026-10-11']);
-        $this->crearExamen(4, ['fecha' => '2026-10-09', 'hora_inicio' => '11:00:00', 'hora_fin' => '11:30:00']);
-        $this->crearExamen(5, ['fecha' => '2026-10-09', 'hora_inicio' => '09:00:00', 'hora_fin' => '15:00:00']);
+        $this->crearExamen(4, ['fecha' => '2026-10-09', 'hora_inicio' => '11:00:00', 'duracion' => 30]);
+        $this->crearExamen(5, ['fecha' => '2026-10-09', 'hora_inicio' => '09:00:00', 'duracion' => 360]);
         $this->crearExamen(6, ['fecha' => '2026-10-08']);
-        $this->crearExamen(7, ['fecha' => '2026-10-08', 'hora_inicio' => '14:00:00', 'hora_fin' => '16:00:00']);
+        $this->crearExamen(7, ['fecha' => '2026-10-08', 'hora_inicio' => '14:00:00']);
         $this->crearExamen(8, ['fecha' => '2026-10-20', 'id_curso' => 2]);
-        $this->crearExamen(9, ['hora_inicio' => '14:00:00', 'hora_fin' => '16:00:00']);
+        $this->crearExamen(9, ['hora_inicio' => '14:00:00']);
 
         $respuesta = $this->getJson('/api/cursos/1/examenes')->assertOk();
 
@@ -162,7 +165,7 @@ class ListarExamenesCursoTest extends TestCase
         $this->crearExamen(1);
 
         $this->getJson('/api/cursos/1/examenes')->assertOk()
-            ->assertJsonPath('datos.0.tipo', 'Primer parcial')
+            ->assertJsonPath('datos.0.tipo', 'Examen parcial')
             ->assertJsonPath('datos.0.inscritos', 0)
             ->assertJsonPath('datos.0.ingresados', 0)
             ->assertJsonPath('datos.0.ambientes', []);
@@ -190,7 +193,7 @@ class ListarExamenesCursoTest extends TestCase
      */
     public function test_examen_sin_fecha_ni_horarios_se_mantiene_programado(): void
     {
-        $this->crearExamen(1, ['fecha' => null, 'hora_inicio' => null, 'hora_fin' => null]);
+        $this->crearExamen(1, ['fecha' => null, 'hora_inicio' => null]);
 
         $this->getJson('/api/cursos/1/examenes')->assertOk()
             ->assertJsonPath('datos.0.estado', 'Programado')
@@ -214,7 +217,6 @@ class ListarExamenesCursoTest extends TestCase
             $tabla->integer('id_examen')->primary();
             $tabla->date('fecha')->nullable();
             $tabla->time('hora_inicio')->nullable();
-            $tabla->time('hora_fin')->nullable();
             $tabla->integer('duracion')->nullable();
             $tabla->integer('tipo_examen');
             $tabla->foreign('tipo_examen')->references('id_tipo_examen')->on('tipo_examen');
@@ -263,7 +265,6 @@ class ListarExamenesCursoTest extends TestCase
             'id_examen' => $idExamen,
             'fecha' => '2026-10-10',
             'hora_inicio' => '08:00:00',
-            'hora_fin' => '10:00:00',
             'duracion' => 120,
             'tipo_examen' => 1,
         ], $atributos));

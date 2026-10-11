@@ -4,7 +4,7 @@
  * @file    RegistrarIncidencia.php
  * @author  Valery D. Ortuno P. <valerydariana98@gmail.com>
  * @created 2026-09-25
- * @updated 2026-09-28
+ * @updated 2026-10-10
  *
  * @description
  * Componente de página con el formulario de registro de una incidencia en la
@@ -59,18 +59,38 @@
  *   registró. Todavía no hay login, así que lo que se guarda es siempre el
  *   usuario por defecto y el modal daba un nombre que no era el de quien
  *   estaba frente a la pantalla (#70).
+ * - 2026-10-10  [T1]  feat: la materia de un examen compartido entre varios
+ *   cursos se elige en un selector y el curso elegido se guarda en
+ *   `central_riesgo.id_curso`; con un solo curso se fija solo. El alta deja de
+ *   apoyarse en `id_ingreso` (columna que ya no existe) y calcula `id_registro`
+ *   bloqueando la tabla, porque la tabla no tiene secuencia.
+ * - 2026-10-10  [T1]  fix: la búsqueda de estudiantes ignora tildes y
+ *   mayúsculas (la base guarda "López" y se busca "lopez"), porque el Postgres
+ *   del proyecto no trae `unaccent`; se normaliza el término y el catálogo con
+ *   `sinAcentos()` y se filtra en memoria.
+ * - 2026-10-10  [T1]  perf: el buscador ya no consulta la base en cada tecla.
+ *   El catálogo de estudiantes se trae una vez, se cachea unos minutos y se
+ *   filtra en PHP, porque Supabase suma ~440 ms por consulta y el buscador se
+ *   sentía lento. El alta de un estudiante limpia la caché.
+ * - 2026-10-10  [T1]  fix: el formulario deja de validar el formato del nombre,
+ *   del apellido y del código SIS (largo de 9 dígitos y solo letras). Esos
+ *   datos vienen del registro de estudiantes y ya no son responsabilidad de
+ *   este formulario; solo se exige que estén llenos y se pide buscarlos con la
+ *   lupa cuando faltan.
  */
 namespace App\Livewire\Monitoreo;
 
 use App\Enums\Motivo;
 use App\Enums\TipoInfraccion;
 use App\Models\CentralRiesgo;
+use App\Models\Curso;
 use App\Models\Estudiante;
 use App\Models\Examen;
 use App\Models\Rol;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -111,6 +131,36 @@ class RegistrarIncidencia extends Component
     public const NOMBRE_MAXIMO = 50;
 
     /**
+     * Caracteres admitidos en el código SIS, el mismo ancho que su columna en la
+     * tabla `estudiante`. No se impone un largo fijo: el SIS lo define el
+     * registro de estudiantes, no este formulario.
+     *
+     * @var int
+     */
+    public const SIS_MAXIMO = 20;
+
+    /**
+     * Clave de caché con el catálogo de estudiantes que usa el buscador.
+     *
+     * La base está en Supabase y cada consulta cuesta ~440 ms de ida y vuelta, así
+     * que el catálogo se trae una vez y se filtra en memoria; sin esto el buscador
+     * consulta la base en cada tecla.
+     *
+     * @var string
+     */
+    public const CACHE_ESTUDIANTES = 'incidencias.busqueda.estudiantes';
+
+    /**
+     * Minutos que el catálogo de estudiantes se mantiene en caché.
+     *
+     * Corto a propósito: si se da de alta un estudiante, como mucho tarda este
+     * tiempo en aparecer en el buscador.
+     *
+     * @var int
+     */
+    public const CACHE_ESTUDIANTES_MINUTOS = 5;
+
+    /**
      * Caracteres admitidos en la materia escrita a mano.
      *
      * @var int
@@ -130,6 +180,23 @@ class RegistrarIncidencia extends Component
      * @var int
      */
     public const BUSQUEDA_LIMITE = 8;
+
+    /**
+     * Caracteres acentuados que la búsqueda por nombre equipara a su versión
+     * sin tilde, en mayúscula y minúscula. Es el mapa que aplica `sinAcentos()`
+     * al término y a los campos, porque este Postgres no trae la extensión
+     * `unaccent`.
+     *
+     * @var string
+     */
+    public const ACENTOS = 'áéíóúüñÁÉÍÓÚÜÑàèìòùÀÈÌÒÙ';
+
+    /**
+     * Reemplazo sin tilde de `ACENTOS`, del mismo largo, para `sinAcentos()`.
+     *
+     * @var string
+     */
+    public const SIN_ACENTOS = 'aeiouunAEIOUUNaeiouAEIOU';
 
     /**
      * Motivo que obliga a describir el hecho, porque no encaja en los demás.
@@ -206,6 +273,20 @@ class RegistrarIncidencia extends Component
      * @var int
      */
     public int $idExamen = 0;
+
+    /**
+     * Curso elegido para la incidencia, solo cuando el examen se comparte entre
+     * varios cursos.
+     *
+     * Con un examen de un solo curso se fija al único curso disponible y no se
+     * pregunta. Con varios cursos se muestra un selector y este valor guarda el
+     * elegido, que es el que se persiste en `central_riesgo.id_curso` y del que
+     * sale la materia. Llega por la URL (`curso`) cuando la pantalla de origen
+     * ya lo conoce.
+     *
+     * @var int
+     */
+    public int $idCurso = 0;
 
     /**
      * Texto escrito en el buscador de estudiantes.
@@ -319,6 +400,8 @@ class RegistrarIncidencia extends Component
         $this->rol = (string) request()->query('rol', Rol::NOMBRE_DOCENTE);
         $this->usuario = (int) request()->query('usuario', self::USUARIO_POR_DEFECTO);
         $this->idExamen = (int) request()->query('examen', 0);
+        $this->idCurso = (int) request()->query('curso', 0);
+        $this->resolverCursoInicial();
 
         if ($this->origen !== self::ORIGEN_MONITOREO) {
             return;
@@ -332,7 +415,6 @@ class RegistrarIncidencia extends Component
         $this->materia = (string) request()->query('materia', '');
     }
 
-    /**
     /**
      * Pantalla a la que vuelve el formulario, según desde dónde se abrió.
      *
@@ -409,8 +491,7 @@ class RegistrarIncidencia extends Component
     /**
      * Etiqueta del estado con la que se muestra la incidencia en la pantalla.
      *
-     * @return string  "Confirmado" para el docente, "Sospechoso" para el auxiliar,
-     *                 tal como pide el criterio de aceptación de la #68.
+     * @return string  "Confirmado" para el docente, "En revisión" para el auxiliar.
      *
      * @author Valery D. Ortuno P. <valerydariana98@gmail.com>
      * @author Amiddala
@@ -419,7 +500,7 @@ class RegistrarIncidencia extends Component
     #[Computed]
     public function etiquetaEstado(): string
     {
-        return $this->rol === Rol::NOMBRE_AUXILIAR ? 'En revision' : 'Confirmado';
+        return $this->rol === Rol::NOMBRE_AUXILIAR ? 'En revisión' : 'Confirmado';
     }
 
     /**
@@ -462,31 +543,140 @@ class RegistrarIncidencia extends Component
     }
 
     /**
-     * Si la materia llegó precargada desde el monitor en vivo y, por lo tanto,
-     * no se puede modificar en el formulario.
+     * Cursos del examen del registro, indexados por id y con su nombre como
+     * etiqueta, para el selector de la vista.
      *
-     * La distinción la da la pantalla de origen, no que el campo tenga texto:
-     * cuando el formulario se abre sin monitor (central de riesgos, por
-     * ejemplo), la materia se escribe a mano.
+     * Sale de la relación `examen -> examen_curso -> curso`. Un examen de un
+     * solo curso devuelve una entrada y la materia se muestra fija; varios
+     * cursos devuelven varias y la persona elige. Si no llega examen o el examen
+     * no tiene cursos, devuelve vacío y la materia se escribe a mano.
      *
-     * @return bool  Verdadero cuando la materia viene del monitor.
+     * @return array<int, string>  Cursos indexados por `id_curso`.
+     *
+     * @author T1
+     * @since  2026-10-10
+     */
+    #[Computed]
+    public function cursosDelExamen(): array
+    {
+        if ($this->idExamen <= 0) {
+            return [];
+        }
+
+        $examen = Examen::query()->with('cursos')->find($this->idExamen);
+
+        if ($examen === null) {
+            return [];
+        }
+
+        return $examen->cursos
+            ->sortBy('id_curso')
+            ->mapWithKeys(fn (Curso $curso): array => [$curso->id_curso => $curso->nombre_curso])
+            ->all();
+    }
+
+    /**
+     * Fija el curso inicial del formulario al abrirlo.
+     *
+     * Con un solo curso se selecciona ese aunque no haya llegado por la URL, para
+     * que el registro siempre quede con su curso. Con varios se respeta el que
+     * venga por la URL solo si pertenece al examen; si no, queda vacío para
+     * obligar a elegir.
+     *
+     * @return void
+     *
+     * @author T1
+     * @since  2026-10-10
+     */
+    private function resolverCursoInicial(): void
+    {
+        $cursos = $this->cursosDelExamen();
+
+        if ($cursos === []) {
+            $this->idCurso = 0;
+
+            return;
+        }
+
+        if (count($cursos) === 1) {
+            $this->idCurso = (int) array_key_first($cursos);
+
+            return;
+        }
+
+        if (! array_key_exists($this->idCurso, $cursos)) {
+            $this->idCurso = 0;
+        }
+    }
+
+    /**
+     * Materia que se muestra en el formulario, ya sea la del curso fijado, la
+     * del único curso del examen o la escrita a mano.
+     *
+     * @return string  Nombre de la materia mostrada.
+     *
+     * @author T1
+     * @since  2026-10-10
+     */
+    #[Computed]
+    public function materiaMostrada(): string
+    {
+        $cursos = $this->cursosDelExamen();
+
+        if ($cursos !== []) {
+            return (string) ($cursos[$this->idCurso] ?? reset($cursos));
+        }
+
+        return $this->materia;
+    }
+
+    /**
+     * Si la materia se muestra fija, sin poder cambiarla en el formulario.
+     *
+     * Es el caso del examen de un solo curso, donde la materia sale del examen, y
+     * el de la entrada del monitor que solo manda la materia como texto sin
+     * examen. Con varios cursos NO es de solo lectura: se elige en el selector.
+     * Sin ninguna referencia se escribe a mano.
+     *
+     * @return bool  Verdadero cuando la materia no se edita.
      *
      * @author Valery D. Ortuno P. <valerydariana98@gmail.com>
+     * @author T1
      * @since  2026-09-28
      */
     #[Computed]
     public function materiaEsSoloLectura(): bool
     {
-        return $this->origen === self::ORIGEN_MONITOREO;
+        $cursos = $this->cursosDelExamen();
+
+        if (count($cursos) === 1) {
+            return true;
+        }
+
+        // Compatibilidad con la entrada del monitor que solo manda la materia
+        // como texto y ningún examen: se muestra tal cual y no se edita.
+        return $cursos === []
+            && $this->origen === self::ORIGEN_MONITOREO
+            && $this->materia !== '';
     }
 
     /**
      * Estudiantes que coinciden con lo escrito en el buscador, por nombre,
-     * apellido o código SIS.
+     * apellido, nombre y apellido juntos o código SIS.
+     *
+     * La búsqueda no distingue tildes ni mayúsculas: la base guarda "López" y
+     * quien busca teclea "lopez" o "ANA" para encontrar "Ana". Como este
+     * Postgres no trae `unaccent`, ambos lados se normalizan aquí con
+     * `sinAcentos()`.
+     *
+     * El filtro recorre en memoria el catálogo cacheado en vez de consultar la
+     * base en cada tecla: la base está en Supabase y cada consulta cuesta ~440
+     * ms de ida y vuelta, así que se traen todos los estudiantes una sola vez.
      *
      * @return Collection<int, Estudiante>  Estudiantes encontrados, hasta el límite.
      *
      * @author Valery D. Ortuno P. <valerydariana98@gmail.com>
+     * @author T1
      * @since  2026-09-26
      */
     #[Computed]
@@ -498,16 +688,88 @@ class RegistrarIncidencia extends Component
             return new Collection();
         }
 
-        $patron = '%'.$termino.'%';
+        $aguja = $this->sinAcentos($termino);
 
-        return Estudiante::query()
-            ->where('sis_estudiante', 'ilike', $patron)
-            ->orWhere('nombre_estudiante', 'ilike', $patron)
-            ->orWhere('apellido_estudiante', 'ilike', $patron)
-            ->orderBy('nombre_estudiante')
-            ->orderBy('apellido_estudiante')
-            ->limit(self::BUSQUEDA_LIMITE)
-            ->get();
+        return $this->catalogoEstudiantes()
+            ->filter(fn (Estudiante $estudiante): bool => $this->coincide($estudiante, $aguja))
+            ->take(self::BUSQUEDA_LIMITE)
+            ->values();
+    }
+
+    /**
+     * Indica si un estudiante coincide con el término ya normalizado.
+     *
+     * Se compara contra el SIS, el nombre, el apellido y el nombre completo
+     * ("nombre apellido"), todos sin tildes ni mayúsculas.
+     *
+     * @param  Estudiante  $estudiante  Estudiante del catálogo.
+     * @param  string      $aguja       Término buscado, ya normalizado.
+     * @return bool  Verdadero si algún campo contiene el término.
+     *
+     * @author T1
+     * @since  2026-10-10
+     */
+    private function coincide(Estudiante $estudiante, string $aguja): bool
+    {
+        $campos = [
+            (string) $estudiante->sis_estudiante,
+            (string) $estudiante->nombre_estudiante,
+            (string) $estudiante->apellido_estudiante,
+            $estudiante->nombre_estudiante.' '.$estudiante->apellido_estudiante,
+        ];
+
+        foreach ($campos as $campo) {
+            if (str_contains($this->sinAcentos($campo), $aguja)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Catálogo de estudiantes que alimenta el buscador, cacheado unos minutos.
+     *
+     * Se cachea para no pagar el viaje a Supabase en cada tecla. El alta de un
+     * estudiante nuevo limpia esta clave, así que el buscador no queda ciego
+     * frente a un registro recién creado.
+     *
+     * @return Collection<int, Estudiante>  Estudiantes ordenados por nombre.
+     *
+     * @author T1
+     * @since  2026-10-10
+     */
+    private function catalogoEstudiantes(): Collection
+    {
+        return Cache::remember(
+            self::CACHE_ESTUDIANTES,
+            now()->addMinutes(self::CACHE_ESTUDIANTES_MINUTOS),
+            fn (): Collection => Estudiante::query()
+                ->orderBy('nombre_estudiante')
+                ->orderBy('apellido_estudiante')
+                ->get(['sis_estudiante', 'nombre_estudiante', 'apellido_estudiante']),
+        );
+    }
+
+    /**
+     * Deja un texto sin tildes y en minúscula, con el mapa `ACENTOS`.
+     *
+     * @param  string  $texto  Texto a normalizar.
+     * @return string  Texto sin tildes y en minúscula.
+     *
+     * @author T1
+     * @since  2026-10-10
+     */
+    private function sinAcentos(string $texto): string
+    {
+        static $mapa = null;
+
+        $mapa ??= array_combine(
+            mb_str_split(self::ACENTOS),
+            mb_str_split(self::SIN_ACENTOS),
+        );
+
+        return strtr(mb_strtolower($texto), $mapa);
     }
 
     /**
@@ -596,20 +858,31 @@ class RegistrarIncidencia extends Component
                 'required',
                 'string',
                 'max:'.self::NOMBRE_MAXIMO,
-                'regex:/^[\p{L}\s]+$/u',
             ],
             'apellidoEstudiante' => [
                 'required',
                 'string',
                 'max:'.self::NOMBRE_MAXIMO,
-                'regex:/^[\p{L}\s]+$/u',
             ],
             'codigoSis' => $this->reglasCodigoSis(),
-            'materia' => [
-                'required',
-                'string',
-                'max:'.self::MATERIA_MAXIMO,
-                'regex:/^[\p{L}\p{N}\s]+$/u',
+            'materia' => count($this->cursosDelExamen()) === 0
+                ? [
+                    'required',
+                    'string',
+                    'max:'.self::MATERIA_MAXIMO,
+                    'regex:/^[\p{L}\p{N}\s]+$/u',
+                ]
+                : ['nullable'],
+            'idCurso' => [
+                function (string $atributo, mixed $valor, \Closure $fallar): void {
+                    $cursos = $this->cursosDelExamen();
+
+                    // Con varios cursos la persona tiene que elegir uno del
+                    // examen; con uno solo lo fija el componente y no se pide.
+                    if (count($cursos) > 1 && ! array_key_exists((int) $valor, $cursos)) {
+                        $fallar('Seleccione la materia del examen.');
+                    }
+                },
             ],
             'tipoIncidencia' => ['required', Rule::in(array_keys($this->tiposIncidencia()))],
             'usuario' => ['required', 'integer', Rule::exists('usuario', 'id_usuario')],
@@ -626,10 +899,13 @@ class RegistrarIncidencia extends Component
      * Reglas del código SIS, con el aviso de duplicado cuando el valor se
      * escribió a mano.
      *
-     * El aviso aplica solo a lo que la persona teclea. El estudiante que llega
-     * precargado desde el monitor y el que se elige con la lupa ya están
-     * ingresados en la base, así que se compara el valor actual contra el
-     * precargado y el duplicado se busca únicamente cuando difieren.
+     * El formato no se valida: el SIS lo define el registro de estudiantes, así
+     * que este formulario acepta el valor tal como llega (de la lupa o del
+     * monitor) y solo exige que no vaya vacío. El aviso de duplicado aplica
+     * únicamente a lo que la persona teclea; el estudiante que llega precargado
+     * desde el monitor y el que se elige con la lupa ya están ingresados en la
+     * base, así que se compara el valor actual contra el precargado y el
+     * duplicado se busca solo cuando difieren.
      *
      * @return array<int, mixed>  Reglas de validación del código SIS.
      *
@@ -638,7 +914,7 @@ class RegistrarIncidencia extends Component
      */
     private function reglasCodigoSis(): array
     {
-        $reglas = ['required', 'digits:9'];
+        $reglas = ['required', 'string', 'max:'.self::SIS_MAXIMO];
 
         if ($this->codigoSis !== $this->sisPrecargado) {
             $reglas[] = Rule::unique('estudiante', 'sis_estudiante');
@@ -661,6 +937,7 @@ class RegistrarIncidencia extends Component
             'nombreEstudiante' => 'nombre',
             'apellidoEstudiante' => 'apellido',
             'codigoSis' => 'código SIS',
+            'idCurso' => 'materia',
             'tipoIncidencia' => 'motivo',
         ];
     }
@@ -679,14 +956,12 @@ class RegistrarIncidencia extends Component
     protected function messages(): array
     {
         return [
-            'nombreEstudiante.required' => 'Ingrese el nombre del estudiante.',
-            'nombreEstudiante.regex' => 'El nombre solo puede contener letras.',
+            'nombreEstudiante.required' => 'Busque y seleccione un estudiante de la lista.',
             'nombreEstudiante.max' => 'El nombre admite un máximo de '.self::NOMBRE_MAXIMO.' caracteres.',
-            'apellidoEstudiante.required' => 'Ingrese el apellido del estudiante.',
-            'apellidoEstudiante.regex' => 'El apellido solo puede contener letras.',
+            'apellidoEstudiante.required' => 'Busque y seleccione un estudiante de la lista.',
             'apellidoEstudiante.max' => 'El apellido admite un máximo de '.self::NOMBRE_MAXIMO.' caracteres.',
-            'codigoSis.required' => 'Ingrese el código SIS del estudiante.',
-            'codigoSis.digits' => 'El código SIS debe tener 9 números.',
+            'codigoSis.required' => 'Busque y seleccione un estudiante de la lista.',
+            'codigoSis.max' => 'El código SIS admite un máximo de '.self::SIS_MAXIMO.' caracteres.',
             'codigoSis.unique' => 'Ese código SIS ya está registrado.',
             'materia.required' => 'Ingrese la materia del examen.',
             'materia.regex' => 'La materia solo puede contener letras, números y espacios.',
@@ -704,11 +979,11 @@ class RegistrarIncidencia extends Component
      * Registra la incidencia con los datos ingresados en el formulario y abre el
      * modal de confirmación con el resumen de lo guardado.
      *
-     * La materia del formulario no se persiste: la base la deriva de
-     * `id_examen -> examen_curso -> curso.nombre_curso`. El campo sigue en
-     * pantalla porque es el dato que la persona ve y con el que reconoce el
-     * examen, pero el resumen del modal muestra la materia real del examen
-     * registrado, no la escrita.
+     * La materia no es columna: se guarda el curso elegido cuando el examen se
+     * comparte y `materia()` la resuelve, primero del curso guardado y si no del
+     * primer curso del examen. El campo de materia sigue en pantalla porque es el
+     * dato que la persona reconoce, pero el resumen del modal muestra la materia
+     * real del registro.
      *
      * @return void
      *
@@ -741,8 +1016,14 @@ class RegistrarIncidencia extends Component
             $estudiante = $this->resolverEstudiante();
 
             return CentralRiesgo::create([
+                // La tabla no tiene secuencia: el id lo calcula la aplicación con
+                // la tabla bloqueada, igual que el alta de examen.
+                'id_registro' => $this->siguienteIdRegistro(),
                 'sis_estudiante' => $estudiante->sis_estudiante,
                 'id_examen' => $this->resolverExamen($estudiante),
+                // Curso elegido cuando el examen se comparte; null cuando el
+                // examen es de un solo curso (la materia igual sale del examen).
+                'id_curso' => $this->idCursoParaGuardar(),
                 'id_registrador' => $this->usuario,
                 'motivo' => Motivo::from($this->tipoIncidencia),
                 // La descripción es opcional con los motivos del catálogo, así que
@@ -750,7 +1031,6 @@ class RegistrarIncidencia extends Component
                 'detalle_motivo' => $this->descripcion === '' ? null : $this->descripcion,
                 'fecha_registro' => now(),
                 'tipo_infraccion' => $this->tipoInfraccion(),
-                'id_ingreso' => $this->ingresoDelEstudiante($estudiante->sis_estudiante),
             ]);
         });
 
@@ -796,7 +1076,7 @@ class RegistrarIncidencia extends Component
      */
     private function resolverEstudiante(): Estudiante
     {
-        return Estudiante::query()->firstOrCreate(
+        $estudiante = Estudiante::query()->firstOrCreate(
             ['sis_estudiante' => $this->codigoSis],
             [
                 'nombre_estudiante' => $this->nombreEstudiante,
@@ -804,6 +1084,14 @@ class RegistrarIncidencia extends Component
                 'carrera' => null,
             ],
         );
+
+        // El catálogo del buscador se cachea unos minutos; si se dio de alta un
+        // estudiante, se descarta para que aparezca de inmediato.
+        if ($estudiante->wasRecentlyCreated) {
+            Cache::forget(self::CACHE_ESTUDIANTES);
+        }
+
+        return $estudiante;
     }
 
     /**
@@ -865,27 +1153,48 @@ class RegistrarIncidencia extends Component
     }
 
     /**
-     * Último ingreso del estudiante, que es el que se enlaza al registro de la
-     * incidencia.
+     * Siguiente id del registro de la incidencia.
      *
-     * Puede ser null: desde la central de riesgos se reporta a estudiantes que
-     * nunca ingressaron, y `id_ingreso` es nullable justamente para eso.
+     * `central_riesgo.id_registro` es un entero sin secuencia ni default, así que
+     * el id lo calcula la aplicación. Se bloquea la tabla en modo
+     * `SHARE ROW EXCLUSIVE` para que dos altas simultáneas no lean el mismo
+     * máximo e intenten escribir el mismo id; el bloqueo se libera al terminar la
+     * transacción del alta. Es el mismo criterio del alta de examen.
      *
-     * @param  ?string  $sis  Código SIS del estudiante, si está en la base.
-     * @return ?int  Id del ingreso, o null si no tiene ninguno.
+     * @return int  Id libre para el nuevo registro.
      */
-    private function ingresoDelEstudiante(?string $sis): ?int
+    private function siguienteIdRegistro(): int
     {
-        if ($sis === null) {
+        DB::statement('LOCK TABLE central_riesgo IN SHARE ROW EXCLUSIVE MODE');
+
+        return (int) CentralRiesgo::query()->max('id_registro') + 1;
+    }
+
+    /**
+     * Curso que se guarda en `central_riesgo.id_curso`.
+     *
+     * Con un examen de varios cursos es el que la persona eligió; con uno solo es
+     * ese mismo. Sin cursos (materia escrita a mano) queda null y `materia()`
+     * cae al primer curso del examen o a null.
+     *
+     * @return ?int  Id del curso, o null si no se puede determinar.
+     *
+     * @author T1
+     * @since  2026-10-10
+     */
+    private function idCursoParaGuardar(): ?int
+    {
+        $cursos = $this->cursosDelExamen();
+
+        if ($cursos === []) {
             return null;
         }
 
-        $ingreso = DB::table('registro_asistencia')
-            ->where('id_estudiante', $sis)
-            ->orderByDesc('hora_ingreso')
-            ->value('id_ingreso');
+        if (count($cursos) === 1) {
+            return (int) array_key_first($cursos);
+        }
 
-        return $ingreso === null ? null : (int) $ingreso;
+        return array_key_exists($this->idCurso, $cursos) ? $this->idCurso : null;
     }
 
     /**

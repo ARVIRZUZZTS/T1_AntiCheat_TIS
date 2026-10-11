@@ -2,7 +2,7 @@
     @file    materia-examenes.blade.php
     @author  Alex Candia <alex.leonar.candia@gmail.com>
     @created 2026-10-05
-    @updated 2026-10-09
+    @updated 2026-10-10
 
     @description
     Sección "Exámenes" de la vista de detalle de una materia: lista los exámenes
@@ -29,10 +29,6 @@
       modal de alta, que los carga en su buscador.
     - 2026-10-05  [Alex Candia]  feat: la sección pasa también el catálogo de
       materiales y el de normas, que el modal muestra como casillas.
-    - 2026-10-09  [T1]  feat: el listado pasa a consumir con fetch el endpoint
-      /api/cursos/{idCurso}/examenes al abrir la pestaña; el ítem muestra
-      ambientes e ingresados (antes duración e inscritos), con el estado
-      debajo del tipo y en dos etiquetas: Programado y Finalizado.
 
     @see  App\Http\Controllers\Api\CursoExamenController
     @see  App\Services\Ambiente\ListarAmbientesService
@@ -42,38 +38,24 @@
     @see  resources/views/pages/materia-estudiantes.blade.php
 --}}
 
-<div class="flex flex-col gap-[2vh]"
-     x-data="{
-         examenes: [],
-         estado: 'cargando',
-         async cargar() {
-             this.estado = 'cargando';
-             try {
-                 const respuesta = await fetch('{{ route('api.cursos.examenes.listar', ['idCurso' => $curso->id_curso]) }}');
-                 if (!respuesta.ok) {
-                     throw new Error('HTTP ' + respuesta.status);
-                 }
-                 const cuerpo = await respuesta.json();
-                 this.examenes = cuerpo.datos;
-                 this.estado = 'listo';
-             } catch (error) {
-                 this.estado = 'error';
-             }
-         },
-         init() {
-             this.cargar();
-         },
-         horario(examen) {
-             return [examen.hora_inicio, examen.hora_fin].filter(Boolean).join(' – ') || '—';
-         },
-         ambientesDe(examen) {
-             return (examen.ambientes || []).map((ambiente) => ambiente.nombre).join(', ') || '—';
-         },
-     }">
+@php
+    use App\Services\Examen\ListarExamenesCursoService;
+
+    $estados = [
+        ListarExamenesCursoService::ESTADO_PROGRAMADO => ['brand', 'Programado'],
+        ListarExamenesCursoService::ESTADO_EN_CURSO => ['status-en-revision', 'En curso'],
+        ListarExamenesCursoService::ESTADO_FINALIZADO => ['gray', 'Finalizado'],
+    ];
+
+    $total = count($examenes);
+    $resumen = $total === 1 ? '1 examen programado.' : $total.' exámenes programados.';
+@endphp
+
+<div class="flex flex-col gap-[2vh]">
     {{-- Aviso de éxito del alta. Los errores de validación se muestran dentro
          del modal, que además se reabre solo (ver `abrir` más abajo). --}}
     @if (session('mensaje'))
-        <x-ui.alert type="success">{{ session('mensaje') }}</x-ui.alert>
+        <x-ui.modal-aviso :mensaje="session('mensaje')" />
     @endif
 
     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -82,7 +64,6 @@
         </div>
 
         <x-ui.button variant="default" class="shrink-0" @click="$dispatch('abrir-modal-crear-examen')">
-            <svg class="w-4 h-4 me-1.5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-width="2" d="M12 5v14m7-7H5"/></svg>
             Crear examen
         </x-ui.button>
     </div>

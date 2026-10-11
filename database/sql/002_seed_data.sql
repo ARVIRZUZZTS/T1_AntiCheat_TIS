@@ -87,12 +87,12 @@ INSERT INTO curso (id_curso, nombre_curso, sis_doc, fecha_creacion, estado) VALU
 (4, 'Algebra Lineal',  1, '2024-02-15', 'Finalizo'),
 (5, 'Quimica General', 2, '2024-02-20', 'EnCurso');
 
-INSERT INTO examen (id_examen, fecha, hora_inicio, hora_fin, duracion, creador, tipo_examen) VALUES
-(1, '2024-06-10', '08:00', '10:00', 120, 1, 1),
-(2, '2024-06-11', '10:00', '12:00', 120, 2, 2),
-(3, '2024-06-12', '14:00', '16:00', 120, 5, 3),
-(4, '2024-06-13', '08:00', '09:30',  90, 1, 4),
-(5, '2024-06-14', '16:00', '18:00', 120, 2, 5);
+INSERT INTO examen (id_examen, fecha, hora_inicio, duracion, creador, tipo_examen) VALUES
+(1, '2024-06-10', '08:00', 120, 1, 1),
+(2, '2024-06-11', '10:00', 120, 2, 2),
+(3, '2024-06-12', '14:00', 120, 5, 3),
+(4, '2024-06-13', '08:00',  90, 1, 4),
+(5, '2024-06-14', '16:00', 120, 2, 5);
 
 INSERT INTO curso_tipo_gestion (id_curso, id_tg) VALUES
 (1, 1),
