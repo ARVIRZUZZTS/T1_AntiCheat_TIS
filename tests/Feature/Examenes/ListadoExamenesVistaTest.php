@@ -132,7 +132,7 @@ class ListadoExamenesVistaTest extends TestCase
         $this->assertStringContainsString("estado === 'error'", $parcial);
         $this->assertStringContainsString("estado === 'listo'", $parcial);
         $this->assertStringContainsString('Reintentar', $parcial);
-        $this->assertStringContainsString('todavía no tiene exámenes', $parcial);
+        $this->assertStringContainsString('no tiene exámenes registrados', $parcial);
     }
 
     public function test_la_pestana_es_un_template_x_if_que_monta_el_parcial(): void
