@@ -8,11 +8,13 @@
  * @created 2026-10-09
  *
  * @updated 2026-10-10
+ * @updated 2026-10-11
  *
  * @description
  * Servicio de dominio que lista las incidencias de la central de riesgos con
- * tipo de infracción `tramposo`. Devuelve por registro el nombre y el código
- * SIS del estudiante, la materia, el motivo y la fecha/hora, con filtro por
+ * tipo de infracción `tramposo`. Devuelve por registro el id y `id_registro`
+ * (lo que abre el detalle), el nombre y el código SIS del estudiante, la
+ * materia, el motivo y su etiqueta, el estado y la fecha/hora, con filtro por
  * alcance y búsqueda. El orden por defecto es alfabético (A-Z) por apellidos y
  * nombre; la pantalla de la central pide además el orden por fecha, de la más
  * reciente a la más antigua. La respuesta es la lista completa, sin paginación.
@@ -47,6 +49,8 @@
  * - 2026-10-10  [Valery D. Ortuno P]  refactor: la búsqueda y el orden A-Z ya
  *   no dependen de `ilike` ni de `split_part`, exclusivos de PostgreSQL, para
  *   que el servicio se pueda probar con SQLite en memoria.
+ * - 2026-10-11  [Alisson D. Alvarado]  fix: el mapeo agrega `id` (para el
+ *   enlace "Ver detalle") y `estado` (columna Estado de la tabla).
  */
 
 namespace App\Services\CentralRiesgo;
@@ -265,13 +269,14 @@ class ListarIncidenciasTramposoService
      * Convierte una incidencia en el arreglo de datos que consume la API.
      *
      * @param  CentralRiesgo  $incidencia  Incidencia con relaciones precargadas.
-     * @return array<string, mixed> Datos del estudiante, materia, motivo y fecha.
+     * @return array<string, mixed> Datos del estudiante, materia, motivo, estado y fecha.
      */
     private function mapear(CentralRiesgo $incidencia): array
     {
         $estudiante = $incidencia->estudiante;
 
         return [
+            'id' => $incidencia->id_registro,
             'id_registro' => $incidencia->id_registro,
             'nombre' => $estudiante?->nombre_estudiante,
             'apellido' => $estudiante?->apellido_estudiante,
@@ -279,6 +284,9 @@ class ListarIncidenciasTramposoService
             'materia' => $this->resolverMateria($incidencia),
             'motivo' => $incidencia->motivo,
             'motivo_etiqueta' => $incidencia->motivo->etiqueta(),
+            // `estado_incidencia` no está casteado en el modelo (ver
+            // ConsultarDetalleIncidenciaService); se lee por getAttribute.
+            'estado' => $incidencia->getAttribute('estado_incidencia'),
             'fecha' => $incidencia->fecha_registro->toDateTimeString(),
         ];
     }

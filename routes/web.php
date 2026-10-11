@@ -7,6 +7,7 @@
  *
  * @created 2026-09-29
  *
+ * @updated 2026-10-10
  * @updated 2026-10-11
  *
  * @description
@@ -41,6 +42,10 @@
  *   los modales y el controlador se elimina.
  * - 2026-10-10  [Valery D. Ortuno P]  docs: la central de riesgos ya no es un
  *   mock; su vista incrusta el componente Livewire ListaEstudiantes (HU 10).
+ * - 2026-10-10  [Alisson D. Alvarado]  fix: la central de riesgos se enruta a
+ *   su componente Livewire (`CentralRiesgo\Index`), que consume
+ *   `ListarIncidenciasTramposoService` (el mismo listado del endpoint
+ *   `/api/central-riesgo`) en vez de pintar datos mockeados.
  * - 2026-10-11  [OchoaCesar]  feat: ruta temporal /dev/login, registrada solo
  *   en APP_ENV=local, que inicia sesión con el usuario 1 para poder probar el
  *   modal de detalle de incidencia (la API exige sesión y aún no existe
