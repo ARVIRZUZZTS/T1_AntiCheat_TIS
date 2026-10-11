@@ -7,7 +7,7 @@
  *
  * @created 2026-09-29
  *
- * @updated 2026-10-09
+ * @updated 2026-10-11
  *
  * @description
  * Definición de rutas web del panel. Incluye vistas estáticas y componentes Livewire.
@@ -36,6 +36,10 @@
  *   directo a su componente Livewire (`MonitorEnVivo`) en vez de pasar por
  *   `MonitoreoController`; la pantalla ahora persiste el flujo de ingreso desde
  *   los modales y el controlador se elimina.
+ * - 2026-10-11  [OchoaCesar]  feat: ruta temporal /dev/login, registrada solo
+ *   en APP_ENV=local, que inicia sesión con el usuario 1 para poder probar el
+ *   modal de detalle de incidencia (la API exige sesión y aún no existe
+ *   pantalla de login).
  */
 
 use App\Http\Controllers\ExamenController;
@@ -44,11 +48,14 @@ use App\Livewire\Monitoreo\BuscadorRegistro;
 use App\Livewire\Monitoreo\MonitorEnVivo;
 use App\Livewire\Monitoreo\RegistrarIncidencia;
 use App\Models\Curso;
+use App\Models\Usuario;
 use App\Services\Ambiente\ListarAmbientesService;
 use App\Services\Examen\ListarEstudiantesCursoConEstadoService;
 use App\Services\Examen\ListarExamenesCursoService;
 use App\Services\Material\ListarMaterialesService;
 use App\Services\Norma\ListarNormasService;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'pages.inicio')->name('inicio');
@@ -101,3 +108,16 @@ Route::get('/incidencias/{id}', fn (int $id) => view('pages.incidencia-detalle',
 // restringe el registro de incidencias a docentes y auxiliares (#69).
 Route::get('/buscador-incidencia', RegistrarIncidencia::class)->name('buscador-incidencia');
 Route::get('/registrar-incidencia', RegistrarIncidencia::class)->name('registrar-incidencia');
+
+// Solo APP_ENV=local: aún no existe pantalla de login y los endpoints de
+// incidencias exigen sesión (`auth:web`), así que esta ruta temporal inicia
+// sesión con el usuario 1 para poder probar el modal de detalle de incidencia.
+// Fuera de local la ruta ni siquiera se registra.
+// TODO(@OchoaCesar, 2026-10-11): eliminar esta ruta cuando exista el login real.
+if (app()->isLocal()) {
+    Route::get('/dev/login', function (): RedirectResponse {
+        Auth::login(Usuario::find(1) ?? Usuario::query()->firstOrFail());
+
+        return redirect()->route('notificaciones');
+    })->name('dev.login');
+}

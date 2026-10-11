@@ -7,7 +7,7 @@
  *
  * @created 2026-10-09
  *
- * @updated 2026-10-09
+ * @updated 2026-10-11
  *
  * @description Pruebas HTTP con SQLite en memoria, sin usar Supabase, del
  * endpoint GET /api/incidencias/{idIncidencia}: datos completos del detalle
@@ -15,6 +15,10 @@
  *
  * @changelog
  * - 2026-10-09  [Alisson D. Alvarado]  test: cubrir detalle encontrado, 404 e invitado.
+ * - 2026-10-11  [OchoaCesar]  test: el fixture de `motivo` se alinea al enum
+ *   vigente con espacios (`copia o intercambio de respuestas`); el valor con
+ *   guiones bajos ya no es un backing value válido y el cast del modelo lanzaba
+ *   ValueError.
  *
  * @see App\Http\Controllers\Api\DetalleIncidenciaController
  * @see App\Services\CentralRiesgo\ConsultarDetalleIncidenciaService
@@ -170,7 +174,7 @@ class DetalleIncidenciaTest extends TestCase
             'id_examen' => 1,
             'sis_estudiante' => '20181111111',
             'id_registrador' => 2,
-            'motivo' => 'copia_o_intercambio_de_respuestas',
+            'motivo' => 'copia o intercambio de respuestas',
             'detalle_motivo' => 'Copia visible desde el celular en el momento del examen.',
             'fecha_registro' => '2026-10-05 10:30:00',
             'tipo_infraccion' => 'tramposo',

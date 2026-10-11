@@ -7,7 +7,7 @@
  *
  * @created 2026-09-25
  *
- * @updated 2026-10-10
+ * @updated 2026-10-11
  *
  * @description
  * Servicio de dominio que genera el reporte de asistencia de un examen.
@@ -53,6 +53,10 @@
  *   `examen` y pasó a derivarse. En este servicio esa derivada quedó sin uso
  *   cuando el estado pasó a calcularse desde el dato persistido, así que se
  *   retira de acá; la ventana horaria la resuelve `Examen::getHoraFinAttribute()`.
+ * - 2026-10-11  [OchoaCesar]  fix: el estado de la incidencia se lee como enum
+ *   (`EstadoIncidencia`) porque el modelo volvió a castear `estado_incidencia`;
+ *   el `(string)` anterior sobre el enum lanzaba "Object of class could not be
+ *   converted to string" en `incidenciasPorEstudiante()`.
  *
  * @see  \App\Livewire\Monitoreo\MonitorEnVivo
  * @see  App\Services\Asistencia\RegistroIngresoService
@@ -65,6 +69,7 @@
 namespace App\Services\Monitoreo;
 
 use App\Enums\EstadoEstudianteExamen;
+use App\Enums\EstadoIncidencia;
 use App\Enums\Motivo;
 use App\Models\CentralRiesgo;
 use App\Models\EstudianteExamen;
@@ -74,8 +79,8 @@ use Carbon\Carbon;
 use Illuminate\Support\Collection;
 
 /**
- * @package App\Services\Monitoreo
  * @author  OchoaCesar <cesareduardonick@gmail.com>
+ *
  * @since   2026-09-25
  */
 class GenerarReporteAsistenciaService
@@ -85,7 +90,7 @@ class GenerarReporteAsistenciaService
      *
      * @param  int  $idExamen  ID del examen
      * @param  Carbon|null  $ahora  Se conserva por compatibilidad con la firma
-     *   original; el estado ya no depende de la hora, sino de lo persistido.
+     *                              original; el estado ya no depende de la hora, sino de lo persistido.
      * @return array{examen: Examen, estudiantes: Collection}
      */
     public function ejecutar(int $idExamen, ?Carbon $ahora = null): array
@@ -153,7 +158,12 @@ class GenerarReporteAsistenciaService
             ->map(fn (CentralRiesgo $riesgo): array => [
                 'tipo' => (string) $riesgo->tipo_infraccion?->value,
                 'fecha' => $riesgo->fecha_registro?->format('d/m/Y') ?? '',
-                'estado' => (string) $riesgo->getAttribute('estado_incidencia'),
+                // `estado_incidencia` llega casteado a EstadoIncidencia desde el
+                // modelo, pero se acepta también el texto plano por si el cast
+                // se retira.
+                'estado' => $riesgo->getAttribute('estado_incidencia') instanceof EstadoIncidencia
+                    ? $riesgo->getAttribute('estado_incidencia')->value
+                    : (string) $riesgo->getAttribute('estado_incidencia'),
                 // `motivo` llega casteado a Motivo desde el modelo, pero se
                 // acepta también el texto plano por si el cast se retira.
                 'motivo_etiqueta' => $riesgo->motivo instanceof Motivo

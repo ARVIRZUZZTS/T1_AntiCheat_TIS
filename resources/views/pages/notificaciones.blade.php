@@ -2,7 +2,7 @@
     @file    notificaciones.blade.php
     @author  Alisson D. Alvarado <alvaradoalissondalet@gmail.com>
     @created 2026-10-09
-    @updated 2026-10-10
+    @updated 2026-10-11
 
     @description
     Pantalla de notificaciones del docente. Muestra las notificaciones de
@@ -16,8 +16,10 @@
     visual porque los datos son mockeados; cuando exista el endpoint real, ese
     mismo handler persistirá el borrado.
 
-    "Ver detalle" navega al detalle del registro (T4) sin confirmar ni rechazar
-    nada: el registro sigue "En revisión".
+    "Ver detalle" despacha el evento window 'abrir-detalle-incidencia' que abre
+    el modal `x-ui.modal-detalle-incidencia` (detalle + submodales de confirmar
+    y rechazar contra la API); sin JS conserva el href como respaldo. Nada se
+    confirma ni se rechaza hasta que el docente lo indique en ese modal.
 
     Los datos son mockeados a propósito: representan la respuesta de un endpoint
     de notificaciones que se conectará más adelante. El rol del usuario tampoco
@@ -27,8 +29,11 @@
     - 2026-10-09  [Alisson D. Alvarado]  feat: creación inicial de la pantalla.
     - 2026-10-10  feat: "Ver detalle" apunta a la ruta del detalle del registro
       (HU 12 · T4).
+    - 2026-10-11  [OchoaCesar]  feat: "Ver detalle" abre el modal de detalle de
+      incidencia con sus submodales de confirmación y rechazo (HU 12 · T4).
 
     @see  \resources\views\components\ui\notificacion-card.blade.php
+    @see  \resources\views\components\ui\modal-detalle-incidencia.blade.php
 --}}
 
 @extends('layouts.app')
@@ -134,6 +139,9 @@
             No tienes notificaciones
         </div>
     </div>
+
+    {{-- Modal de detalle de incidencia (con sus submodales de decisión y toast). --}}
+    <x-ui.modal-detalle-incidencia />
 
     <script>
         (function () {

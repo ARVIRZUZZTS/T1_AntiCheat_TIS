@@ -2,7 +2,7 @@
     @file    notificacion-card.blade.php
     @author  Alisson D. Alvarado <alvaradoalissondalet@gmail.com>
     @created 2026-10-09
-    @updated 2026-10-10
+    @updated 2026-10-11
 
     @description
     Tarjeta presentacional de una notificación de "Posible Tramposo", responsive
@@ -25,6 +25,9 @@
     - 2026-10-09  [Alisson D. Alvarado]  feat: creación inicial del componente.
     - 2026-10-10  feat: integración de la tarjeta de la HU 12 (T3/T4) sobre la
       base de dev (descripción, layout responsive y acciones).
+    - 2026-10-11  [OchoaCesar]  feat: "Ver detalle" despacha el evento window
+      'abrir-detalle-incidencia' para abrir el modal del detalle en vez de
+      navegar (se conserva el href como respaldo sin JS).
 --}}
 
 @props([
@@ -63,7 +66,11 @@
             {{-- El botón se declara aquí (no usa x-ui.button a propósito) porque la
                  especificación pide texto semibold y el botón base del sistema va en
                  font-medium; se usa la variante roja pedida por la HU 12. --}}
+            {{-- El dispatch es JS plano (igual que la X): Alpine no inicializa
+                 @click en elementos fuera de un alcance x-data, y la tarjeta
+                 se renderiza en una página Blade sin x-data. --}}
             <a href="{{ $detalleHref }}"
+               onclick="event.preventDefault(); window.dispatchEvent(new CustomEvent('abrir-detalle-incidencia', { detail: { id: {{ $id }} } }))"
                class="shrink-0 inline-flex items-center justify-center px-4 py-2 text-sm font-semibold text-white bg-danger rounded-base hover:bg-danger-strong focus:ring-4 focus:ring-danger-medium focus:outline-none">
                 Ver detalle
             </a>
