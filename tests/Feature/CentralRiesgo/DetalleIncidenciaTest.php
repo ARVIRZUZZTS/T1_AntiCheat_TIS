@@ -7,7 +7,7 @@
  *
  * @created 2026-10-09
  *
- * @updated 2026-10-10
+ * @updated 2026-10-11
  *
  * @description Pruebas HTTP con SQLite en memoria, sin usar Supabase, del
  * endpoint GET /api/incidencias/{idIncidencia}: datos completos del detalle
@@ -18,6 +18,10 @@
  * - 2026-10-10  [Valery D. Ortuno P]  test: el motivo de la incidencia de prueba
  *   usa el valor con espacios, que es el que tiene el enum `Motivo` desde que
  *   se alineó con PostgreSQL; con guiones bajos el modelo no lo podía leer.
+ * - 2026-10-11  [OchoaCesar]  test: el fixture de `motivo` se alinea al enum
+ *   vigente con espacios (`copia o intercambio de respuestas`); el valor con
+ *   guiones bajos ya no es un backing value válido y el cast del modelo lanzaba
+ *   ValueError.
  *
  * @see App\Http\Controllers\Api\DetalleIncidenciaController
  * @see App\Services\CentralRiesgo\ConsultarDetalleIncidenciaService

@@ -7,7 +7,7 @@
  *
  * @created 2026-09-29
  *
- * @updated 2026-10-10
+ * @updated 2026-10-11
  *
  * @description
  * Definición de rutas web del panel. Incluye vistas estáticas y componentes Livewire.
@@ -28,25 +28,38 @@
  * - 2026-10-09  [Alisson D. Alvarado]  feat: ruta de la pantalla de
  *   notificaciones del docente. Por ahora renderiza una vista con datos
  *   mockeados; el endpoint real se conecta en una iteración posterior.
+ * - 2026-10-09  [OchoaCesar]  refactor: la pestaña Exámenes deja de recibir los
+ *   exámenes por la ruta; el parcial los consulta con fetch al endpoint
+ *   GET /api/cursos/{idCurso}/examenes cuando se abre.
  * - 2026-10-09  [Alisson D. Alvarado]  refactor: la ruta de la central de
  *   riesgos pasa a ser una vista simple, ya que la pantalla es solo interfaz
  *   (datos mockeados) y llamaba a ListarAlertasService, que fallaba al leer
  *   `estado_incidencia`, columna aún no disponible en la base.
+ * - 2026-10-10  [David E. Chavez T.]  refactor: el monitor en vivo se enruta
+ *   directo a su componente Livewire (`MonitorEnVivo`) en vez de pasar por
+ *   `MonitoreoController`; la pantalla ahora persiste el flujo de ingreso desde
+ *   los modales y el controlador se elimina.
  * - 2026-10-10  [Valery D. Ortuno P]  docs: la central de riesgos ya no es un
  *   mock; su vista incrusta el componente Livewire ListaEstudiantes (HU 10).
+ * - 2026-10-11  [OchoaCesar]  feat: ruta temporal /dev/login, registrada solo
+ *   en APP_ENV=local, que inicia sesión con el usuario 1 para poder probar el
+ *   modal de detalle de incidencia (la API exige sesión y aún no existe
+ *   pantalla de login).
  */
 
 use App\Http\Controllers\ExamenController;
-use App\Http\Controllers\MonitoreoController;
 use App\Livewire\Examenes\EstudiantesCurso;
 use App\Livewire\Monitoreo\BuscadorRegistro;
+use App\Livewire\Monitoreo\MonitorEnVivo;
 use App\Livewire\Monitoreo\RegistrarIncidencia;
 use App\Models\Curso;
+use App\Models\Usuario;
 use App\Services\Ambiente\ListarAmbientesService;
 use App\Services\Examen\ListarEstudiantesCursoConEstadoService;
-use App\Services\Examen\ListarExamenesCursoService;
 use App\Services\Material\ListarMaterialesService;
 use App\Services\Norma\ListarNormasService;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'pages.inicio')->name('inicio');
@@ -56,7 +69,7 @@ Route::get('/materias', fn () => view('pages.materias', [
     'cursos' => Curso::query()->orderBy('id_curso')->get(),
 ]))->name('materias');
 Route::view('/examenes', 'pages.examenes')->name('examenes');
-Route::get('/monitoreo', MonitoreoController::class)->name('monitoreo');
+Route::get('/monitoreo', MonitorEnVivo::class)->name('monitoreo');
 Route::get('/monitoreo/registro-ingreso', BuscadorRegistro::class)->name('monitoreo.registro-ingreso');
 // La vista solo aporta el layout; los datos los resuelve el componente Livewire
 // ListaEstudiantes que incrusta, por eso la ruta sigue sin lógica.
@@ -75,7 +88,6 @@ Route::get('/materias/{curso}', function (Curso $curso) {
     return view('pages.materia-estudiantes', [
         'curso' => $curso,
         'conteos' => $conteos,
-        'examenes' => app(ListarExamenesCursoService::class)->ejecutar($curso->id_curso),
         // Catálogos del modal de alta de examen: el buscador de ambientes los
         // filtra en el navegador, así que se resuelven enteros y no por curso.
         'ambientes' => app(ListarAmbientesService::class)->ejecutar(),
@@ -89,7 +101,26 @@ Route::get('/materias/{curso}', function (Curso $curso) {
 Route::post('/cursos/{curso}/examenes', [ExamenController::class, 'store'])
     ->name('cursos.examenes.store');
 
+// Destino de "Ver detalle" de las notificaciones (HU 12 · T4). La pantalla de
+// detalle aún no existe: se deja la ruta lista con un placeholder navegable.
+Route::get('/incidencias/{id}', fn (int $id) => view('pages.incidencia-detalle', ['id' => $id]))
+    ->whereNumber('id')
+    ->name('incidencias.detalle');
+
 // TODO(@valerydariana98, 2026-09-25): proteger con el middleware de rol que
 // restringe el registro de incidencias a docentes y auxiliares (#69).
 Route::get('/buscador-incidencia', RegistrarIncidencia::class)->name('buscador-incidencia');
 Route::get('/registrar-incidencia', RegistrarIncidencia::class)->name('registrar-incidencia');
+
+// Solo APP_ENV=local: aún no existe pantalla de login y los endpoints de
+// incidencias exigen sesión (`auth:web`), así que esta ruta temporal inicia
+// sesión con el usuario 1 para poder probar el modal de detalle de incidencia.
+// Fuera de local la ruta ni siquiera se registra.
+// TODO(@OchoaCesar, 2026-10-11): eliminar esta ruta cuando exista el login real.
+if (app()->isLocal()) {
+    Route::get('/dev/login', function (): RedirectResponse {
+        Auth::login(Usuario::find(1) ?? Usuario::query()->firstOrFail());
+
+        return redirect()->route('notificaciones');
+    })->name('dev.login');
+}

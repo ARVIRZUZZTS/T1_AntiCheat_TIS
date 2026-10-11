@@ -7,14 +7,19 @@
  *
  * @created 2026-10-09
  *
- * @updated 2026-10-10
+ * @updated 2026-10-11
  *
  * @description
  * Servicio de dominio que devuelve el detalle de una incidencia de la
  * central de riesgos: estudiante, SIS, motivo, materia, quien la reportó,
- * fecha y hora, estado y descripción del hecho. El estudiante y el examen son
- * columnas propias de `central_riesgo` (`sis_estudiante`, `id_examen`), así que
- * se leen por las relaciones del modelo.
+ * fecha y hora, estado y descripción del hecho. Trabaja contra el esquema
+ * actual de `central_riesgo` (ver bd.md): el estudiante y el examen se
+ * resuelven por las columnas propias `sis_estudiante` e `id_examen` y sus
+ * relaciones directas; `central_riesgo` no tiene enlace a
+ * `registro_asistencia` (no existe `id_ingreso`).
+ *
+ * Los enums casteados por el modelo (`motivo`, `estado_incidencia`) se
+ * normalizan a su valor/etiqueta antes de armar el JSON.
  *
  * @changelog
  * - 2026-10-09  [Alisson D. Alvarado]  feat: consulta del detalle de una
@@ -25,6 +30,15 @@
  *   motivo sale del enum ya casteado y la materia de `CentralRiesgo::materia()`,
  *   la misma fuente que el formulario de registro. El estado se deriva del tipo
  *   de infracción cuando la base no tiene `estado_incidencia`.
+ * - 2026-10-11  [OchoaCesar]  fix: se quita el eager load `registroAsistencia`,
+ *   cuya relación ya no existe en el modelo (el esquema actual no tiene
+ *   `id_ingreso` en `central_riesgo`), lo que producía un 500 en
+ *   GET /api/incidencias/{id}; el estudiante se toma de la relación directa
+ *   `estudiante()`. Además `etiquetaMotivo()` y `estado` aceptan los enums ya
+ *   casteados por el modelo (antes `Motivo::tryFrom()` recibía un enum y
+ *   lanzaba TypeError). La fecha se formatea como `Y-m-d H:i:s`: con el Carbon
+ *   crudo JSON emitía ISO-8601 en UTC (corrigiendo la fecha un día) y el
+ *   contrato del endpoint cambiaba respecto a lo que cubre DetalleIncidenciaTest.
  *
  * @see  App\Policies\CentralRiesgoPolicy
  * @see  App\Models\CentralRiesgo
@@ -34,6 +48,7 @@
 namespace App\Services\CentralRiesgo;
 
 use App\Enums\EstadoIncidencia;
+use App\Enums\Motivo;
 use App\Enums\TipoInfraccion;
 use App\Models\CentralRiesgo;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -62,46 +77,72 @@ class ConsultarDetalleIncidenciaService
             'estudiante_nombre' => $estudiante !== null
                 ? trim($estudiante->nombre_estudiante.' '.$estudiante->apellido_estudiante)
                 : null,
-            'sis_estudiante' => $incidencia->sis_estudiante,
-            'motivo' => $incidencia->motivo->etiqueta(),
+            'sis_estudiante' => $incidencia->getAttribute('sis_estudiante')
+                ?? $estudiante?->sis_estudiante,
+            'motivo' => $this->etiquetaMotivo($incidencia),
             'materia' => $incidencia->materia(),
             'reportado_por' => $registrador !== null
                 ? trim($registrador->nombre_usuario.' '.$registrador->apellido)
                 : null,
             'reportado_por_rol' => $registrador?->roles->first()?->nombre_rol,
-            'fecha_registro' => $incidencia->fecha_registro->toDateTimeString(),
-            'estado' => $this->estado($incidencia)->value,
+            // Formato local plano: el contrato del endpoint es 'Y-m-d H:i:s'
+            // (lo que espera el front y DetalleIncidenciaTest); el Carbon crudo
+            // se serializa en ISO-8601 con zona UTC y corre la fecha un día.
+            'fecha_registro' => $incidencia->fecha_registro?->format('Y-m-d H:i:s'),
+            'estado' => $this->estado($incidencia),
             'descripcion' => $incidencia->detalle_motivo,
         ];
+    }
+
+    private function etiquetaMotivo(CentralRiesgo $incidencia): ?string
+    {
+        $motivo = $incidencia->motivo;
+
+        if ($motivo instanceof Motivo) {
+            return $motivo->etiqueta();
+        }
+
+        if ($motivo === null) {
+            return null;
+        }
+
+        return Motivo::tryFrom((string) $motivo)?->etiqueta() ?? (string) $motivo;
     }
 
     /**
      * Estado de revisión de la incidencia.
      *
-     * Sale de `estado_incidencia` cuando la base tiene la columna. Si no la
-     * tiene, se deriva del tipo de infracción con la misma regla que usa la
-     * migración que la agrega: `tramposo` es un caso confirmado y `sospechoso`
-     * uno pendiente de revisión.
+     * Sale de `estado_incidencia` cuando la base o el modelo lo tiene. Si no,
+     * se deriva del tipo de infracción con la misma regla que usa la
+     * migración: `tramposo` es un caso confirmado y `sospechoso` uno pendiente.
      *
      * @param  CentralRiesgo  $incidencia  Incidencia consultada.
-     * @return EstadoIncidencia Estado confirmado o pendiente.
+     * @return string|null Valor del estado ('Confirmado', 'Pendiente', etc.) o null.
      */
-    private function estado(CentralRiesgo $incidencia): EstadoIncidencia
+    private function estado(CentralRiesgo $incidencia): ?string
     {
         $guardado = $incidencia->getAttribute('estado_incidencia');
 
         if ($guardado instanceof EstadoIncidencia) {
-            return $guardado;
+            return $guardado->value;
         }
 
-        $estado = is_string($guardado) ? EstadoIncidencia::tryFrom($guardado) : null;
-
-        if ($estado !== null) {
-            return $estado;
+        if (is_string($guardado)) {
+            return EstadoIncidencia::tryFrom($guardado)?->value ?? $guardado;
         }
 
-        return $incidencia->tipo_infraccion === TipoInfraccion::Tramposo
-            ? EstadoIncidencia::Confirmado
-            : EstadoIncidencia::Pendiente;
+        if ($incidencia->tipo_infraccion instanceof TipoInfraccion) {
+            return $incidencia->tipo_infraccion === TipoInfraccion::Tramposo
+                ? EstadoIncidencia::Confirmado->value
+                : EstadoIncidencia::Pendiente->value;
+        }
+
+        if (is_string($incidencia->tipo_infraccion)) {
+            return $incidencia->tipo_infraccion === TipoInfraccion::Tramposo->value
+                ? EstadoIncidencia::Confirmado->value
+                : EstadoIncidencia::Pendiente->value;
+        }
+
+        return null;
     }
 }
