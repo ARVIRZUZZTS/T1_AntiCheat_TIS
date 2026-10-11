@@ -2,7 +2,7 @@
     @file    notificaciones.blade.php
     @author  Alisson D. Alvarado <alvaradoalissondalet@gmail.com>
     @created 2026-10-09
-    @updated 2026-10-09
+    @updated 2026-10-10
 
     @description
     Pantalla de notificaciones del docente. Muestra las notificaciones de
@@ -16,12 +16,17 @@
     visual porque los datos son mockeados; cuando exista el endpoint real, ese
     mismo handler persistirá el borrado.
 
+    "Ver detalle" navega al detalle del registro (T4) sin confirmar ni rechazar
+    nada: el registro sigue "En revisión".
+
     Los datos son mockeados a propósito: representan la respuesta de un endpoint
     de notificaciones que se conectará más adelante. El rol del usuario tampoco
     viene del auth todavía: se simula con `$esAuxiliar`.
 
     @changelog
     - 2026-10-09  [Alisson D. Alvarado]  feat: creación inicial de la pantalla.
+    - 2026-10-10  feat: "Ver detalle" apunta a la ruta del detalle del registro
+      (HU 12 · T4).
 
     @see  \resources\views\components\ui\notificacion-card.blade.php
 --}}
@@ -40,7 +45,9 @@
         $ahora = \Carbon\CarbonImmutable::now();
         $esAuxiliar = false;
         $formatearTiempo = static function (\Carbon\CarbonImmutable $fecha, \Carbon\CarbonImmutable $ahora): string {
-            $minutos = (int) $ahora->greaterThan($fecha) ? $ahora->diffInMinutes($fecha) : 0;
+            // Carbon 3 devuelve el diff con signo: de la fecha PASADA hacia el
+            // "ahora" para obtener minutos positivos, y se acota a >= 0.
+            $minutos = max(0, (int) $fecha->diffInMinutes($ahora));
 
             if ($minutos < 1) {
                 return 'Hace menos de un minuto';
@@ -114,6 +121,7 @@
                 :examen="$notificacion['examen']"
                 :materia="$notificacion['materia']"
                 :hace="$notificacion['hace']"
+                :detalleHref="route('incidencias.detalle', $notificacion['id'])"
             />
         @endforeach
     </div>

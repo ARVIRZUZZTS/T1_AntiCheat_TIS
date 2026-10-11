@@ -150,6 +150,10 @@ subir un paquete roto.
 .\tools\build-deploy.ps1 -IncludeEnv
 ```
 
+Con `-IncludeEnv` el `.env` que se empaqueta es `deploy\.env.server` (el de
+produccion) y, si no existe, se cae al `.env` local de la raiz. El `.env`
+local **nunca** deberia llegar al servidor: apunta a la base de desarrollo.
+
 Salida:
 
 ```
@@ -173,16 +177,19 @@ Los ZIP quedan en `deploy/`, que esta en `.gitignore`.
 
 ## 4. El `.env` del servidor
 
-El `.env` **no** va en los ZIP: lleva la contrasena de la base y no tiene
-sentido re-subirlo en cada despliegue. Se sube **una sola vez** y despues se
-edita en el servidor con el boton Edit de net2ftp.
+El `.env` **no** va en los ZIP de los despliegues diarios: lleva la contrasena
+de la base y no tiene sentido re-subirlo en cada cambio. Se sube **una sola
+vez** (`.\tools\build-deploy.ps1 -IncludeEnv`) y despues se edita en el
+servidor con el boton Edit de net2ftp.
 
-Contenido para el servidor:
+El archivo de verdad es **`deploy/.env.server`**. Ese es el que hay que tocar
+si cambian credenciales, y es el que empaqueta `-IncludeEnv`. El contenido
+actual:
 
 ```dotenv
 APP_NAME=TechOne
 APP_ENV=production
-APP_KEY=base64:PEGAR_AQUI_EL_APP_KEY_DE_TU_.ENV_LOCAL=
+APP_KEY=base64:lSmD/nZEFmym/lQPcc6No782E/XZ1xd7mCABAIJlG+8=
 APP_DEBUG=false
 APP_TIMEZONE=UTC
 APP_URL=https://techone.tis.cs.umss.edu.bo
@@ -202,7 +209,7 @@ DB_HOST=127.0.0.1
 DB_PORT=5432
 DB_DATABASE=techone_db
 DB_USERNAME=techone
-DB_PASSWORD=...
+DB_PASSWORD=px8vPiRUKuwBXXn
 
 SESSION_DRIVER=file
 SESSION_LIFETIME=120
@@ -220,6 +227,8 @@ CACHE_PREFIX=
 MAIL_MAILER=log
 VITE_APP_NAME="${APP_NAME}"
 ```
+
+Credenciales FTP y de phpPgAdmin: `deploy/credentials.md`.
 
 Tres lineas importan mas que el resto:
 
@@ -286,14 +295,19 @@ muchos datos en sesion, van a necesitar `storage/` escribible igual.
 
 1. Subir `vendor/` descomprimido en la raiz. Son 9.143 archivos; la forma
    comoda es comprimirlo localmente y subir el `.zip`.
-2. Correr `php artisan migrate`... **no aplica**, ver seccion 4. Saltar.
+2. **Cargar la base.** phpPgAdmin -> pestana SQL, con **"Paginar resultados"
+   desmarcado**, y correr `database/sql/000_deploy_completo.sql`. Ese unico
+   archivo trae esquema (11 ENUM + 33 tablas), datos y sequences sincronizados:
+   no hace falta correr `001`, `002` y `003` por separado. Si la base ya
+   tiene tablas, no lo corras (ver seccion 8).
 3. Subir y descomprimir `1_raiz.zip` en la raiz.
 4. Subir y descomprimir `2_public_html.zip` en la raiz.
-5. Crear el `.env` en la raiz con el boton **New / Edit** de net2ftp, usando la
-   plantilla de la seccion 4.
+5. Subir el `.env`: `.\tools\build-deploy.ps1 -IncludeEnv` lo incluye en
+   `1_raiz.zip`, o crearlo en la raiz con el boton **New / Edit** de net2ftp a
+   partir de `deploy/.env.server` (seccion 4).
 6. **Borrar `public_html/index.html` y `public_html/info.php`.** Son los
    archivos de la plantilla de bienvenida de WebTIS. Apache sirve `index.html`
-   antes que `index.php`, asi que mientras esten ahÃ­ se sigue viendo el cartel
+   antes que `index.php`, asi que mientras esten ahi se sigue viendo el cartel
    de bienvenida de la facultad y no la aplicacion. `info.php` ademas expone
    `phpinfo()` publicamente: abrilo una vez para verificar la version de PHP
    (hace falta **8.2 o superior** por Livewire 4) y borralo.
@@ -330,14 +344,48 @@ Se administra **enteramente por phpPgAdmin**, no hay linea de comandos.
 
 | Que | Donde |
 |---|---|
-| Esquema (11 ENUM + 25 tablas) | `database/sql/001_schema.sql` |
+| **Todo de una vez: esquema + datos + sequences** | `database/sql/000_deploy_completo.sql` |
+| Esquema solo (11 ENUM + 25 tablas) | `database/sql/001_schema.sql` |
 | Tablas de Laravel (`users`, `sessions`, `cache`, `jobs`) | `database/sql/003_tablas_laravel.sql` |
-| Datos de prueba | `database/sql/002_seed_data.sql` |
+| Datos de prueba basicos | `database/sql/002_seed_data.sql` |
+| Parche idempotente sobre una base ya cargada | `database/sql/004_actualizar_usuario.sql` |
 | Verificacion | `database/sql/verificar.sql` |
 
-> `001_schema.sql` y `003_tablas_laravel.sql` son el mismo SQL que corre
-> `php artisan migrate` en tu maquina. No hay dos fuentes de verdad: el
-> `003` es la salida de `php artisan migrate --pretend`.
+> **Para levantar una base nueva, usa `000_deploy_completo.sql`.** Es un
+> `pg_dump` de la base de desarrollo local, asi que trae el mismo esquema y
+> **todos** los datos reales (54 estudiantes, 5 examenes, 31 asistencias...),
+> no solo el seed de 5 filas. Los `001`/`002`/`003` quedan como referencia y
+> para entender que hace cada bloque.
+>
+> El `000` sale de `pg_dump --inserts`: el flag es obligatorio porque sin el
+> pg_dump escribe `COPY FROM stdin`, que phpPgAdmin no sabe ejecutar. Para
+> regenerarlo despues de cambiar la base local:
+>
+> ```powershell
+> $env:PGPASSWORD = '<clave local>'
+> & 'C:\Program Files\PostgreSQL\15\bin\pg_dump.exe' -h 127.0.0.1 -U techone -d techone_db `
+>     --no-owner --no-privileges --encoding=UTF8 --inserts `
+>     --file='database\sql\000_deploy_completo.sql'
+> ```
+>
+> Y hay que quitarle a mano las lineas `\restrict` / `\unrestrict` que pg_dump
+> 15.19 agrega al principio y al final: son meta-comandos de psql y phpPgAdmin
+> los toma como SQL y falla.
+
+### Alternativa: el seeder de Laravel
+
+Si la base ya tiene el esquema pero queres cargar solo los datos, esta
+`database/seeders/DeploySeeder.php`: es el snapshot de la base local generado
+por `php tools/generate-deploy-seeder.php`. En local:
+
+```bash
+php artisan db:seed --class=DeploySeeder
+```
+
+Es **destructivo** (hace `TRUNCATE ... CASCADE` antes de insertar) y solo
+sirve donde hay terminal. En el servidor no la vas a poder correr: ahi va el
+`000_deploy_completo.sql`.
+
 
 ### Regla de oro de phpPgAdmin: desmarcar "Paginar resultados"
 
@@ -364,10 +412,10 @@ Correr `database/sql/verificar.sql`. Debe dar:
 | 1 | `base_datos = techone_db`, `usuario_conectado = techone` |
 | 2 | 25 filas, todas `existe = true` |
 | 3 | 11 filas, los ENUM con sus etiquetas |
-| 4 | 25 tablas con 5 filas cada una, salvo `rol` (2) y `tipo_gestion` (4), que son tablas de catalogo |
+| 4 | 25 filas. Con el `000_deploy_completo.sql`: `estudiante` 54, `estudiante_examen` 53, `registro_asistencia` 31, `central_riesgo` 4, `notificacion_docente` 4, `tipo_gestion` 4, `rol` 2, y el resto 5. Con el `002_seed_data.sql` viejo todas dan 5 |
 | 5 | 5 filas, todas `huerfanos = 0` |
-| 6 | 5 filas de datos cruzados |
-| 7 | o error de "no existe la tabla migrations" (normal: en el servidor no se corrio `migrate`) |
+| 6 | 4 filas de datos cruzados |
+| 7 | 4 filas (`0001_01_01_000000_create_users_table`, `..._create_cache_table`, `..._create_jobs_table`, `2026_09_27_000001_migracion_servidor_oficial`). Si la tabla no existe es que cargaste solo el `001`/`002` |
 
 La base completa son **34 tablas**: las 25 del proyecto, las 8 de Laravel y la
 tabla `migrations`. Para comprobar solo las 8 de Laravel:
@@ -470,8 +518,11 @@ ruteada. Rompe en local y en el servidor por igual.
 |---|---|
 | Subir un cambio | `.\tools\build-deploy.ps1` -> subir los 2 ZIP -> descomprimir en la raiz |
 | Ver un error 500 | `APP_DEBUG=true` en el servidor, recargar, leer el mensaje, volver a `false` |
-| Cambiar una credencial | Edit `.env` en net2ftp |
+| Cambiar una credencial | Edit `deploy/.env.server` y despues Edit `.env` en net2ftp |
 | Recompilar los assets | `npm run build` -> `.\tools\build-deploy.ps1` -> subir `2_public_html.zip` |
 | Actualizar dependencias PHP | `composer update` -> subir `vendor/` y `1_raiz.zip` |
 | Correr SQL | phpPgAdmin -> pestana SQL -> **desmarcar "Paginar resultados"** |
 | Comprobar la base | `database/sql/verificar.sql` en phpPgAdmin |
+| Levantar una base nueva | phpPgAdmin -> `database/sql/000_deploy_completo.sql` |
+| Actualizar el dump de la base | `pg_dump --inserts` (ver seccion 8) y quitar `\restrict`/`\unrestrict` |
+| Actualizar el seeder | `php tools/generate-deploy-seeder.php` |

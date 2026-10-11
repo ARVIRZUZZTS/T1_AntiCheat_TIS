@@ -26,8 +26,8 @@ SELECT
 
 
 -- ============================================================================
---  BLOQUE 2 - Las 24 tablas del esquema
---  Debe devolver 24 filas, todas con exists = true
+--  BLOQUE 2 - Las 25 tablas del dominio
+--  Debe devolver 25 filas, todas con existe = true
 -- ============================================================================
 
 WITH esperadas(nombre) AS (
@@ -74,7 +74,8 @@ ORDER BY t.typname;
 
 -- ============================================================================
 --  BLOQUE 4 - Conteo EXACTO de filas por tabla
---  Esto es lo que te dice si 002_seed_data.sql se cargo bien.
+--  Esto es lo que te dice si 000_deploy_completo.sql (o 002_seed_data.sql)
+--  se cargo bien. Ver los valores esperados en DEPLOY.md, seccion 8.
 -- ============================================================================
 
 SELECT 'usuario' AS tabla, COUNT(*) AS filas FROM usuario
@@ -164,9 +165,9 @@ ORDER BY cr.id_registro;
 
 
 -- ============================================================================
---  BLOQUE 7 - ¿Carga la tabla de migraciones de Laravel?
--- Si trae filas, ya corriste php artisan migrate en el servidor.
---  Si la tabla NO existe, es normal: aun no corriste las migraciones.
+--  BLOQUE 7 - Carga la tabla de migraciones de Laravel
+--  Con 000_deploy_completo.sql trae 4 filas. Si la tabla NO existe es que
+--  cargaste solo 001/002/003: en el servidor no se corre php artisan migrate.
 -- ============================================================================
 
 SELECT

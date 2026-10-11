@@ -35,12 +35,16 @@
  *   riesgos pasa a ser una vista simple, ya que la pantalla es solo interfaz
  *   (datos mockeados) y llamaba a ListarAlertasService, que fallaba al leer
  *   `estado_incidencia`, columna aún no disponible en la base.
+ * - 2026-10-10  [David E. Chavez T.]  refactor: el monitor en vivo se enruta
+ *   directo a su componente Livewire (`MonitorEnVivo`) en vez de pasar por
+ *   `MonitoreoController`; la pantalla ahora persiste el flujo de ingreso desde
+ *   los modales y el controlador se elimina.
  */
 
 use App\Http\Controllers\ExamenController;
-use App\Http\Controllers\MonitoreoController;
 use App\Livewire\Examenes\EstudiantesCurso;
 use App\Livewire\Monitoreo\BuscadorRegistro;
+use App\Livewire\Monitoreo\MonitorEnVivo;
 use App\Livewire\Monitoreo\RegistrarIncidencia;
 use App\Models\Curso;
 use App\Services\Ambiente\ListarAmbientesService;
@@ -56,7 +60,7 @@ Route::get('/materias', fn () => view('pages.materias', [
     'cursos' => Curso::query()->orderBy('id_curso')->get(),
 ]))->name('materias');
 Route::view('/examenes', 'pages.examenes')->name('examenes');
-Route::get('/monitoreo', MonitoreoController::class)->name('monitoreo');
+Route::get('/monitoreo', MonitorEnVivo::class)->name('monitoreo');
 Route::get('/monitoreo/registro-ingreso', BuscadorRegistro::class)->name('monitoreo.registro-ingreso');
 // Por ahora la central de riesgos es solo interfaz con datos mockeados: la
 // ruta renderiza la vista sin consultar la base, hasta que exista el endpoint.
@@ -87,6 +91,12 @@ Route::get('/materias/{curso}', function (Curso $curso) {
 // StoreExamenRequest y el alta en RegistrarExamenService; la ruta solo enruta.
 Route::post('/cursos/{curso}/examenes', [ExamenController::class, 'store'])
     ->name('cursos.examenes.store');
+
+// Destino de "Ver detalle" de las notificaciones (HU 12 · T4). La pantalla de
+// detalle aún no existe: se deja la ruta lista con un placeholder navegable.
+Route::get('/incidencias/{id}', fn (int $id) => view('pages.incidencia-detalle', ['id' => $id]))
+    ->whereNumber('id')
+    ->name('incidencias.detalle');
 
 // TODO(@valerydariana98, 2026-09-25): proteger con el middleware de rol que
 // restringe el registro de incidencias a docentes y auxiliares (#69).
