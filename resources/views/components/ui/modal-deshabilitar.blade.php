@@ -105,10 +105,10 @@
                 <div class="flex items-center space-x-3 border-t border-default pt-4">
                     @if ($esLivewire)
                         <x-ui.button variant="danger" wire:click="{{ $wireConfirm }}">Deshabilitar</x-ui.button>
-                        <x-ui.button variant="default" wire:click="{{ $wireClose }}">Cancelar</x-ui.button>
+                        <x-ui.button-cancelar wire:click="{{ $wireClose }}">Cancelar</x-ui.button-cancelar>
                     @else
                         <x-ui.button variant="danger" @click="confirmarDeshabilitar()">Deshabilitar</x-ui.button>
-                        <x-ui.button variant="default" @click="cerrarModalDeshabilitar()">Cancelar</x-ui.button>
+                        <x-ui.button-cancelar @click="cerrarModalDeshabilitar()">Cancelar</x-ui.button-cancelar>
                     @endif
                 </div>
             </div>

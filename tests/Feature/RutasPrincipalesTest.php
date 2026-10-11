@@ -21,10 +21,13 @@
  *
  * @changelog
  * - 2026-09-28  [T1]  test: creación inicial (fix de la ruta materias.detalle).
+ * - 2026-09-28  [T1]  test: la ruta recibe el id_curso numérico (la lista ya
+ *   no usa códigos mock tipo MAT-101) y se prueba contra un curso real.
  */
 
 namespace Tests\Feature;
 
+use App\Models\Curso;
 use Tests\TestCase;
 
 class RutasPrincipalesTest extends TestCase
@@ -37,16 +40,21 @@ class RutasPrincipalesTest extends TestCase
     /**
      * Regresión puntual: route('materias.detalle', ...) debe existir y
      * resolver, porque pages/materias.blade.php genera un link con ella
-     * para cada materia listada.
+     * para cada materia listada. Como la lista ya no usa códigos mock
+     * (MAT-101) sino el id_curso real, se prueba con un curso de la base.
      */
     public function test_el_detalle_de_una_materia_carga_sin_error(): void
     {
-        $this->get(route('materias.detalle', 'MAT-101'))->assertOk();
+        $curso = Curso::query()->firstOrFail();
+
+        $this->get(route('materias.detalle', $curso->id_curso))->assertOk();
     }
 
     public function test_el_link_de_la_lista_apunta_al_detalle_correcto(): void
     {
+        $curso = Curso::query()->firstOrFail();
+
         $this->get(route('materias'))
-            ->assertSee(route('materias.detalle', 'MAT-101'), false);
+            ->assertSee(route('materias.detalle', $curso->id_curso), false);
     }
 }

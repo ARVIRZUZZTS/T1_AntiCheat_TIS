@@ -28,7 +28,7 @@ class NotificacionesTest extends TestCase
             ->assertSee('Notificaciones')
             ->assertSee('Posible Tramposo')
             ->assertSee('Ver detalle')
-            ->assertSee('Ivan Soto Peredo');
+            ->assertSee('Juan Pablo Quispe Mamani');
     }
 
     public function test_el_detalle_del_registro_resuelve(): void

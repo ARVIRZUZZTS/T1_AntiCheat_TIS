@@ -7,23 +7,25 @@
  *
  * @created 2026-09-26
  *
- * @updated 2026-09-26
+ * @updated 2026-10-10
  *
  * @description
  * Pruebas de integración del cambio de estado de un estudiante (issue #27),
  * contra el componente Livewire EstudiantesCurso (los modales de #25/#26
- * llaman a estos mismos métodos). El esquema no tiene migraciones Eloquent
- * (se crea vía docker/postgres/init/001_create_schema.sql), por eso se usa
- * DatabaseTransactions: cada test crea sus propios datos con IDs dedicados
- * (rango 900100+) y se revierten al terminar. Requiere el contenedor de
- * Docker levantado, con las columnas modificado_por/fecha_modificacion ya
- * agregadas a estudiante_examen (ver #27).
+ * llaman a estos mismos métodos). El esquema viene de una migración con SQL
+ * crudo (database/migrations/2026_09_27_000001_migracion_servidor_oficial.php),
+ * por eso se usa DatabaseTransactions: cada test crea sus propios datos con
+ * IDs dedicados (rango 900100+) y se revierten al terminar. Esa migración ya
+ * incluye las columnas modificado_por/fecha_modificacion de estudiante_examen
+ * (ver #27).
  *
  * @see  App\Livewire\Examenes\EstudiantesCurso
  * @see  App\Services\Examen\CambiarEstadoEstudianteService
  *
  * @changelog
  * - 2026-09-26  [T1]  test: creación inicial.
+ * - 2026-10-10  [Valery D. Ortuno P]  test: el dato de tipo_examen usa un valor
+ *   real del catálogo (examen parcial); 'PP' ya no existe en el enum.
  */
 
 namespace Tests\Feature\Examenes;
@@ -62,13 +64,13 @@ class CambiarEstadoEstudianteTest extends TestCase
 
         DB::table('tipo_examen')->insert([
             'id_tipo_examen' => self::ID_TIPO_EXAMEN,
-            'nombre_tipo_examen' => 'PP',
+            'nombre_tipo_examen' => 'examen parcial',
         ]);
 
         DB::table('usuario')->insert([
             'id_usuario' => self::ID_DOCENTE,
             'cod_sis' => 'TESTDOC2',
-            'contraseña' => 'x',
+            'password' => 'x',
             'nombre_usuario' => 'Docente',
             'apellido' => 'De Prueba',
         ]);
@@ -85,7 +87,6 @@ class CambiarEstadoEstudianteTest extends TestCase
             'id_examen' => self::ID_EXAMEN,
             'fecha' => now()->toDateString(),
             'hora_inicio' => '08:00',
-            'hora_fin' => '10:00',
             'duracion' => 120,
             'creador' => self::ID_DOCENTE,
             'tipo_examen' => self::ID_TIPO_EXAMEN,

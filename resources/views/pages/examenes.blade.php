@@ -1,3 +1,16 @@
+{{--
+    @file    examenes.blade.php
+    @author  David E. Chavez T. <virzuzz12345@gmail.com>
+    @created 2026-09-29
+    @updated 2026-09-29
+
+    @description
+    Vista de gestión de exámenes. Muestra la lista de exámenes programados.
+
+    @changelog
+    - 2026-09-29  [David E. Chavez T.]  feat: vista de exámenes.
+--}}
+
 @extends('layouts.app')
 
 @section('title', 'Exámenes')
@@ -7,9 +20,8 @@
         CRUD de exámenes masivos. Datos mockeados: vendrán del endpoint
         <code class="text-fg-brand">/examenes</code>.
     </p>
-    <x-ui.button variant="default" href="#" class="mt-4">Nuevo examen</x-ui.button>
 
-    <div class="mt-6">
+    <div class="mt-6 px-[2vh]">
         <x-ui.table
             :headers="['Examen', 'Materia', 'Fecha', 'Duración', 'Estado']"
             :rows="[

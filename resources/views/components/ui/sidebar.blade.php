@@ -2,7 +2,7 @@
     @file    sidebar.blade.php
 @author  Valery D. Ortuno P. <valerydariana98@gmail.com>
     @created 2026-09-24
-    @updated 2026-09-26
+    @updated 2026-10-09
 
     @description
     Sidebar de navegación del panel. $items es un arreglo de ítems:
@@ -19,9 +19,15 @@
 
     @changelog
     - 2026-09-24  [Valery D. Ortuno P]  feat: creación inicial del sidebar.
+    - 2026-09-25  [OchoaCesar]  feat: el item activo también se resalta en
+      rutas hijas (routeName.*) para vistas de detalle.
     - 2026-09-26  [Valery D. Ortuno P]  fix: ancho del cajón y posición del
       botón hamburguesa en móvil; se corrigen también los acentos del
       comentario de cabecera, que quedaron como "A3" al escribir el archivo.
+    - 2026-09-28  [T1]  chore: resolver el conflicto de merge del changelog al
+      integrar dev en feature/28 (#28).
+    - 2026-10-09  [Alisson D. Alvarado]  feat: botón de notificaciones en la
+      parte inferior del sidebar, con icono de campana y estado activo propio.
 --}}
 
 @props([
@@ -37,7 +43,6 @@
 
     $defaultItems = [
         ['label' => 'Inicio', 'route' => 'inicio'],
-        ['label' => 'Notificaciones', 'route' => 'notificaciones'],
         ['label' => 'Materias', 'route' => 'materias'],
         ['label' => 'Exámenes', 'route' => 'examenes'],
         ['label' => 'Monitor en vivo', 'route' => 'monitoreo'],
@@ -47,6 +52,10 @@
     ];
 
     $nav = $items ?: $defaultItems;
+
+    // El acceso a notificaciones vive fuera de $nav (es un botón fijo del
+    // sidebar, no un ítem más del menú), por eso se resalta aparte.
+    $notificacionesActivas = $current !== '' && request()->routeIs('notificaciones', 'notificaciones.*');
 @endphp
 
 @if ($showTrigger)
@@ -62,7 +71,7 @@
     </div>
 @endif
 
-<aside id="{{ $id }}" class="fixed top-0 left-0 z-40 h-full w-72 lg:w-[15%] bg-surface-sidebar text-neutral-primary transition-transform -translate-x-full lg:translate-x-0" aria-label="Sidebar">
+<aside id="{{ $id }}" class="shrink-0 sticky top-0 h-screen w-72 lg:w-[15%] bg-surface-sidebar text-neutral-primary transition-transform -translate-x-full lg:translate-x-0" aria-label="Sidebar">
     <button type="button" data-drawer-hide="{{ $id }}" aria-controls="{{ $id }}"
             class="lg:hidden absolute top-2.5 end-2.5 flex items-center justify-center text-neutral-primary hover:bg-brand-strong rounded-base w-9 h-9">
         <span class="sr-only">Close sidebar</span>
@@ -112,5 +121,16 @@
                 </li>
             @endforeach
         </ul>
+
+        <div class="mt-auto pt-4">
+            <a href="{{ route('notificaciones') }}" @class([
+                'flex items-center px-3 py-2 rounded-base group',
+                'bg-neutral-primary-soft text-fg-brand' => $notificacionesActivas,
+                'text-neutral-primary hover:bg-brand-active hover:text-neutral-primary' => ! $notificacionesActivas,
+            ])>
+                <svg class="shrink-0 w-5 h-5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5.365V3m0 2.365a5.338 5.338 0 0 1 5.133 3.666c.346 1.097.542 2.238.542 3.404 0 3.44-1.65 5.175-3.646 6.51-.585.39-.968.973-1.029 1.644-.112.841.273 1.414.542 1.95M12 5.365A5.338 5.338 0 0 0 6.867 9.03c-.346 1.097-.542 2.238-.542 3.404 0 3.44 1.65 5.175 3.646 6.51.585.39.968.973 1.029 1.644.112.841-.273 1.414-.542 1.95M5 21h14"/></svg>
+                <span class="ms-3 flex-1 whitespace-nowrap">Notificaciones</span>
+            </a>
+        </div>
     </div>
 </aside>

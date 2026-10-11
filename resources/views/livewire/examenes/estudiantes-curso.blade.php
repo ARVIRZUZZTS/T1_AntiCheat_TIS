@@ -15,6 +15,7 @@
     - 2026-09-25  [Diego Tejerina]  refactor: ajustes en la paginación y diseño responsivo.
     - 2026-09-26  [Alisson D. Alvarado]  feat: conexión del modal de deshabilitar estudiantes.
     - 2026-09-26  [Diego Tejerina]  feat: conexión del modal de habilitar estudiantes (#25).
+    - 2026-10-08  [OchoaCesar]  chore: comentar encabezado original (movido a layout personalizado) por compatibilidad.
     @see  App\Livewire\Examenes\EstudiantesCurso
     @see  resources/views/components/ui/modal-deshabilitar.blade.php
     @see  resources/views/components/ui/modal-habilitar.blade.php
@@ -160,6 +161,7 @@
 
 <div class="flex flex-col lg:h-full lg:overflow-hidden" x-data="@include('partials.busqueda-estudiante')">
     {{-- Encabezado --}}
+    {{--
     <div class="shrink-0 flex items-start sm:items-center justify-between gap-3 px-4 sm:px-6 pb-4 border-b border-default bg-neutral-primary-soft" style="padding-top: max(1rem, env(safe-area-inset-top));">
         <div class="flex items-center gap-3 min-w-0">
             <a href="{{ route('materias') }}" class="shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-full text-body hover:bg-neutral-secondary-medium hover:text-heading focus:outline-none" aria-label="Volver a materias">
@@ -178,6 +180,7 @@
             Cargar CSV
         </x-ui.button>
     </div>
+    --}}
 
     {{-- Cuerpo --}}
     <div class="flex-1 lg:min-h-0 flex flex-col gap-4 p-4 sm:p-6 lg:overflow-hidden">

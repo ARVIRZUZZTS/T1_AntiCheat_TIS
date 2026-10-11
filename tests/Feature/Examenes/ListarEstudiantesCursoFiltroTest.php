@@ -7,17 +7,16 @@
  *
  * @created 2026-09-25
  *
- * @updated 2026-09-26
+ * @updated 2026-10-10
  *
  * @description
  * Pruebas de integración del filtrado de estudiantes por estado (issue #29),
  * contra el endpoint /api/cursos/{id}/estudiantes/estado. El esquema de estas
- * tablas no tiene migraciones Eloquent (se crea vía
- * docker/postgres/init/001_create_schema.sql), por eso se usa
- * DatabaseTransactions en vez de RefreshDatabase: cada test crea sus propios
- * datos con IDs dedicados (rango 900000+) y se revierten al terminar, sin
- * tocar los datos reales de desarrollo. Requiere el contenedor de Docker
- * levantado (ver INSTALACION_DOCKER.md).
+ * tablas viene de una migración con SQL crudo
+ * (database/migrations/2026_09_27_000001_migracion_servidor_oficial.php),
+ * por eso se usa DatabaseTransactions en vez de RefreshDatabase: cada test
+ * crea sus propios datos con IDs dedicados (rango 900000+) y se revierten al
+ * terminar, sin tocar los datos reales de desarrollo.
  *
  * @see  App\Services\Examen\ListarEstudiantesCursoConEstadoService
  * @see  App\Services\Examen\BusquedaEstudianteService
@@ -27,10 +26,13 @@
  * - 2026-09-25  [T1]  test: creación inicial.
  * - 2026-09-26  [Alisson D. Alvarado]  test: cobertura del criterio de búsqueda
  *   por modo (cifra, letra).
+ * - 2026-10-10  [Valery D. Ortuno P]  test: el dato de tipo_examen usa un valor
+ *   real del catálogo (examen parcial); 'PP' ya no existe en el enum.
  */
 
 namespace Tests\Feature\Examenes;
 
+use App\Enums\EstadoIncidencia;
 use App\Models\CentralRiesgo;
 use App\Models\Curso;
 use App\Models\Estudiante;
@@ -58,13 +60,13 @@ class ListarEstudiantesCursoFiltroTest extends TestCase
 
         DB::table('tipo_examen')->insert([
             'id_tipo_examen' => self::ID_TIPO_EXAMEN,
-            'nombre_tipo_examen' => 'PP',
+            'nombre_tipo_examen' => 'examen parcial',
         ]);
 
         DB::table('usuario')->insert([
             'id_usuario' => self::ID_DOCENTE,
             'cod_sis' => 'TESTDOC1',
-            'contraseña' => 'x',
+            'password' => 'x',
             'nombre_usuario' => 'Docente',
             'apellido' => 'De Prueba',
         ]);
@@ -81,7 +83,6 @@ class ListarEstudiantesCursoFiltroTest extends TestCase
             'id_examen' => self::ID_EXAMEN,
             'fecha' => now()->toDateString(),
             'hora_inicio' => '08:00',
-            'hora_fin' => '10:00',
             'duracion' => 120,
             'creador' => self::ID_DOCENTE,
             'tipo_examen' => self::ID_TIPO_EXAMEN,
@@ -153,6 +154,7 @@ class ListarEstudiantesCursoFiltroTest extends TestCase
                 'detalle_motivo' => 'Motivo de prueba',
                 'fecha_registro' => now()->toDateString(),
                 'tipo_infraccion' => $infraccion,
+                'estado_incidencia' => EstadoIncidencia::Pendiente,
             ]);
         }
     }

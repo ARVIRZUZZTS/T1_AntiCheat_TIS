@@ -1,17 +1,28 @@
 -- ============================================================
 -- SCRIPT DE LLENADO DE DATOS
 -- ============================================================
+--
+-- ATENCION: este script NO es idempotente. Correrlo dos veces duplica
+-- filas y viola las claves UNIQUE. Para una base ya cargada usa
+-- 004_actualizar_usuario.sql, que si es idempotente.
+--
+-- Las claves de `usuario.password` van hasheadas con bcrypt porque
+-- `usuario` es la tabla de autenticacion (config/auth.php apunta a
+-- App\Models\Usuario). Claves de prueba:
+--   DOC001 / pass123    DOC002 / pass456    DOC003 / pass654
+--   AUX001 / pass789    AUX002 / pass321
+-- ============================================================
 
 -- =====================
 -- TABLAS INDEPENDIENTES
 -- =====================
 
-INSERT INTO usuario (id_usuario, cod_sis, contraseña, nombre_usuario, apellido) VALUES
-(1, 'DOC001', 'pass123', 'Roberto',  'Silva'),
-(2, 'DOC002', 'pass456', 'Patricia', 'Rojas'),
-(3, 'AUX001', 'pass789', 'Diego',    'Mendoza'),
-(4, 'AUX002', 'pass321', 'Sofia',    'Castro'),
-(5, 'DOC003', 'pass654', 'Fernando', 'Vargas');
+INSERT INTO usuario (id_usuario, cod_sis, password, nombre_usuario, apellido) VALUES
+(1, 'DOC001', '$2y$10$14Gk6GUesrKoUC/44WPCceJCx/5VC.TebBFoxa9wZ8w2D6Hxtwj/K', 'Roberto',  'Silva'),
+(2, 'DOC002', '$2y$10$RdoblUmstY.7zO94vmrrBeNVAEI60IiMurhk.zQ7HvcpjEKryG4/.', 'Patricia', 'Rojas'),
+(3, 'AUX001', '$2y$10$p84V6RdlYDAkAs6dKobGUu2pK2RHarvLytnCxxCwC.WerJQJmLfwa', 'Diego',    'Mendoza'),
+(4, 'AUX002', '$2y$10$oCKNmUI8S9rOkYZDe3r9LOyOU6Ouk4/YyRJvsJYdmYDnATSjK.76a', 'Sofia',    'Castro'),
+(5, 'DOC003', '$2y$10$vE0SJjVzqLk40oLrhN2Kd.G8BETIyz5kmecym86oaELv8wZk8Ak9S', 'Fernando', 'Vargas');
 
 INSERT INTO rol (id_rol, nombre_rol) VALUES
 (1, 'docente'),
@@ -35,8 +46,7 @@ INSERT INTO tipo_gestion (id_tipo_gestion, nombre_tipo_gestion) VALUES
 (1, 'Primer sem'),
 (2, 'inv'),
 (3, 'Seg sem'),
-(4, 'ver'),
-(5, 'Primer sem');
+(4, 'ver');
 
 INSERT INTO ambiente (id_ambiente, nombre_ambiente) VALUES
 (1, 'Aula 101'),
@@ -77,12 +87,12 @@ INSERT INTO curso (id_curso, nombre_curso, sis_doc, fecha_creacion, estado) VALU
 (4, 'Algebra Lineal',  1, '2024-02-15', 'Finalizo'),
 (5, 'Quimica General', 2, '2024-02-20', 'EnCurso');
 
-INSERT INTO examen (id_examen, fecha, hora_inicio, hora_fin, duracion, creador, tipo_examen) VALUES
-(1, '2024-06-10', '08:00', '10:00', 120, 1, 1),
-(2, '2024-06-11', '10:00', '12:00', 120, 2, 2),
-(3, '2024-06-12', '14:00', '16:00', 120, 5, 3),
-(4, '2024-06-13', '08:00', '09:30',  90, 1, 4),
-(5, '2024-06-14', '16:00', '18:00', 120, 2, 5);
+INSERT INTO examen (id_examen, fecha, hora_inicio, duracion, creador, tipo_examen) VALUES
+(1, '2024-06-10', '08:00', 120, 1, 1),
+(2, '2024-06-11', '10:00', 120, 2, 2),
+(3, '2024-06-12', '14:00', 120, 5, 3),
+(4, '2024-06-13', '08:00',  90, 1, 4),
+(5, '2024-06-14', '16:00', 120, 2, 5);
 
 INSERT INTO curso_tipo_gestion (id_curso, id_tg) VALUES
 (1, 1),
@@ -154,12 +164,12 @@ INSERT INTO registro_asistencia (id_ingreso, hora_ingreso, id_examen, id_estudia
 (4, '08:02', 4, '20210004', 4),
 (5, '16:01', 5, '20210005', 3);
 
-INSERT INTO central_riesgo (id_registro, id_ingreso, id_registrador, detalle_motivo, fecha_registro, tipo_infraccion) VALUES
-(1, 1, 3, 'Estudiante mirando hacia otro lado', '2024-06-10', 'sospechoso'),
-(2, 2, 4, 'Uso de celular durante el examen',   '2024-06-11', 'tramposo'),
-(3, 3, 3, 'Llegada tarde al examen',            '2024-06-12', 'pendiente'),
-(4, 4, 4, 'Estudiante en aula equivocada',      '2024-06-13', 'aula equivocada'),
-(5, 5, 3, 'Comportamiento sospechoso',          '2024-06-14', 'sospechoso');
+INSERT INTO central_riesgo (id_registro, id_ingreso, id_registrador, detalle_motivo, fecha_registro, tipo_infraccion, estado_incidencia) VALUES
+(1, 1, 3, 'Estudiante mirando hacia otro lado', '2024-06-10', 'sospechoso',  'Pendiente'),
+(2, 2, 4, 'Uso de celular durante el examen',   '2024-06-11', 'tramposo',   'Confirmado'),
+(3, 3, 3, 'Llegada tarde al examen',            '2024-06-12', 'pendiente',  'Pendiente'),
+(4, 4, 4, 'Estudiante en aula equivocada',      '2024-06-13', 'aula equivocada', 'Confirmado'),
+(5, 5, 3, 'Comportamiento sospechoso',          '2024-06-14', 'sospechoso', 'Pendiente');
 
 INSERT INTO notificacion_docente (id_notificacion, id_central_riesgo, id_curso, estado) VALUES
 (1, 1, 1, 'visto'),

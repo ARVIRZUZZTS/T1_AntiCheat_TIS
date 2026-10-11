@@ -11,18 +11,18 @@
  *
  * @description
  * Pruebas del render del buscador de la pestaña Estudiantes de
- * `pages/materia-estudiantes` (vista mock, sin base de datos). Se verifica que
- * el campo delegue el sanitizeo en Alpine, que el estado venga del parcial
- * compartido (que a su vez Toma sus parametros del Service), que cada fila de
- * la tabla lleve su expresion `x-show` y que exista el aviso de sin resultados.
- * Las reglas de filtrado en sí viven en el alcance Alpine, asi que aca se
- * cubre el contrato que la vista, el parcial y el componente deben seguir
- * manteniendo.
+ * `pages/materia-estudiantes`. La vista ya no trae filas mock: delega la tabla,
+ * el buscador y los filtros al componente Livewire `EstudiantesCurso`, que a su
+ * vez usa el parcial compartido y toma sus parametros del Service. Se verifica
+ * que ese contrato se siga manteniendo y que la pagina no vuelva a renderizar
+ * datos mock ni tags de componente sin compilar.
  *
  * @see  resources/views/pages/materia-estudiantes.blade.php
+ * @see  resources/views/livewire/examenes/estudiantes-curso.blade.php
  * @see  resources/views/partials/busqueda-estudiante.blade.php
  * @see  resources/views/components/ui/table.blade.php
  * @see  resources/views/components/ui/search-input.blade.php
+ * @see  App\Livewire\Examenes\EstudiantesCurso
  * @see  App\Services\Examen\BusquedaEstudianteService
  *
  * @changelog
@@ -30,11 +30,16 @@
  * - 2026-09-26  [Alisson D. Alvarado]  test: el estado del buscador pasa al
  *   parcial compartido; se cubre el aviso de sin resultados y que sus
  *   parámetros vengan de BusquedaEstudianteService.
+ * - 2026-09-28  [T1]  test: el buscador y la tabla pasan al componente
+ *   Livewire; las aserciones que cubrian el markup mock de la pagina (#28) se
+ *   repuntan al componente y la pagina se cubre sin datos mock.
  */
 
 namespace Tests\Feature\Examenes;
 
+use App\Models\Curso;
 use App\Services\Examen\BusquedaEstudianteService;
+use App\Services\Examen\ListarEstudiantesCursoConEstadoService;
 use Illuminate\Support\Js;
 use Illuminate\View\ComponentSlot;
 use Tests\TestCase;
@@ -42,11 +47,31 @@ use Tests\TestCase;
 class BuscadorEstudiantesMateriaTest extends TestCase
 {
     /**
-     * Renderiza la vista de la materia con el codigo dado por la URL.
+     * Renderiza la vista de la materia con los mismos datos que le pasa la
+     * ruta `materias.detalle`.
      */
-    private function renderPagina(string $codigo = 'MAT-101'): string
+    private function renderPagina(): string
     {
-        return view('pages.materia-estudiantes', ['codigo' => $codigo])->render();
+        $curso = Curso::query()->firstOrFail();
+
+        return view('pages.materia-estudiantes', [
+            'curso' => $curso,
+            'conteos' => app(ListarEstudiantesCursoConEstadoService::class)
+                ->conteosPorEstado($curso->id_curso),
+        ])->render();
+    }
+
+    /**
+     * Devuelve el fuente de la vista del componente, que es donde vive hoy el
+     * buscador.
+     */
+    private function fuenteComponente(): string
+    {
+        $vista = file_get_contents(resource_path('views/livewire/examenes/estudiantes-curso.blade.php'));
+
+        $this->assertIsString($vista);
+
+        return $vista;
     }
 
     /**
@@ -73,10 +98,10 @@ class BuscadorEstudiantesMateriaTest extends TestCase
 
     public function test_el_buscador_delega_el_sanitizeo_en_alpine(): void
     {
-        $html = $this->renderPagina();
+        $html = $this->fuenteComponente();
 
         $this->assertStringContainsString(
-            '@input="$event.target.value = sanitizarBusqueda($event.target.value); busqueda = $event.target.value"',
+            '@input="$event.target.value = sanitizarBusqueda($event.target.value)"',
             $html
         );
         $this->assertStringContainsString('x-bind:maxlength="maximoBusqueda()"', $html);
@@ -115,31 +140,36 @@ class BuscadorEstudiantesMateriaTest extends TestCase
         );
     }
 
-    public function test_cada_fila_de_la_tabla_lleva_su_expresion_de_visibilidad(): void
+    /**
+     * Las filas ya no las arma la vista con datos mock: la pagina solo monta el
+     * componente Livewire, que las pide al Service. Este test lo fija para que
+     * el mock no vuelva a colarse en la pagina.
+     */
+    public function test_la_pagina_delega_las_filas_al_componente_livewire(): void
     {
         $html = $this->renderPagina();
 
+        $this->assertStringContainsString('wire:snapshot=', $html);
+
         foreach (['Ana López', 'Bruno Díaz', 'Carla Ruiz', 'Diego Soto', 'Ernesto Vera', 'Fátima Quispe'] as $nombre) {
-            // Blade escapa las comillas del argumento al volcar el atributo.
-            $this->assertStringContainsString(
-                'x-show="coincideEstudiante(&quot;'.$nombre.'&quot;, &quot;',
+            $this->assertStringNotContainsString(
+                $nombre,
                 $html,
-                'La fila de '.$nombre.' debe filtrarse contra su nombre y su SIS.'
+                'La pagina no debe renderizar estudiantes mock ('.$nombre.').'
             );
         }
     }
 
     /**
-     * El aviso de sin resultados cuenta sobre la lista que la vista entrega al
-     * estado Alpine, asi que esa lista tiene que estar disponible.
+     * El aviso de sin resultados cuenta sobre lo que devuelve el componente,
+     * asi que tiene que seguir living en su vista.
      */
     public function test_la_vista_avisa_cuando_la_busqueda_no_tiene_coincidencias(): void
     {
-        $html = $this->renderPagina();
+        $html = $this->fuenteComponente();
 
-        $this->assertStringContainsString('estudiantesBusqueda: ', $html);
-        $this->assertStringContainsString('x-show="sinResultados()"', $html);
-        $this->assertStringContainsString('Sin resultados', $html);
+        $this->assertStringContainsString('title="Sin resultados"', $html);
+        $this->assertStringContainsString('No se encontraron resultados para la búsqueda', $html);
     }
 
     /**

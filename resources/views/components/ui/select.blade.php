@@ -2,7 +2,7 @@
     @file    select.blade.php
     @author  Valery D. Ortuno P. <valerydariana98@gmail.com>
     @created 2026-09-24
-    @updated 2026-09-25
+    @updated 2026-09-28
 
     @description
     Select desplegable con etiqueta. $options es un arreglo de
@@ -12,6 +12,9 @@
     @changelog
     - 2026-09-24  [Valery D. Ortuno P]  feat: creación inicial del componente.
     - 2026-09-25  [Valery D. Ortuno P]  feat: agregar estado de error.
+    - 2026-09-28  [Valery D. Ortuno P]  fix: la opción de placeholder lleva
+      value="" para que el selector arranque en ella y no en la primera opción.
+    - 2026-10-10  [Valery D. Ortuno P]  feat: marca de obligatorio (*) opcional.
 --}}
 
 @props([
@@ -22,6 +25,7 @@
     'selected' => null,
     'placeholder' => null,
     'error' => null,
+    'required' => false,
 ])
 
 @php
@@ -33,14 +37,14 @@
 
 <div>
     @if ($label)
-        <label for="{{ $inputId }}" class="block mb-2.5 text-sm font-medium text-heading">{{ $label }}</label>
+        <label for="{{ $inputId }}" class="block mb-2.5 text-sm font-medium text-heading">{{ $label }}@if ($required) <span class="text-fg-danger-strong" aria-hidden="true">*</span>@endif</label>
     @endif
 
     <select name="{{ $name }}" id="{{ $inputId }}"
             {{ $attributes->merge(['class' => 'block w-full px-3 py-2.5 border text-sm rounded-base shadow-xs placeholder:text-body ' . $stateClass]) }}
             @if ($error) aria-invalid="true" @endif>
         @if ($placeholder)
-            <option disabled @if (! $selected) selected @endif>{{ $placeholder }}</option>
+            <option value="" disabled @if (! $selected) selected @endif>{{ $placeholder }}</option>
         @endif
 
         @foreach ($options as $value => $label)

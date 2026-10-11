@@ -1,31 +1,34 @@
 {{--
     @file    notificaciones.blade.php
-    @created 2026-10-10
+    @author  Alisson D. Alvarado <alvaradoalissondalet@gmail.com>
+    @created 2026-10-09
+    @updated 2026-10-10
 
     @description
-    Pantalla de notificaciones del docente (HU 12 · T3 y T4). Es la pantalla de
-    Inicio: lista las notificaciones de "Posible Tramposo" de la más reciente a
-    la más antigua, cada una en un `x-ui.notificacion-card`.
+    Pantalla de notificaciones del docente. Muestra las notificaciones de
+    "Posible Tramposo" ordenadas de la más reciente a la más antigua, cada una
+    en su tarjeta (`x-ui.notificacion-card`). Si el usuario es auxiliar, esas
+    notificaciones no se muestran; si no queda ninguna, aparece el mensaje
+    "No tienes notificaciones".
 
-    Datos mockeados: en el backend aún no existe controlador/modelo de la tabla
-    `notificacion_docente`, así que se simula la respuesta de un endpoint
-    `/notificaciones` (auxiliar registrador, estudiante, examen y materia
-    salen de notificacion_docente -> central_riesgo -> usuario/estudiante/examen
-    -> curso). Cuando el endpoint real exista, solo cambia la fuente de
-    `$notificaciones`.
+    El botón de cerrar (X) de cada tarjeta la borra del DOM con JavaScript plano
+    (sin Alpine: el proyecto solo carga el bundle de Livewire). Es un descarte
+    visual porque los datos son mockeados; cuando exista el endpoint real, ese
+    mismo handler persistirá el borrado.
 
-    Reglas:
-    - Si el usuario es auxiliar, no ve las notificaciones de "Posible Tramposo"
-      ($esAuxiliar se simula; vendrá del rol autenticado).
-    - La X oculta la tarjeta de la lista y muestra "No tienes notificaciones"
-      cuando ya no queda ninguna. El registro sigue "En revisión": no se
-      confirma, rechaza ni muta nada.
-    - "Ver detalle" navega al detalle del registro, sin confirmar ni rechazar.
+    "Ver detalle" navega al detalle del registro (T4) sin confirmar ni rechazar
+    nada: el registro sigue "En revisión".
 
-    @see  \resources\views\components\ui\notificacion-card.blade.php
+    Los datos son mockeados a propósito: representan la respuesta de un endpoint
+    de notificaciones que se conectará más adelante. El rol del usuario tampoco
+    viene del auth todavía: se simula con `$esAuxiliar`.
 
     @changelog
-    - 2026-10-10  feat: creación inicial de la pantalla (T3 + T4).
+    - 2026-10-09  [Alisson D. Alvarado]  feat: creación inicial de la pantalla.
+    - 2026-10-10  feat: "Ver detalle" apunta a la ruta del detalle del registro
+      (HU 12 · T4).
+
+    @see  \resources\views\components\ui\notificacion-card.blade.php
 --}}
 
 @extends('layouts.app')
@@ -33,28 +36,55 @@
 @section('title', 'Notificaciones')
 
 @section('content')
+    <p class="text-body">
+        Notificaciones de posibles tramposos. Datos mockeados: vendrán del endpoint
+        <code class="text-fg-brand">/notificaciones</code>.
+    </p>
+
     @php
-        $esAuxiliar = false;
-
-        $formatearTiempo = static fn (\Carbon\CarbonImmutable $fecha): string
-            => ucfirst($fecha->locale('es')->diffForHumans());
-
         $ahora = \Carbon\CarbonImmutable::now();
+        $esAuxiliar = false;
+        $formatearTiempo = static function (\Carbon\CarbonImmutable $fecha, \Carbon\CarbonImmutable $ahora): string {
+            // Carbon 3 devuelve el diff con signo: de la fecha PASADA hacia el
+            // "ahora" para obtener minutos positivos, y se acota a >= 0.
+            $minutos = max(0, (int) $fecha->diffInMinutes($ahora));
 
+            if ($minutos < 1) {
+                return 'Hace menos de un minuto';
+            }
+
+            if ($minutos < 60) {
+                return $minutos === 1 ? 'Hace 1 minuto' : "Hace {$minutos} minutos";
+            }
+
+            $horas = (int) floor($minutos / 60);
+
+            if ($horas < 24) {
+                return $horas === 1 ? 'Hace 1 hora' : "Hace {$horas} horas";
+            }
+
+            $dias = (int) floor($horas / 24);
+
+            return $dias === 1 ? 'Hace 1 día' : "Hace {$dias} días";
+        };
+
+        // Respuesta mockeada del endpoint /notificaciones, alineada con el esquema
+        // real: notificacion_docente -> central_riesgo -> registro_asistencia ->
+        // estudiante/examen, con el auxiliar como registrador y el curso como materia.
         $notificaciones = collect([
             [
                 'id' => 1,
                 'tipo' => 'Posible Tramposo',
-                'auxiliar' => 'Juan Peres',
-                'estudiante' => 'Ivan Soto Peredo',
-                'examen' => 'Segundo Parcial',
-                'materia' => 'Cálculo 2',
+                'auxiliar' => 'María Fernanda Rojas',
+                'estudiante' => 'Juan Pablo Quispe Mamani',
+                'examen' => 'Primer Parcial',
+                'materia' => 'Matemática I',
                 'fecha_registro' => $ahora->subMinutes(20),
             ],
             [
                 'id' => 2,
                 'tipo' => 'Posible Tramposo',
-                'auxiliar' => 'María Fernanda Rojas',
+                'auxiliar' => 'Carlos Andrés Vega',
                 'estudiante' => 'Valentina Arce Flores',
                 'examen' => 'Examen Final',
                 'materia' => 'Física II',
@@ -63,46 +93,47 @@
             [
                 'id' => 3,
                 'tipo' => 'Posible Tramposo',
-                'auxiliar' => 'Carlos Andrés Vega',
+                'auxiliar' => 'Lucía Morales Castro',
                 'estudiante' => 'Diego Fernández Soto',
-                'examen' => 'Primer Parcial',
+                'examen' => 'Segundo Parcial',
                 'materia' => 'Química Orgánica',
-                'fecha_registro' => $ahora->subDay()->subHours(3),
+                'fecha_registro' => $ahora->subDays(1)->subHours(3),
             ],
         ])
-            ->when(
-                $esAuxiliar,
-                fn ($items) => $items->reject(fn (array $n) => ($n['tipo'] ?? '') === 'Posible Tramposo')
-            )
+            ->reject(static fn (array $n): bool => $esAuxiliar && ($n['tipo'] ?? '') === 'Posible Tramposo')
             ->sortByDesc('fecha_registro')
-            ->values();
+            ->values()
+            ->map(static function (array $n) use ($ahora, $formatearTiempo): array {
+                $n['hace'] = $formatearTiempo($n['fecha_registro'], $ahora);
+
+                return $n;
+            });
     @endphp
 
-    @if ($notificaciones->isEmpty())
-        <div class="mt-6 rounded-2xl border border-light bg-neutral-primary-soft p-6 text-center text-sm text-body shadow-xs">
-            No tienes notificaciones
-        </div>
-    @else
-        <div id="notificaciones-lista" class="mt-6 flex flex-col gap-4">
-            @foreach ($notificaciones as $n)
-                <x-ui.notificacion-card
-                    :title="'Posible Tramposo'"
-                    :text="'El auxiliar '.$n['auxiliar'].' registró al estudiante '.$n['estudiante'].' como posible tramposo en el examen de '.$n['examen'].' de la materia '.$n['materia'].'.'"
-                    :time="$formatearTiempo($n['fecha_registro'])"
-                >
-                    <x-slot:actions>
-                        <x-ui.button variant="danger" size="sm" :href="route('incidencias.detalle', $n['id'])">
-                            Ver detalle
-                        </x-ui.button>
-                    </x-slot:actions>
-                </x-ui.notificacion-card>
-            @endforeach
-        </div>
+    <div id="notificaciones-lista" class="mt-6 flex flex-col gap-4 px-[2vh]">
+        @foreach ($notificaciones as $notificacion)
+            <x-ui.notificacion-card
+                class="js-notificacion"
+                :id="$notificacion['id']"
+                :titulo="$notificacion['tipo']"
+                :auxiliar="$notificacion['auxiliar']"
+                :estudiante="$notificacion['estudiante']"
+                :examen="$notificacion['examen']"
+                :materia="$notificacion['materia']"
+                :hace="$notificacion['hace']"
+                :detalleHref="route('incidencias.detalle', $notificacion['id'])"
+            />
+        @endforeach
+    </div>
 
-        <div id="notificaciones-vacio" class="mt-6 rounded-2xl border border-light bg-neutral-primary-soft p-6 text-center text-sm text-body shadow-xs" hidden>
+    {{-- Estado vacío. Se oculta con el atributo HTML cuando hay notificaciones y
+         el script de abajo lo revela si el docente cierra todas con la X; así el
+         mensaje aparece tanto al arrancar sin datos como tras borrar la última. --}}
+    <div id="notificaciones-vacio" class="mt-6 px-[2vh]" @if ($notificaciones->isNotEmpty()) hidden @endif>
+        <div class="bg-neutral-primary-soft border border-light rounded-base shadow-xs p-6 text-center text-sm text-body">
             No tienes notificaciones
         </div>
-    @endif
+    </div>
 
     <script>
         (function () {
