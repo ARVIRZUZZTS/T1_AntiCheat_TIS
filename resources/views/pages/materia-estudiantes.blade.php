@@ -26,7 +26,7 @@
     - 2026-10-05  [Alex Candia]  feat: la pestaña Exámenes muestra el listado de
       exámenes de la materia con el botón "Crear examen".
     - 2026-10-08  [OchoaCesar]  refactor: mover header a @section('header') y añadir margen superior al contenido para mantener espaciado.
-    - 2026-10-09  [T1]  feat: la pestaña Exámenes pasa a template x-if y el
+    - 2026-10-09  [OchoaCesar]  feat: la pestaña Exámenes pasa a template x-if y el
       parcial consulta el listado al endpoint con fetch al abrirse.
 
     @see  App\Livewire\Examenes\EstudiantesCurso
