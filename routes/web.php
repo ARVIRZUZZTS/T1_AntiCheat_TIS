@@ -7,7 +7,7 @@
  *
  * @created 2026-09-29
  *
- * @updated 2026-10-09
+ * @updated 2026-10-10
  *
  * @description
  * Definición de rutas web del panel. Incluye vistas estáticas y componentes Livewire.
@@ -32,6 +32,8 @@
  *   riesgos pasa a ser una vista simple, ya que la pantalla es solo interfaz
  *   (datos mockeados) y llamaba a ListarAlertasService, que fallaba al leer
  *   `estado_incidencia`, columna aún no disponible en la base.
+ * - 2026-10-10  [Valery D. Ortuno P]  docs: la central de riesgos ya no es un
+ *   mock; su vista incrusta el componente Livewire ListaEstudiantes (HU 10).
  */
 
 use App\Http\Controllers\ExamenController;
@@ -56,8 +58,8 @@ Route::get('/materias', fn () => view('pages.materias', [
 Route::view('/examenes', 'pages.examenes')->name('examenes');
 Route::get('/monitoreo', MonitoreoController::class)->name('monitoreo');
 Route::get('/monitoreo/registro-ingreso', BuscadorRegistro::class)->name('monitoreo.registro-ingreso');
-// Por ahora la central de riesgos es solo interfaz con datos mockeados: la
-// ruta renderiza la vista sin consultar la base, hasta que exista el endpoint.
+// La vista solo aporta el layout; los datos los resuelve el componente Livewire
+// ListaEstudiantes que incrusta, por eso la ruta sigue sin lógica.
 Route::view('/central-riesgo', 'pages.central-riesgo')->name('central-riesgo');
 Route::view('/usuarios', 'pages.usuarios')->name('usuarios');
 Route::view('/reportes', 'pages.reportes')->name('reportes');

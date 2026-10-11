@@ -2,7 +2,7 @@
     @file    pagination.blade.php
     @author  OchoaCesar <cesareduardonick@gmail.com>
     @created 2026-09-23
-    @updated 2026-09-29
+    @updated 2026-10-10
 
     @description
     Paginación de números con anterior/siguiente. Variantes de tamaño
@@ -14,6 +14,10 @@
     @changelog
     - 2026-09-23  [OchoaCesar]  feat: creación inicial del componente UI.
     - 2026-09-29  [David E. Chavez T.]  fix: agregar @changelog y email del autor.
+    - 2026-10-10  [Valery D. Ortuno P]  fix: la página activa no se leía. Sus
+      colores se sumaban a los del botón inactivo y, al chocar dos utilidades de
+      Tailwind, ganaba el fondo gris con el texto blanco. Ahora cada botón lleva
+      solo los colores de su estado.
 --}}
 
 @props([
@@ -31,10 +35,14 @@
         'large' => 'w-10 h-10',
         default => 'w-9 h-9',
     };
-    $btnClass = 'flex items-center justify-center text-body bg-neutral-secondary-medium box-border border border-default-medium hover:bg-neutral-tertiary-medium hover:text-heading font-medium text-sm ' . $box . ' focus:outline-none';
-    $activeClass = $activeFilled
-        ? 'text-white bg-brand border-brand hover:bg-brand hover:text-white'
-        : 'text-fg-brand bg-neutral-tertiary-medium';
+    $baseClass = 'flex items-center justify-center box-border border font-medium text-sm ' . $box . ' focus:outline-none';
+    $btnClass = $baseClass . ' text-body bg-neutral-secondary-medium border-default-medium hover:bg-neutral-tertiary-medium hover:text-heading';
+    // Los colores de la página activa reemplazan a los del botón inactivo en vez
+    // de sumarse: dos utilidades de color en el mismo elemento chocan y no gana
+    // la que se escribió última, sino la que Tailwind emite última.
+    $activeClass = $baseClass . ' ' . ($activeFilled
+        ? 'text-white bg-brand border-brand'
+        : 'text-fg-brand bg-neutral-tertiary-medium border-default-medium');
     $prev = max(1, $current - 1);
     $next = min($total, $current + 1);
 @endphp
@@ -60,7 +68,7 @@
                 @if ($interactive)
                     <button type="button" wire:click="irPagina({{ $page }})"
                             @class([
-                                $btnClass,
+                                $btnClass => $page !== $current,
                                 $activeClass => $page === $current,
                             ])
                             aria-current="{{ $page === $current ? 'page' : null }}">
@@ -69,7 +77,7 @@
                 @else
                     <a href="{{ $href ?? '#' }}?page={{ $page }}"
                        @class([
-                           $btnClass,
+                           $btnClass => $page !== $current,
                            $activeClass => $page === $current,
                        ])
                        aria-current="{{ $page === $current ? 'page' : null }}">

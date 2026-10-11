@@ -7,7 +7,7 @@
  *
  * @created 2026-10-09
  *
- * @updated 2026-10-09
+ * @updated 2026-10-10
  *
  * @description Pruebas HTTP con SQLite en memoria, sin usar Supabase, del
  * endpoint GET /api/incidencias/{idIncidencia}: datos completos del detalle
@@ -15,6 +15,9 @@
  *
  * @changelog
  * - 2026-10-09  [Alisson D. Alvarado]  test: cubrir detalle encontrado, 404 e invitado.
+ * - 2026-10-10  [Valery D. Ortuno P]  test: el motivo de la incidencia de prueba
+ *   usa el valor con espacios, que es el que tiene el enum `Motivo` desde que
+ *   se alineó con PostgreSQL; con guiones bajos el modelo no lo podía leer.
  *
  * @see App\Http\Controllers\Api\DetalleIncidenciaController
  * @see App\Services\CentralRiesgo\ConsultarDetalleIncidenciaService
@@ -170,7 +173,7 @@ class DetalleIncidenciaTest extends TestCase
             'id_examen' => 1,
             'sis_estudiante' => '20181111111',
             'id_registrador' => 2,
-            'motivo' => 'copia_o_intercambio_de_respuestas',
+            'motivo' => 'copia o intercambio de respuestas',
             'detalle_motivo' => 'Copia visible desde el celular en el momento del examen.',
             'fecha_registro' => '2026-10-05 10:30:00',
             'tipo_infraccion' => 'tramposo',

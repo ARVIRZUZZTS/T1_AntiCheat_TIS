@@ -7,30 +7,35 @@
  *
  * @created 2026-10-09
  *
- * @updated 2026-10-09
+ * @updated 2026-10-10
  *
  * @description
  * Servicio de dominio que devuelve el detalle de una incidencia de la
  * central de riesgos: estudiante, SIS, motivo, materia, quien la reportó,
- * fecha y hora, estado y descripción del hecho. Admite los dos esquemas de
- * `central_riesgo`: el de Supabase, que enlaza `id_examen` y `sis_estudiante`
- * directo, y el original, que lo hace a través de `registro_asistencia` (`id_ingreso`).
+ * fecha y hora, estado y descripción del hecho. El estudiante y el examen son
+ * columnas propias de `central_riesgo` (`sis_estudiante`, `id_examen`), así que
+ * se leen por las relaciones del modelo.
  *
  * @changelog
  * - 2026-10-09  [Alisson D. Alvarado]  feat: consulta del detalle de una
  *   incidencia, con error controlado si no existe.
+ * - 2026-10-10  [Valery D. Ortuno P]  fix: el servicio cargaba la relación
+ *   `registroAsistencia`, que el modelo perdió con el esquema #70, y fallaba
+ *   con cualquier incidencia. Ahora usa `estudiante`, `curso` y `examen`; el
+ *   motivo sale del enum ya casteado y la materia de `CentralRiesgo::materia()`,
+ *   la misma fuente que el formulario de registro. El estado se deriva del tipo
+ *   de infracción cuando la base no tiene `estado_incidencia`.
  *
  * @see  App\Policies\CentralRiesgoPolicy
  * @see  App\Models\CentralRiesgo
+ * @see  App\Livewire\CentralRiesgo\ListaEstudiantes
  */
 
 namespace App\Services\CentralRiesgo;
 
 use App\Enums\EstadoIncidencia;
-use App\Enums\Motivo;
+use App\Enums\TipoInfraccion;
 use App\Models\CentralRiesgo;
-use App\Models\Estudiante;
-use App\Models\Examen;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 class ConsultarDetalleIncidenciaService
@@ -46,54 +51,57 @@ class ConsultarDetalleIncidenciaService
     public function ejecutar(int $idIncidencia): array
     {
         $incidencia = CentralRiesgo::query()
-            ->with(['registroAsistencia.estudiante', 'registrador.roles'])
+            ->with(['estudiante', 'curso', 'examen.cursos', 'registrador.roles'])
             ->findOrFail($idIncidencia);
 
-        $idExamen = $incidencia->getAttribute('id_examen')
-            ?? $incidencia->registroAsistencia?->id_examen;
-
-        $estudiante = $incidencia->registroAsistencia->estudiante
-            ?? Estudiante::query()->find($incidencia->getAttribute('sis_estudiante'));
-
-        $estado = $incidencia->getAttribute('estado_incidencia');
+        $estudiante = $incidencia->estudiante;
+        $registrador = $incidencia->registrador;
 
         return [
             'id_registro' => $incidencia->id_registro,
             'estudiante_nombre' => $estudiante !== null
                 ? trim($estudiante->nombre_estudiante.' '.$estudiante->apellido_estudiante)
                 : null,
-            'sis_estudiante' => $incidencia->getAttribute('sis_estudiante')
-                ?? $estudiante?->sis_estudiante,
-            'motivo' => $this->etiquetaMotivo($incidencia),
-            'materia' => $this->nombreMateria($idExamen),
-            'reportado_por' => $incidencia->registrador !== null
-                ? trim($incidencia->registrador->nombre_usuario.' '.$incidencia->registrador->apellido)
+            'sis_estudiante' => $incidencia->sis_estudiante,
+            'motivo' => $incidencia->motivo->etiqueta(),
+            'materia' => $incidencia->materia(),
+            'reportado_por' => $registrador !== null
+                ? trim($registrador->nombre_usuario.' '.$registrador->apellido)
                 : null,
-            'reportado_por_rol' => $incidencia->registrador?->roles->first()?->nombre_rol,
-            'fecha_registro' => $incidencia->fecha_registro,
-            'estado' => $estado instanceof EstadoIncidencia ? $estado->value : null,
+            'reportado_por_rol' => $registrador?->roles->first()?->nombre_rol,
+            'fecha_registro' => $incidencia->fecha_registro->toDateTimeString(),
+            'estado' => $this->estado($incidencia)->value,
             'descripcion' => $incidencia->detalle_motivo,
         ];
     }
 
-    private function etiquetaMotivo(CentralRiesgo $incidencia): ?string
+    /**
+     * Estado de revisión de la incidencia.
+     *
+     * Sale de `estado_incidencia` cuando la base tiene la columna. Si no la
+     * tiene, se deriva del tipo de infracción con la misma regla que usa la
+     * migración que la agrega: `tramposo` es un caso confirmado y `sospechoso`
+     * uno pendiente de revisión.
+     *
+     * @param  CentralRiesgo  $incidencia  Incidencia consultada.
+     * @return EstadoIncidencia Estado confirmado o pendiente.
+     */
+    private function estado(CentralRiesgo $incidencia): EstadoIncidencia
     {
-        $motivo = $incidencia->getAttribute('motivo');
+        $guardado = $incidencia->getAttribute('estado_incidencia');
 
-        if ($motivo === null) {
-            return null;
+        if ($guardado instanceof EstadoIncidencia) {
+            return $guardado;
         }
 
-        return Motivo::tryFrom($motivo)?->etiqueta() ?? $motivo;
-    }
+        $estado = is_string($guardado) ? EstadoIncidencia::tryFrom($guardado) : null;
 
-
-    private function nombreMateria(?int $idExamen): ?string
-    {
-        if ($idExamen === null) {
-            return null;
+        if ($estado !== null) {
+            return $estado;
         }
 
-        return Examen::query()->with('cursos')->find($idExamen)?->cursos->first()?->nombre_curso;
+        return $incidencia->tipo_infraccion === TipoInfraccion::Tramposo
+            ? EstadoIncidencia::Confirmado
+            : EstadoIncidencia::Pendiente;
     }
 }
