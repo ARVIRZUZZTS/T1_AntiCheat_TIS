@@ -50,7 +50,7 @@ enum Motivo: string
     public function etiqueta(): string
     {
         return match ($this) {
-            self::IntentoDeIngresoNoAutorizado => 'Intento de Ingreso a examen no autorizado',
+            self::IntentoDeIngresoNoAutorizado => 'Intento de ingreso a examen no autorizado',
             self::UsoDeDispositivosElectronicos => 'Uso de dispositivos electrónicos no autorizados',
             self::CopiaOIntercambioDeRespuestas => 'Copia o intercambio de respuestas',
             self::UsoDeMaterialNoAutorizado => 'Uso de material no autorizado',
