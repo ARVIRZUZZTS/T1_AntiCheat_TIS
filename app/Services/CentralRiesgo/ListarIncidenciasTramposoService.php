@@ -7,14 +7,14 @@
  *
  * @created 2026-10-09
  *
- * @updated 2026-10-09
+ * @updated 2026-10-11
  *
  * @description
  * Servicio de dominio que lista las incidencias de la central de riesgos con
- * tipo de infracción `tramposo`. Devuelve por registro el nombre y el código
- * SIS del estudiante, la materia, el motivo y la fecha/hora, siempre en orden
- * alfabético (A-Z) por apellidos y nombre, con filtro por alcance y búsqueda.
- * La respuesta es la lista completa, sin paginación.
+ * tipo de infracción `tramposo`. Devuelve por registro el id, el nombre y el
+ * código SIS del estudiante, la materia, el motivo, el estado y la fecha/hora,
+ * siempre en orden alfabético (A-Z) por apellidos y nombre, con filtro por
+ * alcance y búsqueda. La respuesta es la lista completa, sin paginación.
  *
  * El estudiante y el examen son columnas propias de `central_riesgo`
  * (`sis_estudiante`, `id_examen`), así que no hace falta pasar por
@@ -38,6 +38,8 @@
  * - 2026-10-09  [T1]  refactor: quitar la paginación (la API devuelve la
  *   lista completa) y eliminar el parámetro de orden: el listado siempre es
  *   A-Z por apellidos y nombre.
+ * - 2026-10-11  [Alisson D. Alvarado]  fix: el mapeo agrega `id` (para el
+ *   enlace "Ver detalle") y `estado` (columna Estado de la tabla).
  */
 
 namespace App\Services\CentralRiesgo;
@@ -200,18 +202,22 @@ class ListarIncidenciasTramposoService
      * Convierte una incidencia en el arreglo de datos que consume la API.
      *
      * @param  CentralRiesgo  $incidencia  Incidencia con relaciones precargadas.
-     * @return array<string, mixed> Datos del estudiante, materia, motivo y fecha.
+     * @return array<string, mixed> Datos del estudiante, materia, motivo, estado y fecha.
      */
     private function mapear(CentralRiesgo $incidencia): array
     {
         $estudiante = $incidencia->estudiante;
 
         return [
+            'id' => $incidencia->id_registro,
             'nombre' => $estudiante?->nombre_estudiante,
             'apellido' => $estudiante?->apellido_estudiante,
             'sis' => $estudiante?->sis_estudiante,
             'materia' => $this->resolverMateria($incidencia),
             'motivo' => $incidencia->motivo,
+            // `estado_incidencia` no está casteado en el modelo (ver
+            // ConsultarDetalleIncidenciaService); se lee por getAttribute.
+            'estado' => $incidencia->getAttribute('estado_incidencia'),
             'fecha' => $incidencia->fecha_registro->toDateTimeString(),
         ];
     }
