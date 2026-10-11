@@ -29,6 +29,8 @@
  *   traductor y nunca pasa por messages(), así que su mensaje salía en inglés.
  * - 2026-10-10  [Alex Candia]  fix: la fecha exige cuatro dígitos de año.
  *   `date_format:d/m/Y` acepta `10/12/262` y esa fecha se guardaba como 0262.
+ * - 2026-10-10  [Alex Candia]  feat: mensajes claros de hora y fecha inválidas,
+ *   y validación del año (`19xx`/`20xx`) con su propio mensaje.
  */
 
 namespace App\Http\Requests;
@@ -37,6 +39,7 @@ use App\Enums\TipoExamen;
 use App\Services\Examen\RegistrarExamenService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 class StoreExamenRequest extends FormRequest
 {
@@ -48,6 +51,30 @@ class StoreExamenRequest extends FormRequest
     public function authorize(): bool
     {
         return true;
+    }
+
+    /**
+     * Valida aparte el año de la fecha.
+     *
+     * La regla de formato solo mira que sean cuatro dígitos; acá se exige que el
+     * año empiece con 19 o 20, para poder dar un mensaje propio ("Ingrese un año
+     * válido") en vez del genérico de formato.
+     */
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator): void {
+            $fecha = (string) $this->input('fecha');
+
+            if (! preg_match('/^\d{2}\/\d{2}\/(\d{4})$/', $fecha, $coincidencias)) {
+                return;
+            }
+
+            $anio = (int) $coincidencias[1];
+
+            if ($anio < 1900 || $anio > 2099) {
+                $validator->errors()->add('fecha', 'Ingrese un año válido.');
+            }
+        });
     }
 
     /**
@@ -64,7 +91,10 @@ class StoreExamenRequest extends FormRequest
             // El regex exige los cuatro dígitos del año: `date_format` acepta
             // `10/12/262` y eso se guardaba como el año 0262.
             'fecha' => ['required', 'regex:/^\d{2}\/\d{2}\/\d{4}$/', 'date_format:d/m/Y'],
-            'hora_inicio' => ['required', 'date_format:H:i'],
+            // El regex refuerza el rango 00:00-23:59. `type="time"` no deja
+            // escribir una hora inválida, pero el mensaje propio cubre igual un
+            // envío que no venga del navegador.
+            'hora_inicio' => ['required', 'date_format:H:i', 'regex:/^([01]\d|2[0-3]):[0-5]\d$/'],
             'duracion' => ['required', 'integer', 'min:1', 'max:'.RegistrarExamenService::DURACION_MAXIMA],
             // Sin ambiente el examen no se puede monitorear, así que se exige al
             // menos uno.
@@ -90,14 +120,12 @@ class StoreExamenRequest extends FormRequest
     {
         return [
             'tipo_examen.required' => 'Seleccione el tipo de examen.',
-            // La regla enum de Laravel no acepta clave por campo, así que el
-            // mensaje va con la clave suelta: si se pondría `tipo_examen.enum`
-            // no aplicaría y saldría el mensaje en inglés.
-            'enum' => 'El tipo de examen no es válido.',
-            'fecha.required' => 'Ingrese la fecha de inicio.',
-            'fecha.date_format' => 'La fecha debe estar en formato dd/mm/aaaa.',
+            'fecha.required' => 'Ingrese la fecha.',
+            'fecha.regex' => 'Ingrese una fecha válida.',
+            'fecha.date_format' => 'Ingrese una fecha válida.',
             'hora_inicio.required' => 'Ingrese la hora de inicio.',
-            'hora_inicio.date_format' => 'La hora debe estar en formato hh:mm.',
+            'hora_inicio.date_format' => 'Ingrese una hora válida.',
+            'hora_inicio.regex' => 'Ingrese una hora válida.',
             'duracion.required' => 'Ingrese la duración del examen.',
             'duracion.integer' => 'La duración debe estar en minutos, solo números.',
             'duracion.min' => 'La duración debe ser de al menos 1 minuto.',
@@ -119,7 +147,7 @@ class StoreExamenRequest extends FormRequest
     {
         return [
             'tipo_examen' => 'tipo de examen',
-            'fecha' => 'fecha de inicio',
+            'fecha' => 'fecha',
             'hora_inicio' => 'hora de inicio',
             'duracion' => 'duración',
             'ambientes' => 'ambientes',

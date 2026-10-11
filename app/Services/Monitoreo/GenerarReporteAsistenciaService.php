@@ -25,6 +25,10 @@
  *                 La vista decide si la pinta como tramposo o como sospechoso.
  *  - `presente`   tiene fila en `registro_asistencia`.
  *  - `pendiente`  ninguno de los casos anteriores.
+ * Dado el id de un examen, resuelve el estado de asistencia de cada estudiante
+ * inscrito (`presente` / `ausente` / `pendiente`) contrastando la hora actual
+ * contra la ventana horaria del examen (fecha + hora_inicio y la duración), e
+ * incluye registrador, hora de ingreso y observaciones de cada estudiante.
  *
  * @changelog
  * - 2026-09-25  [OchoaCesar]  feat:  creación inicial del servicio con estados
@@ -48,6 +52,11 @@
  * - 2026-10-10  [T1]  feat: `tipoExamen` entra al `with()`, para el subtítulo del
  *   header del monitor (materia · tipo de examen). Sin esto la vista lo cargaría
  *   aparte y sumaría otro viaje a la base (~335ms con la latencia actual).
+ *                                    (solo cuando el estado es 'presente').
+ * - 2026-10-10  [Alex Candia]  refactor: la hora de fin se deriva de la hora de
+ *                                    inicio más la duración (la columna se quitó),
+ *                                    así que un examen que cruza la medianoche
+ *                                    termina al día siguiente.
  *
  * @see  \App\Livewire\Monitoreo\MonitorEnVivo
  * @see  App\Services\Asistencia\RegistroIngresoService
@@ -86,9 +95,10 @@ class GenerarReporteAsistenciaService
      */
     public function ejecutar(int $idExamen, ?Carbon $ahora = null): array
     {
-        $examen = Examen::query()
-            ->with(['cursos', 'ambientes', 'materialesPermitidos', 'tipoExamen'])
-            ->findOrFail($idExamen);
+        $examen = Examen::findOrFail($idExamen);
+        $ahora = $ahora ?? Carbon::now();
+        $inicio = Carbon::parse($examen->fecha.' '.$examen->hora_inicio);
+        $fin = $inicio->copy()->addMinutes((int) $examen->duracion);
 
         $registros = RegistroAsistencia::query()
             ->where('id_examen', $examen->id_examen)

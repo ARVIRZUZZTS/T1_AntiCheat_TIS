@@ -149,7 +149,9 @@ class ListarExamenesCursoService
     }
 
     /**
-     * Estado del examen según su ventana horaria (fecha + hora_inicio/hora_fin).
+     * Estado del examen según su ventana horaria (fecha + hora_inicio y la
+     * duración). La hora de fin se resuelve acá sumando la duración, así que un
+     * examen que cruza la medianoche termina al día siguiente y no se adelanta.
      *
      * @param  Examen  $examen  Examen a clasificar.
      * @param  Carbon  $ahora  Momento de referencia.
@@ -162,7 +164,9 @@ class ListarExamenesCursoService
         }
 
         $inicio = Carbon::parse($examen->fecha.' '.($examen->hora_inicio ?? self::HORA_INICIO_POR_DEFECTO));
-        $fin = Carbon::parse($examen->fecha.' '.($examen->hora_fin ?? self::HORA_FIN_POR_DEFECTO));
+        $fin = $examen->duracion === null
+            ? Carbon::parse($examen->fecha.' '.self::HORA_FIN_POR_DEFECTO)
+            : $inicio->copy()->addMinutes((int) $examen->duracion);
 
         if ($ahora->gt($fin)) {
             return self::ESTADO_FINALIZADO;

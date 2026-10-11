@@ -83,7 +83,6 @@ class ListarEstudiantesCursoFiltroTest extends TestCase
             'id_examen' => self::ID_EXAMEN,
             'fecha' => now()->toDateString(),
             'hora_inicio' => '08:00',
-            'hora_fin' => '10:00',
             'duracion' => 120,
             'creador' => self::ID_DOCENTE,
             'tipo_examen' => self::ID_TIPO_EXAMEN,
