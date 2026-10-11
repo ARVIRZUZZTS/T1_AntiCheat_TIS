@@ -37,6 +37,7 @@
 
     $defaultItems = [
         ['label' => 'Inicio', 'route' => 'inicio'],
+        ['label' => 'Notificaciones', 'route' => 'notificaciones'],
         ['label' => 'Materias', 'route' => 'materias'],
         ['label' => 'Exámenes', 'route' => 'examenes'],
         ['label' => 'Monitor en vivo', 'route' => 'monitoreo'],
