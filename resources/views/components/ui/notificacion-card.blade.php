@@ -55,10 +55,10 @@
 
     <div class="flex-1 min-w-0 pe-8">
         <h3 class="text-sm font-bold leading-snug text-heading break-words">{{ $titulo }}</h3>
-        <p class="mt-1 text-sm text-body break-words">{{ $descripcion }}</p>
+        <p class="js-descripcion mt-1 text-sm text-body break-words">{{ $descripcion }}</p>
 
         <div class="mt-3 flex items-center justify-between gap-3">
-            <span class="text-xs text-muted">{{ $hace }}</span>
+            <span class="js-hace text-xs text-muted">{{ $hace }}</span>
 
             {{-- El botón se declara aquí (no usa x-ui.button a propósito) porque la
                  especificación pide texto semibold y el botón base del sistema va en

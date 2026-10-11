@@ -87,6 +87,7 @@ use App\Models\Curso;
 use App\Models\Estudiante;
 use App\Models\Examen;
 use App\Models\Rol;
+use App\Services\Notificacion\NotificacionService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Collection;
@@ -1015,7 +1016,7 @@ class RegistrarIncidencia extends Component
         $registro = DB::transaction(function (): CentralRiesgo {
             $estudiante = $this->resolverEstudiante();
 
-            return CentralRiesgo::create([
+            $registro = CentralRiesgo::create([
                 // La tabla no tiene secuencia: el id lo calcula la aplicación con
                 // la tabla bloqueada, igual que el alta de examen.
                 'id_registro' => $this->siguienteIdRegistro(),
@@ -1032,6 +1033,13 @@ class RegistrarIncidencia extends Component
                 'fecha_registro' => now(),
                 'tipo_infraccion' => $this->tipoInfraccion(),
             ]);
+
+            // HU 12 · T1: si un auxiliar reporta a un posible tramposo, se avisa
+            // al docente de la materia. El servicio decide si aplica (solo
+            // `sospechoso`) y resuelve el curso del aviso.
+            app(NotificacionService::class)->notificarPosibleTramposo($registro);
+
+            return $registro;
         });
 
         $nombreEnBase = $registro->estudiante === null
