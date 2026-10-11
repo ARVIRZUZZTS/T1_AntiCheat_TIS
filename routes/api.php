@@ -24,6 +24,7 @@ use App\Http\Controllers\Api\CursoExamenController;
 use App\Http\Controllers\Api\DetalleIncidenciaController;
 use App\Http\Controllers\Api\EstudianteExamenController;
 use App\Http\Controllers\Api\ExamenMonitoreoController;
+use App\Http\Controllers\Api\NotificacionController;
 use App\Http\Controllers\Api\ResolverIncidenciaController;
 use Illuminate\Support\Facades\Route;
 
@@ -42,6 +43,15 @@ Route::middleware(['web', 'auth:web'])->group(function (): void {
     Route::get('/incidencias/{idIncidencia}', [DetalleIncidenciaController::class, 'index'])
         ->whereNumber('idIncidencia')
         ->name('api.incidencias.detalle');
+
+    // Notificaciones "Posible Tramposo" del docente autenticado (HU 12): listado
+    // y ocultado lógico. Un auxiliar no recibe estas notificaciones.
+    Route::get('/notificaciones', [NotificacionController::class, 'index'])
+        ->name('api.notificaciones.index');
+
+    Route::patch('/notificaciones/{idNotificacion}/ocultar', [NotificacionController::class, 'ocultar'])
+        ->whereNumber('idNotificacion')
+        ->name('api.notificaciones.ocultar');
 });
 Route::get('/cursos/{idCurso}/examenes', [CursoExamenController::class, 'index'])
     ->whereNumber('idCurso')

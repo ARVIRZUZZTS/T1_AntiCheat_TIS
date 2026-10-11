@@ -5,25 +5,24 @@
     @updated 2026-10-11
 
     @description
-    Pantalla de notificaciones del docente. Muestra las notificaciones de
-    "Posible Tramposo" ordenadas de la más reciente a la más antigua, cada una
-    en su tarjeta (`x-ui.notificacion-card`). Si el usuario es auxiliar, esas
-    notificaciones no se muestran; si no queda ninguna, aparece el mensaje
+    Pantalla de notificaciones del docente. Lista las notificaciones de
+    "Posible Tramposo" que devuelve el endpoint real `/api/notificaciones`,
+    ordenadas de la más reciente a la más antigua (el backend ya las ordena y
+    les pone el tiempo transcurrido en español). Cada una se pinta con
+    `x-ui.notificacion-card`. Si no queda ninguna, aparece el mensaje
     "No tienes notificaciones".
 
-    El botón de cerrar (X) de cada tarjeta la borra del DOM con JavaScript plano
-    (sin Alpine: el proyecto solo carga el bundle de Livewire). Es un descarte
-    visual porque los datos son mockeados; cuando exista el endpoint real, ese
-    mismo handler persistirá el borrado.
+    El rol se lee del usuario autenticado: si es auxiliar, esas notificaciones
+    no se le generan ni se le muestran, así que la pantalla no consulta el
+    endpoint y arranca en el estado vacío.
 
     "Ver detalle" despacha el evento window 'abrir-detalle-incidencia' que abre
     el modal `x-ui.modal-detalle-incidencia` (detalle + submodales de confirmar
     y rechazar contra la API); sin JS conserva el href como respaldo. Nada se
     confirma ni se rechaza hasta que el docente lo indique en ese modal.
 
-    Los datos son mockeados a propósito: representan la respuesta de un endpoint
-    de notificaciones que se conectará más adelante. El rol del usuario tampoco
-    viene del auth todavía: se simula con `$esAuxiliar`.
+    "Ver detalle" navega al detalle del registro (T4) sin confirmar ni rechazar
+    nada.
 
     @changelog
     - 2026-10-09  [Alisson D. Alvarado]  feat: creación inicial de la pantalla.
@@ -41,100 +40,39 @@
 @section('title', 'Notificaciones')
 
 @section('content')
-    <p class="text-body">
-        Notificaciones de posibles tramposos. Datos mockeados: vendrán del endpoint
-        <code class="text-fg-brand">/notificaciones</code>.
-    </p>
-
     @php
-        $ahora = \Carbon\CarbonImmutable::now();
-        $esAuxiliar = false;
-        $formatearTiempo = static function (\Carbon\CarbonImmutable $fecha, \Carbon\CarbonImmutable $ahora): string {
-            // Carbon 3 devuelve el diff con signo: de la fecha PASADA hacia el
-            // "ahora" para obtener minutos positivos, y se acota a >= 0.
-            $minutos = max(0, (int) $fecha->diffInMinutes($ahora));
-
-            if ($minutos < 1) {
-                return 'Hace menos de un minuto';
-            }
-
-            if ($minutos < 60) {
-                return $minutos === 1 ? 'Hace 1 minuto' : "Hace {$minutos} minutos";
-            }
-
-            $horas = (int) floor($minutos / 60);
-
-            if ($horas < 24) {
-                return $horas === 1 ? 'Hace 1 hora' : "Hace {$horas} horas";
-            }
-
-            $dias = (int) floor($horas / 24);
-
-            return $dias === 1 ? 'Hace 1 día' : "Hace {$dias} días";
-        };
-
-        // Respuesta mockeada del endpoint /notificaciones, alineada con el esquema
-        // real: notificacion_docente -> central_riesgo -> registro_asistencia ->
-        // estudiante/examen, con el auxiliar como registrador y el curso como materia.
-        $notificaciones = collect([
-            [
-                'id' => 1,
-                'tipo' => 'Posible Tramposo',
-                'auxiliar' => 'María Fernanda Rojas',
-                'estudiante' => 'Juan Pablo Quispe Mamani',
-                'examen' => 'Primer Parcial',
-                'materia' => 'Matemática I',
-                'fecha_registro' => $ahora->subMinutes(20),
-            ],
-            [
-                'id' => 2,
-                'tipo' => 'Posible Tramposo',
-                'auxiliar' => 'Carlos Andrés Vega',
-                'estudiante' => 'Valentina Arce Flores',
-                'examen' => 'Examen Final',
-                'materia' => 'Física II',
-                'fecha_registro' => $ahora->subHours(2),
-            ],
-            [
-                'id' => 3,
-                'tipo' => 'Posible Tramposo',
-                'auxiliar' => 'Lucía Morales Castro',
-                'estudiante' => 'Diego Fernández Soto',
-                'examen' => 'Segundo Parcial',
-                'materia' => 'Química Orgánica',
-                'fecha_registro' => $ahora->subDays(1)->subHours(3),
-            ],
-        ])
-            ->reject(static fn (array $n): bool => $esAuxiliar && ($n['tipo'] ?? '') === 'Posible Tramposo')
-            ->sortByDesc('fecha_registro')
-            ->values()
-            ->map(static function (array $n) use ($ahora, $formatearTiempo): array {
-                $n['hace'] = $formatearTiempo($n['fecha_registro'], $ahora);
-
-                return $n;
-            });
+        $usuario = auth()->user();
+        $esAuxiliar = $usuario !== null
+            && $usuario->roles->contains('nombre_rol', \App\Models\Rol::NOMBRE_AUXILIAR);
     @endphp
 
-    <div id="notificaciones-lista" class="mt-6 flex flex-col gap-4 px-[2vh]">
-        @foreach ($notificaciones as $notificacion)
-            <x-ui.notificacion-card
-                class="js-notificacion"
-                :id="$notificacion['id']"
-                :titulo="$notificacion['tipo']"
-                :auxiliar="$notificacion['auxiliar']"
-                :estudiante="$notificacion['estudiante']"
-                :examen="$notificacion['examen']"
-                :materia="$notificacion['materia']"
-                :hace="$notificacion['hace']"
-                :detalleHref="route('incidencias.detalle', $notificacion['id'])"
-            />
-        @endforeach
+    <p class="text-body">
+        Notificaciones de posibles tramposos.
+    </p>
+
+    {{-- Plantilla de una tarjeta: el script la clona por cada notificación que
+         devuelve el endpoint. Mantiene una sola fuente de estilos. --}}
+    <template id="notificacion-template">
+        <x-ui.notificacion-card
+            class="js-notificacion"
+            :id="0"
+            titulo="Posible Tramposo"
+            auxiliar=""
+            estudiante=""
+            examen=""
+            materia=""
+            hace=""
+            detalleHref="#"
+        />
+    </template>
+
+    <div id="notificaciones-lista"
+         class="mt-6 flex flex-col gap-4 px-[2vh]"
+         data-endpoint="{{ route('api.notificaciones.index') }}"
+         data-es-auxiliar="{{ $esAuxiliar ? '1' : '0' }}">
     </div>
 
-    {{-- Estado vacío. Se oculta con el atributo HTML cuando hay notificaciones y
-         el script de abajo lo revela si el docente cierra todas con la X; así el
-         mensaje aparece tanto al arrancar sin datos como tras borrar la última. --}}
-    <div id="notificaciones-vacio" class="mt-6 px-[2vh]" @if ($notificaciones->isNotEmpty()) hidden @endif>
+    <div id="notificaciones-vacio" class="mt-6 px-[2vh]" hidden>
         <div class="bg-neutral-primary-soft border border-light rounded-base shadow-xs p-6 text-center text-sm text-body">
             No tienes notificaciones
         </div>
@@ -148,12 +86,67 @@
             'use strict';
 
             var lista = document.getElementById('notificaciones-lista');
+            var plantilla = document.getElementById('notificacion-template');
 
-            if (!lista) {
+            if (!lista || !plantilla) {
                 return;
             }
 
             var vacio = document.getElementById('notificaciones-vacio');
+            var meta = document.querySelector('meta[name="csrf-token"]');
+            var token = meta ? meta.getAttribute('content') : '';
+            var endpoint = lista.dataset.endpoint;
+            var esAuxiliar = lista.dataset.esAuxiliar === '1';
+
+            function actualizarVacio() {
+                if (vacio) {
+                    vacio.hidden = lista.querySelectorAll('.js-notificacion').length !== 0;
+                }
+            }
+
+            function crearTarjeta(notificacion) {
+                var nodo = plantilla.content.firstElementChild.cloneNode(true);
+                nodo.dataset.id = notificacion.id;
+
+                var titulo = nodo.querySelector('h3');
+                var descripcion = nodo.querySelector('.js-descripcion');
+                var hace = nodo.querySelector('.js-hace');
+                var detalle = nodo.querySelector('a');
+                var cerrar = nodo.querySelector('.js-cerrar-notificacion');
+
+                if (titulo) { titulo.textContent = notificacion.titulo || ''; }
+                if (descripcion) { descripcion.textContent = notificacion.descripcion || ''; }
+                if (hace) { hace.textContent = notificacion.hace || ''; }
+                if (detalle) { detalle.setAttribute('href', notificacion.detalle_href || '#'); }
+                if (cerrar) { cerrar.dataset.id = notificacion.id; }
+
+                return nodo;
+            }
+
+            function cargar() {
+                if (esAuxiliar) {
+                    actualizarVacio();
+                    return;
+                }
+
+                fetch(endpoint, {
+                    headers: { 'Accept': 'application/json' },
+                    credentials: 'same-origin'
+                })
+                    .then(function (respuesta) {
+                        if (!respuesta.ok) {
+                            throw new Error('HTTP ' + respuesta.status);
+                        }
+                        return respuesta.json();
+                    })
+                    .then(function (notificaciones) {
+                        (notificaciones || []).forEach(function (notificacion) {
+                            lista.appendChild(crearTarjeta(notificacion));
+                        });
+                        actualizarVacio();
+                    })
+                    .catch(actualizarVacio);
+            }
 
             lista.addEventListener('click', function (evento) {
                 var boton = evento.target.closest('.js-cerrar-notificacion');
@@ -164,14 +157,34 @@
 
                 var tarjeta = boton.closest('.js-notificacion');
 
-                if (tarjeta) {
-                    tarjeta.remove();
+                if (!tarjeta) {
+                    return;
                 }
 
-                if (vacio && lista.querySelectorAll('.js-notificacion').length === 0) {
-                    vacio.hidden = false;
-                }
+                boton.disabled = true;
+
+                fetch(endpoint + '/' + tarjeta.dataset.id + '/ocultar', {
+                    method: 'PATCH',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': token,
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                })
+                    .then(function (respuesta) {
+                        if (!respuesta.ok) {
+                            throw new Error('HTTP ' + respuesta.status);
+                        }
+                        tarjeta.remove();
+                        actualizarVacio();
+                    })
+                    .catch(function () {
+                        boton.disabled = false;
+                    });
             });
+
+            cargar();
         })();
     </script>
 @endsection
