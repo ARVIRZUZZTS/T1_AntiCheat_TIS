@@ -2,7 +2,7 @@
     @file    materia-examenes.blade.php
     @author  Alex Candia <alex.leonar.candia@gmail.com>
     @created 2026-10-05
-    @updated 2026-10-05
+    @updated 2026-10-10
 
     @description
     Sección "Exámenes" de la vista de detalle de una materia: lista los exámenes
@@ -23,6 +23,8 @@
       modal de alta, que los carga en su buscador.
     - 2026-10-05  [Alex Candia]  feat: la sección pasa también el catálogo de
       materiales y el de normas, que el modal muestra como casillas.
+    - 2026-10-10  [Alex Candia]  refactor: el botón "Crear examen" queda solo con
+      el texto (sin el ícono "+") y el aviso de éxito pasa a ser un modal chico.
 
     @see  App\Services\Examen\ListarExamenesCursoService
     @see  App\Services\Ambiente\ListarAmbientesService
@@ -46,10 +48,12 @@
 @endphp
 
 <div class="flex flex-col gap-[2vh]">
-    {{-- Aviso de éxito del alta. Los errores de validación se muestran dentro
-         del modal, que además se reabre solo (ver `abrir` más abajo). --}}
+    {{-- Aviso de éxito del alta: un modal chico con un solo botón. Al
+         aceptarlo se vuelve al listado, que ya trae el examen creado. Los
+         errores de validación se muestran dentro del modal de alta, que además
+         se reabre solo (ver `abrir` más abajo). --}}
     @if (session('mensaje'))
-        <x-ui.alert type="success">{{ session('mensaje') }}</x-ui.alert>
+        <x-ui.modal-aviso :mensaje="session('mensaje')" />
     @endif
 
     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -59,7 +63,6 @@
         </div>
 
         <x-ui.button variant="default" class="shrink-0" @click="$dispatch('abrir-modal-crear-examen')">
-            <svg class="w-4 h-4 me-1.5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-width="2" d="M12 5v14m7-7H5"/></svg>
             Crear examen
         </x-ui.button>
     </div>

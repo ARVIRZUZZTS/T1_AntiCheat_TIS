@@ -156,7 +156,6 @@ class ListarIncidenciasTramposoTest extends TestCase
             'id_examen' => $id,
             'fecha' => now()->toDateString(),
             'hora_inicio' => '08:00',
-            'hora_fin' => '10:00',
             'duracion' => 120,
             'creador' => self::DOCENTE_A,
             'tipo_examen' => self::ID_TIPO_EXAMEN,

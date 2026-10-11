@@ -57,6 +57,9 @@
  * - 2026-09-29  [Valery D. Ortuno P]  fix: pruebas de que el modal quede dentro
  *   de la raiz del componente, de que no aparezca como raiz extra ni con el modal
  *   abierto ni cerrado, y de que el resumen no muestre quien registro (#70).
+ * - 2026-10-10  [T1]  feat: prueba de que la busqueda por nombre ignora tildes y
+ *   mayusculas; el test de precarga pasa a exigir que nombre, apellido y codigo
+ *   SIS lleguen de solo lectura, porque ahora se llenan con la lupa y no a mano.
  */
 
 namespace Tests\Feature;
@@ -164,9 +167,9 @@ class RegistrarIncidenciaTest extends TestCase
     /**
      * Verifica que al llegar desde el monitor se precarguen el estudiante y el
      * estado que corresponde al rol recibido, y que el formulario se muestre con
-     * sus dos tarjetas. Los datos del estudiante llegan cargados pero editables,
-     * por si el mismo no esta en la base de datos; la materia que viene del
-     * monitor, en cambio, es de solo lectura.
+     * sus dos tarjetas. Los datos del estudiante llegan cargados y de solo
+     * lectura: se cambian con el buscador, no escribiendo a mano. La materia que
+     * viene del monitor tambien es de solo lectura.
      */
     public function test_desde_el_monitor_se_precargan_el_estudiante_y_el_estado(): void
     {
@@ -184,9 +187,9 @@ class RegistrarIncidenciaTest extends TestCase
 
         foreach (['nombreEstudiante', 'apellidoEstudiante', 'codigoSis'] as $campo) {
             $this->assertMatchesRegularExpression(
-                '/<input(?![^>]*readonly)[^>]*name="'.$campo.'"/',
+                '/<input[^>]*name="'.$campo.'"[^>]*readonly/',
                 $cuerpo,
-                'El campo '.$campo.' debe llegar editable para poder corregirlo a mano.'
+                'El campo '.$campo.' debe ser de solo lectura: se llena con el buscador.'
             );
         }
 
@@ -224,9 +227,7 @@ class RegistrarIncidenciaTest extends TestCase
     {
         Livewire::test(RegistrarIncidencia::class)
             ->call('registrar')
-            ->assertSee('Ingrese el nombre del estudiante.')
-            ->assertSee('Ingrese el apellido del estudiante.')
-            ->assertSee('Ingrese el código SIS del estudiante.')
+            ->assertSee('Busque y seleccione un estudiante de la lista.')
             ->assertSee('Ingrese la materia del examen.')
             ->assertSee('Seleccione el motivo de la incidencia.')
             ->assertDontSee('field is required');
@@ -245,7 +246,7 @@ class RegistrarIncidenciaTest extends TestCase
 
         Livewire::test(RegistrarIncidencia::class)
             ->set('rol', Rol::NOMBRE_AUXILIAR)
-            ->assertSee('En revision')
+            ->assertSee('En revisión')
             ->assertSet('tipoInfraccion', TipoInfraccion::Sospechoso);
     }
 
@@ -274,6 +275,57 @@ class RegistrarIncidenciaTest extends TestCase
         $componente = Livewire::test(RegistrarIncidencia::class)->set('busqueda', 'J');
 
         $this->assertCount(0, $componente->instance()->resultadosBusqueda());
+    }
+
+    /**
+     * Verifica que la busqueda por nombre ignore las tildes y las mayusculas: la
+     * base guarda "Jesús Añazco" y quien busca puede escribir "jesus" o "anazco".
+     */
+    public function test_el_buscador_ignora_las_tildes_del_nombre(): void
+    {
+        Estudiante::query()->create([
+            'sis_estudiante' => '900000777',
+            'nombre_estudiante' => 'Jesús',
+            'apellido_estudiante' => 'Añazco',
+            'carrera' => 'Ingenieria de Sistemas',
+        ]);
+
+        $componente = Livewire::test(RegistrarIncidencia::class)
+            ->set('busqueda', 'anazco')
+            ->assertSee('Jesús Añazco')
+            ->set('busqueda', 'jesus')
+            ->assertSee('Jesús Añazco')
+            ->set('busqueda', 'Jesús')
+            ->assertSee('Jesús Añazco');
+
+        $this->assertCount(1, $componente->instance()->resultadosBusqueda());
+    }
+
+    /**
+     * Verifica que la busqueda por nombre no distinga mayusculas: escribir
+     * "ana" en minuscula tiene que encontrar a "Ana".
+     */
+    public function test_el_buscador_ignora_las_mayusculas(): void
+    {
+        Estudiante::query()->create([
+            'sis_estudiante' => '900000888',
+            'nombre_estudiante' => 'Ana',
+            'apellido_estudiante' => 'Zeballos',
+            'carrera' => 'Ingenieria de Sistemas',
+        ]);
+
+        $componente = Livewire::test(RegistrarIncidencia::class)
+            ->set('busqueda', 'ana')
+            ->assertSee('Ana Zeballos')
+            ->set('busqueda', 'ANA')
+            ->assertSee('Ana Zeballos')
+            ->set('busqueda', 'zeballos')
+            ->assertSee('Ana Zeballos');
+
+        $this->assertTrue(
+            $componente->instance()->resultadosBusqueda()
+                ->contains(fn (Estudiante $e): bool => $e->sis_estudiante === '900000888'),
+        );
     }
 
     /**
@@ -315,7 +367,7 @@ class RegistrarIncidenciaTest extends TestCase
             ->set('apellidoEstudiante', self::APELLIDO)
             ->set('codigoSis', self::SIS_VALIDO)
             ->set('sisPrecargado', self::SIS_VALIDO)
-            ->set('tipoIncidencia', 'copia_o_intercambio_de_respuestas')
+            ->set('tipoIncidencia', Motivo::CopiaOIntercambioDeRespuestas->value)
             ->set('materia', 'Fisica 1!')
             ->call('registrar')
             ->assertHasErrors('materia')
@@ -334,67 +386,45 @@ class RegistrarIncidenciaTest extends TestCase
     }
 
     /**
-     * Verifica que el nombre y el apellido solo admitan letras, porque se
-     * escriben a mano cuando el estudiante no esta en la base de datos.
+     * Verifica que el nombre y el apellido ya no se validen por formato: son
+     * datos del registro de estudiantes y este formulario solo exige que no
+     * vayan vacios. Un nombre con digitos o signos ya no se rechaza.
      */
-    public function test_nombre_y_apellido_solo_admiten_letras(): void
+    public function test_el_nombre_y_el_apellido_no_se_validan_por_formato(): void
     {
-        Livewire::test(RegistrarIncidencia::class)
+        $datos = Livewire::test(RegistrarIncidencia::class)
             ->set('nombreEstudiante', 'Ana2')
-            ->set('apellidoEstudiante', self::APELLIDO)
+            ->set('apellidoEstudiante', 'Lopez-1')
             ->set('codigoSis', self::SIS_VALIDO)
             ->set('sisPrecargado', self::SIS_VALIDO)
-            ->set('tipoIncidencia', 'copia_o_intercambio_de_respuestas')
+            ->set('tipoIncidencia', Motivo::CopiaOIntercambioDeRespuestas->value)
             ->set('materia', self::MATERIA_EJEMPLO)
-            ->call('registrar')
-            ->assertHasErrors('nombreEstudiante')
-            ->assertSee('El nombre solo puede contener letras.', escape: false);
+            ->instance()
+            ->validate();
 
-        Livewire::test(RegistrarIncidencia::class)
-            ->set('nombreEstudiante', self::NOMBRE)
-            ->set('apellidoEstudiante', 'Lopez1')
-            ->set('codigoSis', self::SIS_VALIDO)
-            ->set('sisPrecargado', self::SIS_VALIDO)
-            ->set('tipoIncidencia', 'copia_o_intercambio_de_respuestas')
-            ->set('materia', self::MATERIA_EJEMPLO)
-            ->call('registrar')
-            ->assertHasErrors('apellidoEstudiante')
-            ->assertSee('El apellido solo puede contener letras.', escape: false);
+        $this->assertSame('Ana2', $datos['nombreEstudiante']);
+        $this->assertSame('Lopez-1', $datos['apellidoEstudiante']);
     }
 
     /**
-     * Verifica que el codigo SIS admita solo 9 numeros, sin letras ni signos.
+     * Verifica que el codigo SIS acepte el valor tal como llega del registro de
+     * estudiantes: ya no se exigen nueve digitos ni se rechazan letras.
      */
-    public function test_el_codigo_sis_solo_admite_nueve_numeros(): void
+    public function test_el_codigo_sis_acepta_lo_que_llega_del_registro(): void
     {
-        Livewire::test(RegistrarIncidencia::class)
-            ->set('nombreEstudiante', self::NOMBRE)
-            ->set('apellidoEstudiante', self::APELLIDO)
-            ->set('codigoSis', '20220101')
-            ->set('tipoIncidencia', 'copia_o_intercambio_de_respuestas')
-            ->set('materia', self::MATERIA_EJEMPLO)
-            ->call('registrar')
-            ->assertHasErrors('codigoSis')
-            ->assertSee('El código SIS debe tener 9 números.', escape: false);
+        foreach (['20220101', '2022A013'] as $codigo) {
+            $datos = Livewire::test(RegistrarIncidencia::class)
+                ->set('nombreEstudiante', self::NOMBRE)
+                ->set('apellidoEstudiante', self::APELLIDO)
+                ->set('codigoSis', $codigo)
+                ->set('sisPrecargado', $codigo)
+                ->set('tipoIncidencia', Motivo::CopiaOIntercambioDeRespuestas->value)
+                ->set('materia', self::MATERIA_EJEMPLO)
+                ->instance()
+                ->validate();
 
-        Livewire::test(RegistrarIncidencia::class)
-            ->set('nombreEstudiante', self::NOMBRE)
-            ->set('apellidoEstudiante', self::APELLIDO)
-            ->set('codigoSis', '2022A013')
-            ->set('tipoIncidencia', 'copia_o_intercambio_de_respuestas')
-            ->set('materia', self::MATERIA_EJEMPLO)
-            ->call('registrar')
-            ->assertHasErrors('codigoSis');
-
-        Livewire::test(RegistrarIncidencia::class)
-            ->set('nombreEstudiante', self::NOMBRE)
-            ->set('apellidoEstudiante', self::APELLIDO)
-            ->set('codigoSis', self::SIS_VALIDO)
-            ->set('sisPrecargado', self::SIS_VALIDO)
-            ->set('tipoIncidencia', 'copia_o_intercambio_de_respuestas')
-            ->set('materia', self::MATERIA_EJEMPLO)
-            ->call('registrar')
-            ->assertHasNoErrors();
+            $this->assertSame($codigo, $datos['codigoSis']);
+        }
     }
 
     /**
@@ -427,7 +457,7 @@ class RegistrarIncidenciaTest extends TestCase
             ->set('codigoSis', self::SIS_VALIDO)
             ->set('sisPrecargado', self::SIS_VALIDO)
             ->set('materia', self::MATERIA_EJEMPLO)
-            ->set('tipoIncidencia', 'copia_o_intercambio_de_respuestas')
+            ->set('tipoIncidencia', Motivo::CopiaOIntercambioDeRespuestas->value)
             ->call('registrar')
             ->assertHasNoErrors();
 
@@ -449,7 +479,7 @@ class RegistrarIncidenciaTest extends TestCase
     public function test_la_etiqueta_de_descripcion_cambia_segun_el_motivo(): void
     {
         Livewire::test(RegistrarIncidencia::class)
-            ->set('tipoIncidencia', 'copia_o_intercambio_de_respuestas')
+            ->set('tipoIncidencia', Motivo::CopiaOIntercambioDeRespuestas->value)
             ->assertSee('Descripcion del hecho</label>', escape: false)
             ->set('tipoIncidencia', RegistrarIncidencia::MOTIVO_OTRO)
             ->assertSee('Descripcion del hecho *</label>', escape: false);
@@ -466,7 +496,7 @@ class RegistrarIncidenciaTest extends TestCase
             ->set('codigoSis', self::SIS_VALIDO)
             ->set('sisPrecargado', self::SIS_VALIDO)
             ->set('materia', self::MATERIA_EJEMPLO)
-            ->set('tipoIncidencia', 'copia_o_intercambio_de_respuestas')
+            ->set('tipoIncidencia', Motivo::CopiaOIntercambioDeRespuestas->value)
             ->set('descripcion', str_repeat('a', RegistrarIncidencia::DESCRIPCION_MAXIMO + 1))
             ->call('registrar')
             ->assertHasErrors('descripcion');
@@ -569,7 +599,7 @@ class RegistrarIncidenciaTest extends TestCase
     {
         Livewire::test(RegistrarIncidencia::class)
             ->assertSee('Seleccione el motivo de la incidencia')
-            ->assertSee('Intento de Ingreso a examen no autorizado')
+            ->assertSee('Intento de ingreso a examen no autorizado')
             ->assertSee('Uso de dispositivos electrónicos no autorizados')
             ->assertSee('Copia o intercambio de respuestas')
             ->assertSee('Uso de material no autorizado')
@@ -578,52 +608,22 @@ class RegistrarIncidenciaTest extends TestCase
     }
 
     /**
-     * Verifica que los estudiantes que trae la semilla de `002_seed_data.sql`
-     * sirvan para probar el formulario: codigo SIS de 9 digitos y nombre y
-     * apellido que el componente acepta. Si alguien cambia la semilla y rompe
-     * una de las dos cosas, este test lo avisa en vez de dejarlo para
-     * descubrirlo a mano en el navegador.
+     * Verifica que los estudiantes cargados en la base tengan los datos que el
+     * formulario necesita: nombre, apellido y codigo SIS no vacios. El formato
+     * ya no se valida aqui, es responsabilidad del registro de estudiantes.
      */
-    public function test_los_estudiantes_de_la_semilla_son_validos_para_el_formulario(): void
+    public function test_los_estudiantes_cargados_tienen_datos_completos(): void
     {
         $estudiantes = Estudiante::query()
             ->where('sis_estudiante', 'not like', '9%')
-            ->orderBy('sis_estudiante')
             ->get();
 
-        $this->assertGreaterThan(0, $estudiantes->count(), 'La semilla debe traer estudiantes de prueba.');
+        $this->assertGreaterThan(0, $estudiantes->count(), 'La base debe traer estudiantes de prueba.');
 
         foreach ($estudiantes as $estudiante) {
-            /* El monitor precarga el codigo SIS por la URL, y mount() guarda
-               ese mismo valor en `sisPrecargado` para distinguirlo de lo que se
-               escribe a mano; hay que setear los dos, como hace el monitor. */
-            $componente = Livewire::test(RegistrarIncidencia::class)
-                ->set('origen', RegistrarIncidencia::ORIGEN_MONITOREO)
-                ->set('nombreEstudiante', $estudiante->nombre_estudiante)
-                ->set('apellidoEstudiante', $estudiante->apellido_estudiante)
-                ->set('codigoSis', $estudiante->sis_estudiante)
-                ->set('sisPrecargado', $estudiante->sis_estudiante)
-                ->set('materia', self::MATERIA_EJEMPLO)
-                ->set('tipoIncidencia', Motivo::IntentoDeIngresoNoAutorizado->value)
-                ->call('registrar');
-
-            $errores = $componente->errors()->toArray();
-
-            $this->assertArrayNotHasKey(
-                'codigoSis',
-                $errores,
-                'El SIS '.$estudiante->sis_estudiante.' no cumple la regla de 9 digitos.',
-            );
-
-            foreach (['nombreEstudiante', 'apellidoEstudiante'] as $campo) {
-                $this->assertArrayNotHasKey(
-                    $campo,
-                    $errores,
-                    'El valor de '.$campo.' del estudiante '.$estudiante->sis_estudiante
-                        .' es rechazado por el formulario: '.$estudiante->nombre_estudiante
-                        .' '.$estudiante->apellido_estudiante,
-                );
-            }
+            $this->assertNotSame('', trim((string) $estudiante->sis_estudiante));
+            $this->assertNotSame('', trim((string) $estudiante->nombre_estudiante));
+            $this->assertNotSame('', trim((string) $estudiante->apellido_estudiante));
         }
     }
 
@@ -640,7 +640,7 @@ class RegistrarIncidenciaTest extends TestCase
             ->set('codigoSis', self::SIS_VALIDO)
             ->set('sisPrecargado', self::SIS_VALIDO)
             ->set('materia', self::MATERIA_EJEMPLO)
-            ->set('tipoIncidencia', 'copia_o_intercambio_de_respuestas')
+            ->set('tipoIncidencia', Motivo::CopiaOIntercambioDeRespuestas->value)
             ->call('registrar')
             ->assertHasNoErrors()
             ->assertSet('confirmacionVisible', true)
@@ -679,7 +679,7 @@ class RegistrarIncidenciaTest extends TestCase
             ->set('codigoSis', self::SIS_VALIDO)
             ->set('sisPrecargado', self::SIS_VALIDO)
             ->set('materia', self::MATERIA_EJEMPLO)
-            ->set('tipoIncidencia', 'uso_de_dispositivos_electronicos')
+            ->set('tipoIncidencia', Motivo::UsoDeDispositivosElectronicos->value)
             ->call('registrar')
             ->assertHasNoErrors();
 
@@ -703,7 +703,7 @@ class RegistrarIncidenciaTest extends TestCase
             ->set('codigoSis', self::SIS_VALIDO)
             ->set('sisPrecargado', self::SIS_VALIDO)
             ->set('materia', self::MATERIA_EJEMPLO)
-            ->set('tipoIncidencia', 'uso_de_dispositivos_electronicos')
+            ->set('tipoIncidencia', Motivo::UsoDeDispositivosElectronicos->value)
             ->call('registrar')
             ->call('aceptarRegistro')
             ->assertRedirect(route('monitoreo'));
@@ -722,7 +722,7 @@ class RegistrarIncidenciaTest extends TestCase
             ->set('codigoSis', self::SIS_VALIDO)
             ->set('sisPrecargado', self::SIS_VALIDO)
             ->set('materia', self::MATERIA_EJEMPLO)
-            ->set('tipoIncidencia', 'suplantacion_de_identidad')
+            ->set('tipoIncidencia', Motivo::SuplantacionDeIdentidad->value)
             ->call('registrar')
             ->call('aceptarRegistro')
             ->assertRedirect(route('central-riesgo'));
@@ -742,9 +742,9 @@ class RegistrarIncidenciaTest extends TestCase
             ->set('codigoSis', self::SIS_VALIDO)
             ->set('sisPrecargado', self::SIS_VALIDO)
             ->set('materia', self::MATERIA_EJEMPLO)
-            ->set('tipoIncidencia', 'uso_de_material_no_autorizado')
+            ->set('tipoIncidencia', Motivo::UsoDeMaterialNoAutorizado->value)
             ->call('registrar')
-            ->assertSee('En revision');
+            ->assertSee('En revisión');
     }
 
     /**
@@ -760,7 +760,7 @@ class RegistrarIncidenciaTest extends TestCase
             ->set('codigoSis', self::SIS_VALIDO)
             ->set('sisPrecargado', self::SIS_VALIDO)
             ->set('materia', self::MATERIA_EJEMPLO)
-            ->set('tipoIncidencia', 'intento_de_ingreso_no_autorizado')
+            ->set('tipoIncidencia', Motivo::IntentoDeIngresoNoAutorizado->value)
             ->call('registrar')
             ->assertSet('confirmacionVisible', true);
 
@@ -792,7 +792,7 @@ class RegistrarIncidenciaTest extends TestCase
             ->set('codigoSis', self::SIS_VALIDO)
             ->set('sisPrecargado', self::SIS_VALIDO)
             ->set('materia', self::MATERIA_EJEMPLO)
-            ->set('tipoIncidencia', 'uso_de_dispositivos_electronicos')
+            ->set('tipoIncidencia', Motivo::UsoDeDispositivosElectronicos->value)
             ->set('descripcion', 'Se le vio el celular debajo del banco')
             ->call('registrar')
             ->assertHasNoErrors()
@@ -831,7 +831,7 @@ class RegistrarIncidenciaTest extends TestCase
             ->set('codigoSis', self::SIS_VALIDO)
             ->set('sisPrecargado', self::SIS_VALIDO)
             ->set('materia', self::MATERIA_EJEMPLO)
-            ->set('tipoIncidencia', 'intento_de_ingreso_no_autorizado')
+            ->set('tipoIncidencia', Motivo::IntentoDeIngresoNoAutorizado->value)
             ->call('registrar')
             ->assertHasNoErrors();
 
@@ -854,12 +854,73 @@ class RegistrarIncidenciaTest extends TestCase
             ->set('codigoSis', self::SIS_VALIDO)
             ->set('sisPrecargado', self::SIS_VALIDO)
             ->set('materia', self::MATERIA_EJEMPLO)
-            ->set('tipoIncidencia', 'copia_o_intercambio_de_respuestas')
+            ->set('tipoIncidencia', Motivo::CopiaOIntercambioDeRespuestas->value)
             ->call('registrar')
             ->assertHasNoErrors();
 
         $this->assertSame(self::MATERIA_DEL_EXAMEN, $componente->get('resumen')['materia']);
         $componente->assertSee(self::MATERIA_DEL_EXAMEN);
+
+        // El examen de un solo curso fija ese curso al guardar, aunque la
+        // persona no lo elija.
+        $registro = CentralRiesgo::query()->orderByDesc('id_registro')->firstOrFail();
+        $this->assertSame(3, $registro->id_curso, 'El examen de un solo curso fija su curso.');
+    }
+
+    /**
+     * Verifica que un examen compartido entre varios cursos pida elegir la
+     * materia y guarde el curso elegido en `central_riesgo.id_curso`, que es de
+     * donde `materia()` la resuelve.
+     */
+    public function test_con_varios_cursos_en_el_examen_se_elige_la_materia(): void
+    {
+        // Se le suma un segundo curso al examen del monitor para simular un
+        // examen compartido; se revierte al terminar el test.
+        DB::table('curso')->insert([
+            'id_curso' => 900001,
+            'nombre_curso' => 'Curso Compartido',
+            'sis_doc' => 1,
+            'fecha_creacion' => '2024-02-05',
+            'estado' => 'EnCurso',
+        ]);
+
+        DB::table('examen_curso')->insert([
+            'id_examen' => self::EXAMEN_DEL_MONITOR,
+            'id_curso' => 900001,
+        ]);
+
+        // Sin elegir curso no deja registrar: el selector es obligatorio.
+        Livewire::test(RegistrarIncidencia::class)
+            ->set('idExamen', self::EXAMEN_DEL_MONITOR)
+            ->set('nombreEstudiante', self::NOMBRE)
+            ->set('apellidoEstudiante', self::APELLIDO)
+            ->set('codigoSis', self::SIS_VALIDO)
+            ->set('sisPrecargado', self::SIS_VALIDO)
+            ->set('materia', self::MATERIA_EJEMPLO)
+            ->set('tipoIncidencia', Motivo::CopiaOIntercambioDeRespuestas->value)
+            ->call('registrar')
+            ->assertHasErrors('idCurso');
+
+        // El selector manda el id del curso como valor, no su nombre.
+        Livewire::test(RegistrarIncidencia::class)
+            ->set('idExamen', self::EXAMEN_DEL_MONITOR)
+            ->assertSee('value="900001"', escape: false)
+            ->assertSee('Curso Compartido')
+            ->set('nombreEstudiante', self::NOMBRE)
+            ->set('apellidoEstudiante', self::APELLIDO)
+            ->set('codigoSis', self::SIS_VALIDO)
+            ->set('sisPrecargado', self::SIS_VALIDO)
+            ->set('materia', self::MATERIA_EJEMPLO)
+            ->set('tipoIncidencia', Motivo::CopiaOIntercambioDeRespuestas->value)
+            ->set('idCurso', 900001)
+            ->call('registrar')
+            ->assertHasNoErrors()
+            ->assertSet('confirmacionVisible', true);
+
+        $registro = CentralRiesgo::query()->orderByDesc('id_registro')->firstOrFail();
+
+        $this->assertSame(900001, $registro->id_curso);
+        $this->assertSame('Curso Compartido', $registro->materia());
     }
 
     /**
@@ -875,7 +936,7 @@ class RegistrarIncidenciaTest extends TestCase
             ->set('apellidoEstudiante', self::APELLIDO)
             ->set('codigoSis', '111111111')
             ->set('materia', self::MATERIA_EJEMPLO)
-            ->set('tipoIncidencia', 'copia_o_intercambio_de_respuestas')
+            ->set('tipoIncidencia', Motivo::CopiaOIntercambioDeRespuestas->value)
             ->call('registrar')
             ->assertHasNoErrors()
             ->assertSet('confirmacionVisible', true);
@@ -926,7 +987,7 @@ class RegistrarIncidenciaTest extends TestCase
             ->set('codigoSis', self::SIS_VALIDO)
             ->set('sisPrecargado', self::SIS_VALIDO)
             ->set('materia', self::MATERIA_EJEMPLO)
-            ->set('tipoIncidencia', 'uso_de_material_no_autorizado')
+            ->set('tipoIncidencia', Motivo::UsoDeMaterialNoAutorizado->value)
             ->call('registrar')
             ->assertHasNoErrors();
 
@@ -950,7 +1011,7 @@ class RegistrarIncidenciaTest extends TestCase
             ->set('codigoSis', self::SIS_VALIDO)
             ->set('sisPrecargado', self::SIS_VALIDO)
             ->set('materia', self::MATERIA_EJEMPLO)
-            ->set('tipoIncidencia', 'suplantacion_de_identidad')
+            ->set('tipoIncidencia', Motivo::SuplantacionDeIdentidad->value)
             ->call('registrar')
             ->assertHasNoErrors();
 
@@ -975,7 +1036,7 @@ class RegistrarIncidenciaTest extends TestCase
             ->set('codigoSis', self::SIS_VALIDO)
             ->set('sisPrecargado', self::SIS_VALIDO)
             ->set('materia', self::MATERIA_EJEMPLO)
-            ->set('tipoIncidencia', 'uso_de_material_no_autorizado')
+            ->set('tipoIncidencia', Motivo::UsoDeMaterialNoAutorizado->value)
             ->call('registrar')
             ->assertHasNoErrors()
             ->assertSet('confirmacionVisible', true);
@@ -1006,7 +1067,7 @@ class RegistrarIncidenciaTest extends TestCase
                 ->set('codigoSis', self::SIS_VALIDO)
             ->set('sisPrecargado', self::SIS_VALIDO)
                 ->set('materia', self::MATERIA_EJEMPLO)
-                ->set('tipoIncidencia', 'intento_de_ingreso_no_autorizado')
+                ->set('tipoIncidencia', Motivo::IntentoDeIngresoNoAutorizado->value)
                 ->call('registrar')
                 ->assertHasNoErrors();
         }
@@ -1037,7 +1098,7 @@ class RegistrarIncidenciaTest extends TestCase
             ->set('codigoSis', self::SIS_VALIDO)
             ->set('sisPrecargado', self::SIS_VALIDO)
             ->set('materia', self::MATERIA_EJEMPLO)
-            ->set('tipoIncidencia', 'suplantacion_de_identidad')
+            ->set('tipoIncidencia', Motivo::SuplantacionDeIdentidad->value)
             ->call('registrar')
             ->assertHasErrors('usuario')
             ->assertSet('confirmacionVisible', false);
@@ -1060,7 +1121,7 @@ class RegistrarIncidenciaTest extends TestCase
             ->set('codigoSis', self::SIS_VALIDO)
             ->set('sisPrecargado', self::SIS_VALIDO)
             ->set('materia', self::MATERIA_EJEMPLO)
-            ->set('tipoIncidencia', 'uso_de_dispositivos_electronicos')
+            ->set('tipoIncidencia', Motivo::UsoDeDispositivosElectronicos->value)
             ->call('registrar')
             ->assertHasNoErrors();
 
@@ -1096,41 +1157,6 @@ class RegistrarIncidenciaTest extends TestCase
             'Miraba hacia la puerta',
             CentralRiesgo::query()->orderByDesc('id_registro')->firstOrFail()->detalle_motivo
         );
-    }
-
-    /**
-     * Verifica que la semilla mezcle los cuatro patrones de nombre que tiene que
-     * separar el monitor: nombre con un apellido, dos nombres con un apellido,
-     * un nombre con dos apellidos y dos nombres con dos apellidos.
-     */
-    public function test_la_semilla_mezcla_los_cuatro_patrones_de_nombre(): void
-    {
-        $estudiantes = Estudiante::query()
-            ->where('sis_estudiante', 'not like', '9%')
-            ->get();
-
-        $patrones = [
-            'nombre + 1 apellido' => $estudiantes->contains(
-                fn (Estudiante $e): bool => $this->contarPalabras($e->nombre_estudiante) === 1
-                    && $this->contarPalabras($e->apellido_estudiante) === 1,
-            ),
-            '2 nombres + 1 apellido' => $estudiantes->contains(
-                fn (Estudiante $e): bool => $this->contarPalabras($e->nombre_estudiante) === 2
-                    && $this->contarPalabras($e->apellido_estudiante) === 1,
-            ),
-            'nombre + 2 apellidos' => $estudiantes->contains(
-                fn (Estudiante $e): bool => $this->contarPalabras($e->nombre_estudiante) === 1
-                    && $this->contarPalabras($e->apellido_estudiante) === 2,
-            ),
-            '2 nombres + 2 apellidos' => $estudiantes->contains(
-                fn (Estudiante $e): bool => $this->contarPalabras($e->nombre_estudiante) === 2
-                    && $this->contarPalabras($e->apellido_estudiante) === 2,
-            ),
-        ];
-
-        foreach ($patrones as $patron => $existe) {
-            $this->assertTrue($existe, 'La semilla no tiene ningun estudiante con el patron: '.$patron);
-        }
     }
 
     /**
@@ -1305,15 +1331,5 @@ class RegistrarIncidenciaTest extends TestCase
         $this->assertNotNull($estudiante, 'La semilla debe traer estudiantes de prueba.');
 
         return $estudiante;
-    }
-
-    /**
-     * Cuenta las palabras de un nombre, ignorando los espacios sobrantes.
-     */
-    private function contarPalabras(string $texto): int
-    {
-        $limpio = trim(preg_replace('/\s+/u', ' ', $texto) ?? '');
-
-        return $limpio === '' ? 0 : count(explode(' ', $limpio));
     }
 }

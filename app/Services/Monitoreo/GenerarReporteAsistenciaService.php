@@ -26,6 +26,11 @@
  *  - `presente`   tiene fila en `registro_asistencia`.
  *  - `pendiente`  ninguno de los casos anteriores.
  *
+ * El examen se resuelve con sus relaciones en la misma consulta porque la vista
+ * del monitor lee cursos, ambientes, materiales permitidos y el tipo: cargarlas
+ * por separado eran cuatro viajes más a la base por página, que con la latencia
+ * del servidor remoto costaban ~1s.
+ *
  * @changelog
  * - 2026-09-25  [OchoaCesar]  feat:  creación inicial del servicio con estados
  *                                     presente/ausente/pendiente, registrador y
@@ -41,13 +46,13 @@
  *   los modales de no habilitado y de central de riesgos no se alcanzaban.
  *   También se deja de comparar contra la hora de inicio: si el registrador
  *   anotó el ingreso, el estudiante entró, aunque se consulte antes de la hora.
- * - 2026-10-10  [T1]  fix: `with(['cursos', 'ambientes', 'materialesPermitidos'])`
- *   al resolver el examen. La vista del monitor lee esas tres relaciones y las
- *   cargaba por separado: tres viajes de ida y vuelta a la base por página que,
- *   con la latencia del servidor remoto, costaban ~1s.
- * - 2026-10-10  [T1]  feat: `tipoExamen` entra al `with()`, para el subtítulo del
- *   header del monitor (materia · tipo de examen). Sin esto la vista lo cargaría
- *   aparte y sumaría otro viaje a la base (~335ms con la latencia actual).
+ * - 2026-10-10  [T1]  perf: el examen se resuelve con `with(['cursos',
+ *   'ambientes', 'materialesPermitidos', 'tipoExamen'])`, y `tipoExamen` para el
+ *   subtítulo del header. Cuatro viajes menos a la base por página.
+ * - 2026-10-10  [Alex Candia]  refactor: la columna `hora_fin` se quitó de
+ *   `examen` y pasó a derivarse. En este servicio esa derivada quedó sin uso
+ *   cuando el estado pasó a calcularse desde el dato persistido, así que se
+ *   retira de acá; la ventana horaria la resuelve `Examen::getHoraFinAttribute()`.
  *
  * @see  \App\Livewire\Monitoreo\MonitorEnVivo
  * @see  App\Services\Asistencia\RegistroIngresoService
@@ -69,8 +74,8 @@ use Carbon\Carbon;
 use Illuminate\Support\Collection;
 
 /**
+ * @package App\Services\Monitoreo
  * @author  OchoaCesar <cesareduardonick@gmail.com>
- *
  * @since   2026-09-25
  */
 class GenerarReporteAsistenciaService
@@ -79,10 +84,9 @@ class GenerarReporteAsistenciaService
      * Genera el reporte de asistencia de un examen.
      *
      * @param  int  $idExamen  ID del examen
-     * @param  Carbon|null  $ahora  Fecha/hora actual; se conserva por
-     *                              compatibilidad con la firma original pero el estado ya no depende de
-     *                              ella, sino de lo que hay persistido.
-     * @return array<string, mixed>
+     * @param  Carbon|null  $ahora  Se conserva por compatibilidad con la firma
+     *   original; el estado ya no depende de la hora, sino de lo persistido.
+     * @return array{examen: Examen, estudiantes: Collection}
      */
     public function ejecutar(int $idExamen, ?Carbon $ahora = null): array
     {
@@ -137,6 +141,7 @@ class GenerarReporteAsistenciaService
      * caso la clave no existe.
      *
      * @param  int  $idExamen  ID del examen.
+     * @return Collection<string, array{tipo: string, fecha: string, estado: string, motivo_etiqueta: string}>
      */
     private function incidenciasPorEstudiante(int $idExamen): Collection
     {
@@ -146,10 +151,14 @@ class GenerarReporteAsistenciaService
             ->get()
             ->keyBy('sis_estudiante')
             ->map(fn (CentralRiesgo $riesgo): array => [
-                'tipo' => $riesgo->tipo_infraccion->value,
-                'fecha' => $riesgo->fecha_registro->format('d/m/Y'),
+                'tipo' => (string) $riesgo->tipo_infraccion?->value,
+                'fecha' => $riesgo->fecha_registro?->format('d/m/Y') ?? '',
                 'estado' => (string) $riesgo->getAttribute('estado_incidencia'),
-                'motivo_etiqueta' => Motivo::tryFrom((string) $riesgo->motivo)?->etiqueta() ?? (string) $riesgo->motivo,
+                // `motivo` llega casteado a Motivo desde el modelo, pero se
+                // acepta también el texto plano por si el cast se retira.
+                'motivo_etiqueta' => $riesgo->motivo instanceof Motivo
+                    ? $riesgo->motivo->etiqueta()
+                    : (Motivo::tryFrom((string) $riesgo->motivo)?->etiqueta() ?? (string) $riesgo->motivo),
             ]);
     }
 

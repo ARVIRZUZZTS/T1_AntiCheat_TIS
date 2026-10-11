@@ -2,7 +2,7 @@
     @file    registrar-incidencia.blade.php
     @author  Valery D. Ortuno P. <valerydariana98@gmail.com>
     @created 2026-09-25
-    @updated 2026-09-28
+    @updated 2026-10-10
 
     @description
     Vista del formulario de registro de una incidencia en la central de riesgos.
@@ -48,6 +48,16 @@
  *   raíz del componente, porque Livewire solo morfea el primer elemento del
  *   HTML que devuelve y, siendo hermano de la raíz, nunca llegaba a pintarse
  *   (#70).
+ * - 2026-10-10  [T1]  feat: con un examen compartido entre varios cursos la
+ *   materia se elige en un selector y el curso elegido es el que se guarda; con
+ *   un solo curso la materia sigue siendo de solo lectura.
+ * - 2026-10-10  [T1]  fix: nombre, apellido y código SIS pasan a solo lectura
+ *   (se llenan al elegir un resultado de la búsqueda) y el desplegable de
+ *   resultados se ancla a un contenedor `relative` para que deje de salir
+ *   descolocado.
+ * - 2026-10-10  [T1]  perf: el buscador avisa mientras carga y el mensaje de
+ *   "ningún estudiante coincide" espera a que haya al menos dos caracteres; el
+ *   aviso de autocapitalización del navegador se apaga en el campo.
 --}}
 
 @section('title', 'Registrar incidencia')
@@ -70,31 +80,43 @@
     {{-- Tarjeta 1: quién es el estudiante. El buscador va fuera del <form> de
          registro porque `x-ui.search-input` ya emite su propio <form>.
 
-         Los campos de solo lectura (nombre y código SIS) conservan el fondo
-         gris de fábrica del design system; los editables llevan
-         `bg-neutral-primary-soft!` para ponerse en blanco y así distinguirse
-         de un vistazo. El `!` es necesario porque los componentes de `x-ui`
-         fijan el fondo con su propia utilidad de Tailwind. --}}
+         Nombre, apellido y código SIS son de solo lectura: se llenan al elegir
+         un resultado de la búsqueda (o con lo que precargue el monitor) y no se
+         escriben a mano. Conservan el fondo gris de fábrica del design system. --}}
     <section class="bg-neutral-primary-soft border border-default rounded-base shadow-xs p-6 sm:p-8">
         <h2 class="text-lg font-semibold text-heading">Datos del estudiante</h2>
 
-        <div class="mt-6">
+        <div class="relative mt-6">
             <x-ui.search-input
                 name="busqueda"
                 id="busqueda"
                 placeholder="Buscar por nombre o código SIS..."
-                wire:model.live.debounce.300ms="busqueda"
+                wire:model.live.debounce.250ms="busqueda"
                 wire:submit.prevent="buscarEstudiantes"
                 :show-button="false"
+                autocomplete="off"
+                autocapitalize="none"
+                autocorrect="off"
+                spellcheck="false"
                 class="bg-neutral-primary-soft!"
             />
 
+            {{-- Aviso mientras viaja la petición del buscador: la base está en
+                 Supabase y el primer viaje tarda; después el catálogo queda en
+                 caché y responde al instante. --}}
+            <p class="mt-2 text-sm text-body" wire:loading wire:target="busqueda">
+                Buscando estudiantes…
+            </p>
+
+            {{-- El desplegable se ancla al contenedor `relative` de arriba; sin
+                 él, `absolute` se medía contra la página y salía descolocado. --}}
             @if (filled($busqueda) && $resultados->isNotEmpty())
-                <ul class="absolute z-10 mt-1 w-full overflow-hidden rounded-base border border-default bg-surface-page shadow-xs"
+                <ul class="absolute z-20 mt-1 w-full max-h-64 overflow-y-auto rounded-base border border-default bg-surface-page shadow-lg"
                     role="listbox"
                     aria-label="Estudiantes encontrados">
                     @foreach ($resultados as $resultado)
-                        <li role="option" aria-selected="false">
+                        <li role="option" aria-selected="false"
+                            wire:key="resultado-{{ $resultado->sis_estudiante }}">
                             <button type="button"
                                     wire:click="seleccionarEstudiante('{{ $resultado->sis_estudiante }}')"
                                     class="flex w-full flex-col items-start gap-0.5 border-b border-default px-3 py-2 text-start text-sm last:border-b-0 hover:bg-neutral-secondary-soft focus:bg-neutral-secondary-soft focus:outline-none">
@@ -106,48 +128,45 @@
                         </li>
                     @endforeach
                 </ul>
-            @elseif (filled($busqueda) && $resultados->isEmpty())
+            @elseif (mb_strlen(trim($busqueda)) >= 2 && $resultados->isEmpty())
                 <p class="mt-2 text-sm text-body">
                     Ningún estudiante coincide con «{{ trim($busqueda) }}».
                 </p>
             @endif
         </div>
 
+        <p class="mt-2 text-sm text-body">
+            El nombre, el apellido y el código SIS se completan al elegir un estudiante de la búsqueda.
+        </p>
+
         <div class="mt-6 grid gap-5 sm:grid-cols-3">
-            {{-- Precargados desde el monitor o desde el buscador, pero editables:
-                 si el estudiante no está en la base de datos se escribe a mano. --}}
+            {{-- Solo lectura: se llenan al elegir un estudiante de la búsqueda (o
+                 con lo que precargue el monitor), no se escriben a mano. --}}
             <x-ui.input
                 label="Nombres *"
                 name="nombreEstudiante"
                 :value="$nombreEstudiante"
-                wire:model="nombreEstudiante"
                 :error="$errors->first('nombreEstudiante')"
-                maxlength="50"
                 placeholder="Nombres del estudiante"
-                class="bg-neutral-primary-soft!"
+                readonly
             />
 
             <x-ui.input
                 label="Apellidos *"
                 name="apellidoEstudiante"
                 :value="$apellidoEstudiante"
-                wire:model="apellidoEstudiante"
                 :error="$errors->first('apellidoEstudiante')"
-                maxlength="50"
                 placeholder="Apellidos del estudiante"
-                class="bg-neutral-primary-soft!"
+                readonly
             />
 
             <x-ui.input
                 label="Código SIS *"
                 name="codigoSis"
                 :value="$codigoSis"
-                wire:model="codigoSis"
                 :error="$errors->first('codigoSis')"
-                maxlength="9"
-                inputmode="numeric"
                 placeholder="SIS del estudiante"
-                class="bg-neutral-primary-soft!"
+                readonly
             />
         </div>
     </section>
@@ -157,20 +176,34 @@
           class="bg-neutral-primary-soft border border-default rounded-base shadow-xs p-6 sm:p-8">
         <h2 class="text-lg font-semibold text-heading">Detalles de la incidencia</h2>
 
+        @php $cursosDelExamen = $this->cursosDelExamen(); @endphp
         <div class="mt-6 grid gap-5 sm:grid-cols-2">
-            @if ($this->materiaEsSoloLectura())
-                {{-- La materia precargada desde el monitor en vivo es un dato de
-                     solo lectura: no se puede cambiar en el formulario. --}}
+            @if (count($cursosDelExamen) > 1)
+                {{-- Examen compartido entre varios cursos: la materia se elige
+                     entre los cursos asociados y el elegido es el que se guarda. --}}
+                <x-ui.select
+                    label="Materia *"
+                    name="idCurso"
+                    wire:model.live="idCurso"
+                    :options="$cursosDelExamen"
+                    :selected="$idCurso"
+                    :error="$errors->first('idCurso')"
+                    placeholder="Seleccione la materia del examen"
+                    class="bg-neutral-primary-soft!"
+                />
+            @elseif ($this->materiaEsSoloLectura())
+                {{-- La materia del examen de un solo curso es un dato de solo
+                     lectura: no se puede cambiar en el formulario. --}}
                 <x-ui.input
                     label="Materia"
                     name="materia"
-                    :value="$materia"
+                    :value="$this->materiaMostrada()"
                     readonly
                 />
             @else
-                {{-- Sin materia del monitor (acceso directo, por ejemplo desde
-                     la central de riesgos) se escribe a mano: solo letras,
-                     números y espacios. --}}
+                {{-- Sin examen que resuelva la materia (acceso directo, por
+                     ejemplo desde la central de riesgos) se escribe a mano: solo
+                     letras, números y espacios. --}}
                 <x-ui.input
                     label="Materia *"
                     name="materia"
