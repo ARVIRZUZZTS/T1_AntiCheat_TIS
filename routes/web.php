@@ -87,6 +87,12 @@ Route::get('/materias/{curso}', function (Curso $curso) {
 Route::post('/cursos/{curso}/examenes', [ExamenController::class, 'store'])
     ->name('cursos.examenes.store');
 
+// Destino de "Ver detalle" de las notificaciones (HU 12 · T4). La pantalla de
+// detalle aún no existe: se deja la ruta lista con un placeholder navegable.
+Route::get('/incidencias/{id}', fn (int $id) => view('pages.incidencia-detalle', ['id' => $id]))
+    ->whereNumber('id')
+    ->name('incidencias.detalle');
+
 // TODO(@valerydariana98, 2026-09-25): proteger con el middleware de rol que
 // restringe el registro de incidencias a docentes y auxiliares (#69).
 Route::get('/buscador-incidencia', RegistrarIncidencia::class)->name('buscador-incidencia');
