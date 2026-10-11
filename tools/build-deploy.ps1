@@ -23,10 +23,15 @@
     Carpeta donde se generan los ZIP. Por defecto .\deploy
 
 .PARAMETER IncludeEnv
-    Incluir tambien el .env local dentro de 1_raiz.zip. Solo para el primer
+    Incluir tambien un .env dentro de 1_raiz.zip. Solo para el primer
     despliegue: el archivo lleva la contrasena de la base, asi que conviene
     editarlo una vez en el servidor con el boton Edit de net2ftp y no volver a
     subirlo.
+
+.PARAMETER EnvFile
+    Archivo a empaquetar como .env cuando se pasa -IncludeEnv. Por defecto
+    deploy\.env.server, que es el .env de produccion (credenciales del
+    servidor, APP_DEBUG=false). Si no existe, se cae al .env local de la raiz.
 
 .EXAMPLE
     .\tools\build-deploy.ps1
@@ -34,11 +39,12 @@
 
 .EXAMPLE
     .\tools\build-deploy.ps1 -IncludeEnv
-    Igual, pero ademas empaqueta el .env local (primer despliegue).
+    Igual, pero ademas empaqueta deploy\.env.server (primer despliegue).
 #>
 [CmdletBinding()]
 param(
     [string]$OutputDir = 'deploy',
+    [string]$EnvFile = '',
     [switch]$IncludeEnv
 )
 
@@ -151,16 +157,56 @@ foreach ($file in @('artisan', 'server.php', 'composer.json', 'composer.lock')) 
     }
 }
 
-# El .env local apunta a una base que no existe en esta maquina (Docker esta
-# dado de baja). Se copia solo si el usuario lo pide explicitamente.
+# --- Exclusiones ------------------------------------------------------------
+#
+# Cosas que viven en el repo pero no son parte de la aplicacion web. Sin esto
+# el ZIP se lleva 8 MB de basura al hosting (AnyDesk.exe) y una base SQLite que
+# el servidor ni usa: alla la base es PostgreSQL.
+
+Write-Step 'Excluyendo archivos que no van al servidor'
+
+$excluir = @(
+    'database\db_server',        # AnyDesk.exe, gcapi.dll, locks: es la caja de la BD, no el sitio
+    'database\database.sqlite'   # el servidor usa PostgreSQL (ver DEPLOY.md seccion 8)
+)
+
+foreach ($ruta in $excluir) {
+    $destino = Join-Path $stgRaiz $ruta
+    if (Test-Path -LiteralPath $destino) {
+        Remove-Item -LiteralPath $destino -Recurse -Force
+        Write-Warn "No se incluye '$ruta'"
+    }
+}
+
+# bootstrap/cache/ es del GenerateManifest del local. Laravel lo regenera en el
+# servidor, y un services.php viejo puede apuntar a rutas que ya no existen.
+Get-ChildItem -LiteralPath (Join-Path $stgRaiz 'bootstrap\cache') -File -Force -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -ne '.gitignore' } |
+    Remove-Item -Force -ErrorAction SilentlyContinue
+
+# El .env local apunta a la base de desarrollo, no a la del servidor. Se
+# empaqueta solo si el usuario lo pide, y entonces se toma de $EnvFile
+# (por defecto deploy\.env.server, el de produccion).
 if ($IncludeEnv) {
-    $envLocal = Join-Path $root '.env'
-    if (Test-Path -LiteralPath $envLocal) {
-        Copy-Item -LiteralPath $envLocal -Destination (Join-Path $stgRaiz '.env') -Force
-        Write-Warn 'Se incluyo el .env local. Contiene credenciales: subilo una vez y editalo en el servidor.'
+    $candidates = @()
+
+    if ($EnvFile -ne '') {
+        $candidates += if ([System.IO.Path]::IsPathRooted($EnvFile)) { $EnvFile } else { Join-Path $root $EnvFile }
+    }
+
+    $candidates += @(
+        (Join-Path $root 'deploy\.env.server'),
+        (Join-Path $root '.env')
+    )
+
+    $envSource = $candidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+
+    if ($envSource) {
+        Copy-Item -LiteralPath $envSource -Destination (Join-Path $stgRaiz '.env') -Force
+        Write-Warn "Se incluyo '$envSource' como .env del servidor. Contiene credenciales: subilo una vez y editalo en el servidor."
     }
     else {
-        Write-Warn 'Se pidio -IncludeEnv pero no hay .env local.'
+        Write-Warn 'Se pidio -IncludeEnv pero no hay ni deploy\.env.server ni .env local.'
     }
 }
 
@@ -260,6 +306,7 @@ if ($hasEnv) {
     Write-Warn 'El ZIP incluye el .env. Editalo en el servidor y no lo vuelvas a subir.'
 }
 else {
-    Write-Host 'El .env NO va en el ZIP: subilo una sola vez con el boton Edit de net2ftp.'
-    Write-Host 'Plantilla en la seccion 4 de DEPLOY.md.'
+    Write-Host 'El .env NO va en el ZIP: subilo una sola vez con -IncludeEnv (o crealo'
+    Write-Host 'con el boton New/Edit de net2ftp). Plantilla: deploy\.env.server y'
+    Write-Host 'seccion 4 de DEPLOY.md.'
 }
