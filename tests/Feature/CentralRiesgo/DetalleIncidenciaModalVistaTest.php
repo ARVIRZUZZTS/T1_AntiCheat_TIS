@@ -58,6 +58,8 @@ class DetalleIncidenciaModalVistaTest extends TestCase
         $pagina = $this->fuente('views/pages/notificaciones.blade.php');
 
         $this->assertStringContainsString("new CustomEvent('abrir-detalle-incidencia'", $tarjeta);
+        $this->assertStringContainsString('data-incidencia="{{ $id }}"', $tarjeta);
+        $this->assertStringContainsString('parseInt(this.dataset.incidencia, 10)', $tarjeta);
         $this->assertStringNotContainsString('@click.prevent="$dispatch', $tarjeta);
         $this->assertStringContainsString('@abrir-detalle-incidencia.window="abrir($event)"', $modal);
         $this->assertStringContainsString('<x-ui.modal-detalle-incidencia', $pagina);
