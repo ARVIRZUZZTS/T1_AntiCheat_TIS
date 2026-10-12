@@ -2,7 +2,7 @@
     @file    monitor-en-vivo.blade.php
     @author  David E. Chavez T. <virzuzz12345@gmail.com>
     @created 2026-09-29
-    @updated 2026-10-10
+    @updated 2026-10-12
 
     @description
     Vista del monitor en vivo: tarjetas de conteo, tabla de estudiantes del
@@ -64,6 +64,9 @@
       hamburguesa en mobile. La tabla pasa a `compact` (misma altura de fila
       que la de /materias/{curso}) y la búsqueda deja el botón "Buscar" por
       `wire:model.live.debounce.350ms` con reseteo de página en cada tecla.
+    - 2026-10-12  [T1]  refactor: el botón "Registrar incidencia" abre directo
+      el formulario (antes pasaba por la pantalla intermedia "Registro ingreso")
+      y le manda el examen en curso, el rol de docente y el usuario por la URL.
 --}}
 
 @section('title', 'Monitor en vivo')
@@ -199,7 +202,15 @@
 @section('subtitle', $subtituloExamen)
 
 @section('header-actions')
-    <a href="{{ route('monitoreo.registro-ingreso') }}"
+    {{-- Abre directamente el formulario de incidencia, con el examen del
+         monitor, el rol y el usuario que hoy lee el formulario por la URL:
+         ya no hay pantalla intermedia "Registro ingreso" de por medio. --}}
+    <a href="{{ route('registrar-incidencia', [
+            'origen' => \App\Livewire\Monitoreo\RegistrarIncidencia::ORIGEN_MONITOREO,
+            'examen' => $examen->id_examen,
+            'rol' => \App\Models\Rol::NOMBRE_DOCENTE,
+            'usuario' => auth()->id() ?? \App\Livewire\Monitoreo\RegistrarIncidencia::USUARIO_POR_DEFECTO,
+        ]) }}"
        aria-label="Registrar incidencia"
        class="inline-flex items-center justify-center gap-1.5 rounded-full border border-transparent bg-brand px-3 py-2.5 sm:px-4 text-sm font-medium leading-5 text-white shadow-xs hover:bg-brand-strong focus:outline-none focus:ring-4 focus:ring-brand-medium">
         <svg class="w-4 h-4 shrink-0" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>

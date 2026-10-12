@@ -589,12 +589,12 @@ class RegistrarIncidenciaTest extends TestCase
     /**
      * Verifica que cancelar desde el monitor regrese al monitor en vivo.
      */
-    public function test_cancelar_desde_el_monitor_regresa_al_registro_de_ingreso(): void
+    public function test_cancelar_desde_el_monitor_regresa_al_monitor(): void
     {
         Livewire::test(RegistrarIncidencia::class)
             ->set('origen', RegistrarIncidencia::ORIGEN_MONITOREO)
             ->call('cancelar')
-            ->assertRedirect(route('monitoreo.registro-ingreso'));
+            ->assertRedirect(route('monitoreo'));
     }
 
     /**
@@ -697,10 +697,10 @@ class RegistrarIncidenciaTest extends TestCase
     }
 
     /**
-     * Verifica que el botón Aceptar cierre el modal y devuelva al registro
-     * de ingreso, la pantalla desde la que se abrió el formulario.
+     * Verifica que el botón Aceptar cierre el modal y devuelva al monitor en
+     * vivo, la pantalla desde la que se abrió el formulario.
      */
-    public function test_aceptar_cierra_el_modal_y_regresa_al_registro_de_ingreso(): void
+    public function test_aceptar_cierra_el_modal_y_regresa_al_monitor(): void
     {
         Livewire::test(RegistrarIncidencia::class)
             ->set('origen', RegistrarIncidencia::ORIGEN_MONITOREO)
@@ -713,7 +713,7 @@ class RegistrarIncidenciaTest extends TestCase
             ->set('tipoIncidencia', Motivo::UsoDeDispositivosElectronicos->value)
             ->call('registrar')
             ->call('aceptarRegistro')
-            ->assertRedirect(route('monitoreo.registro-ingreso'));
+            ->assertRedirect(route('monitoreo'));
     }
 
     /**
