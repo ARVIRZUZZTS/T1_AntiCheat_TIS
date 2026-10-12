@@ -337,13 +337,20 @@
                     </p>
 
                     @if ($this->estudiantes->lastPage() > 1)
-                        <x-ui.pagination
-                            :interactive="true"
-                            :active-filled="true"
-                            size="sm"
-                            :current="$this->estudiantes->currentPage()"
-                            :total="$this->estudiantes->lastPage()"
-                        />
+                        {{-- Con muchas páginas, los botones (uno por página +
+                             2 flechas) pueden no entrar en el ancho de la
+                             card en mobile y desbordarse hacia los dos lados
+                             en vez de quedarse adentro; con scroll propio no
+                             se salen. --}}
+                        <div class="max-w-full overflow-x-auto">
+                            <x-ui.pagination
+                                :interactive="true"
+                                :active-filled="true"
+                                size="sm"
+                                :current="$this->estudiantes->currentPage()"
+                                :total="$this->estudiantes->lastPage()"
+                            />
+                        </div>
                     @endif
                 </div>
             @endif
