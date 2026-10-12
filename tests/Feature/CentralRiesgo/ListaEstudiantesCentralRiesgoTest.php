@@ -26,6 +26,9 @@
  * - 2026-10-10  [Valery D. Ortuno P]  test: creación inicial.
  * - 2026-10-11  [Valery D. Ortuno P]  test: el alcance por defecto pasa a ser
  *   "Toda la institución"; "Mis materias" se elige explícitamente.
+ * - 2026-10-11  [Valery D. Ortuno P]  test: el detalle es un modal (x y
+ *   "Aceptar"), la lista sigue visible detrás, el orden A-Z también ordena
+ *   "Mis materias" y ordenar no cambia la cantidad de estudiantes.
  */
 
 namespace Tests\Feature\CentralRiesgo;
@@ -340,6 +343,53 @@ class ListaEstudiantesCentralRiesgoTest extends TestCase
             ->call('verDetalle', 999)
             ->assertOk()
             ->assertDontSee('Detalles de la incidencia');
+    }
+
+    public function test_ordenar_az_tambien_ordena_mis_materias(): void
+    {
+        $componente = Livewire::test(ListaEstudiantes::class)
+            ->call('cambiarAlcance', ListarIncidenciasTramposoService::ALCANCE_MIS_MATERIAS)
+            ->set('ordenAlfabetico', true);
+
+        // Mis materias: Alvarez (Luis), Paredes (Jaime), Zapata (Ana, Carla).
+        $this->assertSame([self::LUIS, self::JAIME, self::ANA, self::CARLA], $this->sisListados($componente));
+    }
+
+    public function test_ordenar_no_cambia_la_cantidad_de_estudiantes(): void
+    {
+        $this->crearSancionados(6);
+
+        $componente = $this->institucion();
+        $antes = $componente->instance()->estudiantes->total();
+
+        $this->assertSame(11, $antes);
+        $this->assertSame($antes, $componente->set('ordenAlfabetico', true)->instance()->estudiantes->total());
+        $this->assertSame($antes, $componente->set('ordenAlfabetico', false)->instance()->estudiantes->total());
+    }
+
+    public function test_el_detalle_se_muestra_como_modal_con_la_x_y_aceptar(): void
+    {
+        $componente = $this->institucion()
+            ->call('verDetalle', $this->idDeIncidencia(self::LUIS));
+
+        $componente
+            ->assertSee('role="dialog"', false)
+            ->assertSee('aria-modal="true"', false)
+            ->assertSee('aria-label="Cerrar detalles de la incidencia"', false)
+            ->assertSee('Aceptar');
+
+        // Ya no parte la pantalla en dos: no queda el panel lateral.
+        $componente->assertDontSee('lg:w-[380px]', false);
+    }
+
+    public function test_la_lista_sigue_visible_detras_del_modal(): void
+    {
+        $componente = $this->institucion()
+            ->call('verDetalle', $this->idDeIncidencia(self::LUIS));
+
+        $componente
+            ->assertSee('Mostrando')
+            ->assertSee('Maria Bernales Soto');
     }
 
     public function test_la_pantalla_carga_desde_el_boton_central_de_riesgos_del_sidebar(): void

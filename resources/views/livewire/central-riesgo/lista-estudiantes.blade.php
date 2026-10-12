@@ -10,9 +10,8 @@
     interruptor "Ordenar A-Z" y la lista de estudiantes sancionados, en cards
     en móvil y en tabla en desktop, con paginación de 8 registros.
 
-    Al elegir un estudiante se abre el detalle de su incidencia. En móvil ocupa
-    la pantalla (la lista se oculta) y se vuelve con la flecha; en desktop se
-    abre a la derecha de la lista, con la pantalla dividida, y se cierra con la X.
+    Al elegir un estudiante se abre el detalle de su incidencia como modal,
+    encima de la lista, con la X y un botón "Aceptar" para cerrarlo.
 
     @changelog
     - 2026-10-10  [Valery D. Ortuno P]  feat: creación inicial de la vista, a
@@ -22,6 +21,9 @@
     - 2026-10-11  [Valery D. Ortuno P]  fix: se quita el banner de "Bloqueo
       automático" (ya no existe) y el botón "Registrar incidencia" (el registro
       se hace desde Monitor en vivo).
+    - 2026-10-11  [Valery D. Ortuno P]  fix: el detalle deja de partir la
+      pantalla en dos y pasa a ser un modal con (x) y botón "Aceptar"; la lista
+      ya no se oculta en móvil.
 
     @see  App\Livewire\CentralRiesgo\ListaEstudiantes
     @see  resources/views/partials/busqueda-estudiante.blade.php
@@ -54,9 +56,9 @@
 
 <div class="px-4 pt-[2vh] pb-8 sm:px-6 lg:px-[2vh]" x-data="{ @include('partials.busqueda-estudiante') }">
     <div class="lg:flex lg:items-start lg:gap-6">
-        {{-- Lista. En móvil se oculta mientras el detalle está abierto, porque
-             el detalle se ve "en otra pantalla"; en desktop queda a la izquierda. --}}
-        <section @class(['min-w-0 lg:block lg:flex-1', 'hidden' => $detalle !== null]) aria-label="Lista de estudiantes">
+        {{-- Lista. El detalle se abre como modal encima, así que la lista nunca
+             se oculta y conserva orden, filtro y página. --}}
+        <section class="min-w-0 lg:flex-1" aria-label="Lista de estudiantes">
             <div class="flex flex-wrap items-center justify-between gap-3">
                 <div class="flex flex-wrap gap-2" role="tablist" aria-label="Ámbito de la central">
                     @foreach ($alcances as $clave => $etiqueta)
@@ -195,27 +197,26 @@
         </section>
 
         @if ($detalle !== null)
-            <aside wire:key="detalle-{{ $detalle['id_registro'] }}"
-                   class="lg:sticky lg:top-4 lg:w-[380px] lg:shrink-0 xl:w-[420px]"
-                   aria-label="Detalles de la incidencia">
-                <div class="rounded-xl border border-neutral-quaternary bg-neutral-primary-soft shadow-xs">
+            {{-- Detalle como modal: se abre encima de la lista y se cierra con
+                 la X, con "Aceptar" o tocando el fondo. No hay más acciones. --}}
+            <div wire:key="modal-detalle-{{ $detalle['id_registro'] }}"
+                 class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/50 p-4"
+                 role="dialog" aria-modal="true" aria-labelledby="titulo-detalle-incidencia"
+                 wire:click="cerrarDetalle">
+                <div class="w-full max-w-lg rounded-xl border border-neutral-quaternary bg-neutral-primary-soft shadow-lg"
+                     wire:click.stop>
                     <div class="flex items-center gap-2 border-b border-neutral-quaternary px-4 py-3">
-                        {{-- Móvil: vuelve a la lista, que conserva orden, filtro y página. --}}
-                        <button type="button" wire:click="cerrarDetalle" aria-label="Volver a la lista"
-                                class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-body hover:bg-neutral-secondary-medium hover:text-heading focus:outline-none lg:hidden">
-                            <svg class="h-5 w-5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m15 19-7-7 7-7"/></svg>
-                        </button>
+                        <h2 id="titulo-detalle-incidencia" class="min-w-0 flex-1 text-[15px] font-semibold text-fg-brand">
+                            Detalles de la incidencia
+                        </h2>
 
-                        <h2 class="min-w-0 flex-1 text-[15px] font-semibold text-fg-brand">Detalles de la incidencia</h2>
-
-                        {{-- Desktop: cierra la vista dividida. --}}
                         <button type="button" wire:click="cerrarDetalle" aria-label="Cerrar detalles de la incidencia"
-                                class="hidden h-9 w-9 shrink-0 items-center justify-center rounded-full text-body hover:bg-neutral-secondary-medium hover:text-heading focus:outline-none lg:inline-flex">
+                                class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-body hover:bg-neutral-secondary-medium hover:text-heading focus:outline-none">
                             <svg class="h-5 w-5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18 17.94 6M18 18 6.06 6"/></svg>
                         </button>
                     </div>
 
-                    <div class="space-y-4 p-4">
+                    <div class="max-h-[65vh] space-y-4 overflow-y-auto p-4">
                         <div class="rounded-xl border border-danger-subtle bg-danger-soft p-4">
                             <p class="font-semibold text-fg-danger-strong">{{ $detalle['estudiante_nombre'] ?? 'Estudiante desconocido' }}</p>
                             <p class="mt-1 text-sm text-fg-danger">Código SIS: <span class="font-mono">{{ $detalle['sis_estudiante'] }}</span></p>
@@ -250,8 +251,15 @@
                             </div>
                         </dl>
                     </div>
+
+                    <div class="flex justify-end border-t border-neutral-quaternary px-4 py-3">
+                        <button type="button" wire:click="cerrarDetalle"
+                                class="inline-flex items-center justify-center rounded-base border border-transparent bg-brand px-4 py-2 text-sm font-medium text-white shadow-xs hover:bg-brand-strong focus:outline-none focus:ring-4 focus:ring-brand-medium">
+                            Aceptar
+                        </button>
+                    </div>
                 </div>
-            </aside>
+            </div>
         @endif
     </div>
 </div>
