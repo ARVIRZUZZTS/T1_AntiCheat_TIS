@@ -40,6 +40,7 @@ namespace App\Services\Examen;
 use App\Enums\EstadoEstudianteExamen;
 use App\Enums\TipoExamen;
 use App\Models\Curso;
+use App\Models\Estudiante;
 use App\Models\Examen;
 use App\Models\EstudianteExamen;
 use App\Models\TipoExamen as TipoExamenCatalogo;
@@ -55,6 +56,19 @@ class RegistrarExamenService
      * tope contra un número sin sentido: nadie examina 300 minutos (5 horas).
      */
     public const DURACION_MAXIMA = 300;
+
+    /**
+     * Ventana horaria para empezar un examen, en formato 24 horas. Es la misma que
+     * usa el modal para acotar lo que se escribe, así el campo y la validación no
+     * pueden quedar con rangos distintos.
+     */
+    public const HORA_INICIO_MINIMA = '06:45';
+
+    /**
+     * Última hora de inicio admitida (20:15): con la hora en 20, los minutos
+     * tampoco pasan de 15.
+     */
+    public const HORA_INICIO_MAXIMA = '20:15';
 
     /**
      * Crea el examen y todo lo que se le eligió.
