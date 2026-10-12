@@ -8,20 +8,25 @@
  * @created 2026-10-11
  *
  * @description
- * Pruebas de integración de los endpoints de notificaciones "Posible Tramposo"
- * (HU 12 · T1/T2): listado ordenado de más reciente a más antiguo, lista vacía,
- * auxiliar sin notificaciones, y ocultado lógico sin afectar el caso ni a otros
- * usuarios.
+ * Pruebas de integración de los endpoints de notificaciones: listado ordenado
+ * de más reciente a más antiguo, lista vacía, auxiliar sin notificaciones,
+ * ocultado lógico sin afectar el caso ni a otros usuarios, y la mezcla de los
+ * dos tipos de aviso (HU 12 "Posible Tramposo" y HU 6 "Estudiante ingresado a
+ * central de riesgo") que hoy devuelve el listado.
  *
  * Igual que otras pruebas del proyecto, el esquema se arma sobre SQLite en
  * memoria con una conexión dedicada, así NO se toca la base compartida de
- * Supabase. Se ejecuta además la migración de la columna `oculta` (T2).
+ * Supabase. Se ejecuta además la migración de la columna `oculta` (T2) y la de
+ * `tipo` (HU 6).
  *
  * @see  App\Services\Notificacion\NotificacionService
  * @see  App\Http\Controllers\Api\NotificacionController
  *
  * @changelog
  * - 2026-10-11  [T1]  test: criterios de HU 12 (T1/T2).
+ * - 2026-10-11  [David E. Chavez T.]  test: criterios de HU 6 (T2): listado
+ *   mezclando ambos tipos de aviso en orden inverso y ocultado de un aviso
+ *   "central_riesgo" sin tocar el caso.
  */
 
 namespace Tests\Feature\Notificaciones;
@@ -133,6 +138,73 @@ class NotificacionesApiTest extends TestCase
     {
         $this->getJson('/api/notificaciones')->assertUnauthorized();
         $this->patchJson('/api/notificaciones/1/ocultar')->assertUnauthorized();
+    }
+
+    public function test_lista_mezcla_avisos_de_central_y_posible_tramposo_en_orden_descendente(): void
+    {
+        // Caso nuevo (ahora) con su aviso HU 6, más reciente que los del
+        // fixture (-20 min, -2 h), para verificar el orden cronológico inverso.
+        DB::table('central_riesgo')->insert([
+            'id_registro' => 7, 'sis_estudiante' => '900000001', 'id_examen' => 1, 'id_curso' => 1,
+            'id_registrador' => self::DOCENTE_A, 'tipo_infraccion' => 'tramposo',
+            'estado_incidencia' => 'Pendiente', 'fecha_registro' => Carbon::now()->subMinutes(3)->toDateTimeString(),
+        ]);
+        DB::table('notificacion_docente')->insert([
+            'id_notificacion' => 5,
+            'id_central_riesgo' => 7,
+            'id_curso' => 1,
+            'tipo' => 'central_riesgo',
+            'estado' => 'recibido',
+            'oculta' => false,
+        ]);
+
+        $this->actingAs(Usuario::findOrFail(self::DOCENTE_A), 'web')
+            ->getJson('/api/notificaciones')
+            ->assertOk()
+            ->assertJsonCount(3)
+            // El más reciente primero: el aviso de central de riesgos.
+            ->assertJsonPath('0.id', 5)
+            ->assertJsonPath('0.tipo', 'central_riesgo')
+            ->assertJsonPath('0.titulo', 'Estudiante ingresado a central de riesgo')
+            ->assertJsonPath('0.estudiante', 'Juan Quispe')
+            ->assertJsonPath('0.materia', 'Matemática I')
+            ->assertJsonPath('0.descripcion', 'El estudiante Juan Quispe fue ingresado a la central de riesgo en la materia de Matemática I.')
+            ->assertJsonPath('0.hace', fn (string $valor): bool => str_starts_with($valor, 'Hace') && str_contains($valor, 'minuto'))
+            ->assertJsonPath('0.detalle_href', '#')
+            // Detrás, los avisos "Posible Tramposo" del mismo docente.
+            ->assertJsonPath('1.id', 1)
+            ->assertJsonPath('1.tipo', 'posible_tramposo')
+            ->assertJsonPath('1.titulo', 'Posible Tramposo')
+            ->assertJsonPath('2.id', 2);
+    }
+
+    public function test_ocultar_un_aviso_de_central_de_riesgos_no_toca_el_caso(): void
+    {
+        DB::table('notificacion_docente')->insert([
+            'id_notificacion' => 5,
+            'id_central_riesgo' => 1,
+            'id_curso' => 1,
+            'tipo' => 'central_riesgo',
+            'estado' => 'recibido',
+            'oculta' => false,
+        ]);
+
+        $this->actingAs(Usuario::findOrFail(self::DOCENTE_A), 'web')
+            ->patchJson('/api/notificaciones/5/ocultar')
+            ->assertOk();
+
+        $this->assertDatabaseHas('notificacion_docente', ['id_notificacion' => 5, 'oculta' => true]);
+        // El caso de la central de riesgos queda intacto.
+        $this->assertDatabaseHas('central_riesgo', [
+            'id_registro' => 1,
+            'estado_incidencia' => 'Pendiente',
+            'tipo_infraccion' => 'sospechoso',
+        ]);
+
+        $this->getJson('/api/notificaciones')
+            ->assertOk()
+            ->assertJsonCount(2)
+            ->assertJsonMissing(['id' => 5]);
     }
 
     public function test_registrar_un_sospechoso_genera_aviso_y_un_tramposo_no(): void
