@@ -8,7 +8,12 @@
  * @created 2026-10-11
  *
  * @description
- * Endpoints JSON de las notificaciones "Posible Tramposo" (HU 12).
+ * Endpoints JSON de las notificaciones del docente. Sirven a las dos HU que
+ * generan avisos (el campo `tipo` del payload indica cuál):
+ *
+ *   - `posible_tramposo` (HU 12): el auxiliar reportó a un sospechoso.
+ *   - `central_riesgo` (HU 6): el estudiante ingresó o fue confirmado en la
+ *     central de riesgos.
  *
  * - `index`   GET  `/api/notificaciones` — lista las notificaciones no ocultas
  *   del usuario autenticado, de la más reciente a la más antigua. Lista vacía
@@ -22,6 +27,8 @@
  *
  * @changelog
  * - 2026-10-11  [T1]  feat: endpoints de notificaciones del docente (#HU12).
+ * - 2026-10-11  [David E. Chavez T.]  docs: los endpoints también sirven los
+ *   avisos "central_riesgo" de la HU 6 (#HU6).
  */
 
 namespace App\Http\Controllers\Api;

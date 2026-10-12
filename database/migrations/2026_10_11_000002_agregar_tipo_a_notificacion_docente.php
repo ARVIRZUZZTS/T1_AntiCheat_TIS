@@ -4,7 +4,6 @@
  * @file    2026_10_11_000002_agregar_tipo_a_notificacion_docente.php
  *
  * @author  David E. Chavez T. <virzuzz12345@gmail.com>
- *
  * @created 2026-10-11
  *
  * @description Agrega el tipo de aviso a `notificacion_docente` (HU 6 · T1/T2).
