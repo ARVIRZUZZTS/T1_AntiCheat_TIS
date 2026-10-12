@@ -34,8 +34,9 @@
       filtros pasan a una sola fila. Antes eran dos filas separadas dentro del
       card y la materia estaba al lado del título, sin el tipo de examen.
     - 2026-10-11  [Valery D. Ortuno P]  feat: el botón antes llamado
-      "Registrar ingreso" pasa a ser "Registrar incidencia" y abre el formulario
-      de incidencia para el examen en curso (origen=monitoreo).
+      "Registrar ingreso" pasa a ser "Registrar incidencia". Solo cambia el
+      nombre y se quita el ícono "+"; el enlace y el resto del monitor no se
+      tocan.
 --}}
 
 @section('title', 'Monitor en vivo')
@@ -183,17 +184,8 @@
     @endif
 
     <div class="flex flex-wrap items-center justify-between gap-4">
-        <a href="{{ route('buscador-incidencia', [
-                'origen' => \App\Livewire\Monitoreo\RegistrarIncidencia::ORIGEN_MONITOREO,
-                'materia' => '',
-                'examen' => $examen->id_examen,
-                'rol' => \App\Models\Rol::NOMBRE_DOCENTE,
-                'usuario' => auth()->id() ?? \App\Livewire\Monitoreo\RegistrarIncidencia::USUARIO_POR_DEFECTO,
-            ]) }}"
-           class="inline-flex items-center justify-center gap-1.5 rounded-base border border-transparent bg-brand px-3 py-1.5 text-xs font-medium leading-5 text-white shadow-xs hover:bg-brand-strong focus:outline-none focus:ring-4 focus:ring-brand-medium">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-            </svg>
+        <a href="{{ route('monitoreo.registro-ingreso') }}"
+           class="inline-flex items-center justify-center rounded-base border border-transparent bg-brand px-3 py-1.5 text-xs font-medium leading-5 text-white shadow-xs hover:bg-brand-strong focus:outline-none focus:ring-4 focus:ring-brand-medium">
             Registrar incidencia
         </a>
     </div>
