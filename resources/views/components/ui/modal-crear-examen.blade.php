@@ -129,10 +129,6 @@
 
     $opciones = $tipos ?? TipoExamen::opciones();
 
-    // Old input: si la validación falla, el formulario vuelve a mostrarse con lo
-    // que la persona ya había escrito. El estado de Alpine arranca con esos
-    // valores porque todos los campos están atados con x-model: si se pusieran en
-    // el HTML, Alpine los sobrescribiría con el estado al inicializar.
     $catalogoAmbientes = collect($ambientes)->keyBy('id');
 
     $ambientesElegidos = collect((array) old('ambientes', []))
@@ -144,23 +140,13 @@
     $materialesElegidos = array_map('intval', (array) old('materiales', []));
     $normasElegidas = array_map('intval', (array) old('normas', []));
 
-    // Los errores del último intento se le pasan a Alpine en vez de quedar
-    // pintados en el HTML. Blade los escribe una sola vez y viven toda la carga
-    // de la página: por eso, al cerrar el modal y volverlo a abrir, los campos
-    // seguían en rojo aunque el error ya era viejo. Con el estado en Alpine, el
-    // rojo se apaga al cerrar y los valores escritos se conservan.
     $mensajes = collect($errors->messages())
         ->map(fn (array $lista): string => (string) ($lista[0] ?? ''))
         ->filter()
         ->all();
 
-    // Colores del estado de error. Van con el `!` de Tailwind porque el campo
-    // ya trae los neutros: sin el important gana el que esté último en el CSS,
-    // que no depende del orden del atributo.
     $claseError = 'bg-danger-soft! border-danger-subtle! text-fg-danger-strong! focus:ring-danger! focus:border-danger!';
 
-    // Ventana horaria de inicio. Salen del servicio, que es la misma fuente que
-    // usa la validación: si el rango cambiara, cambiaría en un solo sitio.
     $horaMinima = RegistrarExamenService::HORA_INICIO_MINIMA;
     $horaMaxima = RegistrarExamenService::HORA_INICIO_MAXIMA;
 
@@ -190,7 +176,7 @@
         errores: @js($mensajes),
         mostrarErrores: @js($mensajes !== []),
 
-        // El catalogo de ambientes llega en el <script> de abajo. `termino` ya
+        // El catalogo de ambientes llega en el bloque de script de abajo. `termino` ya
         // viene en minusculas desde el servicio, asi que aca no se normaliza nada.
         init() {
             const ambientes = document.getElementById('indice-ambientes-examen');
@@ -221,22 +207,10 @@
         claseErrorDe(campo) {
             return this.errorDe(campo) ? '{{ $claseError }}' : '';
         },
-
-        // La fecha se escribe dd/mm/aaaa: se queda solo con digitos, coloca los
-        // separadores solos, acota el dia a 31 y el mes a 12, y el año lo
-        // completa con el año en curso. El formato no depende del navegador ni
-        // de la configuracion regional del dispositivo.
         sanearFecha() {
             const digitos = this.fecha.replace(/\D/g, '');
             const diaDeDos = parseInt(digitos.slice(0, 2), 10);
             const diaDeUno = parseInt(digitos.slice(0, 1), 10);
-
-            // Un dia de un solo digito queda pegado al mes: al teclear "9/12"
-            // sobran los digitos "912" y "91" no es un dia. Cuando hay al menos un
-            // digito de mes y los dos primeros no forman un dia valido, el dia es
-            // el primero solo y el mes arranca en el segundo. Se espera al tercer
-            // digito a proposito: con dos todavia no se sabe si el dia es de una o
-            // de dos cifras.
             const diaDeUnDigito = digitos.length >= 3
                 && (diaDeDos === 0 || diaDeDos > 31)
                 && diaDeUno >= 1
@@ -257,10 +231,6 @@
             this.fecha = dia + '/' + mes + '/' + this.anioActual;
         },
 
-        // La hora se escribe en 24 horas, entre la minima y la maxima del centro
-        // de exámenes (06:45 a 20:15): se queda solo con digitos, pone los dos
-        // puntos y acota. La hora nunca pasa de 20, y con la hora en el piso o
-        // en el tope los minutos tampoco salen de rango.
         sanearHora() {
             const digitos = this.horaInicio.replace(/\D/g, '').slice(0, 4);
 
@@ -308,10 +278,6 @@
             return String(numero).padStart(2, '0');
         },
 
-        // La duracion son minutos: solo digitos. Se escribe de vuelta en el
-        // input para que la letra no quede pintada ni un instante. Al ser
-        // type=text no aparecen las flechitas del input number, que en movil
-        // ocupan medio campo.
         sanearDuracion(campo) {
             const digitos = this.duracion.replace(/\D/g, '');
 
@@ -397,18 +363,10 @@
                 </button>
             </div>
 
-            {{-- Formulario real: va con POST y @csrf, sin wire: ni fetch. El
-                 <form> envuelve los campos y el pie de botones. Alpine se encarga
-                 de la ergonomía del formulario y del combobox de ambientes, que sí
-                 necesita JavaScript: sin él no se pueden elegir ambientes. --}}
             <form method="POST" action="{{ route('cursos.examenes.store', $cursoId) }}">
                 @csrf
 
             <div class="space-y-4 py-4">
-                {{-- La materia se muestra como un campo de solo lectura: si el
-                     examen es de una sola materia va el nombre y listo, sin la
-                     flechita de desplegable. Cuando un examen pueda tener varias
-                     materias, aca va un selector con esas materias. --}}
                 @if ($materia)
                     <x-ui.input
                         label="Materia"
@@ -460,7 +418,6 @@
                     inputmode="numeric"
                     maxlength="5"
                     placeholder="06:45"
-                    helper="Formato 24 horas, de {{ $horaMinima }} a {{ $horaMaxima }}."
                     x-model="horaInicio"
                     @input="sanearHora()"
                     x-bind:class="claseErrorDe('hora_inicio')"
@@ -555,14 +512,6 @@
                        class="mt-1 text-sm text-fg-danger-strong"></p>
                 </div>
 
-                {{-- Material permitido: casillas del catalogo, todas desmarcadas.
-                     El catalogo lo resuelve ListarMaterialesService y se recorre con
-                     Blade, no con x-for: los datos ya vienen del servidor y Alpine
-                     solo guarda la seleccion. El `x-model` es un array, asi que la
-                     casilla marcada empuja su id y la desmarcada lo saca.
-                     Ojo: los atributos van SIN `:` a proposito, porque en un tag de
-                     componente Blade un `:` delante del nombre hace que Blade
-                     evalue el valor como PHP y no como expresion de Alpine. --}}
                 <div>
                     <p class="block mb-2.5 text-sm font-medium text-heading" id="materiales_examen">
                         Material permitido
@@ -606,9 +555,7 @@
                 <p x-show="errorDe('materiales_personalizados')" x-text="errorDe('materiales_personalizados')"
                    class="mt-1 text-sm text-fg-danger-strong"></p>
 
-                {{-- Normas del catalogo: mismas casillas desmarcadas que los
-                     materiales, pero cada una es una regla entera y por eso el
-                     texto puede ocupar el ancho completo. --}}
+     
                 <div>
                     <p class="block mb-2.5 text-sm font-medium text-heading" id="normas_examen">
                         Normas
@@ -652,9 +599,6 @@
                 <p x-show="errorDe('normas_personalizadas')" x-text="errorDe('normas_personalizadas')"
                    class="mt-1 text-sm text-fg-danger-strong"></p>
             </div>
-
-            {{-- Mobile: los botones se apilan a lo ancho (stretch del column
-                 flex) y el de guardar queda arriba; desde sm: van en fila. --}}
             <div class="border-t border-default pt-4 flex flex-col-reverse gap-[2vh] sm:flex-row">
                 <x-ui.button-cancelar class="flex-1" @click="$dispatch('cerrar-modal-crear-examen')">Cancelar</x-ui.button-cancelar>
                 <x-ui.button type="submit" variant="default" class="flex-1">Guardar examen</x-ui.button>
@@ -663,9 +607,5 @@
         </div>
     </div>
 
-    {{-- Indice de ambientes para el buscador del modal. Va como application/json
-         y se lee con JSON.parse sobre textContent (no como atributo) por el mismo
-         motivo que en el buscador de registro: el escapado del HTML no se mete en
-         medio. Los materiales no viajan por aqui: los pinta Blade directo. --}}
     <script type="application/json" id="indice-ambientes-examen">@json($ambientes)</script>
 </div>
