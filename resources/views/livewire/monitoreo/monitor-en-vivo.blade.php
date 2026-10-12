@@ -2,7 +2,7 @@
     @file    monitor-en-vivo.blade.php
     @author  David E. Chavez T. <virzuzz12345@gmail.com>
     @created 2026-09-29
-    @updated 2026-10-10
+    @updated 2026-10-12
 
     @description
     Vista del monitor en vivo: tarjetas de conteo, tabla de estudiantes del
@@ -37,6 +37,9 @@
       "Registrar ingreso" pasa a ser "Registrar incidencia". Solo cambia el
       nombre y se quita el ícono "+"; el enlace y el resto del monitor no se
       tocan.
+    - 2026-10-12  [T1]  refactor: el botón "Registrar incidencia" abre directo
+      el formulario (antes pasaba por la pantalla intermedia "Registro ingreso")
+      y le manda el examen en curso, el rol de docente y el usuario por la URL.
 --}}
 
 @section('title', 'Monitor en vivo')
@@ -184,7 +187,16 @@
     @endif
 
     <div class="flex flex-wrap items-center justify-between gap-4">
-        <a href="{{ route('monitoreo.registro-ingreso') }}"
+        {{-- Abre directamente el formulario de incidencia, con el examen del
+             monitor, el rol y el usuario que hoy lee el formulario por la URL.
+             Antes pasaba por la pantalla intermedia "Registro ingreso", que solo
+             agregaba un buscador duplicado. --}}
+        <a href="{{ route('registrar-incidencia', [
+                'origen' => \App\Livewire\Monitoreo\RegistrarIncidencia::ORIGEN_MONITOREO,
+                'examen' => $examen->id_examen,
+                'rol' => \App\Models\Rol::NOMBRE_DOCENTE,
+                'usuario' => auth()->id() ?? \App\Livewire\Monitoreo\RegistrarIncidencia::USUARIO_POR_DEFECTO,
+            ]) }}"
            class="inline-flex items-center justify-center rounded-base border border-transparent bg-brand px-3 py-1.5 text-xs font-medium leading-5 text-white shadow-xs hover:bg-brand-strong focus:outline-none focus:ring-4 focus:ring-brand-medium">
             Registrar incidencia
         </a>
@@ -306,8 +318,8 @@
     {{-- Filtro y buscador de la tabla del monitor.
 
          El filtrado se hace en el navegador sobre las filas ya renderizadas,
-         con la misma lógica que el buscador de registro de ingreso
-         (`buscador-registro.blade.php`) pero sin su vista ni sus botones: sin
+         con la misma lógica que el buscador del formulario de incidencia
+         (`registrar-incidencia.blade.php`) pero sin su vista ni sus botones: sin
          Alpine ni wire:model, porque este proyecto solo carga el bundle de
          Livewire y `x-model` no enlaza el input que emite `x-ui.search-input`.
          La diferencia es que acá los resultados son las propias filas de la

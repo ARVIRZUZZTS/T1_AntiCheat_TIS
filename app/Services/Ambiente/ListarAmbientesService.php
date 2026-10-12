@@ -8,6 +8,7 @@
  * @created 2026-10-05
  *
  * @updated 2026-10-05
+ * @updated 2026-10-12
  *
  * @description
  * Servicio que publica el índice de ambientes que el modal de alta de examen usa
@@ -17,17 +18,19 @@
  * minúsculas, normalizado una sola vez al construir el índice. Así el navegador
  * no tiene que componer cadenas ni aplicar toLowerCase en cada tecla, que es el
  * mismo criterio que usa el índice de
- * {@see \App\Livewire\Monitoreo\BuscadorRegistro} para los estudiantes.
+ * {@see \App\Livewire\Monitoreo\RegistrarIncidencia} para los estudiantes.
  *
  * El filtrado NO se hace en PHP a propósito: con el catálogo ya resuelto en la
  * página, filtrar en el cliente responde al instante, mientras que un viaje al
  * servidor por tecla es lo que volvió lento aquel buscador.
  *
- * @see  \App\Livewire\Monitoreo\BuscadorRegistro
+ * @see  \App\Livewire\Monitoreo\RegistrarIncidencia
  * @see  resources/views/components/ui/modal-crear-examen.blade.php
  *
  * @changelog
  * - 2026-10-05  [Alex Candia]  feat: creación inicial del servicio.
+ * - 2026-10-12  [T1]  docs: el @see apunta a RegistrarIncidencia, que ahora es
+ *   quien publica el índice de estudiantes (antes lo hacía BuscadorRegistro).
  */
 
 namespace App\Services\Ambiente;

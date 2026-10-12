@@ -4,7 +4,7 @@
  * @file    RegistrarIncidencia.php
  * @author  Valery D. Ortuno P. <valerydariana98@gmail.com>
  * @created 2026-09-25
- * @updated 2026-10-10
+ * @updated 2026-10-12
  *
  * @description
  * Componente de página con el formulario de registro de una incidencia en la
@@ -77,6 +77,12 @@
  *   datos vienen del registro de estudiantes y ya no son responsabilidad de
  *   este formulario; solo se exige que estén llenos y se pide buscarlos con la
  *   lupa cuando faltan.
+ * - 2026-10-12  [T1]  perf: el buscador de estudiantes filtra en el navegador
+ *   sobre un índice publicado por `indiceEstudiantes()`, como hacía la pantalla
+ *   intermedia, en vez de viajar al servidor en cada tecla. Con un examen en
+ *   contexto el índice se limita a los inscritos en ese examen (`catalogo()`).
+ *   La pantalla intermedia "Registro ingreso" se elimina: el monitor abre
+ *   directamente este formulario.
  */
 namespace App\Livewire\Monitoreo;
 
@@ -85,6 +91,7 @@ use App\Enums\TipoInfraccion;
 use App\Models\CentralRiesgo;
 use App\Models\Curso;
 use App\Models\Estudiante;
+use App\Models\EstudianteExamen;
 use App\Models\Examen;
 use App\Models\Rol;
 use App\Services\Notificacion\NotificacionService;
@@ -670,9 +677,12 @@ class RegistrarIncidencia extends Component
      * Postgres no trae `unaccent`, ambos lados se normalizan aquí con
      * `sinAcentos()`.
      *
-     * El filtro recorre en memoria el catálogo cacheado en vez de consultar la
-     * base en cada tecla: la base está en Supabase y cada consulta cuesta ~440
-     * ms de ida y vuelta, así que se traen todos los estudiantes una sola vez.
+     * El filtro recorre en memoria el catálogo de `catalogo()`, que con un
+     * examen en contexto son solo los estudiantes inscritos en ese examen y se
+     * consulta una sola vez. La vista ya no renderiza estos resultados: el
+     * buscador filtra en el navegador sobre el índice de `indiceEstudiantes()`
+     * para responder sin ida y vuelta al servidor. Este método queda como la
+     * consulta de referencia del buscador (y la usan las pruebas).
      *
      * @return Collection<int, Estudiante>  Estudiantes encontrados, hasta el límite.
      *
@@ -691,10 +701,73 @@ class RegistrarIncidencia extends Component
 
         $aguja = $this->sinAcentos($termino);
 
-        return $this->catalogoEstudiantes()
+        return $this->catalogo()
             ->filter(fn (Estudiante $estudiante): bool => $this->coincide($estudiante, $aguja))
             ->take(self::BUSQUEDA_LIMITE)
             ->values();
+    }
+
+    /**
+     * Índice de estudiantes que la vista publica para el filtrado en el
+     * navegador, con el mismo formato que usaba la pantalla intermedia
+     * "Registro ingreso".
+     *
+     * Cada entrada lleva el código SIS, el nombre completo y un término ya
+     * normalizado (sin tildes y en minúsculas) para que cada tecla solo
+     * compare, sin componer cadenas. Se construye sobre `catalogo()`, así que
+     * con un examen en contexto solo entran sus inscritos, que es lo que hace
+     * que el buscador sea inmediato.
+     *
+     * @return array<int, array{sis: string, nombre: string, termino: string}>
+     *
+     * @author T1
+     * @since  2026-10-12
+     */
+    #[Computed]
+    public function indiceEstudiantes(): array
+    {
+        return $this->catalogo()
+            ->map(fn (Estudiante $estudiante): array => [
+                'sis' => (string) $estudiante->sis_estudiante,
+                'nombre' => trim($estudiante->nombre_estudiante.' '.$estudiante->apellido_estudiante),
+                'termino' => $this->sinAcentos(trim(sprintf(
+                    '%s %s %s',
+                    $estudiante->sis_estudiante,
+                    $estudiante->nombre_estudiante,
+                    $estudiante->apellido_estudiante,
+                ))),
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Estudiantes que puede reportar el formulario.
+     *
+     * Con un examen en contexto (la entrada del monitor) se limita a los
+     * inscritos en ese examen, como hacía el buscador de la pantalla
+     * intermedia: es una consulta pequeña y acota el buscador al curso del
+     * monitor. Sin examen (la entrada de la central de riesgo) cae al catálogo
+     * completo cacheado.
+     *
+     * @return Collection<int, Estudiante>  Estudiantes ordenados por nombre.
+     *
+     * @author T1
+     * @since  2026-10-12
+     */
+    private function catalogo(): Collection
+    {
+        if ($this->idExamen <= 0) {
+            return $this->catalogoEstudiantes();
+        }
+
+        return Estudiante::query()
+            ->whereIn('sis_estudiante', EstudianteExamen::query()
+                ->select('sis_estudiante')
+                ->where('id_examen', $this->idExamen))
+            ->orderBy('nombre_estudiante')
+            ->orderBy('apellido_estudiante')
+            ->get(['sis_estudiante', 'nombre_estudiante', 'apellido_estudiante']);
     }
 
     /**
