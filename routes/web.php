@@ -98,6 +98,11 @@ Route::get('/materias/{curso}', function (Curso $curso) {
         'ambientes' => app(ListarAmbientesService::class)->ejecutar(),
         'materiales' => app(ListarMaterialesService::class)->ejecutar(),
         'normas' => app(ListarNormasService::class)->ejecutar(),
+        // Esta vista ya trae su propio header con la flecha "Volver" (ver
+        // @section('header') en pages/materia-estudiantes.blade.php); sin esto
+        // el hamburguesa del sidebar se dibujaba encima en movil, duplicando
+        // la navegacion.
+        'sidebarShowTrigger' => false,
     ]);
 })->name('materias.detalle');
 
