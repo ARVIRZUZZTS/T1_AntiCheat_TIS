@@ -40,6 +40,8 @@
  *   directo a su componente Livewire (`MonitorEnVivo`) en vez de pasar por
  *   `MonitoreoController`; la pantalla ahora persiste el flujo de ingreso desde
  *   los modales y el controlador se elimina.
+ * - 2026-10-10  [Valery D. Ortuno P]  docs: la central de riesgos ya no es un
+ *   mock; su vista incrusta el componente Livewire ListaEstudiantes (HU 10).
  * - 2026-10-10  [Alisson D. Alvarado]  fix: la central de riesgos se enruta a
  *   su componente Livewire (`CentralRiesgo\Index`), que consume
  *   `ListarIncidenciasTramposoService` (el mismo listado del endpoint
@@ -51,7 +53,6 @@
  */
 
 use App\Http\Controllers\ExamenController;
-use App\Livewire\CentralRiesgo\Index as CentralRiesgoIndex;
 use App\Livewire\Examenes\EstudiantesCurso;
 use App\Livewire\Monitoreo\BuscadorRegistro;
 use App\Livewire\Monitoreo\MonitorEnVivo;
@@ -75,10 +76,9 @@ Route::get('/materias', fn () => view('pages.materias', [
 Route::view('/examenes', 'pages.examenes')->name('examenes');
 Route::get('/monitoreo', MonitorEnVivo::class)->name('monitoreo');
 Route::get('/monitoreo/registro-ingreso', BuscadorRegistro::class)->name('monitoreo.registro-ingreso');
-// La central de riesgos consume ListarIncidenciasTramposoService, el mismo
-// listado que alimenta el endpoint /api/central-riesgo; la ruta ya no pinta
-// datos mockeados.
-Route::get('/central-riesgo', CentralRiesgoIndex::class)->name('central-riesgo');
+// La vista solo aporta el layout; los datos los resuelve el componente Livewire
+// ListaEstudiantes que incrusta, por eso la ruta sigue sin lógica.
+Route::view('/central-riesgo', 'pages.central-riesgo')->name('central-riesgo');
 Route::view('/usuarios', 'pages.usuarios')->name('usuarios');
 Route::view('/reportes', 'pages.reportes')->name('reportes');
 Route::view('/notificaciones', 'pages.notificaciones')->name('notificaciones');

@@ -2,7 +2,7 @@
     @file    sidebar.blade.php
 @author  Valery D. Ortuno P. <valerydariana98@gmail.com>
     @created 2026-09-24
-    @updated 2026-10-09
+    @updated 2026-10-10
 
     @description
     Sidebar de navegación del panel. $items es un arreglo de ítems:
@@ -28,6 +28,8 @@
       integrar dev en feature/28 (#28).
     - 2026-10-09  [Alisson D. Alvarado]  feat: botón de notificaciones en la
       parte inferior del sidebar, con icono de campana y estado activo propio.
+    - 2026-10-10  [Valery D. Ortuno P]  fix: el ítem pasa a llamarse "Central de
+      riesgos", como lo nombra la HU 10 y el título de la pantalla.
 --}}
 
 @props([
@@ -46,7 +48,7 @@
         ['label' => 'Materias', 'route' => 'materias'],
         ['label' => 'Exámenes', 'route' => 'examenes'],
         ['label' => 'Monitor en vivo', 'route' => 'monitoreo'],
-        ['label' => 'Central de riesgo', 'route' => 'central-riesgo'],
+        ['label' => 'Central de riesgos', 'route' => 'central-riesgo'],
         ['label' => 'Usuarios y roles', 'route' => 'usuarios'],
         ['label' => 'Reportes', 'route' => 'reportes'],
     ];
