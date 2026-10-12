@@ -30,6 +30,13 @@
       parte inferior del sidebar, con icono de campana y estado activo propio.
     - 2026-10-10  [Valery D. Ortuno P]  fix: el ítem pasa a llamarse "Central de
       riesgos", como lo nombra la HU 10 y el título de la pantalla.
+    - 2026-10-12  [Diego Tejerina]  fix: el `<aside>` pasa de `sticky` a `fixed`
+      en mobile (con `lg:sticky` para no tocar el desktop). `sticky` nunca saca
+      al elemento del flujo del `flex` del layout, así que aunque quedara
+      corrido fuera de pantalla con `-translate-x-full`, sus 288px (`w-72`)
+      seguían reservados y empujaban TODO el contenido de CADA página fuera del
+      viewport: esto era la causa del scroll horizontal en todo el sitio en
+      mobile, no un problema de cada vista por separado.
 --}}
 
 @props([
@@ -73,7 +80,7 @@
     </div>
 @endif
 
-<aside id="{{ $id }}" class="shrink-0 sticky top-0 h-screen w-72 lg:w-[15%] bg-surface-sidebar text-neutral-primary transition-transform -translate-x-full lg:translate-x-0" aria-label="Sidebar">
+<aside id="{{ $id }}" class="shrink-0 fixed inset-y-0 start-0 z-40 h-screen w-72 lg:sticky lg:top-0 lg:z-auto lg:w-[15%] bg-surface-sidebar text-neutral-primary transition-transform -translate-x-full lg:translate-x-0" aria-label="Sidebar">
     <button type="button" data-drawer-hide="{{ $id }}" aria-controls="{{ $id }}"
             class="lg:hidden absolute top-2.5 end-2.5 flex items-center justify-center text-neutral-primary hover:bg-brand-strong rounded-base w-9 h-9">
         <span class="sr-only">Close sidebar</span>
