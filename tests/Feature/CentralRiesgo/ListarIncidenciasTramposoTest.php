@@ -31,6 +31,8 @@
  * - 2026-10-09  [T1]  test: creación inicial.
  * - 2026-10-09  [T1]  test: adaptar a la eliminación de la paginación y al
  *   orden alfabético fijo; la respuesta trae la lista completa.
+ * - 2026-10-11  [Valery D. Ortuno P]  test: la API solo devuelve incidencias
+ *   confirmadas; un `tramposo` pendiente no aparece.
  */
 
 namespace Tests\Feature\CentralRiesgo;
@@ -186,7 +188,7 @@ class ListarIncidenciasTramposoTest extends TestCase
         }
     }
 
-    private function crearIncidencia(string $sis, int $idExamen, string $tipo, string $fecha): void
+    private function crearIncidencia(string $sis, int $idExamen, string $tipo, string $fecha, string $estado = 'Confirmado'): void
     {
         static $idRiesgo = 900000;
 
@@ -198,6 +200,7 @@ class ListarIncidenciasTramposoTest extends TestCase
             'detalle_motivo' => 'Motivo de prueba '.$sis,
             'fecha_registro' => $fecha,
             'tipo_infraccion' => $tipo,
+            'estado_incidencia' => $estado,
             'id_examen' => $idExamen,
             'sis_estudiante' => $sis,
             'motivo' => 'uso de dispositivos electronicos',
@@ -230,6 +233,14 @@ class ListarIncidenciasTramposoTest extends TestCase
     public function test_solo_devuelve_incidencias_tramposas(): void
     {
         $this->assertNotContains('900000004', $this->sisDeLaRespuesta());
+    }
+
+    public function test_no_devuelve_tramposos_pendientes_de_confirmar(): void
+    {
+        $this->crearEstudiante('900000008', 'Nadia', 'Cordero Vargas', [self::CURSO_A]);
+        $this->crearIncidencia('900000008', self::EXAMEN_A, 'tramposo', '2026-10-04 09:00:00', 'Pendiente');
+
+        $this->assertNotContains('900000008', $this->sisDeLaRespuesta());
     }
 
     public function test_alcance_mis_materias_solo_muestra_los_cursos_del_usuario(): void
