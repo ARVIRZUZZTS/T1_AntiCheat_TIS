@@ -88,7 +88,7 @@ class ConsultarDetalleIncidenciaService
             // Formato local plano: el contrato del endpoint es 'Y-m-d H:i:s'
             // (lo que espera el front y DetalleIncidenciaTest); el Carbon crudo
             // se serializa en ISO-8601 con zona UTC y corre la fecha un día.
-            'fecha_registro' => $incidencia->fecha_registro?->format('Y-m-d H:i:s'),
+            'fecha_registro' => $incidencia->fecha_registro->format('Y-m-d H:i:s'),
             'estado' => $this->estado($incidencia),
             'descripcion' => $incidencia->detalle_motivo,
         ];
@@ -96,17 +96,17 @@ class ConsultarDetalleIncidenciaService
 
     private function etiquetaMotivo(CentralRiesgo $incidencia): ?string
     {
-        $motivo = $incidencia->motivo;
+        $motivo = $incidencia->getAttribute('motivo');
 
         if ($motivo instanceof Motivo) {
             return $motivo->etiqueta();
         }
 
-        if ($motivo === null) {
-            return null;
+        if (is_string($motivo)) {
+            return Motivo::tryFrom($motivo)?->etiqueta() ?? $motivo;
         }
 
-        return Motivo::tryFrom((string) $motivo)?->etiqueta() ?? (string) $motivo;
+        return null;
     }
 
     /**
@@ -117,9 +117,9 @@ class ConsultarDetalleIncidenciaService
      * migración: `tramposo` es un caso confirmado y `sospechoso` uno pendiente.
      *
      * @param  CentralRiesgo  $incidencia  Incidencia consultada.
-     * @return string|null Valor del estado ('Confirmado', 'Pendiente', etc.) o null.
+     * @return string Valor del estado ('Confirmado', 'Pendiente', etc.).
      */
-    private function estado(CentralRiesgo $incidencia): ?string
+    private function estado(CentralRiesgo $incidencia): string
     {
         $guardado = $incidencia->getAttribute('estado_incidencia');
 
@@ -128,21 +128,13 @@ class ConsultarDetalleIncidenciaService
         }
 
         if (is_string($guardado)) {
-            return EstadoIncidencia::tryFrom($guardado)?->value ?? $guardado;
+            $estadoEnum = EstadoIncidencia::tryFrom($guardado);
+
+            return $estadoEnum !== null ? $estadoEnum->value : $guardado;
         }
 
-        if ($incidencia->tipo_infraccion instanceof TipoInfraccion) {
-            return $incidencia->tipo_infraccion === TipoInfraccion::Tramposo
-                ? EstadoIncidencia::Confirmado->value
-                : EstadoIncidencia::Pendiente->value;
-        }
-
-        if (is_string($incidencia->tipo_infraccion)) {
-            return $incidencia->tipo_infraccion === TipoInfraccion::Tramposo->value
-                ? EstadoIncidencia::Confirmado->value
-                : EstadoIncidencia::Pendiente->value;
-        }
-
-        return null;
+        return $incidencia->tipo_infraccion === TipoInfraccion::Tramposo
+            ? EstadoIncidencia::Confirmado->value
+            : EstadoIncidencia::Pendiente->value;
     }
 }
