@@ -15,6 +15,9 @@
  *
  * @changelog
  * - 2026-10-09  [Alisson D. Alvarado]  test: cubrir detalle encontrado, 404 e invitado.
+ * - 2026-10-10  [Valery D. Ortuno P]  test: el motivo de la incidencia de prueba
+ *   usa el valor con espacios, que es el que tiene el enum `Motivo` desde que
+ *   se alineó con PostgreSQL; con guiones bajos el modelo no lo podía leer.
  * - 2026-10-11  [OchoaCesar]  test: el fixture de `motivo` se alinea al enum
  *   vigente con espacios (`copia o intercambio de respuestas`); el valor con
  *   guiones bajos ya no es un backing value válido y el cast del modelo lanzaba
