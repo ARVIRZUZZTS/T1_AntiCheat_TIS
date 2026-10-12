@@ -100,6 +100,21 @@
       al reabrir el modal se conserva lo escrito en vez de vaciarlo.
     - 2026-10-10  [Alex Candia]  refactor: los textos de ayuda de materiales y
       normas pasan a "Ingrese materiales/normas personalizadas para el examen".
+    - 2026-10-10  [Alex Candia]  fix: el estado de error pasa a ser de Alpine.
+      Blade escribía los errores en el HTML y viven toda la carga de la página,
+      así que al cerrar el modal y volverlo a abrir los campos seguían pintados
+      de rojo aunque el error ya era viejo. Ahora el rojo se apaga al cerrar el
+      modal y lo escrito se conserva, como ya pasaba con los valores.
+    - 2026-10-10  [Alex Candia]  fix: los errores de un item (`materiales.0`)
+      también se muestran. El comodín de la directiva de error de Blade no los
+      encontraba, porque la clave real trae el índice del item.
+    - 2026-10-10  [Alex Candia]  feat: la fecha completa sola el año en curso, la
+      hora pasa a texto en formato 24 horas acotado entre 06:45 y 20:15 (la hora
+      nunca pasa de 20 y, en el piso y en el tope, los minutos tampoco), y la
+      duración solo admite dígitos y tres cifras.
+    - 2026-10-10  [Alex Candia]  fix: la fecha acepta el día de un solo dígito.
+      Al teclear "9/12" sobraba el dígito y se leía como día 91, que se acotaba a
+      31; ahora se arma 09/12.
 
     @see  resources/views/partials/materia-examenes.blade.php
     @see  App\Enums\TipoExamen
@@ -110,13 +125,10 @@
 
 @php
     use App\Enums\TipoExamen;
+    use App\Services\Examen\RegistrarExamenService;
 
     $opciones = $tipos ?? TipoExamen::opciones();
 
-    // Old input: si la validación falla, el formulario vuelve a mostrarse con lo
-    // que la persona ya había escrito. El estado de Alpine arranca con esos
-    // valores porque todos los campos están atados con x-model: si se pusieran en
-    // el HTML, Alpine los sobrescribiría con el estado al inicializar.
     $catalogoAmbientes = collect($ambientes)->keyBy('id');
 
     $ambientesElegidos = collect((array) old('ambientes', []))
@@ -127,6 +139,19 @@
 
     $materialesElegidos = array_map('intval', (array) old('materiales', []));
     $normasElegidas = array_map('intval', (array) old('normas', []));
+
+    $mensajes = collect($errors->messages())
+        ->map(fn (array $lista): string => (string) ($lista[0] ?? ''))
+        ->filter()
+        ->all();
+
+    $claseError = 'bg-danger-soft! border-danger-subtle! text-fg-danger-strong! focus:ring-danger! focus:border-danger!';
+
+    $horaMinima = RegistrarExamenService::HORA_INICIO_MINIMA;
+    $horaMaxima = RegistrarExamenService::HORA_INICIO_MAXIMA;
+
+    // El año lo pone el campo solo, no la persona: es el año en curso.
+    $anioActual = (string) now()->year;
 @endphp
 
 <div
@@ -135,6 +160,9 @@
         tipo: @js(old('tipo_examen', '')),
         fecha: @js(old('fecha', '')),
         horaInicio: @js(old('hora_inicio', '')),
+        horaMinima: @js($horaMinima),
+        horaMaxima: @js($horaMaxima),
+        anioActual: @js($anioActual),
         duracion: @js(old('duracion', '')),
         busquedaAmbiente: '',
         indiceAmbientes: [],
@@ -145,8 +173,10 @@
         materialesPersonalizados: @js(old('materiales_personalizados', '')),
         normasElegidas: @js($normasElegidas),
         normasPersonalizadas: @js(old('normas_personalizadas', '')),
+        errores: @js($mensajes),
+        mostrarErrores: @js($mensajes !== []),
 
-        // El catalogo de ambientes llega en el <script> de abajo. `termino` ya
+        // El catalogo de ambientes llega en el bloque de script de abajo. `termino` ya
         // viene en minusculas desde el servicio, asi que aca no se normaliza nada.
         init() {
             const ambientes = document.getElementById('indice-ambientes-examen');
@@ -154,40 +184,108 @@
             this.indiceAmbientes = ambientes ? JSON.parse(ambientes.textContent) : [];
         },
 
-        // La fecha se escribe dd/mm/aaaa: se queda solo con digitos, coloca los
-        // separadores solos y acota el dia a 31 y el mes a 12. El formato no
-        // depende del navegador ni de la configuracion regional del dispositivo.
-        sanearFecha() {
-            const digitos = this.fecha.replace(/\D/g, '').slice(0, 8);
+        // Mensaje de error de un campo, o cadena vacia si no hay. Se mira tambien
+        // dentro de los items: `materiales.0` cuenta para `materiales`. La
+        // directiva de error de Blade con comodin no las encontraba, porque la
+        // clave real trae el indice del item.
+        errorDe(campo) {
+            if (! this.mostrarErrores) {
+                return '';
+            }
 
-            if (digitos.length <= 2) {
-                this.fecha = digitos;
+            if (this.errores[campo]) {
+                return this.errores[campo];
+            }
+
+            const conIndice = Object.keys(this.errores)
+                .find((clave) => clave.startsWith(campo + '.'));
+
+            return conIndice ? this.errores[conIndice] : '';
+        },
+
+        // Clases de error del campo, o nada si no hay.
+        claseErrorDe(campo) {
+            return this.errorDe(campo) ? '{{ $claseError }}' : '';
+        },
+        sanearFecha() {
+            const digitos = this.fecha.replace(/\D/g, '');
+            const diaDeDos = parseInt(digitos.slice(0, 2), 10);
+            const diaDeUno = parseInt(digitos.slice(0, 1), 10);
+            const diaDeUnDigito = digitos.length >= 3
+                && (diaDeDos === 0 || diaDeDos > 31)
+                && diaDeUno >= 1
+                && diaDeUno <= 9;
+
+            const diaCrudo = digitos.slice(0, diaDeUnDigito ? 1 : 2);
+            const mesCrudo = digitos.slice(diaDeUnDigito ? 1 : 2, diaDeUnDigito ? 3 : 4);
+
+            if (mesCrudo === '') {
+                this.fecha = diaDeUnDigito ? diaCrudo : digitos;
 
                 return;
             }
 
-            const dia = this.acotar(digitos.slice(0, 2), 31);
-            const mes = this.acotar(digitos.slice(2, 4), 12);
-            const anio = digitos.slice(4);
+            const dia = String(Math.min(Math.max(parseInt(diaCrudo, 10) || 1, 1), 31)).padStart(2, '0');
+            const mes = this.acotar(mesCrudo, 12);
 
-            this.fecha = anio === '' ? dia + '/' + mes : dia + '/' + mes + '/' + anio;
+            this.fecha = dia + '/' + mes + '/' + this.anioActual;
         },
 
-        // Limita un grupo de dos digitos a un maximo, solo cuando esta completo.
-        acotar(grupo, maximo) {
+        sanearHora() {
+            const digitos = this.horaInicio.replace(/\D/g, '').slice(0, 4);
+
+            if (digitos.length < 2) {
+                this.horaInicio = digitos;
+
+                return;
+            }
+
+            const [horaMinima, minutoMinimo] = this.horaMinima.split(':');
+            const [horaMaxima, minutoMaximo] = this.horaMaxima.split(':');
+            // La hora se acota apenas se escriben sus dos digitos, no al
+            // tercero: escribir 21 tiene que volverse 20 en el momento.
+            const hora = this.acotar(digitos.slice(0, 2), parseInt(horaMaxima, 10), parseInt(horaMinima, 10));
+
+            if (digitos.length === 2) {
+                this.horaInicio = hora;
+
+                return;
+            }
+
+            let minimo = 1;
+            let maximo = 59;
+
+            if (hora === horaMinima) {
+                minimo = parseInt(minutoMinimo, 10);
+            }
+
+            if (hora === horaMaxima) {
+                maximo = parseInt(minutoMaximo, 10);
+            }
+
+            this.horaInicio = hora + ':' + this.acotar(digitos.slice(2, 4), maximo, minimo);
+        },
+
+        // Limita un grupo de dos digitos al rango [minimo, maximo], y solo
+        // cuando ya esta completo: mientras se escribe, el grupo queda como esta.
+        acotar(grupo, maximo, minimo = 1) {
             if (grupo.length < 2) {
                 return grupo;
             }
 
-            const numero = Math.min(Math.max(parseInt(grupo, 10) || 1, 1), maximo);
+            const numero = Math.min(Math.max(parseInt(grupo, 10) || minimo, minimo), maximo);
 
             return String(numero).padStart(2, '0');
         },
 
-        // La duracion son minutos: solo digitos. Al ser type=text no aparecen
-        // las flechitas del input number, que en movil ocupan medio campo.
-        sanearDuracion() {
-            this.duracion = this.duracion.replace(/\D/g, '');
+        sanearDuracion(campo) {
+            const digitos = this.duracion.replace(/\D/g, '');
+
+            this.duracion = digitos;
+
+            if (campo && campo.value !== digitos) {
+                campo.value = digitos;
+            }
         },
 
         ambientesVisibles() {
@@ -245,7 +343,7 @@
     aria-hidden="true"
     @click.self="$dispatch('cerrar-modal-crear-examen')"
     @keydown.escape.window="$dispatch('cerrar-modal-crear-examen')"
-    @cerrar-modal-crear-examen.window="show = false"
+    @cerrar-modal-crear-examen.window="show = false; mostrarErrores = false"
     @abrir-modal-crear-examen.window="show = true; busquedaAmbiente = ''; listaAbierta = false; indiceResaltado = -1"
     class="overflow-y-auto overflow-x-hidden fixed top-0 right-0 left-0 z-50 flex justify-center items-center w-full md:inset-0 h-full max-h-full bg-overlay-modal/50"
 >
@@ -265,18 +363,10 @@
                 </button>
             </div>
 
-            {{-- Formulario real: va con POST y @csrf, sin wire: ni fetch. El
-                 <form> envuelve los campos y el pie de botones. Alpine se encarga
-                 de la ergonomía del formulario y del combobox de ambientes, que sí
-                 necesita JavaScript: sin él no se pueden elegir ambientes. --}}
             <form method="POST" action="{{ route('cursos.examenes.store', $cursoId) }}">
                 @csrf
 
             <div class="space-y-4 py-4">
-                {{-- La materia se muestra como un campo de solo lectura: si el
-                     examen es de una sola materia va el nombre y listo, sin la
-                     flechita de desplegable. Cuando un examen pueda tener varias
-                     materias, aca va un selector con esas materias. --}}
                 @if ($materia)
                     <x-ui.input
                         label="Materia"
@@ -296,9 +386,12 @@
                     x-model="tipo"
                     :options="$opciones"
                     placeholder="Selecciona un tipo"
-                    :error="$errors->first('tipo_examen')"
+                    x-bind:class="claseErrorDe('tipo_examen')"
+                    x-bind:aria-invalid="errorDe('tipo_examen') ? 'true' : null"
                     required
                 />
+                <p x-show="errorDe('tipo_examen')" x-text="errorDe('tipo_examen')"
+                   class="mt-1 text-sm text-fg-danger-strong"></p>
 
                 <x-ui.input
                     label="Fecha"
@@ -310,19 +403,29 @@
                     maxlength="10"
                     x-model="fecha"
                     @input="sanearFecha()"
-                    :error="$errors->first('fecha')"
+                    x-bind:class="claseErrorDe('fecha')"
+                    x-bind:aria-invalid="errorDe('fecha') ? 'true' : null"
                     required
                 />
+                <p x-show="errorDe('fecha')" x-text="errorDe('fecha')"
+                   class="mt-1 text-sm text-fg-danger-strong"></p>
 
                 <x-ui.input
                     label="Hora de inicio"
                     id="hora_inicio_examen"
                     name="hora_inicio"
-                    type="time"
+                    type="text"
+                    inputmode="numeric"
+                    maxlength="5"
+                    placeholder="06:45"
                     x-model="horaInicio"
-                    :error="$errors->first('hora_inicio')"
+                    @input="sanearHora()"
+                    x-bind:class="claseErrorDe('hora_inicio')"
+                    x-bind:aria-invalid="errorDe('hora_inicio') ? 'true' : null"
                     required
                 />
+                <p x-show="errorDe('hora_inicio')" x-text="errorDe('hora_inicio')"
+                   class="mt-1 text-sm text-fg-danger-strong"></p>
 
                 <x-ui.input
                     label="Duración (minutos)"
@@ -330,11 +433,16 @@
                     name="duracion"
                     type="text"
                     inputmode="numeric"
+                    pattern="[0-9]*"
+                    maxlength="3"
                     x-model="duracion"
-                    @input="sanearDuracion()"
-                    :error="$errors->first('duracion')"
+                    @input="sanearDuracion($event.target)"
+                    x-bind:class="claseErrorDe('duracion')"
+                    x-bind:aria-invalid="errorDe('duracion') ? 'true' : null"
                     required
                 />
+                <p x-show="errorDe('duracion')" x-text="errorDe('duracion')"
+                   class="mt-1 text-sm text-fg-danger-strong"></p>
                 <div @click.outside="listaAbierta = false">
                     <label for="busqueda_ambiente" class="block mb-2.5 text-sm font-medium text-heading">
                         Ambientes <span class="text-fg-danger-strong" aria-hidden="true">*</span>
@@ -354,8 +462,9 @@
                            @keydown.enter.prevent="elegirResaltado()"
                            @keydown.escape="listaAbierta = false"
                            placeholder="Buscar ambiente..."
-                           @error('ambientes') aria-invalid="true" @enderror
-                           class="block w-full p-3 border text-sm rounded-base focus:ring-brand focus:border-brand shadow-xs placeholder:text-body @error('ambientes') border-danger-subtle bg-danger-soft text-fg-danger-strong focus:ring-danger focus:border-danger @else border-default-medium bg-neutral-secondary-medium text-heading @enderror" />
+                           x-bind:class="claseErrorDe('ambientes')"
+                           x-bind:aria-invalid="errorDe('ambientes') ? 'true' : null"
+                           class="block w-full p-3 border border-default-medium bg-neutral-secondary-medium text-heading text-sm rounded-base focus:ring-brand focus:border-brand shadow-xs placeholder:text-body" />
 
                     <ul id="lista-ambientes" role="listbox" aria-label="Ambientes disponibles"
                         x-show="listaAbierta" x-cloak
@@ -399,19 +508,10 @@
                         <input type="hidden" name="ambientes[]" :value="ambiente.id" />
                     </template>
 
-                    @error('ambientes')
-                        <p class="mt-1 text-sm text-fg-danger-strong">{{ $message }}</p>
-                    @enderror
+                    <p x-show="errorDe('ambientes')" x-text="errorDe('ambientes')"
+                       class="mt-1 text-sm text-fg-danger-strong"></p>
                 </div>
 
-                {{-- Material permitido: casillas del catalogo, todas desmarcadas.
-                     El catalogo lo resuelve ListarMaterialesService y se recorre con
-                     Blade, no con x-for: los datos ya vienen del servidor y Alpine
-                     solo guarda la seleccion. El `x-model` es un array, asi que la
-                     casilla marcada empuja su id y la desmarcada lo saca.
-                     Ojo: los atributos van SIN `:` a proposito, porque en un tag de
-                     componente Blade un `:` delante del nombre hace que Blade
-                     evalue el valor como PHP y no como expresion de Alpine. --}}
                 <div>
                     <p class="block mb-2.5 text-sm font-medium text-heading" id="materiales_examen">
                         Material permitido
@@ -435,12 +535,8 @@
                         @endforelse
                     </ul>
 
-                    @error('materiales')
-                        <p class="mt-1 text-sm text-fg-danger-strong">{{ $message }}</p>
-                    @enderror
-                    @error('materiales.*')
-                        <p class="mt-1 text-sm text-fg-danger-strong">{{ $message }}</p>
-                    @enderror
+                    <p x-show="errorDe('materiales')" x-text="errorDe('materiales')"
+                       class="mt-1 text-sm text-fg-danger-strong"></p>
                 </div>
 
                 {{-- Materiales que no estan en el catalogo: texto libre. El
@@ -453,12 +549,13 @@
                     maxlength="300"
                     placeholder="Ingrese materiales personalizados para el examen"
                     x-model="materialesPersonalizados"
-                    :error="$errors->first('materiales_personalizados')"
+                    x-bind:class="claseErrorDe('materiales_personalizados')"
+                    x-bind:aria-invalid="errorDe('materiales_personalizados') ? 'true' : null"
                 />
+                <p x-show="errorDe('materiales_personalizados')" x-text="errorDe('materiales_personalizados')"
+                   class="mt-1 text-sm text-fg-danger-strong"></p>
 
-                {{-- Normas del catalogo: mismas casillas desmarcadas que los
-                     materiales, pero cada una es una regla entera y por eso el
-                     texto puede ocupar el ancho completo. --}}
+     
                 <div>
                     <p class="block mb-2.5 text-sm font-medium text-heading" id="normas_examen">
                         Normas
@@ -482,12 +579,8 @@
                         @endforelse
                     </ul>
 
-                    @error('normas')
-                        <p class="mt-1 text-sm text-fg-danger-strong">{{ $message }}</p>
-                    @enderror
-                    @error('normas.*')
-                        <p class="mt-1 text-sm text-fg-danger-strong">{{ $message }}</p>
-                    @enderror
+                    <p x-show="errorDe('normas')" x-text="errorDe('normas')"
+                       class="mt-1 text-sm text-fg-danger-strong"></p>
                 </div>
 
                 {{-- Normas propias del examen. El maxlength del textarea es lo
@@ -500,12 +593,12 @@
                     maxlength="300"
                     placeholder="Ingrese normas personalizadas para el examen"
                     x-model="normasPersonalizadas"
-                    :error="$errors->first('normas_personalizadas')"
+                    x-bind:class="claseErrorDe('normas_personalizadas')"
+                    x-bind:aria-invalid="errorDe('normas_personalizadas') ? 'true' : null"
                 />
+                <p x-show="errorDe('normas_personalizadas')" x-text="errorDe('normas_personalizadas')"
+                   class="mt-1 text-sm text-fg-danger-strong"></p>
             </div>
-
-            {{-- Mobile: los botones se apilan a lo ancho (stretch del column
-                 flex) y el de guardar queda arriba; desde sm: van en fila. --}}
             <div class="border-t border-default pt-4 flex flex-col-reverse gap-[2vh] sm:flex-row">
                 <x-ui.button-cancelar class="flex-1" @click="$dispatch('cerrar-modal-crear-examen')">Cancelar</x-ui.button-cancelar>
                 <x-ui.button type="submit" variant="default" class="flex-1">Guardar examen</x-ui.button>
@@ -514,9 +607,5 @@
         </div>
     </div>
 
-    {{-- Indice de ambientes para el buscador del modal. Va como application/json
-         y se lee con JSON.parse sobre textContent (no como atributo) por el mismo
-         motivo que en el buscador de registro: el escapado del HTML no se mete en
-         medio. Los materiales no viajan por aqui: los pinta Blade directo. --}}
     <script type="application/json" id="indice-ambientes-examen">@json($ambientes)</script>
 </div>

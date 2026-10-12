@@ -31,6 +31,9 @@
  *   `date_format:d/m/Y` acepta `10/12/262` y esa fecha se guardaba como 0262.
  * - 2026-10-10  [Alex Candia]  feat: mensajes claros de hora y fecha inválidas,
  *   y validación del año (`19xx`/`20xx`) con su propio mensaje.
+ * - 2026-10-10  [Alex Candia]  fix: el piso horario pasa de `after` a
+ *   `after_or_equal` (con su clave de mensaje). `after` es estricto, así que
+ *   rechazaba las 06:45 exactas, que son una hora válida del rango.
  */
 
 namespace App\Http\Requests;
@@ -89,12 +92,23 @@ class StoreExamenRequest extends FormRequest
             // sale igual del enum, que sigue siendo la única fuente de valores.
             'tipo_examen' => ['required', 'in:'.implode(',', array_column(TipoExamen::cases(), 'value'))],
             // El regex exige los cuatro dígitos del año: `date_format` acepta
-            // `10/12/262` y eso se guardaba como el año 0262.
+            // `10/12/262` y eso se guardaba como el año 0262. El año en sí lo
+            // completa el modal con el año en curso.
             'fecha' => ['required', 'regex:/^\d{2}\/\d{2}\/\d{4}$/', 'date_format:d/m/Y'],
             // El regex refuerza el rango 00:00-23:59. `type="time"` no deja
             // escribir una hora inválida, pero el mensaje propio cubre igual un
-            // envío que no venga del navegador.
-            'hora_inicio' => ['required', 'date_format:H:i', 'regex:/^([01]\d|2[0-3]):[0-5]\d$/'],
+            // envío que no venga del navegador. El `after_or_equal`/
+            // `before_or_equal` es lo que acota a la ventana del centro de
+            // exámenes (06:45 a 20:15). Es `after_or_equal` y no `after` porque
+            // el piso es una hora válida: con `after`, las 06:45 exactas quedaban
+            // rechazadas por el propio límite.
+            'hora_inicio' => [
+                'required',
+                'date_format:H:i',
+                'regex:/^([01]\d|2[0-3]):[0-5]\d$/',
+                'after_or_equal:'.RegistrarExamenService::HORA_INICIO_MINIMA,
+                'before_or_equal:'.RegistrarExamenService::HORA_INICIO_MAXIMA,
+            ],
             'duracion' => ['required', 'integer', 'min:1', 'max:'.RegistrarExamenService::DURACION_MAXIMA],
             // Sin ambiente el examen no se puede monitorear, así que se exige al
             // menos uno.
@@ -126,6 +140,10 @@ class StoreExamenRequest extends FormRequest
             'hora_inicio.required' => 'Ingrese la hora de inicio.',
             'hora_inicio.date_format' => 'Ingrese una hora válida.',
             'hora_inicio.regex' => 'Ingrese una hora válida.',
+            'hora_inicio.after_or_equal' => 'La hora de inicio no puede ser anterior a las '
+                .RegistrarExamenService::HORA_INICIO_MINIMA.'.',
+            'hora_inicio.before_or_equal' => 'La hora de inicio no puede ser posterior a las '
+                .RegistrarExamenService::HORA_INICIO_MAXIMA.'.',
             'duracion.required' => 'Ingrese la duración del examen.',
             'duracion.integer' => 'La duración debe estar en minutos, solo números.',
             'duracion.min' => 'La duración debe ser de al menos 1 minuto.',
