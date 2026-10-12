@@ -31,6 +31,17 @@
       que el navegador considere la página "desplazable" unos pixeles hacia la
       izquierda aunque nada se vea mal; con esto ya no hay forma de arrastrar
       la página horizontalmente en ninguna vista.
+    - 2026-10-12  [Diego Tejerina]  fix: el hamburguesa deja de vivir dentro de
+      x-ui.sidebar. Al ser `<aside>` `fixed`, ya no cuenta como ítem del flex
+      del layout, y el botón hamburguesa (el único hermano angosto que quedaba
+      junto a `<main>`) se ponía en fila con todo el contenido en vez de
+      arriba: la "columna de 88px" que empujaba la página entera. Ahora
+      x-ui.page-header dibuja una franja de ancho completo (hamburguesa o
+      flecha de volver + título + subtítulo) arriba de `<main>`, dentro del
+      mismo contenedor en columna, para mobile y desktop. El título/subtítulo
+      de cada vista salen de @section('title')/@section('subtitle') (o de
+      $title/$subtitle si la vista los pasa como variable), y $backRoute
+      cambia el hamburguesa por la flecha en las vistas de detalle.
 --}}
 
 <!DOCTYPE html>
@@ -47,28 +58,40 @@
         @livewireStyles
     </head>
     <body class="bg-surface-page text-heading antialiased overflow-x-hidden">
-        <div class="flex items-start">
-            <x-ui.sidebar title="Control de ingreso Exámenes masivos" :items="$sidebarItems ?? []" :show-trigger="$sidebarShowTrigger ?? true" />
+        <div class="flex">
+            <x-ui.sidebar title-main="Control de Ingreso" title-sub="Exámenes masivos" :items="$sidebarItems ?? []" />
 
-            @if (isset($slot))
-                <main class="flex-1 min-w-0 lg:h-screen lg:overflow-hidden">
-                    {{ $slot }}
-                </main>
-            @else
-                <main class="flex-1 min-w-0">
+            <div class="flex-1 min-w-0 flex flex-col lg:h-screen">
+                @if (isset($slot))
+                    <x-ui.page-header
+                        :title="$title ?? config('app.name')"
+                        :subtitle="$subtitle ?? null"
+                        :back="$backRoute ?? null"
+                    />
+
+                    <main class="flex-1 min-w-0 lg:min-h-0 lg:overflow-hidden">
+                        {{ $slot }}
+                    </main>
+                @else
                     @hasSection('header')
                         @yield('header')
                     @else
-                        <header class="bg-neutral-primary-soft border-b border-default mb-[2vh]">
-                            <div class="px-6 py-4">
-                                <h1 class="text-2xl font-semibold text-heading">@yield('title', config('app.name'))</h1>
-                            </div>
-                        </header>
+                        <x-ui.page-header
+                            :title="trim($__env->yieldContent('title', config('app.name')))"
+                            :subtitle="$__env->yieldContent('subtitle') ?: null"
+                            :back="$backRoute ?? null"
+                        >
+                            @hasSection('header-actions')
+                                <x-slot:actions>@yield('header-actions')</x-slot:actions>
+                            @endif
+                        </x-ui.page-header>
                     @endif
 
-                    @yield('content')
-                </main>
-            @endif
+                    <main class="flex-1 min-w-0">
+                        @yield('content')
+                    </main>
+                @endif
+            </div>
         </div>
 
         @livewireScripts

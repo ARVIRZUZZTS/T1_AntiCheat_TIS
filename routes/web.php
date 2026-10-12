@@ -58,6 +58,7 @@ use App\Livewire\Monitoreo\BuscadorRegistro;
 use App\Livewire\Monitoreo\MonitorEnVivo;
 use App\Livewire\Monitoreo\RegistrarIncidencia;
 use App\Models\Curso;
+use App\Services\Curso\ListarMateriasConMetricasService;
 use App\Models\Usuario;
 use App\Services\Ambiente\ListarAmbientesService;
 use App\Services\Examen\ListarEstudiantesCursoConEstadoService;
@@ -71,7 +72,7 @@ Route::view('/', 'pages.inicio')->name('inicio');
 
 Route::view('/inicio', 'pages.inicio')->name('inicio');
 Route::get('/materias', fn () => view('pages.materias', [
-    'cursos' => Curso::query()->orderBy('id_curso')->get(),
+    'materias' => app(ListarMateriasConMetricasService::class)->ejecutar(),
 ]))->name('materias');
 Route::view('/examenes', 'pages.examenes')->name('examenes');
 Route::get('/monitoreo', MonitorEnVivo::class)->name('monitoreo');
@@ -98,11 +99,9 @@ Route::get('/materias/{curso}', function (Curso $curso) {
         'ambientes' => app(ListarAmbientesService::class)->ejecutar(),
         'materiales' => app(ListarMaterialesService::class)->ejecutar(),
         'normas' => app(ListarNormasService::class)->ejecutar(),
-        // Esta vista ya trae su propio header con la flecha "Volver" (ver
-        // @section('header') en pages/materia-estudiantes.blade.php); sin esto
-        // el hamburguesa del sidebar se dibujaba encima en movil, duplicando
-        // la navegacion.
-        'sidebarShowTrigger' => false,
+        // Vista de detalle: x-ui.page-header muestra la flecha "Volver" en vez
+        // del hamburguesa cuando se le pasa $backRoute.
+        'backRoute' => route('materias'),
     ]);
 })->name('materias.detalle');
 

@@ -17,6 +17,11 @@
     - 2026-10-12  [Diego Tejerina]  fix: los botones del footer se apilan en
       mobile (flex-col, ancho completo) y vuelven a quedar en fila desde
       sm:, para que sean consistentes con el resto de modales del sistema.
+    - 2026-10-12  [Diego Tejerina]  nota: el SIS de "Estudiante: X (SIS: Y)"
+      queda a propósito SIN font-mono (a diferencia de la tabla y las demás
+      pantallas). ModalHabilitarSoloTest busca el texto literal completo
+      ("Estudiante: Ana Lopez (SIS: 202201013)") y un <span> en medio lo
+      parte en dos strings. Envolverlo rompía ese assert.
 
     @see  resources/views/pages/materia-estudiantes.blade.php
     @see  resources/views/livewire/examenes/estudiantes-curso.blade.php

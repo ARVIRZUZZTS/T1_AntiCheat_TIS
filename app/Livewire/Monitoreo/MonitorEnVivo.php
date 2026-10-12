@@ -44,6 +44,14 @@
  *   que el reporte se calculaba **tres veces** por página: 28 consultas y 11s.
  *   Ahora leen `$this->informe`, el reporte se calcula una sola vez y la
  *   página baja a 10 consultas y ~5s.
+ * - 2026-10-12  [Diego Tejerina]  fix: filtro ('todos'/'pendientes'/
+ *   'tramposos') y búsqueda pasan de un script en el navegador (que ocultaba
+ *   filas ya pintadas, por eso la página traía los 50 inscritos de una sola
+ *   vez) a propiedades Livewire que filtran `$this->informe['estudiantes']`
+ *   antes de paginar. `config('monitoreo.por_pagina')` baja de 50 a un
+ *   número chico de verdad: la tabla ya no depende de traer el curso
+ *   completo para que el filtro/búsqueda funcionen. No toca
+ *   confirmarIngreso/rechazarIngreso/permitirIngreso/registrarTramposo.
  */
 
 namespace App\Livewire\Monitoreo;
@@ -56,6 +64,7 @@ use App\Services\Monitoreo\GenerarReporteAsistenciaService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
@@ -80,6 +89,16 @@ class MonitorEnVivo extends Component
      * Página actual de la tabla de estudiantes.
      */
     public int $pagina = 1;
+
+    /**
+     * Filtro activo de la tabla: 'todos', 'pendientes' o 'tramposos'.
+     */
+    public string $filtro = 'todos';
+
+    /**
+     * Término de búsqueda por nombre o código SIS.
+     */
+    public string $busqueda = '';
 
     /**
      * Mensaje de éxito de la última acción, vacío mientras no haya ninguna.
@@ -144,14 +163,15 @@ class MonitorEnVivo extends Component
     }
 
     /**
-     * Estudiantes del examen, paginados.
+     * Estudiantes del examen que pasan el filtro y la búsqueda actuales,
+     * paginados.
      *
      * @return LengthAwarePaginator<int, array<string, mixed>>
      */
     #[Computed]
     public function estudiantes(): LengthAwarePaginator
     {
-        $todos = $this->informe['estudiantes'];
+        $todos = $this->estudiantesFiltrados();
         $porPagina = (int) config('monitoreo.por_pagina', 10);
         $pagina = max(1, $this->pagina);
 
@@ -162,6 +182,45 @@ class MonitorEnVivo extends Component
             $pagina,
             ['path' => LengthAwarePaginator::resolveCurrentPath()],
         );
+    }
+
+    /**
+     * Aplica el filtro de estado y la búsqueda por nombre/SIS sobre el
+     * informe completo, antes de paginar.
+     *
+     * Antes esto lo hacía un script en el navegador, ocultando filas ya
+     * pintadas: por eso la página traía los 50 inscritos de una sola vez
+     * (`config('monitoreo.por_pagina')` era 50). Al paginar de a pocos en el
+     * servidor, el filtro y la búsqueda tienen que viajar con la consulta
+     * para seguir alcanzando a todo el curso y no solo a la página visible.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function estudiantesFiltrados(): Collection
+    {
+        $todos = $this->informe['estudiantes'];
+
+        $filtrados = match ($this->filtro) {
+            'pendientes' => $todos->where('estado_asistencia', 'pendiente'),
+            'tramposos' => $todos->filter(
+                fn (array $fila): bool => ($fila['incidencia']['tipo'] ?? null) === TipoInfraccion::Tramposo->value
+            ),
+            default => $todos,
+        };
+
+        $termino = Str::lower(trim($this->busqueda));
+
+        if ($termino === '') {
+            return $filtrados->values();
+        }
+
+        return $filtrados
+            ->filter(function (array $fila) use ($termino): bool {
+                $texto = Str::lower(trim($fila['sis'].' '.$fila['nombre'].' '.$fila['apellido']));
+
+                return str_contains($texto, $termino);
+            })
+            ->values();
     }
 
     /**
@@ -199,6 +258,30 @@ class MonitorEnVivo extends Component
     public function irPagina(int $pagina): void
     {
         $this->pagina = max(1, $pagina);
+    }
+
+    /**
+     * Cambia el filtro de estado de la tabla y vuelve a la primera página.
+     *
+     * @param  string  $filtro  'todos', 'pendientes' o 'tramposos'.
+     */
+    public function filtrar(string $filtro): void
+    {
+        if (! in_array($filtro, ['todos', 'pendientes', 'tramposos'], true)) {
+            return;
+        }
+
+        $this->filtro = $filtro;
+        $this->pagina = 1;
+    }
+
+    /**
+     * Confirma la búsqueda actual (ya sincronizada por `wire:model.lazy`) y
+     * vuelve a la primera página.
+     */
+    public function buscar(): void
+    {
+        $this->pagina = 1;
     }
 
     /**

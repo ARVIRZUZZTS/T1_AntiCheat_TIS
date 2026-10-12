@@ -22,8 +22,22 @@
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="CACHE_STORE" value="array"/>
-        <!-- <env name="DB_CONNECTION" value="sqlite"/> -->
-        <!-- <env name="DB_DATABASE" value=":memory:"/> -->
+        <!-- sqlite no sirve acá: el driver pdo_sqlite ni está instalado en
+             este entorno, y además 5 de las 12 migraciones usan DDL propio
+             de Postgres (CREATE TYPE ... AS ENUM, catálogos pg_*, casts
+             ::text) que sqlite no entiende. Los tests corren contra una base
+             Postgres LOCAL y separada tanto de la base de desarrollo
+             (t1_anticheat) como de Supabase: nunca contra el host que diga
+             el .env real. phpunit fija estas variables ANTES de que arranque
+             Laravel, y Dotenv::createImmutable() (bootstrap/app.php) no pisa
+             una variable que ya está puesta, así que el .env real queda
+             afuera durante los tests pase lo que pase. -->
+        <env name="DB_CONNECTION" value="pgsql"/>
+        <env name="DB_HOST" value="127.0.0.1"/>
+        <env name="DB_PORT" value="5434"/>
+        <env name="DB_DATABASE" value="t1_anticheat_testing"/>
+        <env name="DB_USERNAME" value="t1_anticheat"/>
+        <env name="DB_PASSWORD" value="t1_anticheat"/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="PULSE_ENABLED" value="false"/>
         <env name="QUEUE_CONNECTION" value="sync"/>

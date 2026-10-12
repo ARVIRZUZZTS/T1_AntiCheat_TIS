@@ -26,6 +26,14 @@
     @see  App\Livewire\Examenes\EstudiantesCurso
     @see  resources/views/components/ui/modal-deshabilitar.blade.php
     @see  resources/views/partials/busqueda-estudiante.blade.php
+
+    @changelog (continúa arriba)
+    - 2026-10-12  [Diego Tejerina]  feat: en mobile (`lg:hidden`) la tabla se
+      reemplaza por una tarjeta por estudiante (avatar + nombre + código SIS,
+      badges de estado/observación, motivo y la acción Habilitar/Deshabilitar
+      abajo); desde `lg:` sigue siendo la tabla de siempre, sin cambios. Los
+      datos de la tarjeta salen de los mismos closures $badge/$avatar/
+      $acciones que ya arma $filas, no hay lógica nueva.
 --}}
 
 @php
@@ -150,6 +158,44 @@
             ->all();
     }
 
+    // Mismos datos que $filas, para las tarjetas de mobile (misma info que la
+    // tabla: avatar + nombre + SIS, badges de estado/observación, motivo y la
+    // acción Habilitar/Deshabilitar), reutilizando los closures de arriba
+    // (su caché interna hace que repetir avatar/badge acá no sea costoso).
+    $tarjetas = [];
+    if ($entradasValidas) {
+        $tarjetas = collect($this->estudiantes->items())
+            ->map(function (array $estudiante) use ($badge, $avatar, $acciones, $estadoBadges, $observacionBadges, $esDocente): array {
+                $nombreCompleto = trim(($estudiante['nombre'] ?? '') . ' ' . ($estudiante['apellido'] ?? ''));
+                $observacion = $estudiante['observacion'] ?? null;
+
+                $tono = match ($observacion) {
+                    'sospechoso' => 'sospechoso',
+                    'tramposo' => 'tramposo',
+                    default => 'default',
+                };
+
+                $cardClass = match ($observacion) {
+                    'sospechoso' => 'bg-status-en-revision-bg',
+                    'tramposo' => 'bg-status-central-riesgos-bg',
+                    default => 'bg-neutral-primary-soft',
+                };
+
+                return [
+                    'cardClass' => $cardClass,
+                    'avatarHtml' => $avatar($nombreCompleto !== '' ? $nombreCompleto : 'na', $tono, 'md', 'shrink-0'),
+                    'nombre' => $nombreCompleto,
+                    'sis' => $estudiante['sis'] ?? '—',
+                    'estadoHtml' => $badge($estudiante['estado'] ?? null, $estadoBadges, 'Sin estado', 'status-pendiente'),
+                    'observacionHtml' => $badge($observacion, $observacionBadges),
+                    'motivo' => $estudiante['motivo'] ?? null,
+                    'accionesHtml' => $acciones((string) ($estudiante['sis'] ?? ''), $estudiante['estado'] ?? null, $esDocente),
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
     $estudianteModal = $sisModalAbierto
         ? collect($this->estudiantes->items())->first(fn ($e) => ($e['sis'] ?? '') === $sisModalAbierto)
         : null;
@@ -238,11 +284,43 @@
 
         @if ($entradasValidas)
             <div class="flex-1 lg:min-h-0 lg:overflow-y-auto">
-                <x-ui.table
-                    compact
-                    :headers="['#', 'ESTUDIANTE', 'CÓDIGO SIS', 'ESTADO (EXAMEN ACTUAL)', 'MOTIVO', 'OBSERVACIONES', 'ACCIONES']"
-                    :rows="$filas"
-                />
+                {{-- Mobile: una tarjeta por estudiante en vez de la tabla
+                     (que en una pantalla chica obligaba a scroll horizontal
+                     con 7 columnas). Desde lg: vuelve a ser la tabla. --}}
+                <div class="space-y-3 lg:hidden">
+                    @foreach ($tarjetas as $tarjeta)
+                        <div class="{{ $tarjeta['cardClass'] }} border border-default rounded-base shadow-xs p-4">
+                            <div class="flex items-center gap-3">
+                                {!! $tarjeta['avatarHtml'] !!}
+                                <div class="min-w-0 flex-1">
+                                    <p class="font-semibold text-heading truncate">{{ $tarjeta['nombre'] }}</p>
+                                    <p class="text-sm text-muted">{{ $tarjeta['sis'] }}</p>
+                                </div>
+                            </div>
+
+                            <div class="mt-3 flex flex-wrap items-center gap-2">
+                                {!! $tarjeta['estadoHtml'] !!}
+                                {!! $tarjeta['observacionHtml'] !!}
+                            </div>
+
+                            @if ($tarjeta['motivo'])
+                                <p class="mt-2 text-sm text-body">{{ $tarjeta['motivo'] }}</p>
+                            @endif
+
+                            <div class="mt-3 border-t border-default pt-3 text-end">
+                                {!! $tarjeta['accionesHtml'] !!}
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+
+                <div class="hidden lg:block">
+                    <x-ui.table
+                        compact
+                        :headers="['#', 'ESTUDIANTE', 'CÓDIGO SIS', 'ESTADO (EXAMEN ACTUAL)', 'MOTIVO', 'OBSERVACIONES', 'ACCIONES']"
+                        :rows="$filas"
+                    />
+                </div>
 
                 @if ($this->estudiantes->total() === 0 && ! $sinResultados)
                     <p class="text-sm text-muted mt-3">No hay estudiantes para mostrar.</p>
