@@ -30,14 +30,17 @@
  *   "Aceptar"), la lista sigue visible detrás, el orden A-Z también ordena
  *   "Mis materias" y ordenar no cambia la cantidad de estudiantes.
  * - 2026-10-11  [Valery D. Ortuno P]  test: la lista muestra el nombre como
- *   "Apellido, Nombre" para que coincida con el orden A-Z.
+ *   "Nombre Apellido" (el orden A-Z sigue siendo por apellido).
  * - 2026-10-11  [Valery D. Ortuno P]  test: una incidencia `tramposo` pero
  *   `Pendiente` no aparece en la central (solo las confirmadas).
+ * - 2026-10-11  [Valery D. Ortuno P]  test: una escritura por Eloquent invalida
+ *   la caché de la lista (la invalidación por versión no deja datos viejos).
  */
 
 namespace Tests\Feature\CentralRiesgo;
 
 use App\Livewire\CentralRiesgo\ListaEstudiantes;
+use App\Models\CentralRiesgo;
 use App\Services\CentralRiesgo\ListarIncidenciasTramposoService;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
@@ -126,7 +129,7 @@ class ListaEstudiantesCentralRiesgoTest extends TestCase
 
         $this->assertTextoEnOrden($componente, ['Estudiante', 'Código SIS', 'Materia', 'Motivo']);
         $componente
-            ->assertSee('Alvarez Gomez, Luis')
+            ->assertSee('Luis Alvarez Gomez')
             ->assertSee(self::LUIS)
             ->assertSee('Calculo I')
             ->assertSee('Uso de dispositivos electrónicos no autorizados')
@@ -401,7 +404,7 @@ class ListaEstudiantesCentralRiesgoTest extends TestCase
 
         $componente
             ->assertSee('Mostrando')
-            ->assertSee('Bernales Soto, Maria');
+            ->assertSee('Maria Bernales Soto');
     }
 
     public function test_la_pantalla_carga_desde_el_boton_central_de_riesgos_del_sidebar(): void
@@ -411,7 +414,33 @@ class ListaEstudiantesCentralRiesgoTest extends TestCase
             ->assertOk()
             ->assertSeeInOrder(['Central de riesgos', 'Toda la institución', 'Mis materias', 'Ordenar A-Z'])
             ->assertSee('href="'.route('central-riesgo').'"', false)
-            ->assertSee('Alvarez Gomez, Luis');
+            ->assertSee('Luis Alvarez Gomez');
+    }
+
+    public function test_una_escritura_invalida_la_cache_de_la_lista(): void
+    {
+        $componente = $this->institucion();
+        $antes = $this->sisListados($componente);
+
+        // Alta por Eloquent: dispara `saved`, sube la versión de la caché y la
+        // lista se vuelve a consultar en vez de servir el resultado viejo.
+        $this->crearEstudiante('900000050', 'Zoe', 'Lopez Mena');
+        CentralRiesgo::create([
+            'id_registro' => ++$this->ultimoIdRegistro,
+            'id_examen' => self::EXAMEN_A,
+            'sis_estudiante' => '900000050',
+            'id_registrador' => self::DOCENTE_A,
+            'motivo' => 'uso de dispositivos electronicos',
+            'detalle_motivo' => 'Prueba de invalidación de la caché',
+            'fecha_registro' => '2026-10-06 08:00:00',
+            'tipo_infraccion' => 'tramposo',
+            'estado_incidencia' => 'Confirmado',
+        ]);
+
+        $despues = $this->sisListados($componente->call('$refresh'));
+
+        $this->assertNotSame($antes, $despues);
+        $this->assertContains('900000050', $despues);
     }
 
     /** Componente con el alcance "Toda la institución". */
