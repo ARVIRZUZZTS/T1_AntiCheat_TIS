@@ -7,7 +7,7 @@
  *
  * @created 2026-10-10
  *
- * @updated 2026-10-10
+ * @updated 2026-10-11
  *
  * @description
  * Componente Livewire de la central de riesgos (HU 10): lista a los estudiantes
@@ -29,17 +29,24 @@
  * - 2026-10-10  [Valery D. Ortuno P]  feat: creación inicial del componente.
  * - 2026-10-11  [Valery D. Ortuno P]  feat: el alcance por defecto pasa a ser
  *   "Toda la institución"; "Mis materias" se muestra a la derecha de ese tab.
+ * - 2026-10-11  [Valery D. Ortuno P]  perf: la lista y el detalle se cachean por
+ *   filtro/orden e id con invalidación por versión (cada escritura de una
+ *   incidencia sube la versión), así abrir el detalle o repetir una búsqueda no
+ *   vuelve a consultar Supabase. Las dos consultas de dominio bajan a una sola
+ *   sentencia cada una.
  */
 
 namespace App\Livewire\CentralRiesgo;
 
 use App\Livewire\Monitoreo\RegistrarIncidencia;
+use App\Services\CentralRiesgo\CacheCentralRiesgo;
 use App\Services\CentralRiesgo\ConsultarDetalleIncidenciaService;
 use App\Services\CentralRiesgo\ListarIncidenciasTramposoService;
 use App\Services\Examen\BusquedaEstudianteService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\Cache;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
@@ -103,13 +110,18 @@ class ListaEstudiantes extends Component
     #[Computed]
     public function estudiantes(): LengthAwarePaginator
     {
-        $incidencias = $this->servicioLista->ejecutar(
-            $this->usuario,
-            $this->alcance,
-            $this->terminoBusqueda(),
-            $this->ordenAlfabetico
-                ? ListarIncidenciasTramposoService::ORDEN_ALFABETICO
-                : ListarIncidenciasTramposoService::ORDEN_RECIENTES,
+        $busqueda = $this->terminoBusqueda();
+        $orden = $this->ordenAlfabetico
+            ? ListarIncidenciasTramposoService::ORDEN_ALFABETICO
+            : ListarIncidenciasTramposoService::ORDEN_RECIENTES;
+
+        // Caché local por filtro y orden: abrir/cerrar el detalle o repetir una
+        // búsqueda no vuelve a viajar a Supabase (~1.6 s por request). Cada
+        // escritura de una incidencia sube la versión y renueva la clave.
+        $incidencias = Cache::remember(
+            CacheCentralRiesgo::claveLista($this->usuario, $this->alcance, $busqueda, $this->ordenAlfabetico),
+            CacheCentralRiesgo::ttlLista(),
+            fn () => $this->servicioLista->ejecutar($this->usuario, $this->alcance, $busqueda, $orden),
         );
 
         // Una página que ya no existe (quedó de un filtro anterior) cae en la
@@ -137,12 +149,18 @@ class ListaEstudiantes extends Component
             return null;
         }
 
-        try {
-            return $this->servicioDetalle->ejecutar($this->idSeleccionado);
-        } catch (ModelNotFoundException) {
-            // La incidencia pudo descartarse mientras la lista estaba abierta.
-            return null;
-        }
+        return Cache::remember(
+            CacheCentralRiesgo::claveDetalle($this->idSeleccionado),
+            CacheCentralRiesgo::ttlDetalle(),
+            function (): ?array {
+                try {
+                    return $this->servicioDetalle->ejecutar($this->idSeleccionado);
+                } catch (ModelNotFoundException) {
+                    // La incidencia pudo descartarse mientras la lista estaba abierta.
+                    return null;
+                }
+            },
+        );
     }
 
     public function cambiarAlcance(string $alcance): void
