@@ -29,6 +29,8 @@
  * - 2026-10-11  [Valery D. Ortuno P]  test: el detalle es un modal (x y
  *   "Aceptar"), la lista sigue visible detrás, el orden A-Z también ordena
  *   "Mis materias" y ordenar no cambia la cantidad de estudiantes.
+ * - 2026-10-11  [Valery D. Ortuno P]  test: la lista muestra el nombre como
+ *   "Apellido, Nombre" para que coincida con el orden A-Z.
  */
 
 namespace Tests\Feature\CentralRiesgo;
@@ -114,7 +116,7 @@ class ListaEstudiantesCentralRiesgoTest extends TestCase
 
         $this->assertTextoEnOrden($componente, ['Estudiante', 'Código SIS', 'Materia', 'Motivo']);
         $componente
-            ->assertSee('Luis Alvarez Gomez')
+            ->assertSee('Alvarez Gomez, Luis')
             ->assertSee(self::LUIS)
             ->assertSee('Calculo I')
             ->assertSee('Uso de dispositivos electrónicos no autorizados')
@@ -389,7 +391,7 @@ class ListaEstudiantesCentralRiesgoTest extends TestCase
 
         $componente
             ->assertSee('Mostrando')
-            ->assertSee('Maria Bernales Soto');
+            ->assertSee('Bernales Soto, Maria');
     }
 
     public function test_la_pantalla_carga_desde_el_boton_central_de_riesgos_del_sidebar(): void
@@ -399,7 +401,7 @@ class ListaEstudiantesCentralRiesgoTest extends TestCase
             ->assertOk()
             ->assertSeeInOrder(['Central de riesgos', 'Toda la institución', 'Mis materias', 'Ordenar A-Z'])
             ->assertSee('href="'.route('central-riesgo').'"', false)
-            ->assertSee('Luis Alvarez Gomez');
+            ->assertSee('Alvarez Gomez, Luis');
     }
 
     /** Componente con el alcance "Toda la institución". */

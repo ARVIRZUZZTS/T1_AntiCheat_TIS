@@ -24,6 +24,8 @@
     - 2026-10-11  [Valery D. Ortuno P]  fix: el detalle deja de partir la
       pantalla en dos y pasa a ser un modal con (x) y botón "Aceptar"; la lista
       ya no se oculta en móvil.
+    - 2026-10-11  [Valery D. Ortuno P]  feat: el estudiante se muestra como
+      "Apellido, Nombre", para que el orden A-Z se lea igual que la lista.
 
     @see  App\Livewire\CentralRiesgo\ListaEstudiantes
     @see  resources/views/partials/busqueda-estudiante.blade.php
@@ -106,7 +108,13 @@
                 {{-- Móvil: cards de estudiantes. --}}
                 <div class="mt-5 space-y-3 lg:hidden">
                     @foreach ($estudiantes as $estudiante)
-                        @php $nombre = trim(($estudiante['nombre'] ?? '').' '.($estudiante['apellido'] ?? '')); @endphp
+                        @php
+                            $nombre = trim(($estudiante['nombre'] ?? '').' '.($estudiante['apellido'] ?? ''));
+                            $apellido = trim($estudiante['apellido'] ?? '');
+                            $pila = trim($estudiante['nombre'] ?? '');
+                            // Se muestra por apellido y luego nombre, igual que el orden A-Z.
+                            $nombreListado = $apellido !== '' ? $apellido.', '.$pila : $pila;
+                        @endphp
                         <article wire:key="card-{{ $estudiante['id_registro'] }}"
                                  wire:click="verDetalle({{ $estudiante['id_registro'] }})"
                                  class="cursor-pointer rounded-xl border border-neutral-quaternary bg-neutral-primary-soft p-4">
@@ -115,7 +123,7 @@
                                 {{-- El texto envuelve en vez de truncarse: `truncate` no deja
                                      partir la línea y ensanchaba la página en pantallas chicas. --}}
                                 <div class="min-w-0">
-                                    <p class="break-words text-sm font-bold text-fg-brand">{{ $nombre }}</p>
+                                    <p class="break-words text-sm font-bold text-fg-brand">{{ $nombreListado }}</p>
                                     <p class="break-words text-[11px] text-body">{{ $estudiante['sis'] }} · {{ $estudiante['materia'] ?? 'Sin materia' }}</p>
                                 </div>
                             </div>
@@ -148,7 +156,13 @@
                             </thead>
                             <tbody>
                                 @foreach ($estudiantes as $estudiante)
-                                    @php $nombre = trim(($estudiante['nombre'] ?? '').' '.($estudiante['apellido'] ?? '')); @endphp
+                                    @php
+                                        $nombre = trim(($estudiante['nombre'] ?? '').' '.($estudiante['apellido'] ?? ''));
+                                        $apellido = trim($estudiante['apellido'] ?? '');
+                                        $pila = trim($estudiante['nombre'] ?? '');
+                                        // Se muestra por apellido y luego nombre, igual que el orden A-Z.
+                                        $nombreListado = $apellido !== '' ? $apellido.', '.$pila : $pila;
+                                    @endphp
                                     <tr wire:key="fila-{{ $estudiante['id_registro'] }}"
                                         wire:click="verDetalle({{ $estudiante['id_registro'] }})"
                                         @class([
@@ -159,7 +173,7 @@
                                         <td class="px-4 py-4">
                                             <div class="flex items-center gap-3">
                                                 <x-ui.avatar :name="$nombre" size="sm" tone="tramposo" class="shrink-0" />
-                                                <p class="text-sm font-bold text-fg-brand">{{ $nombre }}</p>
+                                                <p class="text-sm font-bold text-fg-brand">{{ $nombreListado }}</p>
                                             </div>
                                         </td>
                                         <td class="px-4 py-4 font-mono text-body">{{ $estudiante['sis'] }}</td>
