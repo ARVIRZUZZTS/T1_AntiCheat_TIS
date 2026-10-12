@@ -52,6 +52,18 @@
       compacta: el estado arriba (punto + "En curso" + horario) y una grilla
       de 3 columnas con las mismas 5 métricas debajo. Desde `lg:` sigue
       siendo la fila de 6 cards de siempre, sin cambios.
+    - 2026-10-12  [Diego Tejerina]  fix: las 6 cards pasan a x-ui.stat-card
+      (mismo componente y mismo grid de 2/6 columnas que /materias/{curso}):
+      el recuadro del ícono no tenía `shrink-0`, así que con texto largo
+      ("Deshabilitados", o el horario de "En curso") se aplastaba en vez de
+      quedarse cuadrado. Se quita la card compacta de mobile, ya no hace
+      falta. El `@section('header')` hecho a mano se reemplaza por
+      @section('subtitle') + @section('header-actions') (con "Registrar
+      incidencia" ahí, azul relleno): esta vista se había quedado con el
+      header viejo cuando se armó x-ui.page-header, y por eso no tenía
+      hamburguesa en mobile. La tabla pasa a `compact` (misma altura de fila
+      que la de /materias/{curso}) y la búsqueda deja el botón "Buscar" por
+      `wire:model.live.debounce.350ms` con reseteo de página en cada tecla.
 --}}
 
 @section('title', 'Monitor en vivo')
@@ -178,132 +190,79 @@
     }
 @endphp
 
-{{-- Header propio, con `@hasSection('header')` que ya soporta el layout
-     (`layouts/app.blade.php`): se replica el header por defecto y solo se le
-     añade el subtítulo con la materia y el tipo de examen. El `<h1>` sigue
-     leyendo `@yield('title')`, así que `<title>` y el h1 no cambian. `@endsection`
-     no emite salida, así que la raíz del componente sigue siendo un único `<div>`. --}}
-@section('header')
-    <header class="bg-neutral-primary-soft border-b border-default mb-[2vh]">
-        <div class="px-6 py-4">
-            <h1 class="text-2xl font-semibold text-heading">@yield('title', config('app.name'))</h1>
-            @if ($subtituloExamen !== '')
-                <p class="mt-1 text-sm text-muted truncate">{{ $subtituloExamen }}</p>
-            @endif
-        </div>
-    </header>
+{{-- El título y el subtítulo los pinta x-ui.page-header (layouts/app.blade.php),
+     igual que materia-estudiantes.blade.php: esta vista tenía su propio
+     @section('header') hecho a mano desde antes de que existiera ese
+     componente compartido, y por eso se quedó sin la hamburguesa cuando se
+     agregó ahí (el `@hasSection('header')` del layout hacía que esta vista
+     nunca pasara por x-ui.page-header). --}}
+@section('subtitle', $subtituloExamen)
+
+@section('header-actions')
+    <a href="{{ route('monitoreo.registro-ingreso') }}"
+       aria-label="Registrar incidencia"
+       class="inline-flex items-center justify-center gap-1.5 rounded-full border border-transparent bg-brand px-3 py-2.5 sm:px-4 text-sm font-medium leading-5 text-white shadow-xs hover:bg-brand-strong focus:outline-none focus:ring-4 focus:ring-brand-medium">
+        <svg class="w-4 h-4 shrink-0" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+        <span class="hidden sm:inline">Registrar incidencia</span>
+    </a>
 @endsection
 
 <div class="flex flex-col gap-6 px-[2vh] mt-[2vh]">
+    {{-- Los dos avisos se autodescartan a los 4s: antes se quedaban en
+         pantalla para siempre hasta la próxima acción. `limpiarMensajes()`
+         siempre vacía los dos mensajes ANTES de fijar uno nuevo (ver
+         ejecutarAccion()), así que cada aviso nuevo pasa por "oculto" antes
+         de "visible" y el `x-init` de abajo arranca de cero en cada uno,
+         sin necesidad de un wire:key especial. --}}
     @if ($mensajeExito !== '')
-        <x-ui.alert type="success" title="Listo">{{ $mensajeExito }}</x-ui.alert>
+        <div x-data x-init="setTimeout(() => $wire.limpiarMensajes(), 4000)">
+            <x-ui.alert type="success" title="Listo">{{ $mensajeExito }}</x-ui.alert>
+        </div>
     @endif
 
     @if ($mensajeError !== '')
-        <x-ui.alert type="danger" title="No se pudo completar">{{ $mensajeError }}</x-ui.alert>
+        <div x-data x-init="setTimeout(() => $wire.limpiarMensajes(), 4000)">
+            <x-ui.alert type="danger" title="No se pudo completar">{{ $mensajeError }}</x-ui.alert>
+        </div>
     @endif
 
-    <div class="flex flex-wrap items-center justify-between gap-4">
-        <a href="{{ route('monitoreo.registro-ingreso') }}"
-           class="inline-flex items-center justify-center rounded-base border border-transparent bg-brand px-3 py-1.5 text-xs font-medium leading-5 text-white shadow-xs hover:bg-brand-strong focus:outline-none focus:ring-4 focus:ring-brand-medium">
-            Registrar incidencia
-        </a>
-    </div>
+    {{-- Tarjetas de conteo: mismo componente y mismo grid (2 columnas en
+         mobile, 6 en desktop) que las 5 de /materias/{curso} — antes el
+         mobile tenía su propia card compacta distinta a la de desktop. --}}
+    <div class="grid grid-cols-2 gap-4 lg:grid-cols-6">
+        {{-- Sin ícono a propósito: "08:00 – 09:30" + el recuadro del ícono
+             no entran juntos en el ancho de la card con 6 (o 2) columnas. --}}
+        <x-ui.stat-card :value="substr($examen->hora_inicio, 0, 5) . ' – ' . $finExamen" label="En curso" tone="brand" label-first nowrap />
 
-    {{-- Mobile: una sola card compacta (estado del examen arriba, grilla de
-         3 columnas con las métricas debajo) en vez de las 6 cards apiladas
-         de desktop, que en una pantalla chica ocupaban toda la altura.
-         Mismas métricas que ya existen ($this->conteos), ninguna nueva. --}}
-    <div class="lg:hidden bg-neutral-primary-soft border border-default rounded-base shadow-xs p-4">
-        <div class="flex items-center gap-2">
-            <span class="w-2.5 h-2.5 shrink-0 rounded-full bg-fg-success" aria-hidden="true"></span>
-            <p class="text-sm font-medium text-body">En curso</p>
-            <p class="ms-auto text-sm font-semibold text-fg-brand">{{ substr($examen->hora_inicio, 0, 5) }} – {{ $finExamen }}</p>
-        </div>
+        <x-ui.stat-card :value="$this->conteos['inscritos']" label="Inscritos" tone="brand">
+            <x-slot:icon>
+                <svg class="w-5 h-5 sm:w-6 sm:h-6" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-width="2" d="M16 19h4a1 1 0 0 0 1-1v-1a3 3 0 0 0-3-3h-2m-2.236-4a3 3 0 1 0 0-4M3 18v-1a3 3 0 0 1 3-3h4a3 3 0 0 1 3 3v1a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1Zm8-10a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg>
+            </x-slot:icon>
+        </x-ui.stat-card>
 
-        <div class="mt-4 grid grid-cols-3 gap-4 text-center">
-            <div>
-                <p class="text-xl font-semibold text-fg-brand">{{ $this->conteos['inscritos'] }}</p>
-                <p class="text-xs text-body">Inscritos</p>
-            </div>
-            <div>
-                <p class="text-xl font-semibold text-fg-success">{{ $this->conteos['habilitados'] }}</p>
-                <p class="text-xs text-body">Habilitados</p>
-            </div>
-            <div>
-                <p class="text-xl font-semibold text-fg-danger-strong">{{ $this->conteos['deshabilitados'] }}</p>
-                <p class="text-xs text-body">Deshabilitados</p>
-            </div>
-            <div>
-                <p class="text-xl font-semibold text-fg-warning">{{ $this->conteos['sospechosos'] }}</p>
-                <p class="text-xs text-body">Sospechosos</p>
-            </div>
-            <div>
-                <p class="text-xl font-semibold text-fg-danger-strong">{{ $this->conteos['tramposos'] }}</p>
-                <p class="text-xs text-body">Tramposos</p>
-            </div>
-        </div>
-    </div>
+        <x-ui.stat-card :value="$this->conteos['habilitados']" label="Habilitados" tone="success">
+            <x-slot:icon>
+                <svg class="w-5 h-5 sm:w-6 sm:h-6" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm-3-9 2 2 4-4"/></svg>
+            </x-slot:icon>
+        </x-ui.stat-card>
 
-    {{-- Desktop: grid de 6 columnas en vez de flex-wrap con min-w-[200px],
-         que a 1366px no entraba y la 6ta card ("Tramposos") se iba a una
-         segunda fila, agregando ~130px de alto que después no dejaban
-         encajar la tabla paginada sin scroll de la página. --}}
-    <div class="hidden lg:grid lg:grid-cols-6 gap-[2vh]">
-        <div class="flex items-center justify-between gap-3 bg-neutral-primary-soft p-6 border border-default rounded-base shadow-xs">
-            <div>
-                <p class="text-sm text-body">En curso</p>
-                <p class="text-3xl font-semibold text-fg-brand">{{ substr($examen->hora_inicio, 0, 5) }} – {{ $finExamen }}</p>
-            </div>
-            <span class="flex items-center justify-center w-12 h-12 rounded-base bg-neutral-secondary-soft text-fg-brand">
-                <svg class="w-6 h-6" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
-            </span>
-        </div>
-        <div class="flex items-center justify-between gap-3 bg-neutral-primary-soft p-6 border border-default rounded-base shadow-xs">
-            <div>
-                <p class="text-3xl font-semibold text-fg-brand">{{ $this->conteos['inscritos'] }}</p>
-                <p class="text-sm text-body">Inscritos</p>
-            </div>
-            <span class="flex items-center justify-center w-12 h-12 rounded-base bg-neutral-secondary-soft text-fg-brand">
-                <svg class="w-6 h-6" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-width="2" d="M16 19h4a1 1 0 0 0 1-1v-1a3 3 0 0 0-3-3h-2m-2.236-4a3 3 0 1 0 0-4M3 18v-1a3 3 0 0 1 3-3h4a3 3 0 0 1 3 3v1a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1Zm8-10a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg>
-            </span>
-        </div>
-        <div class="flex items-center justify-between gap-3 bg-neutral-primary-soft p-6 border border-default rounded-base shadow-xs">
-            <div>
-                <p class="text-3xl font-semibold text-fg-success">{{ $this->conteos['habilitados'] }}</p>
-                <p class="text-sm text-body">Habilitados</p>
-            </div>
-            <span class="flex items-center justify-center w-12 h-12 rounded-base bg-neutral-secondary-soft text-fg-success">
-                <svg class="w-6 h-6" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm-3-9 2 2 4-4"/></svg>
-            </span>
-        </div>
-        <div class="flex items-center justify-between gap-3 bg-neutral-primary-soft p-6 border border-default rounded-base shadow-xs">
-            <div>
-                <p class="text-3xl font-semibold text-fg-danger-strong">{{ $this->conteos['deshabilitados'] }}</p>
-                <p class="text-sm text-body">Deshabilitados</p>
-            </div>
-            <span class="flex items-center justify-center w-12 h-12 rounded-base bg-neutral-secondary-soft text-fg-danger-strong">
-                <svg class="w-6 h-6" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18 17.94 6M18 18 6.06 6"/></svg>
-            </span>
-        </div>
-        <div class="flex items-center justify-between gap-3 bg-neutral-primary-soft p-6 border border-default rounded-base shadow-xs">
-            <div>
-                <p class="text-3xl font-semibold text-fg-warning">{{ $this->conteos['sospechosos'] }}</p>
-                <p class="text-sm text-body">Sospechosos</p>
-            </div>
-            <span class="flex items-center justify-center w-12 h-12 rounded-base bg-neutral-secondary-soft text-fg-warning">
-                <svg class="w-6 h-6" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-width="2" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z"/><path stroke="currentColor" stroke-width="2" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg>
-            </span>
-        </div>
-        <div class="flex items-center justify-between gap-3 bg-neutral-primary-soft p-6 border border-default rounded-base shadow-xs">
-            <div>
-                <p class="text-3xl font-semibold text-fg-danger-strong">{{ $this->conteos['tramposos'] }}</p>
-                <p class="text-sm text-body">Tramposos</p>
-            </div>
-            <span class="flex items-center justify-center w-12 h-12 rounded-base bg-neutral-secondary-soft text-fg-danger-strong">
-                <svg class="w-6 h-6" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3 5 6v5c0 4.2 2.8 7.6 7 9 4.2-1.4 7-4.8 7-9V6l-7-3Z"/><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.5 9.5l5 5m0-5-5 5"/></svg>
-            </span>
-        </div>
+        <x-ui.stat-card :value="$this->conteos['deshabilitados']" label="Deshabilitados" tone="danger">
+            <x-slot:icon>
+                <svg class="w-5 h-5 sm:w-6 sm:h-6" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18 17.94 6M18 18 6.06 6"/></svg>
+            </x-slot:icon>
+        </x-ui.stat-card>
+
+        <x-ui.stat-card :value="$this->conteos['sospechosos']" label="Sospechosos" tone="warning">
+            <x-slot:icon>
+                <svg class="w-5 h-5 sm:w-6 sm:h-6" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-width="2" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z"/><path stroke="currentColor" stroke-width="2" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg>
+            </x-slot:icon>
+        </x-ui.stat-card>
+
+        <x-ui.stat-card :value="$this->conteos['tramposos']" label="Tramposos" tone="danger">
+            <x-slot:icon>
+                <svg class="w-5 h-5 sm:w-6 sm:h-6" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3 5 6v5c0 4.2 2.8 7.6 7 9 4.2-1.4 7-4.8 7-9V6l-7-3Z"/><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.5 9.5l5 5m0-5-5 5"/></svg>
+            </x-slot:icon>
+        </x-ui.stat-card>
     </div>
 
     <div class="bg-neutral-primary-soft border border-default rounded-base shadow-xs p-6">
@@ -318,14 +277,20 @@
             <h2 class="text-lg font-semibold text-heading sm:shrink-0">Registro de ingresos</h2>
 
             <div class="flex-1 min-w-0 sm:min-w-[280px]">
+                {{-- Sin botón "Buscar": filtra solo con lo que se escribe
+                     (debounce de 350ms). wireSubmit se mantiene nada más
+                     para que Enter no dispare el submit nativo del <form>
+                     (recargaría la página) — busqueda ya viaja sola por
+                     wire:model.live. Solo letras (con tildes/ñ), dígitos y
+                     espacios, igual que los demás buscadores del sistema. --}}
                 <x-ui.search-input
                     name="monitor-busqueda"
                     id="monitor-busqueda"
                     placeholder="Buscar por nombre o código SIS..."
-                    :show-button="true"
-                    buttonLabel="Buscar"
-                    wire:model.lazy="busqueda"
+                    :show-button="false"
+                    wire:model.live.debounce.350ms="busqueda"
                     wireSubmit="buscar"
+                    @input="$event.target.value = $event.target.value.replace(/[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9 ]/g, '')"
                 />
             </div>
 
@@ -365,6 +330,7 @@
 
                 <div class="hidden lg:block">
                     <x-ui.table
+                        compact
                         min-width="min-w-[640px]"
                         :headers="['Estudiante', 'Código SIS', 'Hora', 'Registro', 'Estado', 'Registrar']"
                         :rows="$filas"
@@ -376,7 +342,11 @@
         {{-- Mobile: apilado (texto arriba, paginación abajo, ambos
              centrados). Desde sm: layout de escritorio (texto a la izquierda
              en absolute, paginación centrada en la misma fila). Mismo patrón
-             que la lista de estudiantes del curso. --}}
+             que la lista de estudiantes del curso. Con 9 páginas, los
+             botones (9 números + 2 flechas) no entran en el ancho de la
+             card en mobile y se salían del borde redondeado hacia los dos
+             lados; el `overflow-x-auto` los deja con scroll propio en vez
+             de desbordar la card. --}}
         @if ($this->estudiantes->total() > 0)
             <div class="mt-6 flex flex-col items-center gap-2 sm:relative sm:flex-row sm:items-center sm:justify-center sm:gap-0 sm:min-h-[2rem]">
                 <p class="text-sm text-muted text-center sm:absolute sm:left-0 sm:text-left">
@@ -384,13 +354,15 @@
                 </p>
 
                 @if ($this->estudiantes->lastPage() > 1)
-                    <x-ui.pagination
-                        :interactive="true"
-                        :active-filled="true"
-                        size="sm"
-                        :current="$this->estudiantes->currentPage()"
-                        :total="$this->estudiantes->lastPage()"
-                    />
+                    <div class="max-w-full overflow-x-auto">
+                        <x-ui.pagination
+                            :interactive="true"
+                            :active-filled="true"
+                            size="sm"
+                            :current="$this->estudiantes->currentPage()"
+                            :total="$this->estudiantes->lastPage()"
+                        />
+                    </div>
                 @endif
             </div>
         @endif
