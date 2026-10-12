@@ -37,6 +37,16 @@
       "Registrar ingreso" pasa a ser "Registrar incidencia". Solo cambia el
       nombre y se quita el ícono "+"; el enlace y el resto del monitor no se
       tocan.
+    - 2026-10-12  [Diego Tejerina]  fix: la tabla fija un ancho mínimo
+      (min-w-[640px]) para que en mobile las columnas no se aplasten; el
+      scroll horizontal queda dentro de la tabla, no en la página.
+    - 2026-10-12  [Diego Tejerina]  fix: la barra de "Registro de ingresos"
+      (título + buscador + filtros) pasa de `flex flex-wrap` suelto a un
+      apilado explícito en mobile (`flex-col`, `sm:flex-row` desde ahí). Con
+      flex-wrap solo, el min-w-[220px] del buscador no contaba para la
+      decisión de ajustar a una línea (esa usa el tamaño natural del
+      contenido) y el botón "Tramposos" terminaba empujado fuera de la
+      pantalla en vez de bajar de línea.
 --}}
 
 @section('title', 'Monitor en vivo')
@@ -253,10 +263,10 @@
              que en pantallas chicas se apilen sin romperse. Los `id` del buscador
              y de los filtros no cambian: el `<script>` de filtrado de más abajo
              los usa para engancharse. --}}
-        <div class="flex flex-wrap items-center gap-x-4 gap-y-3">
-            <h2 class="text-lg font-semibold text-heading shrink-0">Registro de ingresos</h2>
+        <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4 sm:gap-y-3">
+            <h2 class="text-lg font-semibold text-heading sm:shrink-0">Registro de ingresos</h2>
 
-            <div class="flex-1 min-w-[220px] sm:min-w-[280px]">
+            <div class="flex-1 min-w-0 sm:min-w-[280px]">
                 <x-ui.search-input
                     name="monitor-busqueda"
                     id="monitor-busqueda"
@@ -266,7 +276,7 @@
                 />
             </div>
 
-            <div class="flex flex-wrap gap-2 shrink-0" id="monitor-filtros">
+            <div class="flex flex-wrap gap-2 sm:shrink-0" id="monitor-filtros">
                 <x-ui.button variant="default" data-filtro="todos">Todos</x-ui.button>
                 <x-ui.button variant="secondary" data-filtro="pendientes">Pendientes</x-ui.button>
                 <x-ui.button variant="secondary" data-filtro="tramposos">Tramposos</x-ui.button>
@@ -276,6 +286,7 @@
         <div class="mt-4">
             <div id="monitor-tabla">
                 <x-ui.table
+                    min-width="min-w-[640px]"
                     :headers="['Estudiante', 'Código SIS', 'Hora', 'Registro', 'Estado', 'Registrar']"
                     :rows="$filas"
                 />
