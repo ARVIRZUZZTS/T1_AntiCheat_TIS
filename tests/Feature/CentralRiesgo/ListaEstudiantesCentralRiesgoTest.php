@@ -31,6 +31,8 @@
  *   "Mis materias" y ordenar no cambia la cantidad de estudiantes.
  * - 2026-10-11  [Valery D. Ortuno P]  test: la lista muestra el nombre como
  *   "Apellido, Nombre" para que coincida con el orden A-Z.
+ * - 2026-10-11  [Valery D. Ortuno P]  test: una incidencia `tramposo` pero
+ *   `Pendiente` no aparece en la central (solo las confirmadas).
  */
 
 namespace Tests\Feature\CentralRiesgo;
@@ -108,6 +110,14 @@ class ListaEstudiantesCentralRiesgoTest extends TestCase
     public function test_solo_lista_estudiantes_sancionados(): void
     {
         $this->assertNotContains(self::PEDRO_SOSPECHOSO, $this->sisListados($this->institucion()));
+    }
+
+    public function test_una_incidencia_pendiente_no_se_muestra_como_tramposo(): void
+    {
+        $this->crearEstudiante('900000040', 'Nadia', 'Cordero Vargas');
+        $this->crearIncidencia('900000040', self::EXAMEN_A, 'tramposo', '2026-10-05 09:00:00', self::DOCENTE_A, 'Pendiente');
+
+        $this->assertNotContains('900000040', $this->sisListados($this->institucion()));
     }
 
     public function test_la_lista_muestra_estudiante_codigo_sis_materia_motivo_y_ver_detalle(): void
@@ -461,6 +471,7 @@ class ListaEstudiantesCentralRiesgoTest extends TestCase
         string $tipo,
         string $fecha,
         int $registrador = self::DOCENTE_A,
+        string $estado = 'Confirmado',
     ): void {
         DB::table('central_riesgo')->insert([
             'id_registro' => ++$this->ultimoIdRegistro,
@@ -471,6 +482,7 @@ class ListaEstudiantesCentralRiesgoTest extends TestCase
             'detalle_motivo' => 'Motivo de prueba '.$sis,
             'fecha_registro' => $fecha,
             'tipo_infraccion' => $tipo,
+            'estado_incidencia' => $estado,
         ]);
     }
 
@@ -523,6 +535,7 @@ class ListaEstudiantesCentralRiesgoTest extends TestCase
             $tabla->string('detalle_motivo')->nullable();
             $tabla->dateTime('fecha_registro');
             $tabla->string('tipo_infraccion');
+            $tabla->string('estado_incidencia')->default('Confirmado');
             $tabla->foreign('sis_estudiante')->references('sis_estudiante')->on('estudiante');
         });
     }

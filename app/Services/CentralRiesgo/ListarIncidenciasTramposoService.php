@@ -12,7 +12,8 @@
  *
  * @description
  * Servicio de dominio que lista las incidencias de la central de riesgos con
- * tipo de infracción `tramposo`. Devuelve por registro el id y `id_registro`
+ * tipo de infracción `tramposo` y estado `Confirmado`. Devuelve por registro el
+ * id y `id_registro`
  * (lo que abre el detalle), el nombre y el código SIS del estudiante, la
  * materia, el motivo y su etiqueta, el estado y la fecha/hora, con filtro por
  * alcance y búsqueda. El orden por defecto es alfabético (A-Z) por apellidos y
@@ -51,10 +52,13 @@
  *   que el servicio se pueda probar con SQLite en memoria.
  * - 2026-10-11  [Alisson D. Alvarado]  fix: el mapeo agrega `id` (para el
  *   enlace "Ver detalle") y `estado` (columna Estado de la tabla).
+ * - 2026-10-11  [Valery D. Ortuno P]  fix: la central solo lista incidencias
+ *   `Confirmado`; una incidencia pendiente ya no aparece como tramposo (HU 10).
  */
 
 namespace App\Services\CentralRiesgo;
 
+use App\Enums\EstadoIncidencia;
 use App\Enums\TipoInfraccion;
 use App\Models\CentralRiesgo;
 use App\Models\Curso;
@@ -118,6 +122,9 @@ class ListarIncidenciasTramposoService
         $query = CentralRiesgo::query()
             ->join('estudiante', 'estudiante.sis_estudiante', '=', 'central_riesgo.sis_estudiante')
             ->where('central_riesgo.tipo_infraccion', TipoInfraccion::Tramposo->value)
+            // Solo las confirmadas entran a la central: una incidencia pendiente
+            // todavía no es una sanción y no debe mostrarse como tramposo.
+            ->where('central_riesgo.estado_incidencia', EstadoIncidencia::Confirmado->value)
             ->select('central_riesgo.*')
             ->with(['estudiante', 'curso', 'examen.cursos', 'estudiante.cursos']);
 
@@ -284,9 +291,10 @@ class ListarIncidenciasTramposoService
             'materia' => $this->resolverMateria($incidencia),
             'motivo' => $incidencia->motivo,
             'motivo_etiqueta' => $incidencia->motivo->etiqueta(),
-            // `estado_incidencia` no está casteado en el modelo (ver
-            // ConsultarDetalleIncidenciaService); se lee por getAttribute.
-            'estado' => $incidencia->getAttribute('estado_incidencia'),
+            // El modelo castea `estado_incidencia` a EstadoIncidencia; se
+            // devuelve el string del enum para que el JSON y Blade lo muestren
+            // igual que la columna Estado.
+            'estado' => $incidencia->estado_incidencia->value,
             'fecha' => $incidencia->fecha_registro->toDateTimeString(),
         ];
     }
