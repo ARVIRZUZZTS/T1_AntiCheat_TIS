@@ -42,6 +42,15 @@
       de cada vista salen de @section('title')/@section('subtitle') (o de
       $title/$subtitle si la vista los pasa como variable), y $backRoute
       cambia el hamburguesa por la flecha en las vistas de detalle.
+    - 2026-10-12  [Diego Tejerina]  fix: la rama `@else` también acepta
+      @section('back-route', ...) para fijar la flecha de volver. Los
+      componentes Livewire que se renderizan con `->extends('layouts.app')`
+      (ese método de Livewire, no el `@extends` nativo de Blade) no
+      propagan una variable PHP suelta como `$backRoute` hacia el layout —
+      por eso funcionaba en páginas Blade clásicas (`materia-estudiantes`,
+      que pasa `backRoute` como dato de vista) pero no en
+      `registrar-incidencia.blade.php`, que la fijaba con un `@php` suelto
+      y la hamburguesa seguía apareciendo en vez de la flecha.
 --}}
 
 <!DOCTYPE html>
@@ -79,7 +88,7 @@
                         <x-ui.page-header
                             :title="trim($__env->yieldContent('title', config('app.name')))"
                             :subtitle="$__env->yieldContent('subtitle') ?: null"
-                            :back="$backRoute ?? null"
+                            :back="$__env->yieldContent('back-route') ?: ($backRoute ?? null)"
                         >
                             @hasSection('header-actions')
                                 <x-slot:actions>@yield('header-actions')</x-slot:actions>

@@ -19,6 +19,12 @@
 
     @see  resources/views/components/ui/sidebar.blade.php
     @see  resources/views/layouts/app.blade.php
+
+    @changelog
+    - 2026-10-12  [Diego Tejerina]  feat: creación inicial del componente.
+    - 2026-10-12  [Diego Tejerina]  fix: el ícono de la hamburguesa pasa de
+      `text-body` (gris) a `text-fg-brand` (el azul oscuro de la marca, el
+      mismo del sidebar), para todas las vistas.
 --}}
 
 @props([
@@ -36,7 +42,7 @@
             </a>
         @else
             <button type="button" data-drawer-target="sidebar" data-drawer-toggle="sidebar" aria-controls="sidebar"
-                    class="lg:hidden shrink-0 inline-flex items-center justify-center w-10 h-10 rounded-base text-body hover:bg-neutral-secondary-medium hover:text-heading focus:outline-none">
+                    class="lg:hidden shrink-0 inline-flex items-center justify-center w-10 h-10 rounded-base text-fg-brand hover:bg-neutral-secondary-medium focus:outline-none">
                 <span class="sr-only">Abrir menú</span>
                 <svg class="w-5 h-5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-width="2" d="M5 7h14M5 12h14M5 17h10"/></svg>
             </button>
