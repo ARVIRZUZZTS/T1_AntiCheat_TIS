@@ -184,7 +184,15 @@
                 if (titulo) { titulo.textContent = notificacion.titulo || titulos[tipo] || ''; }
                 if (descripcion) { descripcion.textContent = descripcionDe(notificacion, tipo); }
                 if (hace) { hace.textContent = notificacion.hace || ''; }
-                if (detalle) { detalle.setAttribute('href', notificacion.detalle_href || '#'); }
+                if (detalle) {
+                    detalle.setAttribute('href', notificacion.detalle_href || '#');
+                    // El template clona el onclick con id 0; se reescribe con el
+                    // id_registro real de central_riesgo (`referencia`), que es el
+                    // que consulta el modal (/api/incidencias/{id_registro}).
+                    detalle.setAttribute('onclick',
+                        "event.preventDefault(); window.dispatchEvent(new CustomEvent('abrir-detalle-incidencia', { detail: { id: " +
+                        (notificacion.referencia || 0) + " } }))");
+                }
                 if (cerrar) { cerrar.dataset.id = notificacion.id; }
 
                 return nodo;

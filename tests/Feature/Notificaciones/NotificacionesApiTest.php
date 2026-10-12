@@ -27,6 +27,9 @@
  * - 2026-10-11  [David E. Chavez T.]  test: criterios de HU 6 (T2): listado
  *   mezclando ambos tipos de aviso en orden inverso y ocultado de un aviso
  *   "central_riesgo" sin tocar el caso.
+ * - 2026-10-11  [Valery D. Ortuno P]  test: el aviso "posible_tramposo" expone
+ *   `referencia` (id_registro) y `detalle_href`, que son los que usa la tarjeta
+ *   para abrir el detalle.
  */
 
 namespace Tests\Feature\Notificaciones;
@@ -85,6 +88,10 @@ class NotificacionesApiTest extends TestCase
             ->assertJsonPath('0.auxiliar', 'Aux Uno')
             ->assertJsonPath('0.estudiante', 'Juan Quispe')
             ->assertJsonPath('0.materia', 'Matemática I')
+            // `referencia` es el id_registro de central_riesgo que abre el modal
+            // de "Ver detalle" de la tarjeta; `detalle_href` es su respaldo sin JS.
+            ->assertJsonPath('0.referencia', 1)
+            ->assertJsonPath('0.detalle_href', route('incidencias.detalle', 1))
             ->assertJsonPath('0.hace', fn (string $valor): bool => str_starts_with($valor, 'Hace') && str_contains($valor, 'minuto'))
             ->assertJsonMissing(['id' => 3])
             ->assertJsonMissing(['id' => 4]);

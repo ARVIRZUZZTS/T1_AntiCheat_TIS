@@ -54,6 +54,13 @@
  *   enlace "Ver detalle") y `estado` (columna Estado de la tabla).
  * - 2026-10-11  [Valery D. Ortuno P]  fix: la central solo lista incidencias
  *   `Confirmado`; una incidencia pendiente ya no aparece como tramposo (HU 10).
+ * - 2026-10-11  [Valery D. Ortuno P]  perf: la lista pasa de cinco consultas a
+ *   una: el estudiante se lee del join que ya existía y la materia se resuelve
+ *   con una subconsulta (el curso guardado, o el primer curso del examen donde
+ *   el estudiante está inscrito), en vez de los eager loads `estudiante`,
+ *   `curso`, `examen.cursos` y `estudiante.cursos`. Contra un PostgreSQL remoto
+ *   cada viaje de red pesa ~380 ms; el orden A-Z y el contrato de salida no
+ *   cambian.
  */
 
 namespace App\Services\CentralRiesgo;
@@ -61,8 +68,6 @@ namespace App\Services\CentralRiesgo;
 use App\Enums\EstadoIncidencia;
 use App\Enums\TipoInfraccion;
 use App\Models\CentralRiesgo;
-use App\Models\Curso;
-use App\Models\Examen;
 use App\Services\Examen\BusquedaEstudianteService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -119,14 +124,36 @@ class ListarIncidenciasTramposoService
         $this->validarAlcance($alcance, $usuario);
         $this->validarOrden($orden);
 
+        // Una sola consulta: el estudiante entra por el join y la materia se
+        // resuelve con subconsultas, en vez de precargar `estudiante`, `curso`,
+        // `examen.cursos` y `estudiante.cursos` (cuatro viajes de red más).
         $query = CentralRiesgo::query()
             ->join('estudiante', 'estudiante.sis_estudiante', '=', 'central_riesgo.sis_estudiante')
+            ->leftJoin('curso', 'curso.id_curso', '=', 'central_riesgo.id_curso')
             ->where('central_riesgo.tipo_infraccion', TipoInfraccion::Tramposo->value)
             // Solo las confirmadas entran a la central: una incidencia pendiente
             // todavía no es una sanción y no debe mostrarse como tramposo.
             ->where('central_riesgo.estado_incidencia', EstadoIncidencia::Confirmado->value)
             ->select('central_riesgo.*')
-            ->with(['estudiante', 'curso', 'examen.cursos', 'estudiante.cursos']);
+            ->selectRaw('estudiante.nombre_estudiante as lista_est_nombre')
+            ->selectRaw('estudiante.apellido_estudiante as lista_est_apellido')
+            // Misma regla que la materia que armaba el servicio en PHP: el curso
+            // guardado manda; si no, el primer curso del examen donde el
+            // estudiante está inscrito y, en último caso, el primer curso del
+            // examen. Todo dentro de la misma consulta.
+            ->selectRaw(
+                'coalesce(curso.nombre_curso,'
+                .' (select c.nombre_curso from examen_curso ec'
+                .' join curso c on c.id_curso = ec.id_curso'
+                .' join estudiante_curso ecur on ecur.id_curso = ec.id_curso'
+                .' and ecur.sis_estudiante = central_riesgo.sis_estudiante'
+                .' where ec.id_examen = central_riesgo.id_examen'
+                .' order by ec.id_curso limit 1),'
+                .' (select c.nombre_curso from examen_curso ec'
+                .' join curso c on c.id_curso = ec.id_curso'
+                .' where ec.id_examen = central_riesgo.id_examen'
+                .' order by ec.id_curso limit 1)) as lista_materia'
+            );
 
         if ($alcance === self::ALCANCE_MIS_MATERIAS) {
             $this->filtrarPorMisMaterias($query, (int) $usuario);
@@ -253,12 +280,12 @@ class ListarIncidenciasTramposoService
     private function ordenarAlfabeticamente(Collection $incidencias): Collection
     {
         return $incidencias->sortBy(function (CentralRiesgo $incidencia): array {
-            $apellidos = preg_split('/\s+/', trim((string) $incidencia->estudiante?->apellido_estudiante)) ?: [];
+            $apellidos = preg_split('/\s+/', trim((string) $incidencia->getAttribute('lista_est_apellido'))) ?: [];
 
             return [
                 $this->claveDeOrden($apellidos[0] ?? ''),
                 $this->claveDeOrden($apellidos[1] ?? ''),
-                $this->claveDeOrden((string) $incidencia->estudiante?->nombre_estudiante),
+                $this->claveDeOrden((string) $incidencia->getAttribute('lista_est_nombre')),
             ];
         });
     }
@@ -280,15 +307,13 @@ class ListarIncidenciasTramposoService
      */
     private function mapear(CentralRiesgo $incidencia): array
     {
-        $estudiante = $incidencia->estudiante;
-
         return [
             'id' => $incidencia->id_registro,
             'id_registro' => $incidencia->id_registro,
-            'nombre' => $estudiante?->nombre_estudiante,
-            'apellido' => $estudiante?->apellido_estudiante,
-            'sis' => $estudiante?->sis_estudiante,
-            'materia' => $this->resolverMateria($incidencia),
+            'nombre' => $incidencia->getAttribute('lista_est_nombre'),
+            'apellido' => $incidencia->getAttribute('lista_est_apellido'),
+            'sis' => $incidencia->getAttribute('sis_estudiante'),
+            'materia' => $incidencia->getAttribute('lista_materia'),
             'motivo' => $incidencia->motivo,
             'motivo_etiqueta' => $incidencia->motivo->etiqueta(),
             // El modelo castea `estado_incidencia` a EstadoIncidencia; se
@@ -297,37 +322,5 @@ class ListarIncidenciasTramposoService
             'estado' => $incidencia->estado_incidencia->value,
             'fecha' => $incidencia->fecha_registro->toDateTimeString(),
         ];
-    }
-
-    /**
-     * Materia de la incidencia: el curso guardado al registrarla o, si no hay,
-     * el curso del estudiante dentro del examen.
-     *
-     * @param  CentralRiesgo  $incidencia  Incidencia con curso, estudiante y examen precargados.
-     * @return ?string Nombre del curso, o null si el examen no tiene cursos.
-     */
-    private function resolverMateria(CentralRiesgo $incidencia): ?string
-    {
-        // Mismo criterio que CentralRiesgo::materia(), que es el que usa el
-        // detalle: el curso elegido al registrar manda sobre el del examen.
-        if ($incidencia->curso !== null) {
-            return $incidencia->curso->nombre_curso;
-        }
-
-        $examen = $incidencia->examen;
-
-        if ($examen === null) {
-            return null;
-        }
-
-        $estudiante = $incidencia->estudiante;
-        $cursosExamen = $examen->cursos->sortBy('id_curso');
-        $cursosEstudiante = $estudiante === null ? collect() : $estudiante->cursos;
-
-        $principal = $cursosExamen->first(
-            fn (Curso $curso) => $cursosEstudiante->contains('id_curso', $curso->id_curso)
-        ) ?? $cursosExamen->first();
-
-        return $principal?->nombre_curso;
     }
 }

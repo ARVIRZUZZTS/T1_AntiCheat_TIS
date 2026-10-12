@@ -2,7 +2,7 @@
     @file    lista-estudiantes.blade.php
     @author  Valery D. Ortuno P. <valerydariana98@gmail.com>
     @created 2026-10-10
-    @updated 2026-10-10
+    @updated 2026-10-11
 
     @description
     Vista del componente Livewire ListaEstudiantes (HU 10): tabs de alcance
@@ -26,6 +26,10 @@
       ya no se oculta en móvil.
     - 2026-10-11  [Valery D. Ortuno P]  feat: el estudiante se muestra como
       "Apellido, Nombre", para que el orden A-Z se lea igual que la lista.
+    - 2026-10-11  [Valery D. Ortuno P]  fix: el estudiante vuelve a mostrarse
+      como "Nombre Apellido"; el orden A-Z sigue siendo por apellido.
+    - 2026-10-11  [Valery D. Ortuno P]  fix: se quitan los avatares de iniciales
+      de la lista (cards y tabla).
 
     @see  App\Livewire\CentralRiesgo\ListaEstudiantes
     @see  resources/views/partials/busqueda-estudiante.blade.php
@@ -109,17 +113,14 @@
                 <div class="mt-5 space-y-3 lg:hidden">
                     @foreach ($estudiantes as $estudiante)
                         @php
-                            $nombre = trim(($estudiante['nombre'] ?? '').' '.($estudiante['apellido'] ?? ''));
-                            $apellido = trim($estudiante['apellido'] ?? '');
-                            $pila = trim($estudiante['nombre'] ?? '');
-                            // Se muestra por apellido y luego nombre, igual que el orden A-Z.
-                            $nombreListado = $apellido !== '' ? $apellido.', '.$pila : $pila;
+                            // Se muestra "Nombre Apellido", aunque el orden A-Z siga
+                            // siendo por apellido.
+                            $nombreListado = trim(($estudiante['nombre'] ?? '').' '.($estudiante['apellido'] ?? ''));
                         @endphp
                         <article wire:key="card-{{ $estudiante['id_registro'] }}"
                                  wire:click="verDetalle({{ $estudiante['id_registro'] }})"
                                  class="cursor-pointer rounded-xl border border-neutral-quaternary bg-neutral-primary-soft p-4">
                             <div class="flex items-center gap-3">
-                                <x-ui.avatar :name="$nombre" tone="tramposo" class="shrink-0" />
                                 {{-- El texto envuelve en vez de truncarse: `truncate` no deja
                                      partir la línea y ensanchaba la página en pantallas chicas. --}}
                                 <div class="min-w-0">
@@ -157,11 +158,9 @@
                             <tbody>
                                 @foreach ($estudiantes as $estudiante)
                                     @php
-                                        $nombre = trim(($estudiante['nombre'] ?? '').' '.($estudiante['apellido'] ?? ''));
-                                        $apellido = trim($estudiante['apellido'] ?? '');
-                                        $pila = trim($estudiante['nombre'] ?? '');
-                                        // Se muestra por apellido y luego nombre, igual que el orden A-Z.
-                                        $nombreListado = $apellido !== '' ? $apellido.', '.$pila : $pila;
+                                        // Se muestra "Nombre Apellido", aunque el orden A-Z siga
+                                        // siendo por apellido.
+                                        $nombreListado = trim(($estudiante['nombre'] ?? '').' '.($estudiante['apellido'] ?? ''));
                                     @endphp
                                     <tr wire:key="fila-{{ $estudiante['id_registro'] }}"
                                         wire:click="verDetalle({{ $estudiante['id_registro'] }})"
@@ -171,10 +170,7 @@
                                             'hover:bg-[#F7F8FC]' => $idSeleccionado !== $estudiante['id_registro'],
                                         ])>
                                         <td class="px-4 py-4">
-                                            <div class="flex items-center gap-3">
-                                                <x-ui.avatar :name="$nombre" size="sm" tone="tramposo" class="shrink-0" />
-                                                <p class="text-sm font-bold text-fg-brand">{{ $nombreListado }}</p>
-                                            </div>
+                                            <p class="text-sm font-bold text-fg-brand">{{ $nombreListado }}</p>
                                         </td>
                                         <td class="px-4 py-4 font-mono text-body">{{ $estudiante['sis'] }}</td>
                                         <td class="px-4 py-4 text-body">{{ $estudiante['materia'] ?? 'Sin materia' }}</td>
