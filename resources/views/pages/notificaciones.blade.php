@@ -34,6 +34,10 @@
       (HU 12 · T4).
     - 2026-10-11  [OchoaCesar]  feat: "Ver detalle" abre el modal de detalle de
       incidencia con sus submodales de confirmación y rechazo (HU 12 · T4).
+    - 2026-10-11  [OchoaCesar]  fix: al clonar la tarjeta, el script escribe
+      `data-incidencia` con el `referencia` del aviso (id de la incidencia);
+      el onclick incrustado del template quedaba siempre en 0 y el modal lo
+      ignoraba, por lo que "Ver detalle" no abría nada.
 
     @see  \resources\views\components\ui\notificacion-card.blade.php
     @see  \resources\views\components\ui\modal-detalle-incidencia.blade.php
@@ -186,12 +190,10 @@
                 if (hace) { hace.textContent = notificacion.hace || ''; }
                 if (detalle) {
                     detalle.setAttribute('href', notificacion.detalle_href || '#');
-                    // El template clona el onclick con id 0; se reescribe con el
-                    // id_registro real de central_riesgo (`referencia`), que es el
-                    // que consulta el modal (/api/incidencias/{id_registro}).
-                    detalle.setAttribute('onclick',
-                        "event.preventDefault(); window.dispatchEvent(new CustomEvent('abrir-detalle-incidencia', { detail: { id: " +
-                        (notificacion.referencia || 0) + " } }))");
+                    // El modal de detalle se abre con el id de la incidencia,
+                    // que el aviso trae en `referencia` (el `id` es el de la
+                    // notificación y sirve para el ocultar de más abajo).
+                    detalle.dataset.incidencia = notificacion.referencia != null ? notificacion.referencia : '';
                 }
                 if (cerrar) { cerrar.dataset.id = notificacion.id; }
 

@@ -30,6 +30,10 @@
     - 2026-10-11  [OchoaCesar]  feat: "Ver detalle" despacha el evento window
       'abrir-detalle-incidencia' para abrir el modal del detalle en vez de
       navegar (se conserva el href como respaldo sin JS).
+    - 2026-10-11  [OchoaCesar]  fix: el id de la incidencia se lee de
+      `data-incidencia` y no del onclick incrustado, para que el script de la
+      página (que clona tarjetas desde un template estático) pueda
+      reemplazarlo con el `referencia` de cada aviso.
 --}}
 
 @props([
@@ -92,10 +96,14 @@
                  especificación pide texto semibold y el botón base del sistema va en
                  font-medium; se usa la variante roja pedida por la HU 12. --}}
             {{-- El dispatch es JS plano (igual que la X): Alpine no inicializa
-                 @click en elementos fuera de un alcance x-data, y la tarjeta
-                 se renderiza en una página Blade sin x-data. --}}
+                 @click en elementos fuera de un alcance x-data. El id de la
+                 incidencia vive en data-incidencia y no en el onclick: la
+                 página HU 6 clona tarjetas desde un <template> estático y su
+                 script reescribe ese atributo con el `referencia` de cada
+                 aviso (el onclick incrustado quedaría siempre en 0). --}}
             <a href="{{ $detalleHref }}"
-               onclick="event.preventDefault(); window.dispatchEvent(new CustomEvent('abrir-detalle-incidencia', { detail: { id: {{ $id }} } }))"
+               data-incidencia="{{ $id }}"
+               onclick="event.preventDefault(); window.dispatchEvent(new CustomEvent('abrir-detalle-incidencia', { detail: { id: parseInt(this.dataset.incidencia, 10) } }))"
                class="shrink-0 inline-flex items-center justify-center px-4 py-2 text-sm font-semibold text-white bg-danger rounded-base hover:bg-danger-strong focus:ring-4 focus:ring-danger-medium focus:outline-none">
                 Ver detalle
             </a>
