@@ -51,6 +51,18 @@
       que pasa `backRoute` como dato de vista) pero no en
       `registrar-incidencia.blade.php`, que la fijaba con un `@php` suelto
       y la hamburguesa seguía apareciendo en vez de la flecha.
+    - 2026-10-12  [Diego Tejerina]  fix: `<main>` de la rama `@else` pasa a
+      `lg:min-h-0 lg:overflow-y-auto` en desktop. `<body>` lleva
+      `overflow-x-hidden` (ver entrada de arriba) y, por la regla de CSS que
+      fuerza el otro eje a 'auto' cuando uno de los dos ejes no es 'visible',
+      `<body>` terminaba siendo el contenedor que de verdad hacía scroll. El
+      sidebar es `sticky`, pero al quedar adentro de ese `<body>` scrolleable
+      en vez de adentro de un contenedor con altura acotada, se iba con el
+      scroll en vistas largas como `registrar-incidencia.blade.php` (el
+      sidebar `sticky` no "flota" si su contenedor de scroll no es el que
+      tiene la altura fija). Ahora `<main>` es el que scrollea, acotado por
+      el `lg:h-screen` del wrapper, y el sidebar —su hermano, fuera de ese
+      scroll— no se mueve.
 --}}
 
 <!DOCTYPE html>
@@ -96,7 +108,7 @@
                         </x-ui.page-header>
                     @endif
 
-                    <main class="flex-1 min-w-0">
+                    <main class="flex-1 min-w-0 lg:min-h-0 lg:overflow-y-auto">
                         @yield('content')
                     </main>
                 @endif
