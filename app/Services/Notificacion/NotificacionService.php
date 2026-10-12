@@ -8,16 +8,20 @@
  * @created 2026-10-11
  *
  * @description
- * Servicio de dominio de las notificaciones "Posible Tramposo" (HU 12).
+ * Servicio de dominio de las notificaciones del docente.
  *
- * - `notificarPosibleTramposo()` crea el aviso para el docente cuando un
- *   auxiliar registra a un estudiante como sospechoso. El aviso referencia el
- *   caso (`central_riesgo`) y el curso del docente; el resto de los datos
- *   (auxiliar, estudiante, examen, materia, fecha/hora) se derivan de esas
- *   relaciones al listar, así que no se duplican ni se desincronizan.
+ * - `notificarPosibleTramposo()` crea el aviso "Posible Tramposo" (HU 12)
+ *   cuando un auxiliar registra a un estudiante como sospechoso. El aviso
+ *   referencia el caso (`central_riesgo`) y el curso del docente; el resto de
+ *   los datos (auxiliar, estudiante, examen, materia, fecha/hora) se derivan
+ *   de esas relaciones al listar, así que no se duplican ni se desincronizan.
+ * - `notificarCentralRiesgo()` crea el aviso "Estudiante ingresado a central de
+ *   riesgo" (HU 6) cuando un estudiante queda registrado o confirmado como
+ *   tramposo: un aviso por cada materia activa del estudiante, para que cada
+ *   docente vea solo el de su curso.
  * - `listarPara()` devuelve las notificaciones no ocultas del usuario
  *   autenticado, de la más reciente a la más antigua, con el tiempo transcurrido
- *   en español. Un auxiliar nunca recibe notificaciones "Posible Tramposo".
+ *   en español. Un auxiliar nunca recibe notificaciones.
  * - `ocultar()` hace el borrado lógico de una notificación propia.
  *
  * @see  App\Services\Notificacion\TiempoTranscurrido
@@ -25,10 +29,14 @@
  *
  * @changelog
  * - 2026-10-11  [T1]  feat: creación del servicio (#HU12).
+ * - 2026-10-11  [David E. Chavez T.]  feat: aviso "Estudiante ingresado a
+ *   central de riesgo" al registrar/confirmar un tramposo, con un aviso por
+ *   materia activa del estudiante (#HU6).
  */
 
 namespace App\Services\Notificacion;
 
+use App\Enums\CursoEstado;
 use App\Enums\TipoInfraccion;
 use App\Models\CentralRiesgo;
 use App\Models\NotificacionDocente;
@@ -45,6 +53,17 @@ use Illuminate\Support\Facades\Gate;
 class NotificacionService
 {
     public const TITULO_POSIBLE_TRAMPOSO = 'Posible Tramposo';
+
+    /** Título del aviso de la HU 6: el estudiante ya está en la central. */
+    public const TITULO_CENTRAL_RIESGO = 'Estudiante ingresado a central de riesgo';
+
+    /**
+     * Tipos de aviso (columna `tipo` de `notificacion_docente`). La pantalla
+     * pinta una tarjeta distinta según el valor.
+     */
+    public const TIPO_POSIBLE_TRAMPOSO = 'posible_tramposo';
+
+    public const TIPO_CENTRAL_RIESGO = 'central_riesgo';
 
     /** Estado inicial con el que nace un aviso, del enum `estado_notificacion`. */
     public const ESTADO_RECIBIDO = 'recibido';
@@ -85,9 +104,95 @@ class NotificacionService
                 'id_notificacion' => (int) NotificacionDocente::query()->max('id_notificacion') + 1,
                 'id_central_riesgo' => $registro->id_registro,
                 'id_curso' => $idCurso,
+                'tipo' => self::TIPO_POSIBLE_TRAMPOSO,
                 'estado' => self::ESTADO_RECIBIDO,
             ]);
         });
+    }
+
+    /**
+     * Avisa del ingreso de un tramposo a la central de riesgos (HU 6 · T1).
+     *
+     * Se dispara cuando un estudiante queda registrado o confirmado como
+     * "Tramposo". A diferencia del aviso "Posible Tramposo" (que va solo al
+     * docente de la materia del caso), aquí se avisa a **todos los docentes
+     * que tienen al estudiante en sus materias activas**: el hecho es relevante
+     * para cada curso donde cursa, no únicamente para el del examen. Cada
+     * aviso se vincula a su curso, así cada docente ve solamente el suyo y
+     * nadie recibe de golpe estudiantes ajenos a sus materias.
+     *
+     * Es idempotente: si el caso ya tiene aviso `central_riesgo` para un curso,
+     * no se duplica (p. ej. registrar tramposo y confirmar el mismo caso).
+     *
+     * @param  CentralRiesgo  $registro  Caso recién registrado o confirmado.
+     * @param  bool  $porConfirmacion  True cuando el ingreso a la central se
+     *   produce por la confirmación de un caso que el auxiliar reportó como
+     *   sospechoso (sigue teniendo `tipo_infraccion = sospechoso`).
+     * @return array<int, NotificacionDocente> Avisos creados (uno por curso activo).
+     */
+    public function notificarCentralRiesgo(CentralRiesgo $registro, bool $porConfirmacion = false): array
+    {
+        $esTramposo = $registro->tipo_infraccion === TipoInfraccion::Tramposo;
+
+        // Un sospechoso reportado por el auxiliar todavía NO está en la central:
+        // su aviso es el de "Posible Tramposo" (HU 12). El de la HU 6 espera a
+        // que se registre como tramposo o a que el docente confirme el caso.
+        if (! $esTramposo && ! $porConfirmacion) {
+            return [];
+        }
+
+        $cursos = $this->cursosActivosDelEstudiante($registro);
+
+        if ($cursos->isEmpty()) {
+            return [];
+        }
+
+        return DB::transaction(function () use ($registro, $cursos): array {
+            $this->bloquearTabla();
+
+            $yaAvisados = NotificacionDocente::query()
+                ->where('id_central_riesgo', $registro->id_registro)
+                ->where('tipo', self::TIPO_CENTRAL_RIESGO)
+                ->pluck('id_curso')
+                ->map(fn ($idCurso): int => (int) $idCurso)
+                ->all();
+
+            $creados = [];
+
+            foreach ($cursos as $idCurso) {
+                if (in_array((int) $idCurso, $yaAvisados, true)) {
+                    continue;
+                }
+
+                $creados[] = NotificacionDocente::create([
+                    'id_notificacion' => (int) NotificacionDocente::query()->max('id_notificacion') + 1,
+                    'id_central_riesgo' => $registro->id_registro,
+                    'id_curso' => $idCurso,
+                    'tipo' => self::TIPO_CENTRAL_RIESGO,
+                    'estado' => self::ESTADO_RECIBIDO,
+                ]);
+            }
+
+            return $creados;
+        });
+    }
+
+    /**
+     * Cursos activos (`estado = EnCurso`) en los que cursa el estudiante del
+     * caso, de más reciente a más antiguo para un reparto determinista.
+     */
+    private function cursosActivosDelEstudiante(CentralRiesgo $registro): Collection
+    {
+        $estudiante = $registro->estudiante;
+
+        if ($estudiante === null) {
+            return collect();
+        }
+
+        return $estudiante->cursos()
+            ->where('curso.estado', CursoEstado::EnCurso->value)
+            ->orderByDesc('curso.fecha_creacion')
+            ->pluck('curso.id_curso');
     }
 
     /**
@@ -189,10 +294,13 @@ class NotificacionService
         $examen = $registro?->examen;
         $materia = (string) ($notificacion->curso->nombre_curso ?? $registro?->materia() ?? '');
         $nombreExamen = $examen?->tipoExamen->nombre_tipo_examen ?? ($examen !== null ? 'Examen #'.$examen->id_examen : '');
+        $tipo = $notificacion->tipo ?? self::TIPO_POSIBLE_TRAMPOSO;
+        $esCentral = $tipo === self::TIPO_CENTRAL_RIESGO;
 
         return [
             'id' => (int) $notificacion->id_notificacion,
-            'titulo' => self::TITULO_POSIBLE_TRAMPOSO,
+            'tipo' => $tipo,
+            'titulo' => $esCentral ? self::TITULO_CENTRAL_RIESGO : self::TITULO_POSIBLE_TRAMPOSO,
             'auxiliar' => $this->nombreCompleto($auxiliar),
             'estudiante' => $this->nombreCompleto($estudiante),
             'examen' => $nombreExamen,
@@ -200,14 +308,22 @@ class NotificacionService
             'fecha_registro' => $fecha?->toDateTimeString(),
             'hace' => $fecha !== null ? $this->tiempo->enEspanol($fecha) : '',
             'referencia' => (int) $registro->id_registro,
-            'detalle_href' => $registro !== null ? route('incidencias.detalle', $registro->id_registro) : '#',
-            'descripcion' => sprintf(
-                'El auxiliar %s registró al estudiante %s como posible tramposo en el examen de %s de la materia %s.',
-                $this->nombreCompleto($auxiliar),
-                $this->nombreCompleto($estudiante),
-                $nombreExamen,
-                $materia,
-            ),
+            'detalle_href' => $esCentral
+                ? '#'
+                : ($registro !== null ? route('incidencias.detalle', $registro->id_registro) : '#'),
+            'descripcion' => $esCentral
+                ? sprintf(
+                    'El estudiante %s fue ingresado a la central de riesgo en la materia de %s.',
+                    $this->nombreCompleto($estudiante),
+                    $materia,
+                )
+                : sprintf(
+                    'El auxiliar %s registró al estudiante %s como posible tramposo en el examen de %s de la materia %s.',
+                    $this->nombreCompleto($auxiliar),
+                    $this->nombreCompleto($estudiante),
+                    $nombreExamen,
+                    $materia,
+                ),
         ];
     }
 

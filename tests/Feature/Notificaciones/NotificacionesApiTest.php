@@ -57,6 +57,7 @@ class NotificacionesApiTest extends TestCase
         $this->crearEsquema();
 
         (require database_path('migrations/2026_10_11_000001_agregar_oculta_a_notificacion_docente.php'))->up();
+        (require database_path('migrations/2026_10_11_000002_agregar_tipo_a_notificacion_docente.php'))->up();
 
         $this->crearDatos();
     }

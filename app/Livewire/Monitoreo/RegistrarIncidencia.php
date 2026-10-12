@@ -1034,10 +1034,15 @@ class RegistrarIncidencia extends Component
                 'tipo_infraccion' => $this->tipoInfraccion(),
             ]);
 
-            // HU 12 · T1: si un auxiliar reporta a un posible tramposo, se avisa
-            // al docente de la materia. El servicio decide si aplica (solo
-            // `sospechoso`) y resuelve el curso del aviso.
-            app(NotificacionService::class)->notificarPosibleTramposo($registro);
+            // Avisos al docente que dispara el registro:
+            // - HU 12 · T1: si un auxiliar reporta a un posible tramposo, se
+            //   avisa al docente de la materia (solo aplica a `sospechoso`).
+            // - HU 6 · T1: si queda registrado como tramposo, se avisa a los
+            //   docentes de todas las materias activas del estudiante.
+            // El servicio decide si aplica y resuelve los cursos de cada aviso.
+            $notificaciones = app(NotificacionService::class);
+            $notificaciones->notificarPosibleTramposo($registro);
+            $notificaciones->notificarCentralRiesgo($registro);
 
             return $registro;
         });
