@@ -25,6 +25,30 @@
  * Igual que la de `oculta`, esta migración queda PENDIENTE de ejecutar sobre
  * el esquema de Supabase.
  *
+ * @changelog
+ * - 2026-10-11  [David E. Chavez T.]  feat: columna `tipo` en `notificacion_docente` (#HU6).
+ * @author  T1 - Tech One SRL
+ *
+ * @created 2026-10-11
+ *
+ * @description Agrega el tipo de aviso a `notificacion_docente` (HU 6 · T1/T2).
+ * La pantalla de notificaciones pinta dos tarjetas distintas y necesita saber
+ * cuál toca:
+ *
+ *   - `posible_tramposo` (HU 12): el auxiliar reportó a un estudiante como
+ *     sospechoso; tarjeta ámbar con acción "Ver detalle".
+ *   - `central_riesgo` (HU 6): el estudiante fue registrado o confirmado como
+ *     tramposo en la central; tarjeta roja sin acción.
+ *
+ * El tipo se guarda en la notificación (no se deriva del registro) porque un
+ * mismo caso de la central puede generar avisos de distinto tipo: el reporte
+ * del auxiliar (sospechoso) y el ingreso efectivo al confirmarlo. Derivarlo
+ * repintaría como HU 6 avisos que nacieron como HU 12.
+ *
+ * El default `posible_tramposo` cubre las filas ya existentes sin cambiarlas.
+ * Igual que la de `oculta`, esta migración queda PENDIENTE de ejecutar sobre
+ * el esquema de Supabase.
+ *
  * Agrega la columna `tipo` a `notificacion_docente` (HU 12): el
  * tipo de aviso. Nace en `posible_tramposo`, que es el único tipo que hoy
  * genera `NotificacionService`, de modo que el alta no depende de que quien
