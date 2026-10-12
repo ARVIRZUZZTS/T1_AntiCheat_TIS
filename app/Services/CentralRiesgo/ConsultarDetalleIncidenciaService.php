@@ -39,6 +39,11 @@
  *   lanzaba TypeError). La fecha se formatea como `Y-m-d H:i:s`: con el Carbon
  *   crudo JSON emitía ISO-8601 en UTC (corrigiendo la fecha un día) y el
  *   contrato del endpoint cambiaba respecto a lo que cubre DetalleIncidenciaTest.
+ * - 2026-10-11  [Valery D. Ortuno P]  perf: el detalle pasa de seis consultas a
+ *   una sola: el estudiante, el registrador, su rol y la materia se resuelven
+ *   con joins y subconsultas dentro de la consulta base, en vez de eager loads
+ *   contra un PostgreSQL remoto (~380 ms por viaje de red). El contrato de
+ *   salida no cambia y DetalleIncidenciaTest lo verifica.
  *
  * @see  App\Policies\CentralRiesgoPolicy
  * @see  App\Models\CentralRiesgo
@@ -51,6 +56,7 @@ use App\Enums\EstadoIncidencia;
 use App\Enums\Motivo;
 use App\Enums\TipoInfraccion;
 use App\Models\CentralRiesgo;
+use App\Models\Curso;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 class ConsultarDetalleIncidenciaService
@@ -65,26 +71,58 @@ class ConsultarDetalleIncidenciaService
      */
     public function ejecutar(int $idIncidencia): array
     {
+        // Una sola consulta: contra un PostgreSQL remoto cada viaje de red pesa
+        // (~380 ms), así que el estudiante, el registrador, su rol y la materia
+        // del examen se traen con joins y subconsultas en lugar de eager loads.
         $incidencia = CentralRiesgo::query()
-            ->with(['estudiante', 'curso', 'examen.cursos', 'registrador.roles'])
-            ->findOrFail($idIncidencia);
+            ->leftJoin('estudiante', 'estudiante.sis_estudiante', '=', 'central_riesgo.sis_estudiante')
+            ->leftJoin('usuario', 'usuario.id_usuario', '=', 'central_riesgo.id_registrador')
+            ->where('central_riesgo.id_registro', $idIncidencia)
+            ->select('central_riesgo.*')
+            ->selectRaw('estudiante.nombre_estudiante as det_est_nombre')
+            ->selectRaw('estudiante.apellido_estudiante as det_est_apellido')
+            ->selectRaw('estudiante.sis_estudiante as det_est_sis')
+            ->selectRaw('usuario.nombre_usuario as det_usr_nombre')
+            ->selectRaw('usuario.apellido as det_usr_apellido')
+            // Primer curso del examen: la misma fuente que CentralRiesgo::materia()
+            // usa cuando la incidencia no guardó un curso propio.
+            ->selectRaw(
+                '(select c.nombre_curso from examen_curso ec'
+                .' join curso c on c.id_curso = ec.id_curso'
+                .' where ec.id_examen = central_riesgo.id_examen'
+                .' order by ec.id_curso limit 1) as det_materia_examen'
+            )
+            // Rol (docente/auxiliar) del registrador, sin segunda consulta.
+            ->selectRaw(
+                '(select r.nombre_rol from rol_usuario ru'
+                .' join rol r on r.id_rol = ru.id_rol'
+                .' where ru.id_usuario = central_riesgo.id_registrador'
+                .' order by r.id_rol limit 1) as det_rol'
+            )
+            ->first();
 
-        $estudiante = $incidencia->estudiante;
-        $registrador = $incidencia->registrador;
+        if ($incidencia === null) {
+            throw (new ModelNotFoundException)->setModel(CentralRiesgo::class, [$idIncidencia]);
+        }
+
+        $nombreEstudiante = $incidencia->getAttribute('det_est_nombre');
+        $apellidoEstudiante = $incidencia->getAttribute('det_est_apellido');
+        $nombreRegistrador = $incidencia->getAttribute('det_usr_nombre');
+        $apellidoRegistrador = $incidencia->getAttribute('det_usr_apellido');
 
         return [
             'id_registro' => $incidencia->id_registro,
-            'estudiante_nombre' => $estudiante !== null
-                ? trim($estudiante->nombre_estudiante.' '.$estudiante->apellido_estudiante)
+            'estudiante_nombre' => $nombreEstudiante !== null
+                ? trim($nombreEstudiante.' '.(string) $apellidoEstudiante)
                 : null,
             'sis_estudiante' => $incidencia->getAttribute('sis_estudiante')
-                ?? $estudiante?->sis_estudiante,
+                ?? $incidencia->getAttribute('det_est_sis'),
             'motivo' => $this->etiquetaMotivo($incidencia),
-            'materia' => $incidencia->materia(),
-            'reportado_por' => $registrador !== null
-                ? trim($registrador->nombre_usuario.' '.$registrador->apellido)
+            'materia' => $this->materia($incidencia),
+            'reportado_por' => $nombreRegistrador !== null
+                ? trim($nombreRegistrador.' '.(string) $apellidoRegistrador)
                 : null,
-            'reportado_por_rol' => $registrador?->roles->first()?->nombre_rol,
+            'reportado_por_rol' => $incidencia->getAttribute('det_rol'),
             // Formato local plano: el contrato del endpoint es 'Y-m-d H:i:s'
             // (lo que espera el front y DetalleIncidenciaTest); el Carbon crudo
             // se serializa en ISO-8601 con zona UTC y corre la fecha un día.
@@ -92,6 +130,28 @@ class ConsultarDetalleIncidenciaService
             'estado' => $this->estado($incidencia),
             'descripcion' => $incidencia->detalle_motivo,
         ];
+    }
+
+    /**
+     * Materia de la incidencia con la misma regla que `CentralRiesgo::materia()`:
+     * el curso elegido al registrar (`id_curso`) manda; si no, el primer curso
+     * del examen, que ya viene resuelto en `det_materia_examen`.
+     *
+     * El curso elegido se busca aparte (y solo cuando existe) porque
+     * `id_curso` puede no estar en el esquema mínimo de las pruebas.
+     *
+     * @param  CentralRiesgo  $incidencia  Incidencia ya consultada.
+     * @return ?string Nombre de la materia, o null si no se puede resolver.
+     */
+    private function materia(CentralRiesgo $incidencia): ?string
+    {
+        $idCurso = $incidencia->getAttribute('id_curso');
+
+        $materia = $idCurso !== null
+            ? Curso::query()->whereKey($idCurso)->value('nombre_curso')
+            : null;
+
+        return $materia ?? $incidencia->getAttribute('det_materia_examen');
     }
 
     private function etiquetaMotivo(CentralRiesgo $incidencia): ?string
