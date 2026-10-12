@@ -24,6 +24,8 @@
  *
  * @changelog
  * - 2026-10-10  [Valery D. Ortuno P]  test: creación inicial.
+ * - 2026-10-11  [Valery D. Ortuno P]  test: el alcance por defecto pasa a ser
+ *   "Toda la institución"; "Mis materias" se elige explícitamente.
  */
 
 namespace Tests\Feature\CentralRiesgo;
@@ -118,17 +120,17 @@ class ListaEstudiantesCentralRiesgoTest extends TestCase
 
     public function test_mis_materias_muestra_solo_los_sancionados_en_materias_del_usuario(): void
     {
-        $componente = Livewire::test(ListaEstudiantes::class);
+        $componente = Livewire::test(ListaEstudiantes::class)
+            ->call('cambiarAlcance', ListarIncidenciasTramposoService::ALCANCE_MIS_MATERIAS);
 
-        $componente->assertSet('alcance', ListarIncidenciasTramposoService::ALCANCE_MIS_MATERIAS);
         $this->assertSame([self::LUIS, self::ANA, self::CARLA, self::JAIME], $this->sisListados($componente));
     }
 
-    public function test_toda_la_institucion_muestra_los_sancionados_de_todas_las_materias(): void
+    public function test_toda_la_institucion_es_el_alcance_por_defecto(): void
     {
-        $componente = Livewire::test(ListaEstudiantes::class)
-            ->call('cambiarAlcance', ListarIncidenciasTramposoService::ALCANCE_INSTITUCION);
+        $componente = Livewire::test(ListaEstudiantes::class);
 
+        $componente->assertSet('alcance', ListarIncidenciasTramposoService::ALCANCE_INSTITUCION);
         $this->assertSame(self::POR_FECHA, $this->sisListados($componente));
     }
 
@@ -136,7 +138,7 @@ class ListaEstudiantesCentralRiesgoTest extends TestCase
     {
         Livewire::test(ListaEstudiantes::class)
             ->call('cambiarAlcance', 'otro')
-            ->assertSet('alcance', ListarIncidenciasTramposoService::ALCANCE_MIS_MATERIAS);
+            ->assertSet('alcance', ListarIncidenciasTramposoService::ALCANCE_INSTITUCION);
     }
 
     public function test_ordenar_az_ordena_por_primer_apellido_segundo_apellido_y_nombre(): void
@@ -191,6 +193,7 @@ class ListaEstudiantesCentralRiesgoTest extends TestCase
     public function test_la_busqueda_respeta_el_alcance_y_el_orden_elegidos(): void
     {
         $componente = Livewire::test(ListaEstudiantes::class)
+            ->call('cambiarAlcance', ListarIncidenciasTramposoService::ALCANCE_MIS_MATERIAS)
             ->set('ordenAlfabetico', true)
             ->set('busqueda', 'a');
 
@@ -344,7 +347,7 @@ class ListaEstudiantesCentralRiesgoTest extends TestCase
         $this->withoutVite()
             ->get(route('central-riesgo'))
             ->assertOk()
-            ->assertSeeInOrder(['Central de riesgos', 'Mis materias', 'Toda la institución', 'Ordenar A-Z'])
+            ->assertSeeInOrder(['Central de riesgos', 'Toda la institución', 'Mis materias', 'Ordenar A-Z'])
             ->assertSee('href="'.route('central-riesgo').'"', false)
             ->assertSee('Luis Alvarez Gomez');
     }

@@ -13,8 +13,8 @@
  * Componente Livewire de la central de riesgos (HU 10): lista a los estudiantes
  * sancionados con su código SIS, materia y motivo, y muestra el detalle de la
  * incidencia del que se seleccione. Por defecto la lista va de la incidencia
- * más reciente a la más antigua; se puede ordenar A-Z, acotar a las materias
- * del usuario o ver toda la institución, y buscar por nombre o código SIS
+ * más reciente a la más antigua y cubre toda la institución; se puede ordenar
+ * A-Z o acotar a las materias del usuario, y buscar por nombre o código SIS
  * mientras se escribe. Muestra 8 registros por página.
  *
  * El orden, el alcance, la búsqueda y la página son estado del componente, así
@@ -27,6 +27,8 @@
  *
  * @changelog
  * - 2026-10-10  [Valery D. Ortuno P]  feat: creación inicial del componente.
+ * - 2026-10-11  [Valery D. Ortuno P]  feat: el alcance por defecto pasa a ser
+ *   "Toda la institución"; "Mis materias" se muestra a la derecha de ese tab.
  */
 
 namespace App\Livewire\CentralRiesgo;
@@ -44,7 +46,7 @@ use Livewire\Component;
 
 class ListaEstudiantes extends Component
 {
-    public string $alcance = ListarIncidenciasTramposoService::ALCANCE_MIS_MATERIAS;
+    public string $alcance = ListarIncidenciasTramposoService::ALCANCE_INSTITUCION;
 
     public bool $ordenAlfabetico = false;
 

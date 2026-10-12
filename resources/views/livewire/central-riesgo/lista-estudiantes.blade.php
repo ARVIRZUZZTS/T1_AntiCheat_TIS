@@ -6,7 +6,7 @@
 
     @description
     Vista del componente Livewire ListaEstudiantes (HU 10): tabs de alcance
-    (Mis materias / Toda la institución), buscador por nombre o código SIS,
+    (Toda la institución / Mis materias), buscador por nombre o código SIS,
     interruptor "Ordenar A-Z" y la lista de estudiantes sancionados, en cards
     en móvil y en tabla en desktop, con paginación de 8 registros.
 
@@ -17,6 +17,11 @@
     @changelog
     - 2026-10-10  [Valery D. Ortuno P]  feat: creación inicial de la vista, a
       partir del diseño que estaba mockeado en pages/central-riesgo.blade.php.
+    - 2026-10-11  [Valery D. Ortuno P]  feat: "Toda la institución" pasa a ser el
+      primer tab (y el alcance por defecto), con "Mis materias" a su derecha.
+    - 2026-10-11  [Valery D. Ortuno P]  fix: se quita el banner de "Bloqueo
+      automático" (ya no existe) y el botón "Registrar incidencia" (el registro
+      se hace desde Monitor en vivo).
 
     @see  App\Livewire\CentralRiesgo\ListaEstudiantes
     @see  resources/views/partials/busqueda-estudiante.blade.php
@@ -28,8 +33,8 @@
     use Illuminate\Support\Carbon;
 
     $alcances = [
-        ListarIncidenciasTramposoService::ALCANCE_MIS_MATERIAS => 'Mis materias',
         ListarIncidenciasTramposoService::ALCANCE_INSTITUCION => 'Toda la institución',
+        ListarIncidenciasTramposoService::ALCANCE_MIS_MATERIAS => 'Mis materias',
     ];
 
     $estudiantes = $this->estudiantes;
@@ -67,13 +72,6 @@
                         </button>
                     @endforeach
                 </div>
-
-                {{-- Acceso al registro de incidencia desde la central de riesgo: abre
-                     el formulario en blanco (origen=central-riesgo) para que la
-                     persona busque al estudiante con la lupa. --}}
-                <x-ui.button :href="route('registrar-incidencia', ['origen' => 'central-riesgo'])" size="sm">
-                    Registrar incidencia
-                </x-ui.button>
             </div>
 
             <div class="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -192,11 +190,6 @@
                             :total="$estudiantes->lastPage()"
                         />
                     @endif
-                </div>
-
-                <div class="mt-6 rounded-xl border border-danger-subtle bg-danger-soft p-4 lg:mt-8">
-                    <p class="font-semibold text-fg-danger-strong">Bloqueo automático activo</p>
-                    <p class="mt-1 text-sm text-fg-danger">Estos estudiantes no podrán ingresar a tus exámenes.</p>
                 </div>
             @endif
         </section>
