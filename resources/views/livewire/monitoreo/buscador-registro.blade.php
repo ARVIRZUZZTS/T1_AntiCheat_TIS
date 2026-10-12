@@ -54,9 +54,14 @@
       Como hermanos del elemento raíz violaban el requisito de un único elemento
       raíz de Livewire, el componente no renderizaba y el script nunca llegaba a
       ejecutarse.
+    - 2026-10-12  [Diego Tejerina]  fix: el enlace de vuelta se arma ahora con
+      `@section('back-route', ...)` para que lo pinte x-ui.page-header, en vez
+      de un `<nav>` propio en el cuerpo. La vista mostraba la hamburguesa del
+      header Y este enlace al mismo tiempo, duplicando la navegación en mobile.
 --}}
 
 @section('title', 'Registro ingreso')
+@section('back-route', route('monitoreo'))
 
 @php
     // El enlace al formulario se arma una sola vez aquí y el script solo lo
@@ -71,17 +76,6 @@
 @endphp
 
 <div class="flex flex-col gap-6 px-[2vh] mt-[2vh]">
-    {{-- Enlace de vuelta con el mismo patrón que usa registrar-incidencia: `nav`
-         y clases cortas en vez de un botón completo, porque aquí no hay una
-         acción principal a la que competir. --}}
-    <nav aria-label="Ruta de navegación">
-        <a href="{{ route('monitoreo') }}"
-           class="inline-flex items-center gap-1.5 text-sm font-medium text-fg-brand hover:underline">
-            <svg class="w-4 h-4" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m15 19-7-7 7-7"/></svg>
-            Volver al monitor en vivo
-        </a>
-    </nav>
-
     <section class="bg-neutral-primary-soft border border-default rounded-base shadow-xs p-6 sm:p-8">
         <div class="w-full sm:max-w-md">
             <x-ui.search-input

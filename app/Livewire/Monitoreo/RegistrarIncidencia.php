@@ -77,6 +77,14 @@
  *   datos vienen del registro de estudiantes y ya no son responsabilidad de
  *   este formulario; solo se exige que estén llenos y se pide buscarlos con la
  *   lupa cuando faltan.
+ * - 2026-10-12  [Diego Tejerina]  fix: cuando se entra desde el buscador de
+ *   registro de ingreso (`ORIGEN_MONITOREO`), la flecha de volver, "Cancelar"
+ *   y "Aceptar" regresaban directo al monitor en vivo, saltándose la pantalla
+ *   de registro de ingreso desde la que realmente se abrió el formulario.
+ * - 2026-10-12  [Diego Tejerina]  fix: `registrar()` invalida la caché del
+ *   informe de `MonitorEnVivo` para el examen afectado; sin esto, una
+ *   incidencia dada de alta desde el buscador de registro de ingreso podía
+ *   no verse en el monitor hasta que esa caché expirara por su cuenta.
  */
 namespace App\Livewire\Monitoreo;
 
@@ -429,6 +437,10 @@ class RegistrarIncidencia extends Component
     {
         return match ($this->origen) {
             self::ORIGEN_CENTRAL_RIESGO => route('central-riesgo'),
+            // El único lugar que manda ORIGEN_MONITOREO es el buscador de
+            // registro de ingreso (buscador-registro.blade.php), así que
+            // "volver" es volver ahí, no saltar directo al monitor en vivo.
+            self::ORIGEN_MONITOREO => route('monitoreo.registro-ingreso'),
             default => route('monitoreo'),
         };
     }
@@ -1047,6 +1059,12 @@ class RegistrarIncidencia extends Component
             return $registro;
         });
 
+        // El monitor en vivo cachea su informe de asistencia por examen
+        // (MonitorEnVivo::informe()); si esta incidencia es de un examen que
+        // el monitor está mostrando, sin esto el estudiante seguiría viéndose
+        // "pendiente" hasta que la caché expire por su cuenta.
+        Cache::forget(MonitorEnVivo::CACHE_INFORME_PREFIJO.$registro->id_examen);
+
         $nombreEnBase = $registro->estudiante === null
             ? ''
             : trim($registro->estudiante->nombre_estudiante.' '.$registro->estudiante->apellido_estudiante);
@@ -1237,7 +1255,7 @@ class RegistrarIncidencia extends Component
     public function cancelar(): RedirectResponse
     {
         if ($this->origen === self::ORIGEN_MONITOREO) {
-            return redirect()->route('monitoreo');
+            return redirect()->route('monitoreo.registro-ingreso');
         }
 
         if ($this->origen === self::ORIGEN_CENTRAL_RIESGO) {
