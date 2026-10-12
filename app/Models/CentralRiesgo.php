@@ -38,6 +38,9 @@
  *   `ResolverIncidenciaService` comparaba un string contra
  *   `EstadoIncidencia::Pendiente` y toda confirmación/rechazo devolvía 422, y
  *   el detalle de la incidencia respondía `estado: null`.
+ * - 2026-10-11  [Valery D. Ortuno P]  feat: al guardar o borrar una incidencia
+ *   se invalida la caché de la central de riesgos (lista y detalle), para que
+ *   las escrituras se vean al instante aunque la pantalla cachee.
  */
 
 namespace App\Models;
@@ -45,6 +48,7 @@ namespace App\Models;
 use App\Enums\EstadoIncidencia;
 use App\Enums\Motivo;
 use App\Enums\TipoInfraccion;
+use App\Services\CentralRiesgo\CacheCentralRiesgo;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
@@ -96,6 +100,19 @@ class CentralRiesgo extends Model
             'tipo_infraccion' => TipoInfraccion::class,
             'estado_incidencia' => EstadoIncidencia::class,
         ];
+    }
+
+    /**
+     * Invalida la caché de la central de riesgos en cada escritura.
+     *
+     * El alta, la confirmación y el descarte pasan por Eloquent, así que subir
+     * la versión acá es lo que garantiza que la pantalla cacheada se vea al
+     * instante y nunca con datos viejos.
+     */
+    protected static function booted(): void
+    {
+        static::saved(static fn () => CacheCentralRiesgo::invalidar());
+        static::deleted(static fn () => CacheCentralRiesgo::invalidar());
     }
 
     /**
