@@ -100,6 +100,7 @@
                 Ver detalle
             </a>
         </div>
+        @endif
     </div>
 
     <button type="button" aria-label="Cerrar notificación" title="Cerrar"

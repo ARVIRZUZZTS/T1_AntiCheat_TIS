@@ -41,6 +41,7 @@ use App\Models\CentralRiesgo;
 use App\Models\Estudiante;
 use App\Models\EstudianteExamen;
 use App\Models\RegistroAsistencia;
+use App\Services\Notificacion\NotificacionService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -153,7 +154,7 @@ class RegistroIngresoService
 
             $detalle = $detalle === null ? null : trim($detalle);
 
-            return CentralRiesgo::create([
+            $registro = CentralRiesgo::create([
                 'id_registro' => $this->siguienteId(CentralRiesgo::class, 'id_registro'),
                 'sis_estudiante' => $sisEstudiante,
                 'id_examen' => $idExamen,
@@ -163,6 +164,13 @@ class RegistroIngresoService
                 'fecha_registro' => now(),
                 'tipo_infraccion' => TipoInfraccion::Tramposo->value,
             ]);
+
+            // HU 6 · T1: el monitor siempre registra tramposos directos, así que
+            // cada docente con una materia activa del estudiante recibe su aviso
+            // "Estudiante ingresado a central de riesgo".
+            app(NotificacionService::class)->notificarCentralRiesgo($registro);
+
+            return $registro;
         });
     }
 

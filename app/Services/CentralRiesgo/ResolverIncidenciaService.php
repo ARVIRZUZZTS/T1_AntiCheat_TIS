@@ -13,6 +13,8 @@
  *
  * @changelog
  * - 2026-10-09  [Diego Tejerina]  feat: resolver incidencias sin duplicados (#142).
+ * - 2026-10-11  [David E. Chavez T.]  feat: al confirmar se avisa a los
+ *   docentes de las materias activas del estudiante (HU 6 · T1).
  *
  * @see App\Policies\CentralRiesgoPolicy
  */
@@ -22,6 +24,7 @@ namespace App\Services\CentralRiesgo;
 use App\Enums\EstadoIncidencia;
 use App\Models\CentralRiesgo;
 use App\Models\Usuario;
+use App\Services\Notificacion\NotificacionService;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\DB;
@@ -46,6 +49,13 @@ class ResolverIncidenciaService
             $incidencia->estado_incidencia = EstadoIncidencia::Confirmado;
             $incidencia->id_confirmador = $docente->id_usuario;
             $incidencia->save();
+
+            // HU 6 · T1: confirmar es el momento en que el caso del auxiliar
+            // ingresa efectivamente a la central de riesgos, así que recién ahí
+            // se avisa a cada docente con materia activa del estudiante. El
+            // caso sigue con `tipo_infraccion = sospechoso`, por eso el aviso
+            // se fuerza desde la confirmación.
+            app(NotificacionService::class)->notificarCentralRiesgo($incidencia, porConfirmacion: true);
 
             return $incidencia;
         });
