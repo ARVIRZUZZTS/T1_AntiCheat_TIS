@@ -2,7 +2,7 @@
     @file    registrar-incidencia.blade.php
     @author  Valery D. Ortuno P. <valerydariana98@gmail.com>
     @created 2026-09-25
-    @updated 2026-10-10
+    @updated 2026-10-12
 
     @description
     Vista del formulario de registro de una incidencia en la central de riesgos.
@@ -58,13 +58,14 @@
  * - 2026-10-10  [T1]  perf: el buscador avisa mientras carga y el mensaje de
  *   "ningún estudiante coincide" espera a que haya al menos dos caracteres; el
  *   aviso de autocapitalización del navegador se apaga en el campo.
+ * - 2026-10-12  [T1]  perf: el buscador deja de viajar al servidor en cada tecla
+ *   (`wire:model.live`) y filtra en el navegador con Alpine sobre el índice que
+ *   publica `indiceEstudiantes()`, el mismo criterio de la antigua pantalla
+ *   "Registro ingreso". El índice se limita a los inscritos del examen cuando
+ *   hay examen. El campo recibe autofoco al abrir el formulario.
 --}}
 
 @section('title', 'Registrar incidencia')
-
-@php
-    $resultados = $this->resultadosBusqueda();
-@endphp
 
 {{-- El hueco entre las dos tarjetas es el mismo `space-y-6` que usa el monitor
      en vivo entre las suyas, para que las dos pantallas se vean parejas. --}}
@@ -86,53 +87,112 @@
     <section class="bg-neutral-primary-soft border border-default rounded-base shadow-xs p-6 sm:p-8">
         <h2 class="text-lg font-semibold text-heading">Datos del estudiante</h2>
 
-        <div class="relative mt-6">
+        {{-- Un solo buscador. Filtra en el navegador sobre el índice que publica
+             `indiceEstudiantes()` (los inscritos del examen, o el catálogo
+             completo si el formulario se abrió sin examen), igual que hacía la
+             antigua pantalla "Registro ingreso": así responde al instante, sin
+             viajar al servidor en cada tecla. --}}
+        <div class="relative mt-6"
+             x-data="{
+                 indice: [],
+                 resultados: [],
+                 termino: '',
+                 mostrar: false,
+                 sinResultados: false,
+                 minimo: {{ \App\Livewire\Monitoreo\RegistrarIncidencia::BUSQUEDA_MINIMO }},
+                 limite: {{ \App\Livewire\Monitoreo\RegistrarIncidencia::BUSQUEDA_LIMITE }},
+
+                 // El índice llega en el bloque de script de abajo; `termino`
+                 // ya viene normalizado desde PHP, así que cada tecla solo
+                 // compara. Se lee con JSON.parse sobre textContent para no
+                 // pelearse con el escapado del HTML.
+                 init() {
+                     const datos = document.getElementById('indice-estudiantes');
+                     this.indice = datos ? JSON.parse(datos.textContent) : [];
+                 },
+
+                 // El término tecleado se normaliza igual que el índice: sin
+                 // tildes ni mayúsculas, como el buscador anterior.
+                 sinAcentos(texto) {
+                     return texto.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                 },
+
+                 filtrar(valor) {
+                     this.termino = valor.trim();
+
+                     const aguja = this.sinAcentos(this.termino);
+                     this.resultados = [];
+                     this.mostrar = false;
+                     this.sinResultados = false;
+
+                     if (aguja.length < this.minimo) {
+                         return;
+                     }
+
+                     for (let i = 0; i < this.indice.length; i++) {
+                         if (this.indice[i].termino.indexOf(aguja) !== -1) {
+                             this.resultados.push(this.indice[i]);
+
+                             if (this.resultados.length >= this.limite) {
+                                 break;
+                             }
+                         }
+                     }
+
+                     this.mostrar = this.resultados.length > 0;
+                     this.sinResultados = this.resultados.length === 0;
+                 },
+
+                 seleccionar(sis) {
+                     this.$wire.seleccionarEstudiante(sis);
+                     this.termino = '';
+                     this.resultados = [];
+                     this.mostrar = false;
+                     this.sinResultados = false;
+
+                     if (this.$refs.busqueda) {
+                         this.$refs.busqueda.value = '';
+                     }
+                 },
+             }"
+             x-init="$nextTick(() => $refs.busqueda && $refs.busqueda.focus())">
             <x-ui.search-input
                 name="busqueda"
                 id="busqueda"
                 placeholder="Buscar por nombre o código SIS..."
-                wire:model.live.debounce.250ms="busqueda"
-                wire:submit.prevent="buscarEstudiantes"
                 :show-button="false"
+                x-ref="busqueda"
                 autocomplete="off"
                 autocapitalize="none"
                 autocorrect="off"
                 spellcheck="false"
+                autofocus
                 class="bg-neutral-primary-soft!"
+                @input="filtrar($event.target.value)"
+                @keydown.enter.prevent="filtrar($event.target.value)"
             />
-
-            {{-- Aviso mientras viaja la petición del buscador: la base está en
-                 Supabase y el primer viaje tarda; después el catálogo queda en
-                 caché y responde al instante. --}}
-            <p class="mt-2 text-sm text-body" wire:loading wire:target="busqueda">
-                Buscando estudiantes…
-            </p>
 
             {{-- El desplegable se ancla al contenedor `relative` de arriba; sin
                  él, `absolute` se medía contra la página y salía descolocado. --}}
-            @if (filled($busqueda) && $resultados->isNotEmpty())
-                <ul class="absolute z-20 mt-1 w-full max-h-64 overflow-y-auto rounded-base border border-default bg-surface-page shadow-lg"
-                    role="listbox"
-                    aria-label="Estudiantes encontrados">
-                    @foreach ($resultados as $resultado)
-                        <li role="option" aria-selected="false"
-                            wire:key="resultado-{{ $resultado->sis_estudiante }}">
-                            <button type="button"
-                                    wire:click="seleccionarEstudiante('{{ $resultado->sis_estudiante }}')"
-                                    class="flex w-full flex-col items-start gap-0.5 border-b border-default px-3 py-2 text-start text-sm last:border-b-0 hover:bg-neutral-secondary-soft focus:bg-neutral-secondary-soft focus:outline-none">
-                                <span class="font-medium text-heading">
-                                    {{ $resultado->nombre_estudiante }} {{ $resultado->apellido_estudiante }}
-                                </span>
-                                <span class="text-xs text-body">{{ $resultado->sis_estudiante }}</span>
-                            </button>
-                        </li>
-                    @endforeach
-                </ul>
-            @elseif (mb_strlen(trim($busqueda)) >= 2 && $resultados->isEmpty())
-                <p class="mt-2 text-sm text-body">
-                    Ningún estudiante coincide con «{{ trim($busqueda) }}».
-                </p>
-            @endif
+            <ul x-show="mostrar" x-cloak
+                class="absolute z-20 mt-1 w-full max-h-64 overflow-y-auto rounded-base border border-default bg-surface-page shadow-lg"
+                role="listbox"
+                aria-label="Estudiantes encontrados">
+                <template x-for="resultado in resultados" :key="resultado.sis">
+                    <li role="option" aria-selected="false">
+                        <button type="button"
+                                @click="seleccionar(resultado.sis)"
+                                class="flex w-full flex-col items-start gap-0.5 border-b border-default px-3 py-2 text-start text-sm last:border-b-0 hover:bg-neutral-secondary-soft focus:bg-neutral-secondary-soft focus:outline-none">
+                            <span class="font-medium text-heading" x-text="resultado.nombre"></span>
+                            <span class="text-xs text-body" x-text="resultado.sis"></span>
+                        </button>
+                    </li>
+                </template>
+            </ul>
+
+            <p x-show="sinResultados" x-cloak class="mt-2 text-sm text-body">
+                Ningún estudiante coincide con «<span x-text="termino"></span>».
+            </p>
         </div>
 
         <p class="mt-2 text-sm text-body">
@@ -347,4 +407,12 @@
         </div>
     </div>
 @endif
+
+    {{-- Índice del buscador. Viaja como JSON para no pelearse con el escapado
+         del HTML y se lee con `JSON.parse` sobre `textContent`; los resultados
+         se pintan con `x-text`, nunca con `innerHTML`. El estado Alpine vive en
+         el `x-data` del contenedor del buscador (arriba), como en el modal de
+         alta de examen. El bloque va dentro del div raíz porque Livewire exige
+         un único elemento raíz por componente. --}}
+    <script type="application/json" id="indice-estudiantes">{!! json_encode($this->indiceEstudiantes, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) !!}</script>
 </div>

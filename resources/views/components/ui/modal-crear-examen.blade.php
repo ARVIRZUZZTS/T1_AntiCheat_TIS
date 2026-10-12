@@ -3,6 +3,7 @@
     @author  Alex Candia <alex.leonar.candia@gmail.com>
     @created 2026-10-05
     @updated 2026-10-10
+    @updated 2026-10-12
 
     @description
     Componente UI Blade reutilizable para el modal de alta de un examen en una
@@ -40,7 +41,7 @@
 
     El catálogo de ambientes lo arma App\Services\Ambiente\ListarAmbientesService
     y viaja en un `<script type="application/json">`, igual que el índice de
-    estudiantes de livewire/monitoreo/buscador-registro.blade.php: se lee con
+    estudiantes de livewire/monitoreo/registrar-incidencia.blade.php: se lee con
     `JSON.parse` sobre `textContent` en vez de incrustarse como atributo, para no
     pelearse con el escapado del HTML. El `termino` de cada ambiente ya viene en
     minúsculas desde el servicio, así que cada tecla solo compara. Los catálogos
@@ -115,6 +116,9 @@
     - 2026-10-10  [Alex Candia]  fix: la fecha acepta el día de un solo dígito.
       Al teclear "9/12" sobraba el dígito y se leía como día 91, que se acotaba a
       31; ahora se arma 09/12.
+    - 2026-10-12  [T1]  docs: el ejemplo del índice JSON apunta a
+      registrar-incidencia.blade.php (el índice de estudiantes ya no vive en
+      buscador-registro.blade.php).
 
     @see  resources/views/partials/materia-examenes.blade.php
     @see  App\Enums\TipoExamen

@@ -9,6 +9,7 @@
  *
  * @updated 2026-10-10
  * @updated 2026-10-11
+ * @updated 2026-10-12
  *
  * @description
  * Definición de rutas web del panel. Incluye vistas estáticas y componentes Livewire.
@@ -50,11 +51,14 @@
  *   en APP_ENV=local, que inicia sesión con el usuario 1 para poder probar el
  *   modal de detalle de incidencia (la API exige sesión y aún no existe
  *   pantalla de login).
+ * - 2026-10-12  [T1]  refactor: se elimina la pantalla intermedia de registro
+ *   de ingreso (rutas /monitoreo/registro-ingreso y /buscador-incidencia): el
+ *   monitor abre directo el formulario de incidencia, que ahora trae su propio
+ *   buscador. Queda solo /registrar-incidencia.
  */
 
 use App\Http\Controllers\ExamenController;
 use App\Livewire\Examenes\EstudiantesCurso;
-use App\Livewire\Monitoreo\BuscadorRegistro;
 use App\Livewire\Monitoreo\MonitorEnVivo;
 use App\Livewire\Monitoreo\RegistrarIncidencia;
 use App\Models\Curso;
@@ -75,7 +79,6 @@ Route::get('/materias', fn () => view('pages.materias', [
 ]))->name('materias');
 Route::view('/examenes', 'pages.examenes')->name('examenes');
 Route::get('/monitoreo', MonitorEnVivo::class)->name('monitoreo');
-Route::get('/monitoreo/registro-ingreso', BuscadorRegistro::class)->name('monitoreo.registro-ingreso');
 // La vista solo aporta el layout; los datos los resuelve el componente Livewire
 // ListaEstudiantes que incrusta, por eso la ruta sigue sin lógica.
 Route::view('/central-riesgo', 'pages.central-riesgo')->name('central-riesgo');
@@ -114,7 +117,6 @@ Route::get('/incidencias/{id}', fn (int $id) => view('pages.incidencia-detalle',
 
 // TODO(@valerydariana98, 2026-09-25): proteger con el middleware de rol que
 // restringe el registro de incidencias a docentes y auxiliares (#69).
-Route::get('/buscador-incidencia', RegistrarIncidencia::class)->name('buscador-incidencia');
 Route::get('/registrar-incidencia', RegistrarIncidencia::class)->name('registrar-incidencia');
 
 // Solo APP_ENV=local: aún no existe pantalla de login y los endpoints de
