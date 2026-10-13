@@ -44,6 +44,20 @@
  *   que el reporte se calculaba **tres veces** por página: 28 consultas y 11s.
  *   Ahora leen `$this->informe`, el reporte se calcula una sola vez y la
  *   página baja a 10 consultas y ~5s.
+ * - 2026-10-12  [Diego Tejerina]  fix: filtro ('todos'/'pendientes'/
+ *   'tramposos') y búsqueda pasan de un script en el navegador (que ocultaba
+ *   filas ya pintadas, por eso la página traía los 50 inscritos de una sola
+ *   vez) a propiedades Livewire que filtran `$this->informe['estudiantes']`
+ *   antes de paginar. `config('monitoreo.por_pagina')` baja de 50 a un
+ *   número chico de verdad: la tabla ya no depende de traer el curso
+ *   completo para que el filtro/búsqueda funcionen. No toca
+ *   confirmarIngreso/rechazarIngreso/permitirIngreso/registrarTramposo.
+ * - 2026-10-12  [Diego Tejerina]  perf: `informe()` se cachea un minuto por
+ *   examen. Cada tecla del buscador es un request de Livewire nuevo y, sin
+ *   caché, recalculaba las ~10 consultas del informe completo en cada una,
+ *   sintiéndose muy lento. Se invalida en `ejecutarAccion()` y también desde
+ *   `RegistrarIncidencia::registrar()`, que puede escribir en el mismo
+ *   examen desde el buscador de registro de ingreso.
  */
 
 namespace App\Livewire\Monitoreo;
@@ -56,6 +70,8 @@ use App\Services\Monitoreo\GenerarReporteAsistenciaService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
@@ -82,6 +98,16 @@ class MonitorEnVivo extends Component
     public int $pagina = 1;
 
     /**
+     * Filtro activo de la tabla: 'todos', 'pendientes' o 'tramposos'.
+     */
+    public string $filtro = 'todos';
+
+    /**
+     * Término de búsqueda por nombre o código SIS.
+     */
+    public string $busqueda = '';
+
+    /**
      * Mensaje de éxito de la última acción, vacío mientras no haya ninguna.
      */
     public string $mensajeExito = '';
@@ -100,6 +126,20 @@ class MonitorEnVivo extends Component
      * Servicio que persiste las acciones del control de ingreso.
      */
     private RegistroIngresoService $servicioIngreso;
+
+    /**
+     * Prefijo de la clave de caché del informe de asistencia, una por examen.
+     *
+     * Pública porque `RegistrarIncidencia::registrar()` también escribe en
+     * `central_riesgo` para un examen que este monitor puede estar mostrando
+     * (origen `ORIGEN_MONITOREO`), y tiene que poder invalidar la misma clave.
+     */
+    public const CACHE_INFORME_PREFIJO = 'monitoreo.informe.';
+
+    /**
+     * Minutos que se cachea el informe antes de volver a consultar la base.
+     */
+    private const CACHE_INFORME_MINUTOS = 1;
 
     /**
      * Resuelve los servicios en cada ciclo del componente.
@@ -124,14 +164,25 @@ class MonitorEnVivo extends Component
     }
 
     /**
-     * Reporte de asistencia completo del examen.
+     * Reporte de asistencia completo del examen, cacheado un minuto.
+     *
+     * `#[Computed]` solo memoiza dentro del mismo request: cada tecla del
+     * buscador (`wire:model.live.debounce`) es un request nuevo, así que sin
+     * esta caché el filtro/búsqueda recalculaba el informe completo —y sus
+     * ~10 consultas— en cada una. Se invalida en `ejecutarAccion()` para que
+     * una escritura propia (confirmar/rechazar/permitir ingreso, registrar
+     * tramposo) se vea de inmediato y no quede pisada por una versión vieja.
      *
      * @return array{examen: Examen, estudiantes: Collection<int, array<string, mixed>>}
      */
     #[Computed]
     public function informe(): array
     {
-        return $this->servicioReporte->ejecutar($this->idExamen);
+        return Cache::remember(
+            self::CACHE_INFORME_PREFIJO.$this->idExamen,
+            now()->addMinutes(self::CACHE_INFORME_MINUTOS),
+            fn (): array => $this->servicioReporte->ejecutar($this->idExamen),
+        );
     }
 
     /**
@@ -144,14 +195,15 @@ class MonitorEnVivo extends Component
     }
 
     /**
-     * Estudiantes del examen, paginados.
+     * Estudiantes del examen que pasan el filtro y la búsqueda actuales,
+     * paginados.
      *
      * @return LengthAwarePaginator<int, array<string, mixed>>
      */
     #[Computed]
     public function estudiantes(): LengthAwarePaginator
     {
-        $todos = $this->informe['estudiantes'];
+        $todos = $this->estudiantesFiltrados();
         $porPagina = (int) config('monitoreo.por_pagina', 10);
         $pagina = max(1, $this->pagina);
 
@@ -162,6 +214,45 @@ class MonitorEnVivo extends Component
             $pagina,
             ['path' => LengthAwarePaginator::resolveCurrentPath()],
         );
+    }
+
+    /**
+     * Aplica el filtro de estado y la búsqueda por nombre/SIS sobre el
+     * informe completo, antes de paginar.
+     *
+     * Antes esto lo hacía un script en el navegador, ocultando filas ya
+     * pintadas: por eso la página traía los 50 inscritos de una sola vez
+     * (`config('monitoreo.por_pagina')` era 50). Al paginar de a pocos en el
+     * servidor, el filtro y la búsqueda tienen que viajar con la consulta
+     * para seguir alcanzando a todo el curso y no solo a la página visible.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function estudiantesFiltrados(): Collection
+    {
+        $todos = $this->informe['estudiantes'];
+
+        $filtrados = match ($this->filtro) {
+            'pendientes' => $todos->where('estado_asistencia', 'pendiente'),
+            'tramposos' => $todos->filter(
+                fn (array $fila): bool => ($fila['incidencia']['tipo'] ?? null) === TipoInfraccion::Tramposo->value
+            ),
+            default => $todos,
+        };
+
+        $termino = Str::lower(trim($this->busqueda));
+
+        if ($termino === '') {
+            return $filtrados->values();
+        }
+
+        return $filtrados
+            ->filter(function (array $fila) use ($termino): bool {
+                $texto = Str::lower(trim($fila['sis'].' '.$fila['nombre'].' '.$fila['apellido']));
+
+                return str_contains($texto, $termino);
+            })
+            ->values();
     }
 
     /**
@@ -199,6 +290,42 @@ class MonitorEnVivo extends Component
     public function irPagina(int $pagina): void
     {
         $this->pagina = max(1, $pagina);
+    }
+
+    /**
+     * Cambia el filtro de estado de la tabla y vuelve a la primera página.
+     *
+     * @param  string  $filtro  'todos', 'pendientes' o 'tramposos'.
+     */
+    public function filtrar(string $filtro): void
+    {
+        if (! in_array($filtro, ['todos', 'pendientes', 'tramposos'], true)) {
+            return;
+        }
+
+        $this->filtro = $filtro;
+        $this->pagina = 1;
+    }
+
+    /**
+     * `wire:model.live.debounce.350ms="busqueda"` llama a este hook solo con
+     * cada tecla (con el debounce ya aplicado): vuelve a la primera página
+     * para que un resultado nuevo no quede mostrando una página vacía.
+     */
+    public function updatedBusqueda(): void
+    {
+        $this->pagina = 1;
+    }
+
+    /**
+     * Enter dentro del buscador sigue sin botón "Buscar" visible, pero el
+     * `<form>` necesita *algún* `wire:submit` para no hacer un submit nativo
+     * (recargaría la página): `busqueda` ya viaja sola por `wire:model.live`,
+     * así que acá alcanza con repetir el mismo reseteo de página.
+     */
+    public function buscar(): void
+    {
+        $this->pagina = 1;
     }
 
     /**
@@ -300,6 +427,7 @@ class MonitorEnVivo extends Component
 
         try {
             $accion();
+            Cache::forget(self::CACHE_INFORME_PREFIJO.$this->idExamen);
             $this->mensajeExito = $exito;
         } catch (InvalidArgumentException $e) {
             $this->mensajeError = $e->getMessage();
@@ -308,8 +436,12 @@ class MonitorEnVivo extends Component
 
     /**
      * Limpia los mensajes de la acción anterior.
+     *
+     * Pública (no solo de uso interno de `ejecutarAccion()`): la vista la
+     * llama también desde un `setTimeout` de Alpine para que el aviso
+     * "Listo" no se quede para siempre en pantalla.
      */
-    private function limpiarMensajes(): void
+    public function limpiarMensajes(): void
     {
         $this->mensajeExito = '';
         $this->mensajeError = '';

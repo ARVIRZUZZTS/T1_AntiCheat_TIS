@@ -14,6 +14,14 @@
 
     @changelog
     - 2026-09-26  [Diego Tejerina]  feat: creación inicial del componente UI.
+    - 2026-10-12  [Diego Tejerina]  fix: los botones del footer se apilan en
+      mobile (flex-col, ancho completo) y vuelven a quedar en fila desde
+      sm:, para que sean consistentes con el resto de modales del sistema.
+    - 2026-10-12  [Diego Tejerina]  nota: el SIS de "Estudiante: X (SIS: Y)"
+      queda a propósito SIN font-mono (a diferencia de la tabla y las demás
+      pantallas). ModalHabilitarSoloTest busca el texto literal completo
+      ("Estudiante: Ana Lopez (SIS: 202201013)") y un <span> en medio lo
+      parte en dos strings. Envolverlo rompía ese assert.
 
     @see  resources/views/pages/materia-estudiantes.blade.php
     @see  resources/views/livewire/examenes/estudiantes-curso.blade.php
@@ -96,10 +104,11 @@
                 </div>
 
                 <!-- Modal footer -->
-                <div class="flex items-center space-x-3 border-t border-default pt-4">
+                <div class="flex flex-col gap-3 border-t border-default pt-4 sm:flex-row sm:items-center">
                     @if ($esLivewire)
                         <x-ui.button
                             variant="default"
+                            class="w-full justify-center sm:w-auto"
                             wire:click="{{ $wireConfirm }}"
                             wire:loading.attr="disabled"
                             wire:target="{{ $wireConfirm }}"
@@ -108,13 +117,14 @@
                             <span wire:loading wire:target="{{ $wireConfirm }}">Habilitando…</span>
                         </x-ui.button>
                         <x-ui.button-cancelar
+                            class="w-full justify-center sm:w-auto"
                             wire:click="{{ $wireClose }}"
                             wire:loading.attr="disabled"
                             wire:target="{{ $wireConfirm }}"
                         >Cancelar</x-ui.button-cancelar>
                     @else
-                        <x-ui.button variant="default" @click="confirmarHabilitar()">Habilitar</x-ui.button>
-                        <x-ui.button-cancelar @click="cerrarModalHabilitar()">Cancelar</x-ui.button-cancelar>
+                        <x-ui.button variant="default" class="w-full justify-center sm:w-auto" @click="confirmarHabilitar()">Habilitar</x-ui.button>
+                        <x-ui.button-cancelar class="w-full justify-center sm:w-auto" @click="cerrarModalHabilitar()">Cancelar</x-ui.button-cancelar>
                     @endif
                 </div>
             </div>

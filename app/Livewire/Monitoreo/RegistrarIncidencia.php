@@ -83,6 +83,15 @@
  *   contexto el índice se limita a los inscritos en ese examen (`catalogo()`).
  *   La pantalla intermedia "Registro ingreso" se elimina: el monitor abre
  *   directamente este formulario.
+ * - 2026-10-12  [Diego Tejerina]  fix: `registrar()` invalida la caché del
+ *   informe de `MonitorEnVivo` para el examen afectado; sin esto, una
+ *   incidencia dada de alta desde este formulario podía no verse en el
+ *   monitor hasta que esa caché expirara por su cuenta.
+ * - 2026-10-12  [Diego Tejerina]  fix: con la pantalla intermedia "Registro
+ *   ingreso" eliminada (ver entrada de arriba), `rutaVolver()` y `cancelar()`
+ *   dejan de apuntar a esa ruta (ya no existe) para `ORIGEN_MONITOREO` y
+ *   vuelven a caer en el monitor en vivo, como el resto de los orígenes sin
+ *   pantalla propia.
  */
 namespace App\Livewire\Monitoreo;
 
@@ -1119,6 +1128,12 @@ class RegistrarIncidencia extends Component
 
             return $registro;
         });
+
+        // El monitor en vivo cachea su informe de asistencia por examen
+        // (MonitorEnVivo::informe()); si esta incidencia es de un examen que
+        // el monitor está mostrando, sin esto el estudiante seguiría viéndose
+        // "pendiente" hasta que la caché expire por su cuenta.
+        Cache::forget(MonitorEnVivo::CACHE_INFORME_PREFIJO.$registro->id_examen);
 
         $nombreEnBase = $registro->estudiante === null
             ? ''

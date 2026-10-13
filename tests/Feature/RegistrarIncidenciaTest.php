@@ -561,11 +561,16 @@ class RegistrarIncidenciaTest extends TestCase
      */
     public function test_cancelar_desde_la_central_de_riesgo_regresa_a_la_central(): void
     {
-        Livewire::test(RegistrarIncidencia::class)
-            ->set('origen', RegistrarIncidencia::ORIGEN_CENTRAL_RIESGO)
-            ->assertSee(route('central-riesgo'), escape: false)
-            ->call('cancelar')
-            ->assertRedirect(route('central-riesgo'));
+        $componente = Livewire::test(RegistrarIncidencia::class)
+            ->set('origen', RegistrarIncidencia::ORIGEN_CENTRAL_RIESGO);
+
+        // La flecha de volver la pinta x-ui.page-header (layouts/app.blade.php),
+        // fuera de la vista del componente, así que Livewire::test() (que
+        // renderiza el componente aislado, sin el layout) no la ve en el HTML.
+        // Se verifica el dato del que depende esa flecha en vez del markup.
+        $this->assertSame(route('central-riesgo'), $componente->instance()->rutaVolver());
+
+        $componente->call('cancelar')->assertRedirect(route('central-riesgo'));
     }
 
     /**
@@ -574,9 +579,11 @@ class RegistrarIncidenciaTest extends TestCase
      */
     public function test_sin_origen_el_enlace_de_vuelta_apunta_al_monitor(): void
     {
-        Livewire::test(RegistrarIncidencia::class)
-            ->assertSee('Volver al monitor en vivo')
-            ->assertSee(route('monitoreo'), escape: false);
+        // Mismo motivo que arriba: la flecha de volver vive en
+        // x-ui.page-header, fuera de lo que Livewire::test() renderiza.
+        $componente = Livewire::test(RegistrarIncidencia::class);
+
+        $this->assertSame(route('monitoreo'), $componente->instance()->rutaVolver());
     }
 
     /**

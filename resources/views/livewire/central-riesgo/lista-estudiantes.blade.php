@@ -177,7 +177,7 @@
                                         <td class="px-4 py-4 text-body">{{ $estudiante['motivo_etiqueta'] }}</td>
                                         <td class="px-4 py-4 text-end">
                                             <button type="button" wire:click.stop="verDetalle({{ $estudiante['id_registro'] }})"
-                                                    class="cursor-pointer whitespace-nowrap border-0 bg-transparent p-0 text-xs font-bold text-fg-danger-strong hover:underline">
+                                                    class="cursor-pointer whitespace-nowrap border-0 bg-transparent p-0 text-xs font-bold text-fg-danger-strong">
                                                 Ver detalle
                                             </button>
                                         </td>
@@ -194,13 +194,18 @@
                     </p>
 
                     @if ($estudiantes->lastPage() > 1)
-                        <x-ui.pagination
-                            :interactive="true"
-                            :active-filled="true"
-                            size="sm"
-                            :current="$estudiantes->currentPage()"
-                            :total="$estudiantes->lastPage()"
-                        />
+                        {{-- Con muchas páginas, los botones pueden no entrar
+                             en el ancho disponible en mobile y desbordarse;
+                             con scroll propio no se salen de la pantalla. --}}
+                        <div class="max-w-full overflow-x-auto">
+                            <x-ui.pagination
+                                :interactive="true"
+                                :active-filled="true"
+                                size="sm"
+                                :current="$estudiantes->currentPage()"
+                                :total="$estudiantes->lastPage()"
+                            />
+                        </div>
                     @endif
                 </div>
             @endif

@@ -37,6 +37,33 @@
       "Registrar ingreso" pasa a ser "Registrar incidencia". Solo cambia el
       nombre y se quita el ícono "+"; el enlace y el resto del monitor no se
       tocan.
+    - 2026-10-12  [Diego Tejerina]  fix: la tabla fija un ancho mínimo
+      (min-w-[640px]) para que en mobile las columnas no se aplasten; el
+      scroll horizontal queda dentro de la tabla, no en la página.
+    - 2026-10-12  [Diego Tejerina]  fix: la barra de "Registro de ingresos"
+      (título + buscador + filtros) pasa de `flex flex-wrap` suelto a un
+      apilado explícito en mobile (`flex-col`, `sm:flex-row` desde ahí). Con
+      flex-wrap solo, el min-w-[220px] del buscador no contaba para la
+      decisión de ajustar a una línea (esa usa el tamaño natural del
+      contenido) y el botón "Tramposos" terminaba empujado fuera de la
+      pantalla en vez de bajar de línea.
+    - 2026-10-12  [Diego Tejerina]  feat: en mobile (`lg:hidden`) las 6 cards
+      apiladas (estado + 5 métricas) se reemplazan por una sola card
+      compacta: el estado arriba (punto + "En curso" + horario) y una grilla
+      de 3 columnas con las mismas 5 métricas debajo. Desde `lg:` sigue
+      siendo la fila de 6 cards de siempre, sin cambios.
+    - 2026-10-12  [Diego Tejerina]  fix: las 6 cards pasan a x-ui.stat-card
+      (mismo componente y mismo grid de 2/6 columnas que /materias/{curso}):
+      el recuadro del ícono no tenía `shrink-0`, así que con texto largo
+      ("Deshabilitados", o el horario de "En curso") se aplastaba en vez de
+      quedarse cuadrado. Se quita la card compacta de mobile, ya no hace
+      falta. El `@section('header')` hecho a mano se reemplaza por
+      @section('subtitle') + @section('header-actions') (con "Registrar
+      incidencia" ahí, azul relleno): esta vista se había quedado con el
+      header viejo cuando se armó x-ui.page-header, y por eso no tenía
+      hamburguesa en mobile. La tabla pasa a `compact` (misma altura de fila
+      que la de /materias/{curso}) y la búsqueda deja el botón "Buscar" por
+      `wire:model.live.debounce.350ms` con reseteo de página en cada tecla.
     - 2026-10-12  [T1]  refactor: el botón "Registrar incidencia" abre directo
       el formulario (antes pasaba por la pantalla intermedia "Registro ingreso")
       y le manda el examen en curso, el rol de docente y el usuario por la URL.
@@ -101,6 +128,7 @@
     };
 
     $filas = [];
+    $tarjetas = [];
 
     foreach ($this->estudiantes as $estudiante) {
         $incidencia = $estudiante['incidencia'] ?? null;
@@ -146,11 +174,6 @@
         ];
 
         $filas[] = [
-            '__rowAttrs' => [
-                'data-estado' => $estudiante['estado_asistencia'],
-                'data-tramposo' => ($incidencia['tipo'] ?? null) === \App\Enums\TipoInfraccion::Tramposo->value ? '1' : '0',
-                'data-termino' => \Illuminate\Support\Str::lower(trim($estudiante['sis'].' '.$estudiante['nombre'].' '.$estudiante['apellido'])),
-            ],
             ['heading' => true, 'value' => $nombreCompleto],
             $estudiante['sis'],
             $horaIngreso,
@@ -158,155 +181,202 @@
             ['html' => $badge($estadoVisual)],
             ['html' => $boton($datos, $evento, $etiqueta)],
         ];
+
+        $tarjetas[] = [
+            'nombre' => $nombreCompleto,
+            'sis' => $estudiante['sis'],
+            'hora' => $horaIngreso,
+            'registrador' => $estudiante['registrador'] ?? '—',
+            'estadoHtml' => $badge($estadoVisual),
+            'botonHtml' => $boton($datos, $evento, $etiqueta),
+        ];
     }
 @endphp
 
-{{-- Header propio, con `@hasSection('header')` que ya soporta el layout
-     (`layouts/app.blade.php`): se replica el header por defecto y solo se le
-     añade el subtítulo con la materia y el tipo de examen. El `<h1>` sigue
-     leyendo `@yield('title')`, así que `<title>` y el h1 no cambian. `@endsection`
-     no emite salida, así que la raíz del componente sigue siendo un único `<div>`. --}}
-@section('header')
-    <header class="bg-neutral-primary-soft border-b border-default mb-[2vh]">
-        <div class="px-6 py-4">
-            <h1 class="text-2xl font-semibold text-heading">@yield('title', config('app.name'))</h1>
-            @if ($subtituloExamen !== '')
-                <p class="mt-1 text-sm text-muted truncate">{{ $subtituloExamen }}</p>
-            @endif
-        </div>
-    </header>
+{{-- El título y el subtítulo los pinta x-ui.page-header (layouts/app.blade.php),
+     igual que materia-estudiantes.blade.php: esta vista tenía su propio
+     @section('header') hecho a mano desde antes de que existiera ese
+     componente compartido, y por eso se quedó sin la hamburguesa cuando se
+     agregó ahí (el `@hasSection('header')` del layout hacía que esta vista
+     nunca pasara por x-ui.page-header). --}}
+@section('subtitle', $subtituloExamen)
+
+@section('header-actions')
+    {{-- Abre directamente el formulario de incidencia, con el examen del
+         monitor, el rol y el usuario que hoy lee el formulario por la URL:
+         ya no hay pantalla intermedia "Registro ingreso" de por medio. --}}
+    <a href="{{ route('registrar-incidencia', [
+            'origen' => \App\Livewire\Monitoreo\RegistrarIncidencia::ORIGEN_MONITOREO,
+            'examen' => $examen->id_examen,
+            'rol' => \App\Models\Rol::NOMBRE_DOCENTE,
+            'usuario' => auth()->id() ?? \App\Livewire\Monitoreo\RegistrarIncidencia::USUARIO_POR_DEFECTO,
+        ]) }}"
+       aria-label="Registrar incidencia"
+       class="inline-flex items-center justify-center gap-1.5 rounded-full border border-transparent bg-brand px-3 py-2.5 sm:px-4 text-sm font-medium leading-5 text-white shadow-xs hover:bg-brand-strong focus:outline-none focus:ring-4 focus:ring-brand-medium">
+        <svg class="w-4 h-4 shrink-0" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+        <span class="hidden sm:inline">Registrar incidencia</span>
+    </a>
 @endsection
 
 <div class="flex flex-col gap-6 px-[2vh] mt-[2vh]">
+    {{-- Los dos avisos se autodescartan a los 4s: antes se quedaban en
+         pantalla para siempre hasta la próxima acción. `limpiarMensajes()`
+         siempre vacía los dos mensajes ANTES de fijar uno nuevo (ver
+         ejecutarAccion()), así que cada aviso nuevo pasa por "oculto" antes
+         de "visible" y el `x-init` de abajo arranca de cero en cada uno,
+         sin necesidad de un wire:key especial. --}}
     @if ($mensajeExito !== '')
-        <x-ui.alert type="success" title="Listo">{{ $mensajeExito }}</x-ui.alert>
+        <div x-data x-init="setTimeout(() => $wire.limpiarMensajes(), 4000)">
+            <x-ui.alert type="success" title="Listo">{{ $mensajeExito }}</x-ui.alert>
+        </div>
     @endif
 
     @if ($mensajeError !== '')
-        <x-ui.alert type="danger" title="No se pudo completar">{{ $mensajeError }}</x-ui.alert>
+        <div x-data x-init="setTimeout(() => $wire.limpiarMensajes(), 4000)">
+            <x-ui.alert type="danger" title="No se pudo completar">{{ $mensajeError }}</x-ui.alert>
+        </div>
     @endif
 
-    <div class="flex flex-wrap items-center justify-between gap-4">
-        {{-- Abre directamente el formulario de incidencia, con el examen del
-             monitor, el rol y el usuario que hoy lee el formulario por la URL.
-             Antes pasaba por la pantalla intermedia "Registro ingreso", que solo
-             agregaba un buscador duplicado. --}}
-        <a href="{{ route('registrar-incidencia', [
-                'origen' => \App\Livewire\Monitoreo\RegistrarIncidencia::ORIGEN_MONITOREO,
-                'examen' => $examen->id_examen,
-                'rol' => \App\Models\Rol::NOMBRE_DOCENTE,
-                'usuario' => auth()->id() ?? \App\Livewire\Monitoreo\RegistrarIncidencia::USUARIO_POR_DEFECTO,
-            ]) }}"
-           class="inline-flex items-center justify-center rounded-base border border-transparent bg-brand px-3 py-1.5 text-xs font-medium leading-5 text-white shadow-xs hover:bg-brand-strong focus:outline-none focus:ring-4 focus:ring-brand-medium">
-            Registrar incidencia
-        </a>
-    </div>
+    {{-- Tarjetas de conteo: mismo componente y mismo grid (2 columnas en
+         mobile, 6 en desktop) que las 5 de /materias/{curso} — antes el
+         mobile tenía su propia card compacta distinta a la de desktop. --}}
+    <div class="grid grid-cols-2 gap-4 lg:grid-cols-6">
+        {{-- Sin ícono a propósito: "08:00 – 09:30" + el recuadro del ícono
+             no entran juntos en el ancho de la card con 6 (o 2) columnas. --}}
+        <x-ui.stat-card :value="substr($examen->hora_inicio, 0, 5) . ' – ' . $finExamen" label="En curso" tone="brand" label-first nowrap />
 
-    <div class="flex flex-wrap gap-[2vh]">
-        <div class="flex-1 min-w-[200px] flex items-center justify-between gap-3 bg-neutral-primary-soft p-6 border border-default rounded-base shadow-xs">
-            <div>
-                <p class="text-sm text-body">En curso</p>
-                <p class="text-3xl font-semibold text-fg-brand">{{ substr($examen->hora_inicio, 0, 5) }} – {{ $finExamen }}</p>
-            </div>
-            <span class="flex items-center justify-center w-12 h-12 rounded-base bg-neutral-secondary-soft text-fg-brand">
-                <svg class="w-6 h-6" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
-            </span>
-        </div>
-        <div class="flex-1 min-w-[200px] flex items-center justify-between gap-3 bg-neutral-primary-soft p-6 border border-default rounded-base shadow-xs">
-            <div>
-                <p class="text-3xl font-semibold text-fg-brand">{{ $this->conteos['inscritos'] }}</p>
-                <p class="text-sm text-body">Inscritos</p>
-            </div>
-            <span class="flex items-center justify-center w-12 h-12 rounded-base bg-neutral-secondary-soft text-fg-brand">
-                <svg class="w-6 h-6" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-width="2" d="M16 19h4a1 1 0 0 0 1-1v-1a3 3 0 0 0-3-3h-2m-2.236-4a3 3 0 1 0 0-4M3 18v-1a3 3 0 0 1 3-3h4a3 3 0 0 1 3 3v1a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1Zm8-10a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg>
-            </span>
-        </div>
-        <div class="flex-1 min-w-[200px] flex items-center justify-between gap-3 bg-neutral-primary-soft p-6 border border-default rounded-base shadow-xs">
-            <div>
-                <p class="text-3xl font-semibold text-fg-success">{{ $this->conteos['habilitados'] }}</p>
-                <p class="text-sm text-body">Habilitados</p>
-            </div>
-            <span class="flex items-center justify-center w-12 h-12 rounded-base bg-neutral-secondary-soft text-fg-success">
-                <svg class="w-6 h-6" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm-3-9 2 2 4-4"/></svg>
-            </span>
-        </div>
-        <div class="flex-1 min-w-[200px] flex items-center justify-between gap-3 bg-neutral-primary-soft p-6 border border-default rounded-base shadow-xs">
-            <div>
-                <p class="text-3xl font-semibold text-fg-danger-strong">{{ $this->conteos['deshabilitados'] }}</p>
-                <p class="text-sm text-body">Deshabilitados</p>
-            </div>
-            <span class="flex items-center justify-center w-12 h-12 rounded-base bg-neutral-secondary-soft text-fg-danger-strong">
-                <svg class="w-6 h-6" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18 17.94 6M18 18 6.06 6"/></svg>
-            </span>
-        </div>
-        <div class="flex-1 min-w-[200px] flex items-center justify-between gap-3 bg-neutral-primary-soft p-6 border border-default rounded-base shadow-xs">
-            <div>
-                <p class="text-3xl font-semibold text-fg-warning">{{ $this->conteos['sospechosos'] }}</p>
-                <p class="text-sm text-body">Sospechosos</p>
-            </div>
-            <span class="flex items-center justify-center w-12 h-12 rounded-base bg-neutral-secondary-soft text-fg-warning">
-                <svg class="w-6 h-6" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-width="2" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z"/><path stroke="currentColor" stroke-width="2" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg>
-            </span>
-        </div>
-        <div class="flex-1 min-w-[200px] flex items-center justify-between gap-3 bg-neutral-primary-soft p-6 border border-default rounded-base shadow-xs">
-            <div>
-                <p class="text-3xl font-semibold text-fg-danger-strong">{{ $this->conteos['tramposos'] }}</p>
-                <p class="text-sm text-body">Tramposos</p>
-            </div>
-            <span class="flex items-center justify-center w-12 h-12 rounded-base bg-neutral-secondary-soft text-fg-danger-strong">
-                <svg class="w-6 h-6" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3 5 6v5c0 4.2 2.8 7.6 7 9 4.2-1.4 7-4.8 7-9V6l-7-3Z"/><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.5 9.5l5 5m0-5-5 5"/></svg>
-            </span>
-        </div>
+        <x-ui.stat-card :value="$this->conteos['inscritos']" label="Inscritos" tone="brand">
+            <x-slot:icon>
+                <svg class="w-5 h-5 sm:w-6 sm:h-6" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-width="2" d="M16 19h4a1 1 0 0 0 1-1v-1a3 3 0 0 0-3-3h-2m-2.236-4a3 3 0 1 0 0-4M3 18v-1a3 3 0 0 1 3-3h4a3 3 0 0 1 3 3v1a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1Zm8-10a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg>
+            </x-slot:icon>
+        </x-ui.stat-card>
+
+        <x-ui.stat-card :value="$this->conteos['habilitados']" label="Habilitados" tone="success">
+            <x-slot:icon>
+                <svg class="w-5 h-5 sm:w-6 sm:h-6" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm-3-9 2 2 4-4"/></svg>
+            </x-slot:icon>
+        </x-ui.stat-card>
+
+        <x-ui.stat-card :value="$this->conteos['deshabilitados']" label="Deshabilitados" tone="danger">
+            <x-slot:icon>
+                <svg class="w-5 h-5 sm:w-6 sm:h-6" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18 17.94 6M18 18 6.06 6"/></svg>
+            </x-slot:icon>
+        </x-ui.stat-card>
+
+        <x-ui.stat-card :value="$this->conteos['sospechosos']" label="Sospechosos" tone="warning">
+            <x-slot:icon>
+                <svg class="w-5 h-5 sm:w-6 sm:h-6" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-width="2" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z"/><path stroke="currentColor" stroke-width="2" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg>
+            </x-slot:icon>
+        </x-ui.stat-card>
+
+        <x-ui.stat-card :value="$this->conteos['tramposos']" label="Tramposos" tone="danger">
+            <x-slot:icon>
+                <svg class="w-5 h-5 sm:w-6 sm:h-6" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3 5 6v5c0 4.2 2.8 7.6 7 9 4.2-1.4 7-4.8 7-9V6l-7-3Z"/><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.5 9.5l5 5m0-5-5 5"/></svg>
+            </x-slot:icon>
+        </x-ui.stat-card>
     </div>
 
     <div class="bg-neutral-primary-soft border border-default rounded-base shadow-xs p-6">
-        {{-- Una sola fila: título de la tabla, buscador y filtros, en ese orden.
-             El buscador crece para ocupar el hueco (`flex-1`) y `flex-wrap` hace
-             que en pantallas chicas se apilen sin romperse. Los `id` del buscador
-             y de los filtros no cambian: el `<script>` de filtrado de más abajo
-             los usa para engancharse. --}}
-        <div class="flex flex-wrap items-center gap-x-4 gap-y-3">
-            <h2 class="text-lg font-semibold text-heading shrink-0">Registro de ingresos</h2>
+        {{-- Una sola fila: título de la tabla, buscador y filtros, en ese
+             orden. El buscador crece para ocupar el hueco (`flex-1`) y
+             `flex-wrap` hace que en pantallas chicas se apilen sin romperse.
+             Filtro y búsqueda viajan al servidor (MonitorEnVivo::filtrar()/
+             buscar()) y se aplican antes de paginar; antes se hacían acá con
+             un script que ocultaba filas ya pintadas, por eso la página
+             traía los 50 inscritos de una sola vez. --}}
+        <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4 sm:gap-y-3">
+            <h2 class="text-lg font-semibold text-heading sm:shrink-0">Registro de ingresos</h2>
 
-            <div class="flex-1 min-w-[220px] sm:min-w-[280px]">
+            <div class="flex-1 min-w-0 sm:min-w-[280px]">
+                {{-- Sin botón "Buscar": filtra solo con lo que se escribe
+                     (debounce de 350ms). wireSubmit se mantiene nada más
+                     para que Enter no dispare el submit nativo del <form>
+                     (recargaría la página) — busqueda ya viaja sola por
+                     wire:model.live. Solo letras (con tildes/ñ), dígitos y
+                     espacios, igual que los demás buscadores del sistema. --}}
                 <x-ui.search-input
                     name="monitor-busqueda"
                     id="monitor-busqueda"
                     placeholder="Buscar por nombre o código SIS..."
-                    :show-button="true"
-                    buttonLabel="Buscar"
+                    :show-button="false"
+                    wire:model.live.debounce.350ms="busqueda"
+                    wireSubmit="buscar"
+                    @input="$event.target.value = $event.target.value.replace(/[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9 ]/g, '')"
                 />
             </div>
 
-            <div class="flex flex-wrap gap-2 shrink-0" id="monitor-filtros">
-                <x-ui.button variant="default" data-filtro="todos">Todos</x-ui.button>
-                <x-ui.button variant="secondary" data-filtro="pendientes">Pendientes</x-ui.button>
-                <x-ui.button variant="secondary" data-filtro="tramposos">Tramposos</x-ui.button>
+            <div class="flex flex-wrap gap-2 sm:shrink-0">
+                <x-ui.button :variant="$filtro === 'todos' ? 'default' : 'secondary'" wire:click="filtrar('todos')">Todos</x-ui.button>
+                <x-ui.button :variant="$filtro === 'pendientes' ? 'default' : 'secondary'" wire:click="filtrar('pendientes')">Pendientes</x-ui.button>
+                <x-ui.button :variant="$filtro === 'tramposos' ? 'default' : 'secondary'" wire:click="filtrar('tramposos')">Tramposos</x-ui.button>
             </div>
         </div>
 
         <div class="mt-4">
-            <div id="monitor-tabla">
-                <x-ui.table
-                    :headers="['Estudiante', 'Código SIS', 'Hora', 'Registro', 'Estado', 'Registrar']"
-                    :rows="$filas"
-                />
+            @if ($this->estudiantes->total() === 0)
+                <p class="text-center text-sm text-body py-6">No se encontraron estudiantes con ese criterio.</p>
+            @else
+                {{-- Mobile: una tarjeta por estudiante con scroll vertical
+                     normal, igual que la lista de estudiantes del curso.
+                     Desde lg: vuelve a ser la tabla. --}}
+                <div class="space-y-3 lg:hidden">
+                    @foreach ($tarjetas as $tarjeta)
+                        <div class="bg-neutral-primary-soft border border-default rounded-base shadow-xs p-4">
+                            <div class="flex items-start justify-between gap-3">
+                                <div class="min-w-0">
+                                    <p class="font-semibold text-heading truncate">{{ $tarjeta['nombre'] }}</p>
+                                    <p class="text-sm text-muted">{{ $tarjeta['sis'] }}</p>
+                                </div>
+                                {!! $tarjeta['estadoHtml'] !!}
+                            </div>
 
-                <p id="monitor-sin-coincidencias"
-                   class="mt-4 text-center text-sm text-body"
-                   hidden>
-                    No se encontraron estudiantes con ese criterio.
+                            <p class="mt-2 text-xs text-muted">Hora {{ $tarjeta['hora'] }} · Registró {{ $tarjeta['registrador'] }}</p>
+
+                            <div class="mt-3 border-t border-default pt-3 text-end">
+                                {!! $tarjeta['botonHtml'] !!}
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+
+                <div class="hidden lg:block">
+                    <x-ui.table
+                        compact
+                        min-width="min-w-[640px]"
+                        :headers="['Estudiante', 'Código SIS', 'Hora', 'Registro', 'Estado', 'Registrar']"
+                        :rows="$filas"
+                    />
+                </div>
+            @endif
+        </div>
+
+        {{-- Mobile: apilado (texto arriba, paginación abajo, ambos
+             centrados). Desde sm: layout de escritorio (texto a la izquierda
+             en absolute, paginación centrada en la misma fila). Mismo patrón
+             que la lista de estudiantes del curso. Con 9 páginas, los
+             botones (9 números + 2 flechas) no entran en el ancho de la
+             card en mobile y se salían del borde redondeado hacia los dos
+             lados; el `overflow-x-auto` los deja con scroll propio en vez
+             de desbordar la card. --}}
+        @if ($this->estudiantes->total() > 0)
+            <div class="mt-6 flex flex-col items-center gap-2 sm:relative sm:flex-row sm:items-center sm:justify-center sm:gap-0 sm:min-h-[2rem]">
+                <p class="text-sm text-muted text-center sm:absolute sm:left-0 sm:text-left">
+                    Mostrando {{ $this->estudiantes->count() }} de {{ $this->estudiantes->total() }} estudiantes
                 </p>
-            </div>
-        </div>
 
-        <div class="mt-6 flex justify-end">
-            <x-ui.pagination
-                :interactive="true"
-                :current="$this->estudiantes->currentPage()"
-                :total="$this->estudiantes->lastPage()"
-            />
-        </div>
+                @if ($this->estudiantes->lastPage() > 1)
+                    <div class="max-w-full overflow-x-auto">
+                        <x-ui.pagination
+                            :interactive="true"
+                            :active-filled="true"
+                            size="sm"
+                            :current="$this->estudiantes->currentPage()"
+                            :total="$this->estudiantes->lastPage()"
+                        />
+                    </div>
+                @endif
+            </div>
+        @endif
 
         <x-ui.modal-registro-ingreso />
         <x-ui.modal-estudiante-ingresado />
@@ -315,123 +385,4 @@
         <x-ui.modal-registrar-tramposo />
     </div>
 
-    {{-- Filtro y buscador de la tabla del monitor.
-
-         El filtrado se hace en el navegador sobre las filas ya renderizadas,
-         con la misma lógica que el buscador del formulario de incidencia
-         (`registrar-incidencia.blade.php`) pero sin su vista ni sus botones: sin
-         Alpine ni wire:model, porque este proyecto solo carga el bundle de
-         Livewire y `x-model` no enlaza el input que emite `x-ui.search-input`.
-         La diferencia es que acá los resultados son las propias filas de la
-         tabla, marcadas con `data-estado`, `data-tramposo` y `data-termino`,
-         en vez de una lista aparte: así no se duplica el render de la fila ni
-         se rompe el payload de los modales.
-
-         El botón activo se pinta intercambiando las clases de las variantes
-         `default` y `secondary` de `x-ui.button`, que son las que Blade ya
-         aplicó al servidor. --}}
-    <script>
-        (function () {
-            'use strict';
-
-            var BUSQUEDA_MINIMO = 2;
-
-            var CLASE_ACTIVA = 'inline-flex items-center justify-center box-border border focus:ring-4 shadow-xs font-medium leading-5 focus:outline-none text-white bg-brand border-transparent hover:bg-brand-strong focus:ring-brand-medium rounded-base px-4 py-2.5 text-sm';
-            var CLASE_INACTIVA = 'inline-flex items-center justify-center box-border border focus:ring-4 shadow-xs font-medium leading-5 focus:outline-none text-body bg-neutral-secondary-medium border-default-medium hover:bg-neutral-tertiary-medium hover:text-heading focus:ring-neutral-tertiary rounded-base px-4 py-2.5 text-sm';
-
-            var contenedor = document.getElementById('monitor-filtros');
-            var input = document.getElementById('monitor-busqueda');
-            var cuerpo = document.querySelector('#monitor-tabla tbody');
-            var aviso = document.getElementById('monitor-sin-coincidencias');
-
-            var filtroActivo = 'todos';
-
-            function coincideFiltro(fila) {
-                if (filtroActivo === 'pendientes') {
-                    return fila.dataset.estado === 'pendiente';
-                }
-
-                if (filtroActivo === 'tramposos') {
-                    return fila.dataset.tramposo === '1';
-                }
-
-                return true;
-            }
-
-            function coincideBusqueda(fila, termino) {
-                if (termino.length < BUSQUEDA_MINIMO) {
-                    return true;
-                }
-
-                return fila.dataset.termino.indexOf(termino) !== -1;
-            }
-
-            function pintarBotonActivo() {
-                contenedor.querySelectorAll('[data-filtro]').forEach(function (boton) {
-                    var activo = boton.dataset.filtro === filtroActivo;
-                    boton.className = activo ? CLASE_ACTIVA : CLASE_INACTIVA;
-                    boton.setAttribute('aria-pressed', activo ? 'true' : 'false');
-                });
-            }
-
-            function aplicar() {
-                var termino = input.value.trim().toLowerCase();
-                var visibles = 0;
-
-                cuerpo.querySelectorAll('tr').forEach(function (fila) {
-                    if (!fila.dataset.estado) {
-                        return;
-                    }
-
-                    var mostrar = coincideFiltro(fila) && coincideBusqueda(fila, termino);
-                    fila.hidden = !mostrar;
-
-                    if (mostrar) {
-                        visibles++;
-                    }
-                });
-
-                if (aviso !== null) {
-                    aviso.hidden = visibles > 0;
-                }
-            }
-
-            contenedor.querySelectorAll('[data-filtro]').forEach(function (boton) {
-                boton.addEventListener('click', function () {
-                    filtroActivo = boton.dataset.filtro;
-                    pintarBotonActivo();
-                    aplicar();
-                });
-            });
-
-            input.addEventListener('input', aplicar);
-
-            // El form que emite x-ui.search-input recargaría la página con Enter
-            // y dejaría el buscador en blanco; se cancela el envío y se filtra.
-            input.form.addEventListener('submit', function (evento) {
-                evento.preventDefault();
-                aplicar();
-            });
-
-            var botonBuscar = input.form.querySelector('button');
-            if (botonBuscar !== null) {
-                botonBuscar.addEventListener('click', function (evento) {
-                    evento.preventDefault();
-                    aplicar();
-                });
-            }
-
-            pintarBotonActivo();
-
-            // Una acción del componente (confirmar o rechazar un ingreso,
-            // registrar una incidencia) re-renderiza la tabla y las filas
-            // vuelven sin el `hidden` que puso este script. Se reaplica el
-            // filtro para que la selección del usuario no se pierda.
-            if (window.Livewire && typeof window.Livewire.hook === 'function') {
-                window.Livewire.hook('morph.updated', function () {
-                    aplicar();
-                });
-            }
-        })();
-    </script>
 </div>

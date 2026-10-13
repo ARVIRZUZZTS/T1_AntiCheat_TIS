@@ -67,16 +67,19 @@
 
 @section('title', 'Registrar incidencia')
 
+{{-- La flecha de volver va en x-ui.page-header (layouts/app.blade.php), no
+     en un <nav> propio dentro del cuerpo: antes quedaba la hamburguesa en
+     el header (sin sentido acá, esta pantalla no es del menú principal) Y
+     el enlace de vuelta más abajo, duplicando la navegación. Va por
+     @section('back-route', ...) y no por una variable $backRoute suelta:
+     este componente renderiza con ->extends('layouts.app') (el método de
+     Livewire), que no propaga variables PHP sueltas hacia el layout, solo
+     @section(...). $origen decide el destino (monitor o central de riesgo). --}}
+@section('back-route', $this->rutaVolver())
+
 {{-- El hueco entre las dos tarjetas es el mismo `space-y-6` que usa el monitor
      en vivo entre las suyas, para que las dos pantallas se vean parejas. --}}
 <div class="mx-auto w-full max-w-4xl space-y-6">
-    <nav aria-label="Ruta de navegación">
-        <a href="{{ $this->rutaVolver() }}"
-           class="inline-flex items-center gap-1.5 text-sm font-medium text-fg-brand hover:underline">
-            <svg class="w-4 h-4" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m15 19-7-7 7-7"/></svg>
-            {{ $this->etiquetaVolver() }}
-        </a>
-    </nav>
 
     {{-- Tarjeta 1: quién es el estudiante. El buscador va fuera del <form> de
          registro porque `x-ui.search-input` ya emite su propio <form>.

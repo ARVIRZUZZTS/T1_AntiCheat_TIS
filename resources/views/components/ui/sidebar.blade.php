@@ -14,8 +14,10 @@
     azul). $logo es un slot opcional para reemplazar el logo.
 
     En móvil el cajón mide `w-72` en vez del 15% de ancho, que a esa
-    pantalla apenas dejaba 56px, y el botón hamburguesa va en una franja
-    propia con el mismo padding que el encabezado de la página.
+    pantalla apenas dejaba 56px. El botón hamburguesa que lo abre ya NO vive
+    acá: lo dibuja x-ui.page-header (misma franja que el título de cada
+    vista), este componente solo pone el `data-drawer-target`/`id` al que
+    apunta.
 
     @changelog
     - 2026-09-24  [Valery D. Ortuno P]  feat: creación inicial del sidebar.
@@ -30,13 +32,29 @@
       parte inferior del sidebar, con icono de campana y estado activo propio.
     - 2026-10-10  [Valery D. Ortuno P]  fix: el ítem pasa a llamarse "Central de
       riesgos", como lo nombra la HU 10 y el título de la pantalla.
+    - 2026-10-12  [Diego Tejerina]  fix: el `<aside>` pasa de `sticky` a `fixed`
+      en mobile (con `lg:sticky` para no tocar el desktop). `sticky` nunca saca
+      al elemento del flujo del `flex` del layout, así que aunque quedara
+      corrido fuera de pantalla con `-translate-x-full`, sus 288px (`w-72`)
+      seguían reservados y empujaban TODO el contenido de CADA página fuera del
+      viewport: esto era la causa del scroll horizontal en todo el sitio en
+      mobile, no un problema de cada vista por separado.
+    - 2026-10-12  [Diego Tejerina]  fix: el botón hamburguesa se saca de este
+      componente (quedaba en su propia franja de ~88px a la izquierda del
+      contenido: al volverse `fixed` el `<aside>`, ese botón pasaba a ser el
+      único hermano angosto de `<main>` en el `flex` del layout y los dos
+      quedaban en fila, no apilados). Ahora lo dibuja x-ui.page-header arriba
+      del contenido, como una franja de ancho completo. Se quita el prop
+      $showTrigger (ya no aplica). $title se reemplaza por $titleMain/$titleSub
+      (nombre de la app en 2 líneas) y se agrega el bloque del usuario
+      autenticado al final, debajo de Notificaciones.
 --}}
 
 @props([
     'id' => 'sidebar',
-    'title' => null,
+    'titleMain' => null,
+    'titleSub' => null,
     'active' => null,
-    'showTrigger' => true,
     'items' => [],
 ])
 
@@ -58,22 +76,13 @@
     // El acceso a notificaciones vive fuera de $nav (es un botón fijo del
     // sidebar, no un ítem más del menú), por eso se resalta aparte.
     $notificacionesActivas = $current !== '' && request()->routeIs('notificaciones', 'notificaciones.*');
+
+    $usuario = auth()->user();
+    $nombreUsuario = $usuario ? trim($usuario->nombre_usuario.' '.$usuario->apellido) : null;
+    $rolUsuario = $usuario?->roles->first()?->nombre_rol;
 @endphp
 
-@if ($showTrigger)
-    {{-- En movil el boton va en una franja propia con el mismo padding que el
-         encabezado de la pagina (px-6 py-4), para que quede alineado con el
-         titulo a la izquierda y no encima de el. --}}
-    <div class="lg:hidden flex items-center px-6 py-4">
-        <button data-drawer-target="{{ $id }}" data-drawer-toggle="{{ $id }}" aria-controls="{{ $id }}" type="button"
-                class="inline-flex items-center justify-center text-neutral-primary bg-surface-sidebar box-border border border-transparent hover:bg-brand-strong font-medium leading-5 rounded-base text-sm p-2.5 focus:outline-none">
-            <span class="sr-only">Open sidebar</span>
-            <svg class="w-5 h-5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-width="2" d="M5 7h14M5 12h14M5 17h10"/></svg>
-        </button>
-    </div>
-@endif
-
-<aside id="{{ $id }}" class="shrink-0 sticky top-0 h-screen w-72 lg:w-[15%] bg-surface-sidebar text-neutral-primary transition-transform -translate-x-full lg:translate-x-0" aria-label="Sidebar">
+<aside id="{{ $id }}" class="shrink-0 fixed inset-y-0 start-0 z-40 h-screen w-72 lg:sticky lg:top-0 lg:z-auto lg:w-[15%] bg-surface-sidebar text-neutral-primary transition-transform -translate-x-full lg:translate-x-0" aria-label="Sidebar">
     <button type="button" data-drawer-hide="{{ $id }}" aria-controls="{{ $id }}"
             class="lg:hidden absolute top-2.5 end-2.5 flex items-center justify-center text-neutral-primary hover:bg-brand-strong rounded-base w-9 h-9">
         <span class="sr-only">Close sidebar</span>
@@ -89,8 +98,13 @@
                     <img src="{{ asset('fcytLogo.svg') }}" alt="Logo FCyT" class="h-7 w-auto">
                 </span>
             @endif
-            @if ($title)
-                <span class="ms-3 font-light leading-snug">{{ $title }}</span>
+            @if ($titleMain)
+                <span class="ms-3 min-w-0 leading-snug">
+                    <span class="block font-semibold truncate">{{ $titleMain }}</span>
+                    @if ($titleSub)
+                        <span class="block text-xs text-brand-subtle truncate">{{ $titleSub }}</span>
+                    @endif
+                </span>
             @endif
         </a>
 
@@ -133,6 +147,22 @@
                 <svg class="shrink-0 w-5 h-5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5.365V3m0 2.365a5.338 5.338 0 0 1 5.133 3.666c.346 1.097.542 2.238.542 3.404 0 3.44-1.65 5.175-3.646 6.51-.585.39-.968.973-1.029 1.644-.112.841.273 1.414.542 1.95M12 5.365A5.338 5.338 0 0 0 6.867 9.03c-.346 1.097-.542 2.238-.542 3.404 0 3.44 1.65 5.175 3.646 6.51.585.39.968.973 1.029 1.644.112.841-.273 1.414-.542 1.95M5 21h14"/></svg>
                 <span class="ms-3 flex-1 whitespace-nowrap">Notificaciones</span>
             </a>
+
+            {{-- Bloque del usuario autenticado: avatar + nombre + rol. Sale
+                 de auth()->user() (tabla `usuario`, login por cod_sis); sin
+                 login real todavía (solo /dev/login en local), no se muestra
+                 nada si no hay sesión en vez de inventar datos. --}}
+            @if ($usuario)
+                <div class="mt-4 flex items-center gap-3 border-t border-brand-medium/40 pt-4">
+                    <x-ui.avatar :name="$nombreUsuario" size="sm" class="shrink-0" />
+                    <div class="min-w-0">
+                        <p class="truncate text-sm font-medium text-neutral-primary">{{ $nombreUsuario }}</p>
+                        @if ($rolUsuario)
+                            <p class="truncate text-xs text-brand-subtle">{{ $rolUsuario }}</p>
+                        @endif
+                    </div>
+                </div>
+            @endif
         </div>
     </div>
 </aside>

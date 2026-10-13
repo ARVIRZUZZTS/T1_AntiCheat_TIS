@@ -55,10 +55,13 @@ use RuntimeException;
         ['label' => 'Materias', 'route' => 'materias'],
         ['label' => 'Monitor en vivo', 'route' => 'monitoreo'],
     ],
-    // Es una vista de detalle: en mobile ya trae su propia flecha de
-    // "volver" junto al titulo, asi que el trigger de hamburguesa global
-    // sobra (y llegaba a superponerse con el encabezado del curso).
-    'sidebarShowTrigger' => false,
+    // Es una vista de detalle: x-ui.page-header muestra la flecha de
+    // "volver" en vez del hamburguesa cuando se le pasa $backRoute. El
+    // titulo es generico y la ruta de vuelta va literal ('/materias', no
+    // route('materias')) porque los argumentos de un atributo de PHP tienen
+    // que ser constantes: no se puede llamar a una funcion aca.
+    'title' => 'Estudiantes del curso',
+    'backRoute' => '/materias',
 ])]
 #[Title('Estudiantes del curso — Anticheat TIS')]
 class EstudiantesCurso extends Component

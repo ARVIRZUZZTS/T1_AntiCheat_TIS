@@ -17,20 +17,27 @@
     cada fila para filtrarla desde el navegador. Con $compact, las filas
     bajan de py-4 a py-2.5 (~44px de alto).
 
+    @see  resources/views/pages/materia-estudiantes.blade.php
+
     @changelog
     - 2026-09-23  [David E. Chavez T.]  feat: creación inicial del componente.
     - 2026-09-26  [Alisson D. Alvarado] feat: soporte de visibilidad por fila
       con la clave '__xShow' (misma convención '__' que '__rowClass').
     - 2026-10-10  [T1]  feat: soporte de atributos por fila con la clave
       '__rowAttrs' (misma convención '__' que las dos anteriores).
-
-    @see  resources/views/pages/materia-estudiantes.blade.php
+    - 2026-10-12  [Diego Tejerina]  feat: prop opcional `minWidth` para fijar
+      un ancho mínimo a la tabla (por ejemplo 'min-w-[640px]') en tablas con
+      muchas columnas que en mobile quedarían ilegibles si se achicaran al
+      ancho de la pantalla; el scroll queda contenido en este componente
+      (`overflow-x-auto` del div envolvente), nunca en la página. Sin este
+      prop el comportamiento no cambia.
 --}}
 
 @props([
     'headers' => [],
     'rows' => [],
     'compact' => false,
+    'minWidth' => null,
 ])
 
 @php
@@ -38,7 +45,7 @@
 @endphp
 
 <div class="relative overflow-x-auto bg-neutral-primary-soft shadow-xs rounded-base border border-default">
-    <table class="w-full text-sm text-left rtl:text-right text-body">
+    <table class="w-full text-sm text-left rtl:text-right text-body {{ $minWidth }}">
         <thead class="text-sm text-body bg-neutral-secondary-soft border-b rounded-base border-default">
             <tr>
                 @foreach ($headers as $header)

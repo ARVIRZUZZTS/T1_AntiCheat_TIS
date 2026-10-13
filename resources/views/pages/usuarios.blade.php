@@ -9,6 +9,9 @@
 
     @changelog
     - 2026-09-29  [David E. Chavez T.]  feat: vista de usuarios y roles.
+    - 2026-10-12  [Diego Tejerina]  fix: la tabla fija un ancho mínimo
+      (min-w-[640px]) para que en mobile las columnas no se aplasten; el
+      scroll horizontal queda dentro de la tabla, no en la página.
 --}}
 
 @extends('layouts.app')
@@ -23,6 +26,7 @@
 
     <div class="mt-6 px-[2vh]">
         <x-ui.table
+            min-width="min-w-[640px]"
             :headers="['Usuario', 'Email', 'Rol', 'Estado']"
             :rows="[
                 [['heading' => true, 'value' => 'Valery Ortuno'], 'valery@t1.com', 'Administrador', 'Activo'],
