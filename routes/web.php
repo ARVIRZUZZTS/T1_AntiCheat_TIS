@@ -57,11 +57,13 @@
  *   buscador. Queda solo /registrar-incidencia.
  */
 
+use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ExamenController;
 use App\Livewire\Examenes\EstudiantesCurso;
 use App\Livewire\Monitoreo\MonitorEnVivo;
 use App\Livewire\Monitoreo\AccesoMonitor;
 use App\Livewire\Monitoreo\RegistrarIncidencia;
+use App\Livewire\Auxiliares\GestionAuxiliares;
 use App\Models\Curso;
 use App\Services\Curso\ListarMateriasConMetricasService;
 use App\Models\Usuario;
@@ -73,6 +75,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
+Route::middleware('auth')->group(function (): void {
 Route::view('/', 'pages.inicio')->name('inicio');
 
 Route::view('/inicio', 'pages.inicio')->name('inicio');
@@ -82,6 +85,7 @@ Route::get('/materias', fn () => view('pages.materias', [
 Route::view('/examenes', 'pages.examenes')->name('examenes');
 Route::get('/monitoreo', MonitorEnVivo::class)->name('monitoreo');
 Route::get('/monitoreo/acceso', AccesoMonitor::class)->name('monitoreo.acceso');
+Route::get('/auxiliares', GestionAuxiliares::class)->name('auxiliares');
 Route::view('/monitoreo/mock', 'livewire.monitoreo.mock')->name('monitoreo.mock');
 // La vista solo aporta el layout; los datos los resuelve el componente Livewire
 // ListaEstudiantes que incrusta, por eso la ruta sigue sin lógica.
@@ -125,16 +129,18 @@ Route::get('/incidencias/{id}', fn (int $id) => view('pages.incidencia-detalle',
 // TODO(@valerydariana98, 2026-09-25): proteger con el middleware de rol que
 // restringe el registro de incidencias a docentes y auxiliares (#69).
 Route::get('/registrar-incidencia', RegistrarIncidencia::class)->name('registrar-incidencia');
+});
 
-// Solo APP_ENV=local: aún no existe pantalla de login y los endpoints de
-// incidencias exigen sesión (`auth:web`), así que esta ruta temporal inicia
-// sesión con el usuario 1 para poder probar el modal de detalle de incidencia.
-// Fuera de local la ruta ni siquiera se registra.
-// TODO(@OchoaCesar, 2026-10-11): eliminar esta ruta cuando exista el login real.
-if (app()->isLocal()) {
-    Route::get('/dev/login', function (): RedirectResponse {
-        Auth::login(Usuario::find(1) ?? Usuario::query()->firstOrFail());
+// Autenticación real (reemplaza a /dev/login).
+Route::middleware('guest')->group(function (): void {
+    Route::view('/login', 'pages.login')->name('login');
+    Route::view('/registro', 'pages.registro-docente')->name('registro');
+    Route::view('/solicitud-revision', 'pages.solicitud-revision')->name('solicitud-revision');
+    Route::post('/login', [AuthController::class, 'login'])->name('login.store');
+});
 
-        return redirect()->route('notificaciones');
-    })->name('dev.login');
-}
+Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+
+Route::middleware(['auth', 'docente'])->group(function (): void {
+    Route::view('/docentes', 'pages.docentes')->name('docentes');
+});

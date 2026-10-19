@@ -21,7 +21,9 @@ $app = Application::configure(basePath: $basePath)
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
-        //
+        $middleware->alias([
+            'docente' => \App\Http\Middleware\EnsureDocente::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //

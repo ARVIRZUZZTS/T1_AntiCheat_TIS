@@ -26,6 +26,7 @@ class TituloPaginaTest extends TestCase
      */
     public function test_una_vista_blade_muestra_su_titulo_por_seccion(): void
     {
+        $this->actingAs(\App\Models\Usuario::query()->firstOrFail());
         $contenido = $this->get('/monitoreo')->assertOk()->getContent();
 
         $this->assertStringContainsString('<title>Monitor en vivo</title>', $contenido);
@@ -37,6 +38,7 @@ class TituloPaginaTest extends TestCase
      */
     public function test_un_componente_livewire_muestra_el_titulo_entregado(): void
     {
+        $this->actingAs(\App\Models\Usuario::query()->firstOrFail());
         $contenido = $this->get('/registrar-incidencia')->assertOk()->getContent();
 
         $this->assertStringContainsString('<title>Registrar incidencia</title>', $contenido);

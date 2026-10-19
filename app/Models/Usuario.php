@@ -56,6 +56,9 @@ class Usuario extends Authenticatable
 
     protected $keyType = 'int';
 
+    /** La tabla `usuario` no tiene columna `remember_token`. */
+    protected $rememberTokenName = null;
+
     /** @var list<string> */
     protected $fillable = [
         'id_usuario',
@@ -93,3 +96,4 @@ class Usuario extends Authenticatable
         return $this->hasMany(RegistroAsistencia::class, 'id_registrador');
     }
 }
+
