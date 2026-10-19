@@ -108,6 +108,12 @@ class MonitorEnVivo extends Component
     public string $busqueda = '';
 
     /**
+     * Vista activa del monitor: 'ingreso' (control de ingreso) o 'monitor'
+     * (control durante el examen).
+     */
+    public string $modoVista = 'ingreso';
+
+    /**
      * Mensaje de éxito de la última acción, vacío mientras no haya ninguna.
      */
     public string $mensajeExito = '';
@@ -155,10 +161,52 @@ class MonitorEnVivo extends Component
      */
     public function mount(): void
     {
-        $examen = Examen::query()
-            ->orderByDesc('fecha')
-            ->orderByDesc('id_examen')
-            ->firstOrFail();
+        $ahora = now();
+
+        $consulta = Examen::query();
+
+        if (auth()->check() && auth()->user()->roles->contains('nombre_rol', \App\Models\Rol::NOMBRE_AUXILIAR)) {
+            $idAuxiliar = (int) auth()->id();
+            $cursosAsignados = \Illuminate\Support\Facades\DB::table('auxiliar_curso')
+                ->where('id_auxiliar', $idAuxiliar)
+                ->pluck('id_curso');
+
+            $consulta->whereHas('cursos', function ($query) use ($cursosAsignados): void {
+                $query->whereIn('id_curso', $cursosAsignados);
+            });
+        }
+
+        $examen = $consulta
+            ->where(function ($query) use ($ahora): void {
+                $query->where('fecha', '>', $ahora->toDateString())
+                    ->orWhere(function ($subquery) use ($ahora): void {
+                        $subquery->where('fecha', $ahora->toDateString())
+                            ->where('hora_inicio', '>=', $ahora->format('H:i:s'));
+                    });
+            })
+            ->orderBy('fecha')
+            ->orderBy('hora_inicio')
+            ->first();
+
+        if ($examen === null) {
+            $fallback = Examen::query();
+
+            if (auth()->check() && auth()->user()->roles->contains('nombre_rol', \App\Models\Rol::NOMBRE_AUXILIAR)) {
+                $idAuxiliar = (int) auth()->id();
+                $cursosAsignados = \Illuminate\Support\Facades\DB::table('auxiliar_curso')
+                    ->where('id_auxiliar', $idAuxiliar)
+                    ->pluck('id_curso');
+
+                $fallback->whereHas('cursos', function ($query) use ($cursosAsignados): void {
+                    $query->whereIn('id_curso', $cursosAsignados);
+                });
+            }
+
+            $examen = $fallback
+                ->orderByDesc('fecha')
+                ->orderByDesc('id_examen')
+                ->firstOrFail();
+        }
 
         $this->idExamen = (int) $examen->id_examen;
     }
@@ -232,8 +280,17 @@ class MonitorEnVivo extends Component
     {
         $todos = $this->informe['estudiantes'];
 
+        if ($this->modoVista === 'ingreso') {
+            $todos = $todos->whereIn('estado_asistencia', ['pendiente', 'presente'])->values();
+        }
+
         $filtrados = match ($this->filtro) {
             'pendientes' => $todos->where('estado_asistencia', 'pendiente'),
+            'habilitados' => $todos->where('habilitado', true),
+            'deshabilitados' => $todos->where('habilitado', false),
+            'central-riesgos' => $todos->filter(
+                fn (array $fila): bool => ($fila['incidencia'] ?? null) !== null
+            ),
             'tramposos' => $todos->filter(
                 fn (array $fila): bool => ($fila['incidencia']['tipo'] ?? null) === TipoInfraccion::Tramposo->value
             ),
@@ -242,15 +299,36 @@ class MonitorEnVivo extends Component
 
         $termino = Str::lower(trim($this->busqueda));
 
-        if ($termino === '') {
-            return $filtrados->values();
+        if ($termino !== '') {
+            $filtrados = $filtrados
+                ->filter(function (array $fila) use ($termino): bool {
+                    $texto = Str::lower(trim($fila['sis'].' '.$fila['nombre'].' '.$fila['apellido']));
+
+                    return str_contains($texto, $termino);
+                })
+                ->values();
         }
 
         return $filtrados
-            ->filter(function (array $fila) use ($termino): bool {
-                $texto = Str::lower(trim($fila['sis'].' '.$fila['nombre'].' '.$fila['apellido']));
+            ->sort(function (array $a, array $b): int {
+                if ($this->modoVista === 'ingreso') {
+                    // Pendientes primero, luego ingresados.
+                    $prioridadA = $a['estado_asistencia'] === 'pendiente' ? 0 : 1;
+                    $prioridadB = $b['estado_asistencia'] === 'pendiente' ? 0 : 1;
+                } else {
+                    // Monitor: alfabético, pendientes al final.
+                    $prioridadA = $a['estado_asistencia'] === 'pendiente' ? 1 : 0;
+                    $prioridadB = $b['estado_asistencia'] === 'pendiente' ? 1 : 0;
+                }
 
-                return str_contains($texto, $termino);
+                if ($prioridadA !== $prioridadB) {
+                    return $prioridadA <=> $prioridadB;
+                }
+
+                $nombreA = Str::lower(trim(($a['nombre'] ?? '').' '.($a['apellido'] ?? '')));
+                $nombreB = Str::lower(trim(($b['nombre'] ?? '').' '.($b['apellido'] ?? '')));
+
+                return $nombreA <=> $nombreB;
             })
             ->values();
     }
@@ -287,6 +365,36 @@ class MonitorEnVivo extends Component
      *
      * @param  int  $pagina  Página solicitada por la paginación.
      */
+    /**
+     * Cambia la vista activa del monitor (ingreso / monitor) y vuelve a la
+     * primera página.
+     */
+    /**
+     * Ajusta la hora del examen actual para pruebas (mock). Se elimina en
+     * producción.
+     */
+    public function ajustarExamenPrueba(int $minutos): void
+    {
+        $examen = $this->examen;
+        $nuevaHora = now()->addMinutes($minutos);
+
+        $examen->fecha = $nuevaHora->toDateString();
+        $examen->hora_inicio = $nuevaHora->format('H:i:s');
+        $examen->save();
+
+        Cache::forget(self::CACHE_INFORME_PREFIJO.$this->idExamen);
+    }
+
+    public function cambiarVista(string $vista): void
+    {
+        if (! in_array($vista, ['ingreso', 'monitor'], true)) {
+            return;
+        }
+
+        $this->modoVista = $vista;
+        $this->pagina = 1;
+    }
+
     public function irPagina(int $pagina): void
     {
         $this->pagina = max(1, $pagina);
@@ -299,7 +407,7 @@ class MonitorEnVivo extends Component
      */
     public function filtrar(string $filtro): void
     {
-        if (! in_array($filtro, ['todos', 'pendientes', 'tramposos'], true)) {
+        if (! in_array($filtro, ['todos', 'pendientes', 'habilitados', 'deshabilitados', 'central-riesgos', 'tramposos'], true)) {
             return;
         }
 
@@ -410,6 +518,37 @@ class MonitorEnVivo extends Component
      * coloca el contenido en la sección `content` y el layout pinta el `h1`
      * con el `@yield('title')`.
      */
+    public function estadoAcceso(): string
+    {
+        $examen = $this->examen;
+        $inicio = \Carbon\Carbon::parse($examen->fecha.' '.$examen->hora_inicio);
+        $fin = $examen->hora_fin
+            ? \Carbon\Carbon::parse($examen->fecha.' '.$examen->hora_fin)
+            : $inicio->copy()->addMinutes((int) $examen->duracion);
+        $apertura = $inicio->copy()->subMinutes(15);
+        $ahora = now();
+
+        if ($ahora < $apertura) {
+            return 'proximo';
+        }
+        if ($ahora < $inicio) {
+            return 'registro_abierto';
+        }
+        if ($ahora <= $fin) {
+            return 'en_curso';
+        }
+
+        return 'finalizado';
+    }
+
+    public function minutosParaInicio(): int
+    {
+        $examen = $this->examen;
+        $inicio = \Carbon\Carbon::parse($examen->fecha.' '.$examen->hora_inicio);
+
+        return (int) now()->diffInMinutes($inicio, false);
+    }
+
     public function render(): View
     {
         return view('livewire.monitoreo.monitor-en-vivo')->extends('layouts.app');

@@ -19,6 +19,6 @@ return [
     |
     */
 
-    'por_pagina' => 6,
+    'por_pagina' => 50,
 
 ];
