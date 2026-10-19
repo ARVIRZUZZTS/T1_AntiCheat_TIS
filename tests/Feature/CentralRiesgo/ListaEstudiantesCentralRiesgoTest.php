@@ -41,6 +41,7 @@ namespace Tests\Feature\CentralRiesgo;
 
 use App\Livewire\CentralRiesgo\ListaEstudiantes;
 use App\Models\CentralRiesgo;
+use App\Models\Usuario;
 use App\Services\CentralRiesgo\ListarIncidenciasTramposoService;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
@@ -409,6 +410,7 @@ class ListaEstudiantesCentralRiesgoTest extends TestCase
 
     public function test_la_pantalla_carga_desde_el_boton_central_de_riesgos_del_sidebar(): void
     {
+        $this->actingAs(Usuario::query()->firstOrFail());
         $this->withoutVite()
             ->get(route('central-riesgo'))
             ->assertOk()

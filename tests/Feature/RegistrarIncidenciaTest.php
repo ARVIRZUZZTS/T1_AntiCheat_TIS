@@ -70,6 +70,7 @@ use App\Livewire\Monitoreo\RegistrarIncidencia;
 use App\Models\CentralRiesgo;
 use App\Models\Estudiante;
 use App\Models\Rol;
+use App\Models\Usuario;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
@@ -173,6 +174,7 @@ class RegistrarIncidenciaTest extends TestCase
      */
     public function test_desde_el_monitor_se_precargan_el_estudiante_y_el_estado(): void
     {
+        $this->actingAs(Usuario::query()->firstOrFail());
         $respuesta = $this->get('/registrar-incidencia?origen=monitoreo&nombre=Ana%20L%C3%B3pez&sis=202201013&materia=Programacion%20I&rol=docente')
             ->assertOk()
             ->assertSee('Datos del estudiante')
@@ -206,6 +208,7 @@ class RegistrarIncidenciaTest extends TestCase
      */
     public function test_sin_contexto_de_monitor_el_formulario_se_abre_vacio(): void
     {
+        $this->actingAs(Usuario::query()->firstOrFail());
         $this->get('/registrar-incidencia')
             ->assertOk()
             ->assertSee('name="nombreEstudiante"', escape: false)
@@ -520,10 +523,12 @@ class RegistrarIncidenciaTest extends TestCase
      */
     public function test_desde_la_central_de_riesgo_el_formulario_se_abre_vacio(): void
     {
+        $this->actingAs(Usuario::query()->firstOrFail());
         $this->get('/central-riesgo')
             ->assertOk()
             ->assertSee(route('registrar-incidencia', ['origen' => 'central-riesgo']), escape: false);
 
+        $this->actingAs(Usuario::query()->firstOrFail());
         $this->get('/registrar-incidencia?origen=central-riesgo')
             ->assertOk()
             ->assertSee('Volver a la central de riesgo')

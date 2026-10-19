@@ -26,6 +26,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Usuario;
 use Illuminate\Support\Facades\Blade;
 use Tests\TestCase;
 
@@ -33,6 +34,7 @@ class NotificacionesTest extends TestCase
 {
     public function test_la_pantalla_de_notificaciones_carga_sin_error(): void
     {
+        $this->actingAs(Usuario::query()->firstOrFail());
         $this->get(route('notificaciones'))
             ->assertOk()
             ->assertSee('Notificaciones')
@@ -44,6 +46,7 @@ class NotificacionesTest extends TestCase
 
     public function test_el_detalle_del_registro_resuelve(): void
     {
+        $this->actingAs(Usuario::query()->firstOrFail());
         $this->get(route('incidencias.detalle', 1))->assertOk();
     }
 
@@ -52,6 +55,7 @@ class NotificacionesTest extends TestCase
         // El script de la página elige la plantilla según el `tipo` del aviso,
         // así que deben existir las dos y el contenedor debe llevar la ruta
         // del endpoint real como destino del fetch.
+        $this->actingAs(Usuario::query()->firstOrFail());
         $respuesta = $this->get(route('notificaciones'))->assertOk();
 
         $respuesta->assertSee('data-endpoint="'.route('api.notificaciones.index').'"', false);

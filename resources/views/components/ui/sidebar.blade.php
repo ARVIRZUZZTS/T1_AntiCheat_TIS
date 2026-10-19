@@ -69,17 +69,30 @@
         ['label' => 'Central de riesgos', 'route' => 'central-riesgo'],
         ['label' => 'Usuarios y roles', 'route' => 'usuarios'],
         ['label' => 'Reportes', 'route' => 'reportes'],
+        ['label' => 'Docentes', 'route' => 'docentes', 'count' => 3],
+        ['label' => 'Auxiliares', 'route' => 'auxiliares'],
     ];
-
-    $nav = $items ?: $defaultItems;
-
-    // El acceso a notificaciones vive fuera de $nav (es un botón fijo del
-    // sidebar, no un ítem más del menú), por eso se resalta aparte.
-    $notificacionesActivas = $current !== '' && request()->routeIs('notificaciones', 'notificaciones.*');
 
     $usuario = auth()->user();
     $nombreUsuario = $usuario ? trim($usuario->nombre_usuario.' '.$usuario->apellido) : null;
     $rolUsuario = $usuario?->roles->first()?->nombre_rol;
+
+    $auxiliarItems = [
+        ['label' => 'Mis materias', 'route' => 'materias'],
+        ['label' => 'Monitor en vivo', 'route' => 'monitoreo'],
+    ];
+
+    if ($items) {
+        $nav = $items;
+    } elseif ($rolUsuario === 'auxiliar') {
+        $nav = $auxiliarItems;
+    } else {
+        $nav = $defaultItems;
+    }
+
+    // El acceso a notificaciones vive fuera de $nav (es un botón fijo del
+    // sidebar, no un ítem más del menú), por eso se resalta aparte.
+    $notificacionesActivas = $current !== '' && request()->routeIs('notificaciones', 'notificaciones.*');
 @endphp
 
 <aside id="{{ $id }}" class="shrink-0 fixed inset-y-0 start-0 z-40 h-screen w-72 lg:sticky lg:top-0 lg:z-auto lg:w-[15%] bg-surface-sidebar text-neutral-primary transition-transform -translate-x-full lg:translate-x-0" aria-label="Sidebar">
@@ -144,7 +157,6 @@
                 'bg-neutral-primary-soft text-fg-brand' => $notificacionesActivas,
                 'text-neutral-primary hover:bg-brand-active hover:text-neutral-primary' => ! $notificacionesActivas,
             ])>
-                <svg class="shrink-0 w-5 h-5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5.365V3m0 2.365a5.338 5.338 0 0 1 5.133 3.666c.346 1.097.542 2.238.542 3.404 0 3.44-1.65 5.175-3.646 6.51-.585.39-.968.973-1.029 1.644-.112.841.273 1.414.542 1.95M12 5.365A5.338 5.338 0 0 0 6.867 9.03c-.346 1.097-.542 2.238-.542 3.404 0 3.44 1.65 5.175 3.646 6.51.585.39.968.973 1.029 1.644.112.841-.273 1.414-.542 1.95M5 21h14"/></svg>
                 <span class="ms-3 flex-1 whitespace-nowrap">Notificaciones</span>
             </a>
 
@@ -162,6 +174,10 @@
                         @endif
                     </div>
                 </div>
+                <form method="POST" action="{{ route('logout') }}" class="mt-3">
+                    @csrf
+                    <x-ui.button type="submit" variant="secondary" class="w-full justify-center">Cerrar sesión</x-ui.button>
+                </form>
             @endif
         </div>
     </div>

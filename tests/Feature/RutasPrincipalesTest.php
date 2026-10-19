@@ -28,12 +28,14 @@
 namespace Tests\Feature;
 
 use App\Models\Curso;
+use App\Models\Usuario;
 use Tests\TestCase;
 
 class RutasPrincipalesTest extends TestCase
 {
     public function test_la_lista_de_materias_carga_sin_error(): void
     {
+        $this->actingAs(Usuario::query()->firstOrFail());
         $this->get(route('materias'))->assertOk();
     }
 
@@ -45,6 +47,7 @@ class RutasPrincipalesTest extends TestCase
      */
     public function test_el_detalle_de_una_materia_carga_sin_error(): void
     {
+        $this->actingAs(Usuario::query()->firstOrFail());
         $curso = Curso::query()->firstOrFail();
 
         $this->get(route('materias.detalle', $curso->id_curso))->assertOk();
@@ -52,6 +55,7 @@ class RutasPrincipalesTest extends TestCase
 
     public function test_el_link_de_la_lista_apunta_al_detalle_correcto(): void
     {
+        $this->actingAs(Usuario::query()->firstOrFail());
         $curso = Curso::query()->firstOrFail();
 
         $this->get(route('materias'))
