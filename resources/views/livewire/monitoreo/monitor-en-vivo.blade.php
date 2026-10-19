@@ -95,20 +95,49 @@
     // Insignia de estado: se rinde con el componente del design system para no
     // duplicar el mapa de colores de `x-ui.badge`. `ComponentSlot` implementa
     // `Htmlable`, así que el texto se escapa antes de construirlo.
-    $badge = function (string $estado): string {
-        [$tipo, $texto] = match ($estado) {
-            'Ingresó' => ['status-habilitado', 'Ingresó'],
-            'Rechazado' => ['status-no-habilitado', 'Rechazado'],
-            'Sospechoso' => ['status-en-revision', 'Sospechoso'],
-            'C. de Riesgos' => ['status-central-riesgos', 'C. de Riesgos'],
-            default => ['status-pendiente', 'Pendiente'],
+    $badgeGenerico = function (string $tipo, string $texto): string {
+        $clases = match ($tipo) {
+            'status-habilitado' => 'inline-flex items-center px-2 py-1 text-xs font-medium rounded bg-green-100 text-green-800',
+            'ingreso' => 'inline-flex items-center px-2 py-1 text-xs font-medium rounded bg-blue-100 text-blue-800',
+            'status-no-habilitado', 'rechazado', 'riesgo' => 'inline-flex items-center px-2 py-1 text-xs font-medium rounded bg-red-100 text-red-800',
+            'status-pendiente' => 'inline-flex items-center px-2 py-1 text-xs font-medium rounded bg-gray-100 text-gray-800',
+            'status-en-revision' => 'inline-flex items-center px-2 py-1 text-xs font-medium rounded bg-yellow-100 text-yellow-800',
+            'status-central-riesgos' => 'inline-flex items-center px-2 py-1 text-xs font-medium rounded bg-red-100 text-red-800',
+            default => 'inline-flex items-center px-2 py-1 text-xs font-medium rounded bg-blue-100 text-blue-800',
         };
 
-        return view('components.ui.badge', [
-            'type' => $tipo,
-            'slot' => new ComponentSlot(e($texto)),
-            'attributes' => new ComponentAttributeBag(),
-        ])->render();
+        return '<span class="'.$clases.'">'.e($texto).'</span>';
+    };
+
+    $badgeHabilitacion = fn (bool $habilitado): string => $badgeGenerico(
+        $habilitado ? 'status-habilitado' : 'status-no-habilitado',
+        $habilitado ? 'Habilitado' : 'Deshabilitado',
+    );
+
+    $badgeIngreso = function (array $estudiante, ?array $incidencia) use ($badgeGenerico): string {
+        $estadoAsistencia = $estudiante['estado_asistencia'] ?? 'pendiente';
+
+        if ($estadoAsistencia === 'presente') {
+            return $badgeGenerico('ingreso', 'Ingresó');
+        }
+
+        if ($estadoAsistencia === 'rechazado') {
+            return $badgeGenerico('status-no-habilitado', 'Rechazado');
+        }
+
+        if (($incidencia['tipo'] ?? null) === \App\Enums\TipoInfraccion::Tramposo->value) {
+            return $badgeGenerico('status-central-riesgos', 'C. de Riesgos');
+        }
+
+        if ($incidencia !== null) {
+            return $badgeGenerico('status-en-revision', 'Incidencia');
+        }
+
+        if ($estadoAsistencia === 'riesgo') {
+            return $badgeGenerico('status-en-revision', 'Sospechoso');
+        }
+
+        return $badgeGenerico('status-pendiente', 'Pendiente');
     };
 
     // Botón de la fila: es el `x-ui.button` del sistema (mismo juego de clases)
@@ -129,6 +158,10 @@
 
     $filas = [];
     $tarjetas = [];
+    $filasIngresados = [];
+    $filasPendientes = [];
+    $tarjetasIngresados = [];
+    $tarjetasPendientes = [];
 
     foreach ($this->estudiantes as $estudiante) {
         $incidencia = $estudiante['incidencia'] ?? null;
@@ -173,24 +206,53 @@
             'motivoRegistrado' => $incidencia['motivo_etiqueta'] ?? '',
         ];
 
-        $filas[] = [
+        $badgesHtml = $badgeHabilitacion((bool) ($estudiante['habilitado'] ?? true))
+            .' '.$badgeIngreso($estudiante, $incidencia);
+
+        $fila = [
             ['heading' => true, 'value' => $nombreCompleto],
             $estudiante['sis'],
-            $horaIngreso,
-            $estudiante['registrador'] ?? '—',
-            ['html' => $badge($estadoVisual)],
-            ['html' => $boton($datos, $evento, $etiqueta)],
         ];
 
-        $tarjetas[] = [
-            'nombre' => $nombreCompleto,
-            'sis' => $estudiante['sis'],
-            'hora' => $horaIngreso,
-            'registrador' => $estudiante['registrador'] ?? '—',
-            'estadoHtml' => $badge($estadoVisual),
-            'botonHtml' => $boton($datos, $evento, $etiqueta),
-        ];
+        if ($this->modoVista === 'monitor') {
+            $fila[] = $horaIngreso;
+            $fila[] = $estudiante['registrador'] ?? '—';
+        }
+
+        $fila[] = ['html' => $badgesHtml];
+        $fila[] = ['html' => $boton($datos, $evento, $etiqueta)];
+
+        if ($estadoVisual === 'Ingresó') {
+            $filasIngresados[] = $fila;
+            $tarjetasIngresados[] = [
+                'nombre' => $nombreCompleto,
+                'sis' => $estudiante['sis'],
+                'hora' => $horaIngreso,
+                'registrador' => $estudiante['registrador'] ?? '—',
+                'estadoHtml' => $badgesHtml,
+                'botonHtml' => $boton($datos, $evento, $etiqueta),
+            ];
+        } else {
+            $filasPendientes[] = $fila;
+            $tarjetasPendientes[] = [
+                'nombre' => $nombreCompleto,
+                'sis' => $estudiante['sis'],
+                'hora' => $horaIngreso,
+                'registrador' => $estudiante['registrador'] ?? '—',
+                'estadoHtml' => $badgesHtml,
+                'botonHtml' => $boton($datos, $evento, $etiqueta),
+            ];
+        }
     }
+
+    $filas = $filasIngresados;
+    $tarjetas = $tarjetasIngresados;
+    if ($filasIngresados !== [] && $filasPendientes !== []) {
+        $filas[] = ['__separator' => true];
+        $tarjetas[] = ['__separador' => true];
+    }
+    $filas = array_merge($filas, $filasPendientes);
+    $tarjetas = array_merge($tarjetas, $tarjetasPendientes);
 @endphp
 
 {{-- El título y el subtítulo los pinta x-ui.page-header (layouts/app.blade.php),
@@ -212,7 +274,7 @@
             'usuario' => auth()->id() ?? \App\Livewire\Monitoreo\RegistrarIncidencia::USUARIO_POR_DEFECTO,
         ]) }}"
        aria-label="Registrar incidencia"
-       class="inline-flex items-center justify-center gap-1.5 rounded-full border border-transparent bg-brand px-3 py-2.5 sm:px-4 text-sm font-medium leading-5 text-white shadow-xs hover:bg-brand-strong focus:outline-none focus:ring-4 focus:ring-brand-medium">
+       class="inline-flex items-center justify-center gap-1.5 rounded-full border border-transparent bg-brand px-3 py-2.5 sm:px-4 text-sm font-medium leading-5 text-white shadow-xs hover:bg-brand-strong focus:outline-none focus:ring-4 focus:ring-brand-medium" style="display: none;">
         <svg class="w-4 h-4 shrink-0" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
         <span class="hidden sm:inline">Registrar incidencia</span>
     </a>
@@ -276,6 +338,19 @@
         </x-ui.stat-card>
     </div>
 
+    <div class="flex gap-2">
+        <x-ui.button :variant="$modoVista === 'ingreso' ? 'default' : 'secondary'" wire:click="cambiarVista('ingreso')">Ingreso</x-ui.button>
+        <x-ui.button :variant="$modoVista === 'monitor' ? 'default' : 'secondary'" wire:click="cambiarVista('monitor')">Monitor</x-ui.button>
+    </div>
+
+    <div class="flex gap-2 text-xs">
+        <x-ui.button variant="secondary" wire:click="ajustarExamenPrueba(30)">Iniciar en 30 min (mock)</x-ui.button>
+        <x-ui.button variant="secondary" wire:click="ajustarExamenPrueba(15)">Iniciar en 15 min (mock)</x-ui.button>
+        <x-ui.button variant="secondary" wire:click="ajustarExamenPrueba(5)">Iniciar en 5 min (mock)</x-ui.button>
+        <x-ui.button variant="secondary" wire:click="ajustarExamenPrueba(0)">Iniciar ahora (mock)</x-ui.button>
+    </div>
+
+    @if (in_array($this->estadoAcceso(), ['registro_abierto', 'en_curso']))
     <div class="bg-neutral-primary-soft border border-default rounded-base shadow-xs p-6">
         {{-- Una sola fila: título de la tabla, buscador y filtros, en ese
              orden. El buscador crece para ocupar el hueco (`flex-1`) y
@@ -285,7 +360,7 @@
              un script que ocultaba filas ya pintadas, por eso la página
              traía los 50 inscritos de una sola vez. --}}
         <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4 sm:gap-y-3">
-            <h2 class="text-lg font-semibold text-heading sm:shrink-0">Registro de ingresos</h2>
+            <h2 class="text-lg font-semibold text-heading sm:shrink-0">{{ $modoVista === 'monitor' ? 'Monitor en vivo' : 'Registro de ingresos' }}</h2>
 
             <div class="flex-1 min-w-0 sm:min-w-[280px]">
                 {{-- Sin botón "Buscar": filtra solo con lo que se escribe
@@ -306,9 +381,14 @@
             </div>
 
             <div class="flex flex-wrap gap-2 sm:shrink-0">
-                <x-ui.button :variant="$filtro === 'todos' ? 'default' : 'secondary'" wire:click="filtrar('todos')">Todos</x-ui.button>
-                <x-ui.button :variant="$filtro === 'pendientes' ? 'default' : 'secondary'" wire:click="filtrar('pendientes')">Pendientes</x-ui.button>
-                <x-ui.button :variant="$filtro === 'tramposos' ? 'default' : 'secondary'" wire:click="filtrar('tramposos')">Tramposos</x-ui.button>
+                @if ($modoVista === 'ingreso')
+                    <x-ui.button :variant="$filtro === 'todos' ? 'default' : 'secondary'" wire:click="filtrar('todos')">Todos</x-ui.button>
+                    <x-ui.button :variant="$filtro === 'habilitados' ? 'default' : 'secondary'" wire:click="filtrar('habilitados')">Habilitados</x-ui.button>
+                    <x-ui.button :variant="$filtro === 'deshabilitados' ? 'default' : 'secondary'" wire:click="filtrar('deshabilitados')">Deshabilitados</x-ui.button>
+                @else
+                    <x-ui.button :variant="$filtro === 'central-riesgos' ? 'default' : 'secondary'" wire:click="filtrar('central-riesgos')">Central de riesgos</x-ui.button>
+                    <x-ui.button :variant="$filtro === 'pendientes' ? 'default' : 'secondary'" wire:click="filtrar('pendientes')">Pendientes</x-ui.button>
+                @endif
             </div>
         </div>
 
@@ -321,6 +401,10 @@
                      Desde lg: vuelve a ser la tabla. --}}
                 <div class="space-y-3 lg:hidden">
                     @foreach ($tarjetas as $tarjeta)
+                        @if (isset($tarjeta['__separador']))
+                            <hr class="border-default my-2">
+                            @continue
+                        @endif
                         <div class="bg-neutral-primary-soft border border-default rounded-base shadow-xs p-4">
                             <div class="flex items-start justify-between gap-3">
                                 <div class="min-w-0">
@@ -330,7 +414,9 @@
                                 {!! $tarjeta['estadoHtml'] !!}
                             </div>
 
-                            <p class="mt-2 text-xs text-muted">Hora {{ $tarjeta['hora'] }} · Registró {{ $tarjeta['registrador'] }}</p>
+                            @if ($modoVista === 'monitor')
+                                <p class="mt-2 text-xs text-muted">Hora {{ $tarjeta['hora'] }} · Registró {{ $tarjeta['registrador'] }}</p>
+                            @endif
 
                             <div class="mt-3 border-t border-default pt-3 text-end">
                                 {!! $tarjeta['botonHtml'] !!}
@@ -343,7 +429,9 @@
                     <x-ui.table
                         compact
                         min-width="min-w-[640px]"
-                        :headers="['Estudiante', 'Código SIS', 'Hora', 'Registro', 'Estado', 'Registrar']"
+                        :headers="$this->modoVista === 'monitor'
+                            ? ['Estudiante', 'Código SIS', 'Hora', 'Registro', 'Estados', 'Acción']
+                            : ['Estudiante', 'Código SIS', 'Estados', 'Acción']"
                         :rows="$filas"
                     />
                 </div>
@@ -377,12 +465,24 @@
                 @endif
             </div>
         @endif
-
-        <x-ui.modal-registro-ingreso />
-        <x-ui.modal-estudiante-ingresado />
-        <x-ui.modal-no-habilitado />
-        <x-ui.modal-central-riesgos />
-        <x-ui.modal-registrar-tramposo />
     </div>
+
+    @else
+        <div class="bg-neutral-primary-soft border border-default rounded-base shadow-xs p-6">
+            <h2 class="text-lg font-semibold text-heading mb-2">Acceso al monitor</h2>
+            <p class="text-sm text-body mb-2">Estado: {{ $this->estadoAcceso() }}</p>
+            <p class="text-sm text-body mb-4">Comienza en {{ $this->minutosParaInicio() }} minutos.</p>
+            <div>
+                <a href="{{ route('auxiliares') }}" class="px-3 py-1.5 text-xs text-white bg-brand rounded">Gestionar auxiliares</a>
+            </div>
+        </div>
+    @endif
+
+    <x-ui.modal-registro-ingreso />
+    <x-ui.modal-estudiante-ingresado />
+    <x-ui.modal-no-habilitado />
+    <x-ui.modal-central-riesgos />
+    <x-ui.modal-registrar-tramposo :contexto="$modoVista" />
+    <x-ui.modal-opciones-rechazo />
 
 </div>

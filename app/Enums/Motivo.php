@@ -34,6 +34,12 @@ enum Motivo: string
 {
     case IntentoDeIngresoNoAutorizado = 'intento de ingreso no autorizado';
 
+    case IntentoDeIngresoDuplicado = 'intento de ingreso duplicado';
+
+    case AulaEquivocada = 'aula equivocada';
+
+    case IntentoDeIngresoMaterialNoAutorizado = 'intento de ingreso de material no autorizado';
+
     case UsoDeDispositivosElectronicos = 'uso de dispositivos electronicos';
 
     case CopiaOIntercambioDeRespuestas = 'copia o intercambio de respuestas';
@@ -51,6 +57,9 @@ enum Motivo: string
     {
         return match ($this) {
             self::IntentoDeIngresoNoAutorizado => 'Intento de ingreso a examen no autorizado',
+            self::IntentoDeIngresoDuplicado => 'Intento de ingreso duplicado',
+            self::AulaEquivocada => 'Aula equivocada',
+            self::IntentoDeIngresoMaterialNoAutorizado => 'Intento de ingreso con material no autorizado',
             self::UsoDeDispositivosElectronicos => 'Uso de dispositivos electrónicos no autorizados',
             self::CopiaOIntercambioDeRespuestas => 'Copia o intercambio de respuestas',
             self::UsoDeMaterialNoAutorizado => 'Uso de material no autorizado',

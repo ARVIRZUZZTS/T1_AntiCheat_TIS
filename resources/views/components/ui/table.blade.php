@@ -55,6 +55,14 @@
         </thead>
         <tbody>
             @foreach ($rows as $row)
+                @if (is_array($row) && array_key_exists('__separator', $row))
+                    <tr>
+                        <td colspan="{{ count($headers) }}" class="px-4 py-2">
+                            <hr class="border-default">
+                        </td>
+                    </tr>
+                    @continue
+                @endif
                 @php
                     $rowClass = is_array($row) ? ($row['__rowClass'] ?? null) : null;
                     $rowXShow = is_array($row) ? ($row['__xShow'] ?? null) : null;

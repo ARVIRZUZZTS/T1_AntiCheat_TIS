@@ -60,6 +60,7 @@
 use App\Http\Controllers\ExamenController;
 use App\Livewire\Examenes\EstudiantesCurso;
 use App\Livewire\Monitoreo\MonitorEnVivo;
+use App\Livewire\Monitoreo\AccesoMonitor;
 use App\Livewire\Monitoreo\RegistrarIncidencia;
 use App\Models\Curso;
 use App\Services\Curso\ListarMateriasConMetricasService;
@@ -80,6 +81,8 @@ Route::get('/materias', fn () => view('pages.materias', [
 ]))->name('materias');
 Route::view('/examenes', 'pages.examenes')->name('examenes');
 Route::get('/monitoreo', MonitorEnVivo::class)->name('monitoreo');
+Route::get('/monitoreo/acceso', AccesoMonitor::class)->name('monitoreo.acceso');
+Route::view('/monitoreo/mock', 'livewire.monitoreo.mock')->name('monitoreo.mock');
 // La vista solo aporta el layout; los datos los resuelve el componente Livewire
 // ListaEstudiantes que incrusta, por eso la ruta sigue sin lógica.
 Route::view('/central-riesgo', 'pages.central-riesgo')->name('central-riesgo');

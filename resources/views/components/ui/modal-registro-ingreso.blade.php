@@ -115,7 +115,7 @@
                     <x-ui.button
                         variant="danger"
                         class="flex-1"
-                        @click="$dispatch('rechazar-ingreso', { sis: sis }); show = false"
+                        @click="$dispatch('abrir-modal-rechazo', { sis: sis, nombre: nombre }); show = false"
                     >Rechazar</x-ui.button>
                 </div>
             </div>
