@@ -10,6 +10,7 @@
  * @updated 2026-10-10
  * @updated 2026-10-11
  * @updated 2026-10-12
+ * @updated 2026-10-21
  *
  * @description
  * Definición de rutas web del panel. Incluye vistas estáticas y componentes Livewire.
@@ -55,6 +56,9 @@
  *   de ingreso (rutas /monitoreo/registro-ingreso y /buscador-incidencia): el
  *   monitor abre directo el formulario de incidencia, que ahora trae su propio
  *   buscador. Queda solo /registrar-incidencia.
+ * - 2026-10-21  [Alex Candia]  feat: /reportes deja de ser vista mock. La ruta
+ *   delega en ListarFiltrosReporteService, que entrega las materias y los
+ *   exámenes agrupados por curso para los selectores dinámicos.
  */
 
 use App\Http\Controllers\AuthController;
@@ -71,6 +75,7 @@ use App\Services\Ambiente\ListarAmbientesService;
 use App\Services\Examen\ListarEstudiantesCursoConEstadoService;
 use App\Services\Material\ListarMaterialesService;
 use App\Services\Norma\ListarNormasService;
+use App\Services\Reporte\ListarFiltrosReporteService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
@@ -91,7 +96,11 @@ Route::view('/monitoreo/mock', 'livewire.monitoreo.mock')->name('monitoreo.mock'
 // ListaEstudiantes que incrusta, por eso la ruta sigue sin lógica.
 Route::view('/central-riesgo', 'pages.central-riesgo')->name('central-riesgo');
 Route::view('/usuarios', 'pages.usuarios')->name('usuarios');
-Route::view('/reportes', 'pages.reportes')->name('reportes');
+
+Route::get('/reportes', fn (ListarFiltrosReporteService $filtros) => view(
+    'pages.reportes',
+    $filtros->ejecutar(),
+))->name('reportes');
 Route::view('/notificaciones', 'pages.notificaciones')->name('notificaciones');
 
 Route::get('/cursos/{curso}/estudiantes/estado', EstudiantesCurso::class)
