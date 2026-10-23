@@ -78,6 +78,10 @@ class EstudiantesCurso extends Component
 
     public string $mensajeError = '';
 
+    public bool $soloLectura = false;
+
+    public bool $modoHabilitacion = false;
+
     // Estado de los modales de #25 (habilitar) y #26 (inhabilitar) — issue #27.
     // Vive acá porque tabla y modales comparten la misma pantalla; #25/#26
     // solo agregan el HTML condicional a estas propiedades/metodos, sin

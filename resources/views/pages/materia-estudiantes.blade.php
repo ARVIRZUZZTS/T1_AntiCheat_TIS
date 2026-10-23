@@ -141,7 +141,7 @@
 
         {{-- Pestaña Estudiantes: componente Livewire con los datos reales. --}}
         <section x-show="tab === 'estudiantes'" x-cloak class="mt-4">
-            @livewire(\App\Livewire\Examenes\EstudiantesCurso::class, ['curso' => $curso], key($curso->id_curso))
+            @livewire(\App\Livewire\Examenes\EstudiantesCurso::class, ['curso' => $curso, 'soloLectura' => true], key('estudiantes-'.$curso->id_curso))
         </section>
 
         {{-- Pestaña Exámenes: el parcial consulta el endpoint al abrirla. El
@@ -154,7 +154,9 @@
         </template>
 
         {{-- Pestañas pendientes de endpoint: vacías por ahora. --}}
-        <section x-show="tab === 'habilitacion'" x-cloak class="mt-4 px-4 sm:px-6 lg:px-8"></section>
+        <section x-show="tab === 'habilitacion'" x-cloak class="mt-4">
+            @livewire(\App\Livewire\Examenes\EstudiantesCurso::class, ['curso' => $curso, 'modoHabilitacion' => true], key('habilitacion-'.$curso->id_curso))
+        </section>
         <section x-show="tab === 'auxiliares'" x-cloak class="mt-4 px-4 sm:px-6 lg:px-8"></section>
     </div>
 @endsection
