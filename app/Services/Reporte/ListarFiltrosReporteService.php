@@ -13,8 +13,15 @@
  * (`id_curso => [id, etiqueta]`). La etiqueta del examen ya viene legible
  * ("Examen final — 20/10/2026"), resuelta con el enum de tipo y la fecha.
  *
- * Todo se resuelve en pocas consultas agrupadas (una por materias, una por
- * exámenes): nunca una consulta por curso, aunque la lista de materias crezca.
+ * Solo devuelve las materias y exámenes que le corresponden al usuario:
+ * - Docente: los cursos donde `curso.sis_doc` es su `id_usuario`.
+ * - Auxiliar: los cursos asignados en `auxiliar_curso`.
+ * - Con ambos roles: la unión de los dos conjuntos.
+ * - Sin ninguno de esos roles: nada.
+ *
+ * Todo se resuelve en pocas consultas agrupadas (una por roles, una por
+ * materias, una por exámenes): nunca una consulta por curso, aunque la lista de
+ * materias crezca.
  *
  * La lógica vive acá y no en `routes/web.php` porque las rutas son solo la
  * capa HTTP de entrada: no deben contener consultas ni reglas de negocio
@@ -22,17 +29,24 @@
  *
  * @see  App\Services\Curso\ListarMateriasConMetricasService
  * @see  App\Enums\TipoExamen
+ * @see  App\Models\Rol
  * @see  resources/views/pages/reportes.blade.php
  *
  * @changelog
  * - 2026-10-21  [Alex Candia]  feat: creación inicial del servicio.
+ * - 2026-10-21  [Alex Candia]  feat: filtrar materias y exámenes por el usuario
+ *   autenticado (cursos del docente y cursos asignados al auxiliar).
  */
 
 namespace App\Services\Reporte;
 
 use App\Enums\TipoExamen;
+use App\Models\Curso;
+use App\Models\Rol;
+use App\Models\Usuario;
 use App\Services\Curso\ListarMateriasConMetricasService;
 use Carbon\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 class ListarFiltrosReporteService
@@ -49,23 +63,61 @@ class ListarFiltrosReporteService
      *     examenesPorCurso: array<int, list<array{id: int, etiqueta: string}>>
      * }
      */
-    public function ejecutar(): array
+    public function ejecutar(?Usuario $usuario): array
     {
+        $idsCursos = $usuario === null
+            ? collect()
+            : $this->idsCursosDelUsuario($usuario);
+
         return [
-            'opcionesMaterias' => $this->opcionesMaterias(),
-            'examenesPorCurso' => $this->examenesPorCurso(),
+            'opcionesMaterias' => $this->opcionesMaterias($idsCursos),
+            'examenesPorCurso' => $this->examenesPorCurso($idsCursos),
         ];
     }
 
     /**
-     * Materias en el formato que espera `x-ui.select` (id => nombre), tomadas
-     * del mismo servicio que usa la página `/materias`.
+     * IDs de los cursos que le corresponden al usuario según sus roles.
+     * Docente ve los cursos que dicta (`sis_doc`); auxiliar, los que tiene
+     * asignados en `auxiliar_curso`. Si tiene ambos roles, se unen.
      *
+     * @return Collection<int, int>
+     */
+    private function idsCursosDelUsuario(Usuario $usuario): Collection
+    {
+        $roles = $usuario->roles()->pluck('nombre_rol');
+
+        $ids = collect();
+
+        if ($roles->contains(Rol::NOMBRE_DOCENTE)) {
+            $ids = $ids->merge(
+                Curso::query()
+                    ->where('sis_doc', $usuario->id_usuario)
+                    ->pluck('id_curso')
+            );
+        }
+
+        if ($roles->contains(Rol::NOMBRE_AUXILIAR)) {
+            $ids = $ids->merge(
+                DB::table('auxiliar_curso')
+                    ->where('id_auxiliar', $usuario->id_usuario)
+                    ->pluck('id_curso')
+            );
+        }
+
+        return $ids->map(fn ($id): int => (int) $id)->unique()->values();
+    }
+
+    /**
+     * Materias en el formato que espera `x-ui.select` (id => nombre), tomadas
+     * del mismo servicio que usa la página `/materias` pero acotadas a los
+     * cursos del usuario.
+     *
+     * @param  Collection<int, int>  $idsCursos
      * @return array<int, string>
      */
-    private function opcionesMaterias(): array
+    private function opcionesMaterias(Collection $idsCursos): array
     {
-        return $this->listarMaterias->ejecutar()
+        return $this->listarMaterias->ejecutar($idsCursos->all())
             ->mapWithKeys(fn (array $fila): array => [
                 $fila['curso']->id_curso => $fila['curso']->nombre_curso,
             ])
@@ -73,17 +125,23 @@ class ListarFiltrosReporteService
     }
 
     /**
-     * Exámenes de todos los cursos en una sola consulta, agrupados por curso.
-     * Un examen puede estar compartido entre cursos, por eso se agrupa por la
-     * fila de `examen_curso` y no por `id_examen`.
+     * Exámenes de los cursos del usuario en una sola consulta, agrupados por
+     * curso. Un examen puede estar compartido entre cursos, por eso se agrupa
+     * por la fila de `examen_curso` y no por `id_examen`.
      *
+     * @param  Collection<int, int>  $idsCursos
      * @return array<int, list<array{id: int, etiqueta: string}>>
      */
-    private function examenesPorCurso(): array
+    private function examenesPorCurso(Collection $idsCursos): array
     {
+        if ($idsCursos->isEmpty()) {
+            return [];
+        }
+
         return DB::table('examen')
             ->join('examen_curso', 'examen_curso.id_examen', '=', 'examen.id_examen')
             ->leftJoin('tipo_examen', 'tipo_examen.id_tipo_examen', '=', 'examen.tipo_examen')
+            ->whereIn('examen_curso.id_curso', $idsCursos)
             ->select(
                 'examen_curso.id_curso',
                 'examen.id_examen',

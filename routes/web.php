@@ -77,6 +77,7 @@ use App\Services\Material\ListarMaterialesService;
 use App\Services\Norma\ListarNormasService;
 use App\Services\Reporte\ListarFiltrosReporteService;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
@@ -97,9 +98,9 @@ Route::view('/monitoreo/mock', 'livewire.monitoreo.mock')->name('monitoreo.mock'
 Route::view('/central-riesgo', 'pages.central-riesgo')->name('central-riesgo');
 Route::view('/usuarios', 'pages.usuarios')->name('usuarios');
 
-Route::get('/reportes', fn (ListarFiltrosReporteService $filtros) => view(
+Route::get('/reportes', fn (Request $request, ListarFiltrosReporteService $filtros) => view(
     'pages.reportes',
-    $filtros->ejecutar(),
+    $filtros->ejecutar($request->user()),
 ))->name('reportes');
 Route::view('/notificaciones', 'pages.notificaciones')->name('notificaciones');
 
