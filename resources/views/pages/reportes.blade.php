@@ -2,13 +2,17 @@
     @file    reportes.blade.php
     @author  Alex Candia <alex.leonar.candia@gmail.com>
     @created 2026-09-29
-    @updated 2026-10-21
+    @updated 2026-10-23
 
     @description
     Pantalla de reportes por materia y examen. Dos selectores dinámicos
-    (materia → examen) condicionan la aparición de tres pestañas de reporte.
-    El contenido de cada pestaña se implementará después; por ahora cada una
-    muestra un placeholder.
+    (materia -> examen) condicionan la aparición de tres pestañas de reporte.
+
+    Esta vista solo conserva el estado compartido (materia, examen y pestaña
+    activa). El contenido de cada reporte vive en su propio parcial bajo
+    partials/reportes/ para que el archivo no siga creciendo. La pestaña de
+    horario de ingreso escucha el evento `reporte-horario-actualizar`, que se
+    dispara cuando cambia el examen.
 
     El selector de examen es un <select> a mano con las mismas clases de
     x-ui.select, porque las opciones deben cambiar cuando cambia la materia
@@ -20,6 +24,12 @@
     - 2026-10-21  [Alex Candia]  feat: selectores dinámicos de materia y examen,
       tres pestañas de reporte (asistencia, ingresos ilegales, hora de ingreso),
       y contenido condicional a que ambos selectores tengan valor.
+    - 2026-10-23  [Alex Candia]  feat: frontend del reporte de horario de ingreso
+      con filtros por aula y rango horario, resumen, listado y exportación.
+    - 2026-10-23  [Alex Candia]  refactor: la pestaña de horario de ingreso pasa
+      a partials/reportes/horario-ingreso.blade.php con su propio estado Alpine.
+
+    @see  resources/views/partials/reportes/horario-ingreso.blade.php
 --}}
 
 @extends('layouts.app')
@@ -28,8 +38,8 @@
 
 @section('content')
     <div
-        {{-- OJO: este atributo va entre comillas dobles, asi que dentro no puede
-             aparecer ni una sola comilla doble, ni en codigo ni en comentarios.
+        {{-- OJO: este atributo va entre comillas dobles, así que dentro no puede
+             aparecer ni una sola comilla doble, ni en código ni en comentarios.
              Para valores se usa @js() y para comentar, comillas simples. --}}
         x-data="{
             materiaId: '',
@@ -37,20 +47,26 @@
             tab: 'asistencia',
             examenesPorCurso: @js($examenesPorCurso),
 
-            // Examenes de la materia elegida. Si no hay materia o no hay
-            // examenes para esa materia, la lista queda vacia.
+            // Exámenes de la materia elegida. Si no hay materia o no hay
+            // exámenes para esa materia, la lista queda vacía.
             get examenesVisibles() {
                 return this.examenesPorCurso[this.materiaId] || [];
             },
 
-            // Cambiar de materia invalida el examen elegido.
             init() {
+                // Cambiar de materia invalida el examen elegido.
                 this.$watch('materiaId', () => { this.examenId = ''; });
+                this.$watch('examenId', (idExamen) => {
+                    this.$dispatch('reporte-horario-actualizar', {
+                        idCurso: this.materiaId,
+                        idExamen: idExamen,
+                    });
+                });
             }
         }"
         class="pb-6"
     >
-        {{-- Selectores: 1 columna en mobile, 2 en sm o mas grande. --}}
+        {{-- Selectores: 1 columna en mobile, 2 en sm o más grande. --}}
         <div class="grid grid-cols-1 gap-4 px-4 pt-4 sm:grid-cols-2 sm:px-6 sm:pt-6 lg:px-8">
             <x-ui.select
                 label="Materia"
@@ -81,9 +97,8 @@
             </div>
         </div>
 
-
         <p x-show="materiaId && examenesVisibles.length === 0" class="px-4 mt-4 text-sm text-body sm:px-6 lg:px-8">
-            No hay examenes para esta materia.
+            No hay exámenes para esta materia.
         </p>
 
         <div class="mt-6">
@@ -104,6 +119,7 @@
             <section x-show="tab === 'ingresos' && materiaId && examenId" x-cloak class="mt-4 px-4 sm:px-6 lg:px-8">
             </section>
             <section x-show="tab === 'horarios' && materiaId && examenId" x-cloak class="mt-4 px-4 sm:px-6 lg:px-8">
+                @include('partials.reportes.horario-ingreso')
             </section>
         </div>
     </div>
