@@ -436,6 +436,24 @@ class MonitorEnVivo extends Component
         $this->pagina = 1;
     }
 
+    public function reportarSisNoEncontrado(): mixed
+    {
+        $sis = trim($this->busqueda);
+
+        if ($sis === '') {
+            return null;
+        }
+
+        return redirect()->route('registrar-incidencia', [
+            'origen' => \App\Livewire\Monitoreo\RegistrarIncidencia::ORIGEN_MONITOREO,
+            'examen' => $this->idExamen,
+            'rol' => \App\Models\Rol::NOMBRE_DOCENTE,
+            'usuario' => auth()->id() ?? \App\Livewire\Monitoreo\RegistrarIncidencia::USUARIO_POR_DEFECTO,
+            'sis' => $sis,
+            'motivo' => \App\Enums\Motivo::IntentoDeIngresoNoAutorizado->value,
+        ]);
+    }
+
     /**
      * Confirma el ingreso de un estudiante (modal M1).
      *

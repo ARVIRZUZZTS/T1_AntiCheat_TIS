@@ -430,6 +430,7 @@ class RegistrarIncidencia extends Component
         $this->codigoSis = (string) request()->query('sis', '');
         $this->sisPrecargado = $this->codigoSis;
         $this->materia = (string) request()->query('materia', '');
+        $this->tipoIncidencia = (string) request()->query('motivo', '');
     }
 
     /**
