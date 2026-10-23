@@ -162,7 +162,13 @@ class ListarFiltrosReporteService
                 'examen.id_examen',
                 'examen.fecha',
                 'tipo_examen.nombre_tipo_examen',
-            )
+            );
+
+        if ($idsCursos !== null) {
+            $consulta->whereIn('examen_curso.id_curso', $idsCursos);
+        }
+
+        return $consulta
             ->orderByDesc('examen.fecha')
             ->get()
             ->groupBy('id_curso')

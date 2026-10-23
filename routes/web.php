@@ -63,6 +63,8 @@
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ExamenController;
+use App\Http\Controllers\Reporte\ExportarReporteIngresosIlegalesController;
+use App\Http\Controllers\Reporte\ListarReporteIngresosIlegalesController;
 use App\Livewire\Examenes\EstudiantesCurso;
 use App\Livewire\Monitoreo\MonitorEnVivo;
 use App\Livewire\Monitoreo\AccesoMonitor;
@@ -96,12 +98,16 @@ Route::view('/monitoreo/mock', 'livewire.monitoreo.mock')->name('monitoreo.mock'
 // La vista solo aporta el layout; los datos los resuelve el componente Livewire
 // ListaEstudiantes que incrusta, por eso la ruta sigue sin lógica.
 Route::view('/central-riesgo', 'pages.central-riesgo')->name('central-riesgo');
-Route::view('/usuarios', 'pages.usuarios')->name('usuarios');
 
-Route::get('/reportes', fn (Request $request, ListarFiltrosReporteService $filtros) => view(
-    'pages.reportes',
-    $filtros->ejecutar($request->user()),
-))->name('reportes');
+Route::get('/reportes', function (Request $request, ListarFiltrosReporteService $filtros) {
+    return view('pages.reportes', $filtros->ejecutar($request->user()));
+})->name('reportes');
+
+Route::get('/reportes/ingresos-ilegales/exportar/{examen}', ExportarReporteIngresosIlegalesController::class)
+    ->name('reportes.ingresos-ilegales.exportar');
+
+Route::get('/reportes/ingresos-ilegales', ListarReporteIngresosIlegalesController::class)
+    ->name('reportes.ingresos-ilegales');
 Route::view('/notificaciones', 'pages.notificaciones')->name('notificaciones');
 
 Route::get('/cursos/{curso}/estudiantes/estado', EstudiantesCurso::class)

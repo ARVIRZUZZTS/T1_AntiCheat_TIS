@@ -97,13 +97,13 @@
     // `Htmlable`, así que el texto se escapa antes de construirlo.
     $badgeGenerico = function (string $tipo, string $texto): string {
         $clases = match ($tipo) {
-            'status-habilitado' => 'inline-flex items-center px-2 py-1 text-xs font-medium rounded bg-green-100 text-green-800',
-            'ingreso' => 'inline-flex items-center px-2 py-1 text-xs font-medium rounded bg-blue-100 text-blue-800',
-            'status-no-habilitado', 'rechazado', 'riesgo' => 'inline-flex items-center px-2 py-1 text-xs font-medium rounded bg-red-100 text-red-800',
-            'status-pendiente' => 'inline-flex items-center px-2 py-1 text-xs font-medium rounded bg-gray-100 text-gray-800',
-            'status-en-revision' => 'inline-flex items-center px-2 py-1 text-xs font-medium rounded bg-yellow-100 text-yellow-800',
-            'status-central-riesgos' => 'inline-flex items-center px-2 py-1 text-xs font-medium rounded bg-red-100 text-red-800',
-            default => 'inline-flex items-center px-2 py-1 text-xs font-medium rounded bg-blue-100 text-blue-800',
+            'status-habilitado' => 'inline-flex items-center px-2 py-1 text-xs font-medium rounded-full border border-green-200 bg-green-100 text-green-800',
+            'ingreso' => 'inline-flex items-center px-2 py-1 text-xs font-medium rounded-full border border-blue-200 bg-blue-100 text-blue-800',
+            'status-no-habilitado', 'rechazado', 'riesgo' => 'inline-flex items-center px-2 py-1 text-xs font-medium rounded-full border border-red-200 bg-red-100 text-red-800',
+            'status-pendiente' => 'inline-flex items-center px-2 py-1 text-xs font-medium rounded-full border border-gray-200 bg-gray-100 text-gray-800',
+            'status-en-revision' => 'inline-flex items-center px-2 py-1 text-xs font-medium rounded-full border border-yellow-200 bg-yellow-100 text-yellow-800',
+            'status-central-riesgos' => 'inline-flex items-center px-2 py-1 text-xs font-medium rounded-full border border-red-200 bg-red-100 text-red-800',
+            default => 'inline-flex items-center px-2 py-1 text-xs font-medium rounded-full border border-blue-200 bg-blue-100 text-blue-800',
         };
 
         return '<span class="'.$clases.'">'.e($texto).'</span>';
@@ -245,14 +245,14 @@
         }
     }
 
-    $filas = $filasIngresados;
-    $tarjetas = $tarjetasIngresados;
-    if ($filasIngresados !== [] && $filasPendientes !== []) {
+    $filas = $filasPendientes;
+    $tarjetas = $tarjetasPendientes;
+    if ($filasPendientes !== [] && $filasIngresados !== []) {
         $filas[] = ['__separator' => true];
         $tarjetas[] = ['__separador' => true];
     }
-    $filas = array_merge($filas, $filasPendientes);
-    $tarjetas = array_merge($tarjetas, $tarjetasPendientes);
+    $filas = array_merge($filas, $filasIngresados);
+    $tarjetas = array_merge($tarjetas, $tarjetasIngresados);
 @endphp
 
 {{-- El título y el subtítulo los pinta x-ui.page-header (layouts/app.blade.php),
@@ -395,6 +395,9 @@
         <div class="mt-4">
             @if ($this->estudiantes->total() === 0)
                 <p class="text-center text-sm text-body py-6">No se encontraron estudiantes con ese criterio.</p>
+                <div class="text-center pb-6">
+                    <x-ui.button wire:click="reportarSisNoEncontrado" variant="secondary">Reportar SIS</x-ui.button>
+                </div>
             @else
                 {{-- Mobile: una tarjeta por estudiante con scroll vertical
                      normal, igual que la lista de estudiantes del curso.

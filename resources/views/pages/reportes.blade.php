@@ -45,6 +45,8 @@
             materiaId: '',
             examenId: '',
             tab: 'asistencia',
+            ingresos: [],
+            cargandoIngresos: false,
             examenesPorCurso: @js($examenesPorCurso),
 
             // Exámenes de la materia elegida. Si no hay materia o no hay
@@ -54,14 +56,22 @@
             },
 
             init() {
-                // Cambiar de materia invalida el examen elegido.
-                this.$watch('materiaId', () => { this.examenId = ''; });
-                this.$watch('examenId', (idExamen) => {
-                    this.$dispatch('reporte-horario-actualizar', {
-                        idCurso: this.materiaId,
-                        idExamen: idExamen,
-                    });
-                });
+                this.$watch('materiaId', () => { this.examenId = ''; this.ingresos = []; });
+                this.$watch('examenId', () => { if (this.tab === 'ingresos' && this.examenId) { this.cargarIngresos(); } });
+                this.$watch('tab', () => { if (this.tab === 'ingresos' && this.examenId) { this.cargarIngresos(); } });
+            },
+            async cargarIngresos() {
+                if (! this.examenId) { return; }
+                this.cargandoIngresos = true;
+                try {
+                    const url = '/reportes/ingresos-ilegales?examen=' + encodeURIComponent(this.examenId) + '&curso=' + encodeURIComponent(this.materiaId);
+                    const response = await fetch(url, { headers: { 'Accept': 'application/json' } });
+                    this.ingresos = await response.json();
+                } catch (e) {
+                    this.ingresos = [];
+                } finally {
+                    this.cargandoIngresos = false;
+                }
             }
         }"
         class="pb-6"
@@ -110,13 +120,68 @@
 
             <nav class="flex gap-2 overflow-x-auto border-b border-default px-4 pb-4 sm:px-6 lg:px-8" aria-label="Tipos de reporte">
                 <button type="button" @click="tab = 'asistencia'" :class="tab === 'asistencia' ? '{{ $tabActivo }}' : '{{ $tabInactivo }}'" class="{{ $tabClases }}">Reporte de asistencia</button>
-                <button type="button" @click="tab = 'ingresos'" :class="tab === 'ingresos' ? '{{ $tabActivo }}' : '{{ $tabInactivo }}'" class="{{ $tabClases }}">Reporte de intentos de ingreso ilegales</button>
+                <button type="button" @click="tab = 'ingresos'" :class="tab === 'ingresos' ? '{{ $tabActivo }}' : '{{ $tabInactivo }}'" class="{{ $tabClases }}">Reporte de intentos no autorizados</button>
                 <button type="button" @click="tab = 'horarios'" :class="tab === 'horarios' ? '{{ $tabActivo }}' : '{{ $tabInactivo }}'" class="{{ $tabClases }}">Reporte de Hora de ingreso</button>
             </nav>
 
             <section x-show="tab === 'asistencia' && materiaId && examenId" x-cloak class="mt-4 px-4 sm:px-6 lg:px-8">
             </section>
             <section x-show="tab === 'ingresos' && materiaId && examenId" x-cloak class="mt-4 px-4 sm:px-6 lg:px-8">
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 mb-4">
+                    <div class="rounded-base border border-default bg-neutral-primary-soft p-4">
+                        <p class="text-sm text-body">Total de intentos</p>
+                        <p class="text-2xl font-semibold text-heading" x-text="ingresos.length"></p>
+                    </div>
+                    <div class="rounded-base border border-default bg-neutral-primary-soft p-4">
+                        <p class="text-sm text-body">Estudiantes distintos</p>
+                        <p class="text-2xl font-semibold text-heading" x-text="new Set(ingresos.map(r => r.sis)).size"></p>
+                    </div>
+                </div>
+
+                <div class="flex justify-end mb-4">
+                    <button type="button"
+                            :disabled="ingresos.length === 0"
+                            @click="if (ingresos.length) window.location.href = '/reportes/ingresos-ilegales/exportar/' + examenId + '?curso=' + materiaId"
+                            class="inline-flex items-center justify-center box-border border focus:ring-4 shadow-xs font-medium leading-5 rounded-base focus:outline-none px-4 py-2.5 text-sm text-white bg-brand border-transparent hover:bg-brand-strong disabled:opacity-50 disabled:cursor-not-allowed">
+                        Exportar a Excel
+                    </button>
+                </div>
+
+                <template x-if="cargandoIngresos">
+                    <p class="text-sm text-body">Cargando reporte...</p>
+                </template>
+
+                <div class="overflow-x-auto" x-show="! cargandoIngresos">
+                    <table class="w-full text-sm text-left text-body">
+                        <thead class="text-xs uppercase bg-neutral-secondary-medium text-heading">
+                            <tr>
+                                <th class="px-3 py-2">SIS</th>
+                                <th class="px-3 py-2">Nombre</th>
+                                <th class="px-3 py-2">Apellido</th>
+                                <th class="px-3 py-2">Aula</th>
+                                <th class="px-3 py-2">Motivo</th>
+                                <th class="px-3 py-2">Tipo</th>
+                                <th class="px-3 py-2">Estado</th>
+                                <th class="px-3 py-2">Fecha</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template x-for="registro in ingresos" :key="registro.sis + registro.fecha">
+                                <tr class="border-b border-default">
+                                    <td class="px-3 py-2 font-mono" x-text="registro.sis"></td>
+                                    <td class="px-3 py-2" x-text="registro.nombre"></td>
+                                    <td class="px-3 py-2" x-text="registro.apellido"></td>
+                                    <td class="px-3 py-2" x-text="registro.aula"></td>
+                                    <td class="px-3 py-2" x-text="registro.motivo"></td>
+                                    <td class="px-3 py-2" x-text="registro.tipo"></td>
+                                    <td class="px-3 py-2" x-text="registro.estado"></td>
+                                    <td class="px-3 py-2" x-text="registro.fecha"></td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                    <p x-show="ingresos.length === 0" class="text-sm text-body mt-3">No hay intentos de ingreso no autorizados.</p>
+                </div>
             </section>
             <section x-show="tab === 'horarios' && materiaId && examenId" x-cloak class="mt-4 px-4 sm:px-6 lg:px-8">
                 @include('partials.reportes.horario-ingreso')
