@@ -11,13 +11,19 @@
 
     Los ids del curso y del examen no se pasan como props porque cambian con
     Alpine. La página dispara el evento `reporte-horario-actualizar` cuando
-    cambia el examen y este parcial lo escucha en window. Al recibirlo reinicia
-    filtros y consulta el endpoint; si el examen queda vacío solo limpia el
-    estado.
+    cambia el examen y este parcial lo escucha en window. Al recibirlo consulta
+    el endpoint; si el examen queda vacío solo limpia el estado.
+
+    El reporte no tiene filtros ni resumen: solo muestra la tabla con el
+    listado de ingresos del examen elegido.
 
     @changelog
     - 2026-10-23  [Alex Candia]  refactor: se extrae la pestaña de
       reportes.blade.php a un parcial con su propio estado de Alpine.
+    - 2026-10-23  [Alex Candia]  fix: se eliminan los filtros por aula y rango
+      horario; el reporte muestra todos los ingresos del examen.
+    - 2026-10-23  [Alex Candia]  fix: se quitan el resumen de totales y primeros/últimos
+      ingresos; solo se muestra el listado.
 
     @see  resources/views/pages/reportes.blade.php
     @see  App\Http\Controllers\Api\ReporteHorarioIngresoController
@@ -30,27 +36,17 @@
         endpoint: @js(route('api.reportes.horarios-ingreso')),
         endpointExportar: @js(route('api.reportes.horarios-ingreso.exportar')),
 
-        aulaId: '',
-        horaDesde: '',
-        horaHasta: '',
         horario: null,
         cargando: false,
         errorReporte: '',
-
-        get aulas() {
-            return this.horario ? this.horario.aulas : [];
-        },
 
         get hayDatos() {
             return this.horario !== null && ! this.horario.sin_datos;
         },
 
-        actualizarDesdeFiltros(evento) {
+        actualizarSeleccion(evento) {
             this.idCurso = evento.detail.idCurso;
             this.idExamen = evento.detail.idExamen;
-            this.aulaId = '';
-            this.horaDesde = '';
-            this.horaHasta = '';
             this.horario = null;
             this.errorReporte = '';
 
@@ -63,10 +59,6 @@
             const parametros = new URLSearchParams();
             parametros.set('id_curso', this.idCurso);
             parametros.set('id_examen', this.idExamen);
-
-            if (this.aulaId) { parametros.set('id_aula', this.aulaId); }
-            if (this.horaDesde) { parametros.set('hora_desde', this.horaDesde); }
-            if (this.horaHasta) { parametros.set('hora_hasta', this.horaHasta); }
 
             return parametros;
         },
@@ -97,49 +89,15 @@
             }
         },
 
-        limpiarFiltros() {
-            this.aulaId = '';
-            this.horaDesde = '';
-            this.horaHasta = '';
-            this.cargar();
-        },
-
         exportar() {
             if (! this.hayDatos) { return; }
 
             window.location.href = this.endpointExportar + '?' + this.parametros().toString();
         }
     }"
-    x-on:reporte-horario-actualizar.window="actualizarDesdeFiltros($event)"
+    x-on:reporte-horario-actualizar.window="actualizarSeleccion($event)"
     class="space-y-6"
 >
-    <div class="rounded-base border border-default bg-neutral-primary-soft p-4 shadow-xs sm:p-6">
-        <form @submit.prevent="cargar()" class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div>
-                <label for="aula_horario" class="block mb-2.5 text-sm font-medium text-heading">Aula</label>
-                <select
-                    name="id_aula"
-                    id="aula_horario"
-                    x-model="aulaId"
-                    class="block w-full px-3 py-2.5 border text-sm rounded-base shadow-xs placeholder:text-body bg-neutral-secondary-medium border-default-medium text-heading focus:ring-brand focus:border-brand"
-                >
-                    <option value="">Todas las aulas</option>
-                    <template x-for="aula in aulas" :key="aula.id">
-                        <option :value="aula.id" x-text="aula.nombre"></option>
-                    </template>
-                </select>
-            </div>
-
-            <x-ui.input label="Desde" name="hora_desde" id="hora_desde" type="time" x-model="horaDesde" />
-            <x-ui.input label="Hasta" name="hora_hasta" id="hora_hasta" type="time" x-model="horaHasta" />
-
-            <div class="flex flex-col gap-2 sm:col-span-2 sm:flex-row sm:items-end lg:col-span-1 lg:flex-col lg:items-stretch">
-                <x-ui.button type="submit" class="w-full">Aplicar filtros</x-ui.button>
-                <x-ui.button type="button" variant="secondary" class="w-full" @click="limpiarFiltros()">Limpiar</x-ui.button>
-            </div>
-        </form>
-    </div>
-
     <p x-show="cargando" x-cloak class="rounded-base border border-default bg-neutral-primary-soft p-6 text-center text-sm text-body">
         Cargando reporte...
     </p>
@@ -164,38 +122,6 @@
                 >
                     Exportar a Excel
                 </x-ui.button>
-            </div>
-
-            <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                <div class="flex items-center justify-between gap-3 rounded-base border border-default bg-neutral-primary-soft p-4 shadow-xs sm:p-6">
-                    <div class="min-w-0">
-                        <p class="truncate text-xl font-semibold text-fg-brand sm:text-3xl" x-text="horario.resumen.total"></p>
-                        <p class="truncate text-sm text-body">Estudiantes ingresados</p>
-                    </div>
-                    <span class="flex size-10 shrink-0 items-center justify-center rounded-base bg-neutral-secondary-soft text-fg-brand sm:size-12">
-                        <svg class="h-5 w-5 sm:h-6 sm:w-6" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 19h4a1 1 0 0 0 1-1v-1a3 3 0 0 0-3-3h-2m-2-4h2a3 3 0 0 1 3 3v2a1 1 0 0 1-1 1h-4m-3-9a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm-2 8H6a3 3 0 0 0-3 3v1a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-1a3 3 0 0 0-3-3h-3Z"/></svg>
-                    </span>
-                </div>
-
-                <div class="flex items-center justify-between gap-3 rounded-base border border-default bg-neutral-primary-soft p-4 shadow-xs sm:p-6">
-                    <div class="min-w-0">
-                        <p class="truncate text-xl font-semibold text-fg-success sm:text-3xl" x-text="horario.resumen.primer_ingreso || 'Sin registros'"></p>
-                        <p class="truncate text-sm text-body">Primer ingreso</p>
-                    </div>
-                    <span class="flex size-10 shrink-0 items-center justify-center rounded-base bg-neutral-secondary-soft text-fg-success sm:size-12">
-                        <svg class="h-5 w-5 sm:h-6 sm:w-6" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
-                    </span>
-                </div>
-
-                <div class="flex items-center justify-between gap-3 rounded-base border border-default bg-neutral-primary-soft p-4 shadow-xs sm:p-6">
-                    <div class="min-w-0">
-                        <p class="truncate text-xl font-semibold text-fg-warning sm:text-3xl" x-text="horario.resumen.ultimo_ingreso || 'Sin registros'"></p>
-                        <p class="truncate text-sm text-body">Último ingreso</p>
-                    </div>
-                    <span class="flex size-10 shrink-0 items-center justify-center rounded-base bg-neutral-secondary-soft text-fg-warning sm:size-12">
-                        <svg class="h-5 w-5 sm:h-6 sm:w-6" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
-                    </span>
-                </div>
             </div>
 
             <p x-show="horario.sin_datos" class="rounded-base border border-default bg-neutral-primary-soft p-8 text-center text-sm text-body">
