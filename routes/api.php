@@ -25,6 +25,7 @@ use App\Http\Controllers\Api\DetalleIncidenciaController;
 use App\Http\Controllers\Api\EstudianteExamenController;
 use App\Http\Controllers\Api\ExamenMonitoreoController;
 use App\Http\Controllers\Api\NotificacionController;
+use App\Http\Controllers\Api\ReporteHorarioIngresoController;
 use App\Http\Controllers\Api\ResolverIncidenciaController;
 use Illuminate\Support\Facades\Route;
 
@@ -52,6 +53,12 @@ Route::middleware(['web', 'auth:web'])->group(function (): void {
     Route::patch('/notificaciones/{idNotificacion}/ocultar', [NotificacionController::class, 'ocultar'])
         ->whereNumber('idNotificacion')
         ->name('api.notificaciones.ocultar');
+
+    Route::get('/reportes/horarios-ingreso', [ReporteHorarioIngresoController::class, 'index'])
+        ->name('api.reportes.horarios-ingreso');
+
+    Route::get('/reportes/horarios-ingreso/exportar', [ReporteHorarioIngresoController::class, 'exportar'])
+        ->name('api.reportes.horarios-ingreso.exportar');
 });
 Route::get('/cursos/{idCurso}/examenes', [CursoExamenController::class, 'index'])
     ->whereNumber('idCurso')

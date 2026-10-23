@@ -65,13 +65,19 @@ class ListarFiltrosReporteService
      */
     public function ejecutar(?Usuario $usuario): array
     {
+        $roles = $usuario === null
+            ? collect()
+            : $usuario->roles()->pluck('nombre_rol');
         $idsCursos = $usuario === null
             ? collect()
-            : $this->idsCursosDelUsuario($usuario);
+            : $this->idsCursosDelUsuario($usuario, $roles);
 
         return [
             'opcionesMaterias' => $this->opcionesMaterias($idsCursos),
-            'examenesPorCurso' => $this->examenesPorCurso($idsCursos),
+            'examenesPorCurso' => $this->examenesPorCurso(
+                $idsCursos,
+                $roles->contains(Rol::NOMBRE_DOCENTE) ? $usuario : null,
+            ),
         ];
     }
 
@@ -80,12 +86,11 @@ class ListarFiltrosReporteService
      * Docente ve los cursos que dicta (`sis_doc`); auxiliar, los que tiene
      * asignados en `auxiliar_curso`. Si tiene ambos roles, se unen.
      *
+     * @param  Collection<int, string>  $roles
      * @return Collection<int, int>
      */
-    private function idsCursosDelUsuario(Usuario $usuario): Collection
+    private function idsCursosDelUsuario(Usuario $usuario, Collection $roles): Collection
     {
-        $roles = $usuario->roles()->pluck('nombre_rol');
-
         $ids = collect();
 
         if ($roles->contains(Rol::NOMBRE_DOCENTE)) {
@@ -132,7 +137,7 @@ class ListarFiltrosReporteService
      * @param  Collection<int, int>  $idsCursos
      * @return array<int, list<array{id: int, etiqueta: string}>>
      */
-    private function examenesPorCurso(Collection $idsCursos): array
+    private function examenesPorCurso(Collection $idsCursos, ?Usuario $docente): array
     {
         if ($idsCursos->isEmpty()) {
             return [];
@@ -142,6 +147,16 @@ class ListarFiltrosReporteService
             ->join('examen_curso', 'examen_curso.id_examen', '=', 'examen.id_examen')
             ->leftJoin('tipo_examen', 'tipo_examen.id_tipo_examen', '=', 'examen.tipo_examen')
             ->whereIn('examen_curso.id_curso', $idsCursos)
+            ->when($docente !== null, fn ($consulta) => $consulta->where(
+                fn ($acceso) => $acceso
+                    ->where('examen.creador', $docente->id_usuario)
+                    ->orWhereExists(fn ($invitacion) => $invitacion
+                        ->select(DB::raw('1'))
+                        ->from('invitacion_examen_compartido')
+                        ->whereColumn('invitacion_examen_compartido.id_examen', 'examen.id_examen')
+                        ->where('invitacion_examen_compartido.id_docente_invitado', $docente->id_usuario)
+                        ->where('invitacion_examen_compartido.estado', 'aceptado'))
+            ))
             ->select(
                 'examen_curso.id_curso',
                 'examen.id_examen',
