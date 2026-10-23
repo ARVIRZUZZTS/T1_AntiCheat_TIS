@@ -49,11 +49,20 @@ class ListarFiltrosReporteService
      *     examenesPorCurso: array<int, list<array{id: int, etiqueta: string}>>
      * }
      */
-    public function ejecutar(): array
+    public function ejecutar(?int $idDocente = null): array
     {
+        $idsCursos = null;
+
+        if ($idDocente !== null) {
+            $idsCursos = \App\Models\Curso::query()
+                ->where('sis_doc', $idDocente)
+                ->pluck('id_curso')
+                ->all();
+        }
+
         return [
-            'opcionesMaterias' => $this->opcionesMaterias(),
-            'examenesPorCurso' => $this->examenesPorCurso(),
+            'opcionesMaterias' => $this->opcionesMaterias($idsCursos),
+            'examenesPorCurso' => $this->examenesPorCurso($idsCursos),
         ];
     }
 
@@ -63,9 +72,10 @@ class ListarFiltrosReporteService
      *
      * @return array<int, string>
      */
-    private function opcionesMaterias(): array
+    private function opcionesMaterias(?array $idsCursos = null): array
     {
         return $this->listarMaterias->ejecutar()
+            ->filter(fn (array $fila): bool => $idsCursos === null || in_array($fila['curso']->id_curso, $idsCursos, true))
             ->mapWithKeys(fn (array $fila): array => [
                 $fila['curso']->id_curso => $fila['curso']->nombre_curso,
             ])
@@ -79,9 +89,9 @@ class ListarFiltrosReporteService
      *
      * @return array<int, list<array{id: int, etiqueta: string}>>
      */
-    private function examenesPorCurso(): array
+    private function examenesPorCurso(?array $idsCursos = null): array
     {
-        return DB::table('examen')
+        $consulta = DB::table('examen')
             ->join('examen_curso', 'examen_curso.id_examen', '=', 'examen.id_examen')
             ->leftJoin('tipo_examen', 'tipo_examen.id_tipo_examen', '=', 'examen.tipo_examen')
             ->select(
@@ -89,7 +99,13 @@ class ListarFiltrosReporteService
                 'examen.id_examen',
                 'examen.fecha',
                 'tipo_examen.nombre_tipo_examen',
-            )
+            );
+
+        if ($idsCursos !== null) {
+            $consulta->whereIn('examen_curso.id_curso', $idsCursos);
+        }
+
+        return $consulta
             ->orderByDesc('examen.fecha')
             ->get()
             ->groupBy('id_curso')
