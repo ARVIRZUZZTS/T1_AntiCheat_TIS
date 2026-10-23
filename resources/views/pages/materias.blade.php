@@ -164,7 +164,7 @@
                     </div>
 
                     <x-ui.button :href="route('materias.detalle', $curso->id_curso)" variant="default" class="w-full sm:w-auto shrink-0">
-                        Abrir materia
+                        Info
                     </x-ui.button>
                 </div>
             @empty

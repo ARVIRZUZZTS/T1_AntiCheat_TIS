@@ -67,7 +67,6 @@
         ['label' => 'Exámenes', 'route' => 'examenes'],
         ['label' => 'Monitor en vivo', 'route' => 'monitoreo'],
         ['label' => 'Central de riesgos', 'route' => 'central-riesgo'],
-        ['label' => 'Usuarios y roles', 'route' => 'usuarios'],
         ['label' => 'Reportes', 'route' => 'reportes'],
         ['label' => 'Docentes', 'route' => 'docentes', 'count' => 3],
         ['label' => 'Auxiliares', 'route' => 'auxiliares'],

@@ -140,8 +140,7 @@
                     'shrink-0'
                 );
 
-                return [
-                    '__rowClass' => $rowClass,
+                $columnas = [
                     ['value' => (string) ($this->estudiantes->firstItem() + $indice)],
                     [
                         'heading' => true,
@@ -149,10 +148,18 @@
                     ],
                     ['html' => '<span class="font-mono">' . e($estudiante['sis'] ?? '—') . '</span>'],
                     ['html' => $badge($estudiante['estado'] ?? null, $estadoBadges, 'Sin estado', 'status-pendiente')],
-                    $estudiante['motivo'] ?? '—',
-                    ['html' => $badge($observacion, $observacionBadges)],
-                    ['html' => $acciones((string) ($estudiante['sis'] ?? ''), $estudiante['estado'] ?? null, $esDocente)],
                 ];
+
+                if (! $this->modoHabilitacion) {
+                    $columnas[] = $estudiante['motivo'] ?? '—';
+                    $columnas[] = ['html' => $badge($observacion, $observacionBadges)];
+                }
+
+                if (! $this->soloLectura) {
+                    $columnas[] = ['html' => $acciones((string) ($estudiante['sis'] ?? ''), $estudiante['estado'] ?? null, $esDocente)];
+                }
+
+                return array_merge(['__rowClass' => $rowClass], $columnas);
             })
             ->values()
             ->all();
@@ -205,7 +212,7 @@
         : '';
 @endphp
 
-<div class="flex flex-col lg:h-full lg:overflow-hidden" x-data="@include('partials.busqueda-estudiante')">
+<div class="flex flex-col lg:h-full lg:overflow-hidden" x-data="{ @include('partials.busqueda-estudiante') }">
     {{-- Encabezado --}}
     {{--
     <div class="shrink-0 flex items-start sm:items-center justify-between gap-3 px-4 sm:px-6 pb-4 border-b border-default bg-neutral-primary-soft" style="padding-top: max(1rem, env(safe-area-inset-top));">
@@ -247,6 +254,7 @@
 
             <div class="flex flex-wrap gap-2 shrink-0">
                 @foreach ($this->filtros as $clave => $etiqueta)
+                    @if (! $this->modoHabilitacion || in_array($clave, [App\Services\Examen\ListarEstudiantesCursoConEstadoService::FILTRO_TODOS, App\Services\Examen\ListarEstudiantesCursoConEstadoService::FILTRO_HABILITADOS, App\Services\Examen\ListarEstudiantesCursoConEstadoService::FILTRO_DESHABILITADOS], true))
                     <x-ui.button
                         :key="$clave"
                         :variant="$estado === $clave ? 'default' : 'tertiary'"
@@ -256,6 +264,7 @@
                     >
                         {{ $etiqueta }} {{ $this->conteos[$clave] }}
                     </x-ui.button>
+                    @endif
                 @endforeach
             </div>
         </div>
@@ -300,16 +309,20 @@
 
                             <div class="mt-3 flex flex-wrap items-center gap-2">
                                 {!! $tarjeta['estadoHtml'] !!}
-                                {!! $tarjeta['observacionHtml'] !!}
+                                @if (! $this->modoHabilitacion)
+                                    {!! $tarjeta['observacionHtml'] !!}
+                                @endif
                             </div>
 
-                            @if ($tarjeta['motivo'])
+                            @if (! $this->modoHabilitacion && $tarjeta['motivo'])
                                 <p class="mt-2 text-sm text-body">{{ $tarjeta['motivo'] }}</p>
                             @endif
 
-                            <div class="mt-3 border-t border-default pt-3 text-end">
-                                {!! $tarjeta['accionesHtml'] !!}
-                            </div>
+                            @if (! $this->soloLectura)
+                                <div class="mt-3 border-t border-default pt-3 text-end">
+                                    {!! $tarjeta['accionesHtml'] !!}
+                                </div>
+                            @endif
                         </div>
                     @endforeach
                 </div>
@@ -317,7 +330,7 @@
                 <div class="hidden lg:block">
                     <x-ui.table
                         compact
-                        :headers="['#', 'ESTUDIANTE', 'CÓDIGO SIS', 'ESTADO (EXAMEN ACTUAL)', 'MOTIVO', 'OBSERVACIONES', 'ACCIONES']"
+                        :headers="$this->modoHabilitacion ? ['#', 'ESTUDIANTE', 'CÓDIGO SIS', 'ESTADO (EXAMEN ACTUAL)', 'ACCIONES'] : ($this->soloLectura ? ['#', 'ESTUDIANTE', 'CÓDIGO SIS', 'ESTADO (EXAMEN ACTUAL)', 'MOTIVO', 'OBSERVACIONES'] : ['#', 'ESTUDIANTE', 'CÓDIGO SIS', 'ESTADO (EXAMEN ACTUAL)', 'MOTIVO', 'OBSERVACIONES', 'ACCIONES'])"
                         :rows="$filas"
                     />
                 </div>
