@@ -55,7 +55,7 @@
     escrito a mano en `norma_personalizada` y `material_personalizado`.
 
     @props([
-        'materia' => null,
+        'nombreCurso' => null,
         'tipos' => null,
         'ambientes' => [],
         'materiales' => [],
@@ -133,6 +133,11 @@
     - 2026-10-24  [Valery D. Ortuno P]  fix: "Cancelar" vuelve a la página
       anterior; la URL iba con la directiva js dentro del atributo del
       componente, que Blade no compila, y el clic daba error.
+    - 2026-10-24  [Valery D. Ortuno P]  fix: un dia de dos digitos mayor a 31
+      se cambia a 31 en vez de partirse en dia y mes (32 quedaba 03/2).
+    - 2026-10-24  [Valery D. Ortuno P]  feat: el campo "Materia" pasa a "Curso"
+      y muestra el nombre completo del curso (materia y grupo); la prop
+      `materia` pasa a `nombreCurso`.
     - 2026-10-24  [Valery D. Ortuno P]  fix: la hora de inicio acepta minutos
       00 (08:00 quedaba en 08:01, porque el piso de los minutos era 1).
     - 2026-10-24  [Valery D. Ortuno P]  feat: "Materiales personalizados" pasa a
@@ -261,14 +266,9 @@
                 dia = dia.slice(0, 2);
             }
 
-            // Al teclear '9' y luego '1' no se quiere el dia 91: es 09 y el
-            // mes empieza con 1. Lo mismo un primer digito que ya no admite
-            // otro (4 a 9 en el dia, 2 a 9 en el mes).
-            if (dia.length === 2 && dia[0] !== '0' && parseInt(dia, 10) > 31) {
-                mes = dia.slice(1) + mes;
-                dia = '0' + dia[0];
-            }
-
+            // Un primer digito que ya no admite otro (4 a 9 en el dia, 2 a 9 en
+            // el mes) se completa con cero al instante: '9' es 09. Un dia de dos
+            // digitos mayor a 31 no se parte: acotar() lo deja en 31 (HU 11).
             if (dia.length === 1 && parseInt(dia, 10) > 3) {
                 dia = '0' + dia;
             }
@@ -440,12 +440,12 @@
         @csrf
 
     <div class="space-y-4 py-4">
-        @if ($materia)
+        @if ($nombreCurso)
             <x-ui.input
-                label="Materia"
-                id="materia_examen"
-                name="materia"
-                :value="$materia"
+                label="Curso"
+                id="curso_examen"
+                name="nombre_curso"
+                :value="$nombreCurso"
                 readonly
                 required
                 class="cursor-default"
