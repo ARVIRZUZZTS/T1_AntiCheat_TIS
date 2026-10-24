@@ -67,6 +67,8 @@
  *   y estas rutas quedan solo para docentes. El auxiliar tiene /mis-cursos.
  * - 2026-10-24  [Valery D. Ortuno P]  feat: POST /cursos (`cursos.store`), alta
  *   de curso desde el formulario "Crear curso".
+ * - 2026-10-24  [Valery D. Ortuno P]  feat: /central-riesgo queda solo para
+ *   docentes (HU 10); antes un auxiliar podía abrirla por URL.
  */
 
 use App\Http\Controllers\AuthController;
@@ -97,9 +99,6 @@ Route::get('/monitoreo', MonitorEnVivo::class)->name('monitoreo');
 Route::get('/monitoreo/acceso', AccesoMonitor::class)->name('monitoreo.acceso');
 Route::get('/auxiliares', GestionAuxiliares::class)->name('auxiliares');
 Route::view('/monitoreo/mock', 'livewire.monitoreo.mock')->name('monitoreo.mock');
-// La vista solo aporta el layout; los datos los resuelve el componente Livewire
-// ListaEstudiantes que incrusta, por eso la ruta sigue sin lógica.
-Route::view('/central-riesgo', 'pages.central-riesgo')->name('central-riesgo');
 
 Route::get('/reportes', function (Request $request, ListarFiltrosReporteService $filtros) {
     return view('pages.reportes', $filtros->ejecutar($request->user()));
@@ -135,6 +134,10 @@ Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
 Route::middleware(['auth', 'docente'])->group(function (): void {
     Route::view('/docentes', 'pages.docentes')->name('docentes');
+
+    // Central de riesgos (HU 10): solo para docentes. La vista solo aporta el
+    // layout; los datos los resuelve el componente Livewire ListaEstudiantes.
+    Route::view('/central-riesgo', 'pages.central-riesgo')->name('central-riesgo');
 
     // Sección Cursos: la lista, el formulario "Crear curso" (y su envío) y la
     // vista de cada curso con estudiantes y habilitaciones. Que el curso sea

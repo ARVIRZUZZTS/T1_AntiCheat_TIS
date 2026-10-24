@@ -3,6 +3,7 @@
     @author  Valery D. Ortuno P. <valerydariana98@gmail.com>
     @created 2026-10-10
     @updated 2026-10-11
+    @updated 2026-10-24
 
     @description
     Vista del componente Livewire ListaEstudiantes (HU 10): tabs de alcance
@@ -30,6 +31,9 @@
       como "Nombre Apellido"; el orden A-Z sigue siendo por apellido.
     - 2026-10-11  [Valery D. Ortuno P]  fix: se quitan los avatares de iniciales
       de la lista (cards y tabla).
+    - 2026-10-24  [Valery D. Ortuno P]  feat: la lista muestra solo la materia
+      del curso registrado y el detalle suma el grupo por separado; los textos
+      visibles van sin acentos.
 
     @see  App\Livewire\CentralRiesgo\ListaEstudiantes
     @see  resources/views/partials/busqueda-estudiante.blade.php
@@ -41,7 +45,7 @@
     use Illuminate\Support\Carbon;
 
     $alcances = [
-        ListarIncidenciasTramposoService::ALCANCE_INSTITUCION => 'Toda la institución',
+        ListarIncidenciasTramposoService::ALCANCE_INSTITUCION => 'Toda la institucion',
         ListarIncidenciasTramposoService::ALCANCE_MIS_MATERIAS => 'Mis materias',
     ];
 
@@ -53,11 +57,11 @@
 
     $tituloLista = $alcance === ListarIncidenciasTramposoService::ALCANCE_MIS_MATERIAS
         ? 'Estudiantes en mis materias'
-        : 'Estudiantes de toda la institución';
+        : 'Estudiantes de toda la institucion';
 
     $etiquetaReportante = ($detalle['reportado_por_rol'] ?? null) === Rol::NOMBRE_AUXILIAR
-        ? 'Auxiliar que reportó'
-        : 'Docente que reportó';
+        ? 'Auxiliar que reporto'
+        : 'Docente que reporto';
 @endphp
 
 <div class="px-4 pt-[2vh] pb-8 sm:px-6 lg:px-[2vh]" x-data="{ @include('partials.busqueda-estudiante') }">
@@ -66,7 +70,7 @@
              se oculta y conserva orden, filtro y página. --}}
         <section class="min-w-0 lg:flex-1" aria-label="Lista de estudiantes">
             <div class="flex flex-wrap items-center justify-between gap-3">
-                <div class="flex flex-wrap gap-2" role="tablist" aria-label="Ámbito de la central">
+                <div class="flex flex-wrap gap-2" role="tablist" aria-label="Ambito de la central">
                     @foreach ($alcances as $clave => $etiqueta)
                         <button type="button" role="tab" wire:key="alcance-{{ $clave }}"
                                 wire:click="cambiarAlcance('{{ $clave }}')"
@@ -106,7 +110,7 @@
 
             @if ($estudiantes->total() === 0)
                 <p class="mt-6 rounded-xl border border-default bg-neutral-primary-soft p-8 text-center text-sm text-body">
-                    {{ $sinCoincidencias ? 'No se encontró ninguna coincidencia' : 'No hay estudiantes registrados' }}
+                    {{ $sinCoincidencias ? 'No se encontro ninguna coincidencia' : 'No hay estudiantes registrados' }}
                 </p>
             @else
                 {{-- Móvil: cards de estudiantes. --}}
@@ -149,7 +153,7 @@
                             <thead>
                                 <tr class="border-b border-neutral-quaternary">
                                     <th scope="col" class="px-4 py-3 text-[10px] font-medium uppercase tracking-wider text-body">Estudiante</th>
-                                    <th scope="col" class="px-4 py-3 text-[10px] font-medium uppercase tracking-wider text-body">Código SIS</th>
+                                    <th scope="col" class="px-4 py-3 text-[10px] font-medium uppercase tracking-wider text-body">Codigo SIS</th>
                                     <th scope="col" class="px-4 py-3 text-[10px] font-medium uppercase tracking-wider text-body">Materia</th>
                                     <th scope="col" class="px-4 py-3 text-[10px] font-medium uppercase tracking-wider text-body">Motivo</th>
                                     <th scope="col" class="px-4 py-3"><span class="sr-only">Acciones</span></th>
@@ -234,7 +238,7 @@
                     <div class="max-h-[65vh] space-y-4 overflow-y-auto p-4">
                         <div class="rounded-xl border border-danger-subtle bg-danger-soft p-4">
                             <p class="font-semibold text-fg-danger-strong">{{ $detalle['estudiante_nombre'] ?? 'Estudiante desconocido' }}</p>
-                            <p class="mt-1 text-sm text-fg-danger">Código SIS: <span class="font-mono">{{ $detalle['sis_estudiante'] }}</span></p>
+                            <p class="mt-1 text-sm text-fg-danger">Codigo SIS: <span class="font-mono">{{ $detalle['sis_estudiante'] }}</span></p>
                         </div>
 
                         <dl class="space-y-4 text-sm">
@@ -242,9 +246,17 @@
                                 <dt class="text-[10px] font-medium uppercase tracking-wider text-body">Motivo</dt>
                                 <dd class="mt-1 font-medium text-heading">{{ $detalle['motivo'] }}</dd>
                             </div>
-                            <div>
-                                <dt class="text-[10px] font-medium uppercase tracking-wider text-body">Materia</dt>
-                                <dd class="mt-1 font-medium text-heading">{{ $detalle['materia'] ?? 'Sin materia' }}</dd>
+                            {{-- La lista muestra solo la materia; el detalle suma el
+                                 grupo, que sale del nombre del curso registrado. --}}
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <dt class="text-[10px] font-medium uppercase tracking-wider text-body">Materia</dt>
+                                    <dd class="mt-1 font-medium text-heading">{{ $detalle['materia'] ?? 'Sin materia' }}</dd>
+                                </div>
+                                <div>
+                                    <dt class="text-[10px] font-medium uppercase tracking-wider text-body">Grupo</dt>
+                                    <dd class="mt-1 font-medium text-heading">{{ $detalle['grupo'] ?? '—' }}</dd>
+                                </div>
                             </div>
                             <div>
                                 <dt class="text-[10px] font-medium uppercase tracking-wider text-body">{{ $etiquetaReportante }}</dt>
@@ -261,8 +273,8 @@
                                 </dd>
                             </div>
                             <div>
-                                <dt class="text-[10px] font-medium uppercase tracking-wider text-body">Descripción del hecho</dt>
-                                <dd class="mt-1 whitespace-pre-line break-words text-heading">{{ $detalle['descripcion'] ?: 'Sin descripción' }}</dd>
+                                <dt class="text-[10px] font-medium uppercase tracking-wider text-body">Descripcion del hecho</dt>
+                                <dd class="mt-1 whitespace-pre-line break-words text-heading">{{ $detalle['descripcion'] ?: 'Sin descripcion' }}</dd>
                             </div>
                         </dl>
                     </div>
