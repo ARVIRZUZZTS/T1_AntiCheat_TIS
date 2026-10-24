@@ -79,13 +79,14 @@ use App\Services\Material\ListarMaterialesService;
 use App\Services\Norma\ListarNormasService;
 use App\Services\Reporte\ListarFiltrosReporteService;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('auth')->group(function (): void {
 Route::view('/', 'pages.inicio')->name('inicio');
 
-Route::view('/inicio', 'pages.inicio')->name('inicio');
+Route::view('/inicio', 'pages.inicio');
 Route::get('/materias', fn () => view('pages.materias', [
     'materias' => app(ListarMateriasConMetricasService::class)->ejecutar(),
 ]))->name('materias');
@@ -98,10 +99,9 @@ Route::view('/monitoreo/mock', 'livewire.monitoreo.mock')->name('monitoreo.mock'
 // ListaEstudiantes que incrusta, por eso la ruta sigue sin lógica.
 Route::view('/central-riesgo', 'pages.central-riesgo')->name('central-riesgo');
 
-Route::get('/reportes', fn (ListarFiltrosReporteService $filtros) => view(
-    'pages.reportes',
-    $filtros->ejecutar(auth()->id()),
-))->name('reportes');
+Route::get('/reportes', function (Request $request, ListarFiltrosReporteService $filtros) {
+    return view('pages.reportes', $filtros->ejecutar($request->user()));
+})->name('reportes');
 
 Route::get('/reportes/ingresos-ilegales/exportar/{examen}', ExportarReporteIngresosIlegalesController::class)
     ->name('reportes.ingresos-ilegales.exportar');

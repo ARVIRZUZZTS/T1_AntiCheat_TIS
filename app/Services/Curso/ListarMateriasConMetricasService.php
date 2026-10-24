@@ -33,6 +33,9 @@
  *
  * @changelog
  * - 2026-10-12  [Diego Tejerina]  feat: creación inicial del servicio.
+ * - 2026-10-21  [Alex Candia]  feat: parámetro opcional `$idsCursos` para
+ *   acotar el listado a un subconjunto (usado por los reportes por usuario).
+ *   Sin argumento conserva el comportamiento anterior (todos los cursos).
  */
 
 namespace App\Services\Curso;
@@ -45,6 +48,8 @@ use Illuminate\Support\Facades\DB;
 class ListarMateriasConMetricasService
 {
     /**
+     * @param  array<int, int>|null  $idsCursos  Si se pasa, solo se listan
+     *         esos cursos; `null` lista todos (comportamiento de /materias).
      * @return Collection<int, array{
      *     curso: Curso,
      *     inscritos: int,
@@ -54,12 +59,17 @@ class ListarMateriasConMetricasService
      *     examen_activo: bool,
      * }>
      */
-    public function ejecutar(): Collection
+    public function ejecutar(?array $idsCursos = null): Collection
     {
-        $cursos = Curso::query()
+        $consulta = Curso::query()
             ->withCount(['estudiantes as inscritos'])
-            ->orderBy('id_curso')
-            ->get();
+            ->orderBy('id_curso');
+
+        if ($idsCursos !== null) {
+            $consulta->whereIn('id_curso', $idsCursos);
+        }
+
+        $cursos = $consulta->get();
 
         if ($cursos->isEmpty()) {
             return collect();
