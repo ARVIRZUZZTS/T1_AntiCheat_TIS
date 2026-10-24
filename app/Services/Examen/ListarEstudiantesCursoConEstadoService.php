@@ -40,12 +40,14 @@
  *   ("Central de Riesgo" en pantalla) pasan a contar a los estudiantes que
  *   están en la central por una incidencia del curso (tramposo confirmada, en
  *   cualquier examen del curso), en vez de los tramposos del examen actual.
+ * - 2026-10-24  [Valery D. Ortuno P]  refactor: "en la central por el curso"
+ *   pasa a ser tramposo con ese `id_curso`, la misma regla que la lista de la
+ *   central de riesgos (ya no mira `estado_incidencia` ni el examen).
  */
 
 namespace App\Services\Examen;
 
 use App\Enums\EstadoEstudianteExamen;
-use App\Enums\EstadoIncidencia;
 use App\Enums\TipoInfraccion;
 use App\Models\CentralRiesgo;
 use App\Models\Curso;
@@ -55,7 +57,6 @@ use App\Models\Examen;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Pagination\LengthAwarePaginator;
-use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
 class ListarEstudiantesCursoConEstadoService
@@ -227,14 +228,12 @@ class ListarEstudiantesCursoConEstadoService
 
     /**
      * Acota una consulta de `central_riesgo` a las incidencias por las que un
-     * estudiante está en la central de riesgos por este curso: tramposo y
-     * confirmada, en cualquier examen del curso.
+     * estudiante está en la central de riesgos por este curso: tramposo (que
+     * equivale a confirmada) y registrada en ese curso (`id_curso`).
      *
-     * Una incidencia es del curso si guardó ese `id_curso`; si no guardó
-     * ninguno, si su examen pertenece al curso. Es la misma regla con la que
-     * la central de riesgos resuelve la materia de cada incidencia. El filtro
-     * "Central de Riesgo" y la tarjeta del detalle del curso cuentan con esta
-     * regla, así que siempre dan el mismo número.
+     * Es la misma regla con la que la central de riesgos lista a los
+     * estudiantes, así que el filtro "Central de Riesgo", la tarjeta del
+     * detalle del curso y "Mis materias" de la central dan el mismo número.
      *
      * @param  Builder  $q  Consulta sobre `central_riesgo`.
      * @param  int  $idCurso  ID del curso.
@@ -245,16 +244,7 @@ class ListarEstudiantesCursoConEstadoService
     private function delCursoEnCentralRiesgo(Builder $q, int $idCurso): void
     {
         $q->where('tipo_infraccion', TipoInfraccion::Tramposo->value)
-            ->where('estado_incidencia', EstadoIncidencia::Confirmado->value)
-            ->where(function (Builder $delCurso) use ($idCurso) {
-                $delCurso->where('id_curso', $idCurso)
-                    ->orWhere(function (Builder $porExamen) use ($idCurso) {
-                        $porExamen->whereNull('id_curso')
-                            ->whereIn('id_examen', DB::table('examen_curso')
-                                ->where('id_curso', $idCurso)
-                                ->select('id_examen'));
-                    });
-            });
+            ->where('id_curso', $idCurso);
     }
 
     /**

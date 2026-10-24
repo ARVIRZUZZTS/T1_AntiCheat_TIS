@@ -8,6 +8,7 @@
  * @created 2026-09-26
  *
  * @updated 2026-10-10
+ * @updated 2026-10-24
  *
  * @description
  * Servicio del control de ingreso del monitor en vivo. Persiste las cuatro
@@ -27,6 +28,9 @@
  *   asignaba el PK `id_ingreso` y lanzaba excepciones que no existen en el
  *   proyecto. Se reescribe sobre `InvalidArgumentException` (convención del
  *   proyecto) y se agregan rechazar(), permitir() y registrarIncidencia().
+ * - 2026-10-24  [Valery D. Ortuno P]  fix: registrarIncidencia() guarda el curso
+ *   (`id_curso`) con ResolverCursoIncidenciaService; sin él la incidencia no
+ *   aparecía con materia en la central de riesgos (HU 10).
  *
  * @see  App\Livewire\Monitoreo\MonitorEnVivo
  * @see  App\Services\Examen\CambiarEstadoEstudianteService
@@ -41,6 +45,7 @@ use App\Models\CentralRiesgo;
 use App\Models\Estudiante;
 use App\Models\EstudianteExamen;
 use App\Models\RegistroAsistencia;
+use App\Services\CentralRiesgo\ResolverCursoIncidenciaService;
 use App\Services\Notificacion\NotificacionService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
@@ -158,6 +163,9 @@ class RegistroIngresoService
                 'id_registro' => $this->siguienteId(CentralRiesgo::class, 'id_registro'),
                 'sis_estudiante' => $sisEstudiante,
                 'id_examen' => $idExamen,
+                // La central de riesgos lista por el curso registrado: sin él la
+                // incidencia quedaba "Sin materia" y fuera de "Mis materias".
+                'id_curso' => app(ResolverCursoIncidenciaService::class)->ejecutar($sisEstudiante, $idExamen),
                 'id_registrador' => $idRegistrador,
                 'motivo' => $motivo->value,
                 'detalle_motivo' => $detalle === '' ? null : $detalle,

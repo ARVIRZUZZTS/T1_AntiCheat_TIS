@@ -8,6 +8,7 @@
  * @created 2026-10-09
  *
  * @updated 2026-10-11
+ * @updated 2026-10-24
  *
  * @description Pruebas HTTP con SQLite en memoria, sin usar Supabase, del
  * endpoint GET /api/incidencias/{idIncidencia}: datos completos del detalle
@@ -22,6 +23,10 @@
  *   vigente con espacios (`copia o intercambio de respuestas`); el valor con
  *   guiones bajos ya no es un backing value válido y el cast del modelo lanzaba
  *   ValueError.
+ * - 2026-10-24  [Valery D. Ortuno P]  test: `central_riesgo` del esquema de
+ *   prueba suma `id_curso`; el detalle trae `curso`, `materia` y `grupo` del
+ *   curso registrado y el estado sale del tipo de infracción (tramposo =
+ *   Confirmado aunque `estado_incidencia` diga Pendiente).
  *
  * @see App\Http\Controllers\Api\DetalleIncidenciaController
  * @see App\Services\CentralRiesgo\ConsultarDetalleIncidenciaService
@@ -66,7 +71,9 @@ class DetalleIncidenciaTest extends TestCase
                     'estudiante_nombre' => 'María Gómez',
                     'sis_estudiante' => '20181111111',
                     'motivo' => 'Copia o intercambio de respuestas',
+                    'curso' => 'Matemática Discreta - Grupo 3',
                     'materia' => 'Matemática Discreta',
+                    'grupo' => '3',
                     'reportado_por' => 'Luis Rojas',
                     'reportado_por_rol' => 'auxiliar',
                     'fecha_registro' => '2026-10-05 10:30:00',
@@ -135,6 +142,7 @@ class DetalleIncidenciaTest extends TestCase
         Schema::create('central_riesgo', function (Blueprint $tabla): void {
             $tabla->integer('id_registro')->primary();
             $tabla->integer('id_examen');
+            $tabla->integer('id_curso')->nullable();
             $tabla->string('sis_estudiante');
             $tabla->integer('id_registrador');
             $tabla->string('motivo')->nullable();
@@ -168,20 +176,22 @@ class DetalleIncidenciaTest extends TestCase
             'carrera' => 'Ing. de Sistemas',
         ]);
         DB::table('curso')->insert([
-            'id_curso' => 1, 'nombre_curso' => 'Matemática Discreta', 'sis_doc' => 1,
+            'id_curso' => 1, 'nombre_curso' => 'Matemática Discreta - Grupo 3', 'sis_doc' => 1,
         ]);
         DB::table('examen')->insert(['id_examen' => 1]);
         DB::table('examen_curso')->insert(['id_examen' => 1, 'id_curso' => 1]);
         DB::table('central_riesgo')->insert([
             'id_registro' => 1,
             'id_examen' => 1,
+            'id_curso' => 1,
             'sis_estudiante' => '20181111111',
             'id_registrador' => 2,
             'motivo' => 'copia o intercambio de respuestas',
             'detalle_motivo' => 'Copia visible desde el celular en el momento del examen.',
             'fecha_registro' => '2026-10-05 10:30:00',
             'tipo_infraccion' => 'tramposo',
-            'estado_incidencia' => 'Confirmado',
+            // El estado sale del tipo (tramposo = Confirmado), no de esta columna.
+            'estado_incidencia' => 'Pendiente',
             'id_confirmador' => null,
         ]);
     }

@@ -8,6 +8,7 @@
  * @created 2026-10-09
  *
  * @updated 2026-10-09
+ * @updated 2026-10-24
  *
  * @description Confirma o descarta incidencias pendientes dentro de una transacción.
  *
@@ -15,6 +16,10 @@
  * - 2026-10-09  [Diego Tejerina]  feat: resolver incidencias sin duplicados (#142).
  * - 2026-10-11  [David E. Chavez T.]  feat: al confirmar se avisa a los
  *   docentes de las materias activas del estudiante (HU 6 · T1).
+ * - 2026-10-24  [Valery D. Ortuno P]  fix: confirmar pasa el caso a
+ *   `tramposo`, porque la central de riesgos ahora lista por tipo de
+ *   infracción (tramposo = confirmado); sin esto un caso confirmado no
+ *   aparecía en la central.
  *
  * @see App\Policies\CentralRiesgoPolicy
  */
@@ -22,6 +27,7 @@
 namespace App\Services\CentralRiesgo;
 
 use App\Enums\EstadoIncidencia;
+use App\Enums\TipoInfraccion;
 use App\Models\CentralRiesgo;
 use App\Models\Usuario;
 use App\Services\Notificacion\NotificacionService;
@@ -46,15 +52,18 @@ class ResolverIncidenciaService
     {
         return DB::transaction(function () use ($idIncidencia, $docente): CentralRiesgo {
             $incidencia = $this->obtenerPendiente($idIncidencia, $docente);
+            // Tramposo equivale a confirmado: la central de riesgos lista por
+            // tipo de infracción, así que el caso pasa de sospechoso a tramposo.
+            // `estado_incidencia` se sigue escribiendo mientras exista la columna.
+            $incidencia->tipo_infraccion = TipoInfraccion::Tramposo;
             $incidencia->estado_incidencia = EstadoIncidencia::Confirmado;
             $incidencia->id_confirmador = $docente->id_usuario;
             $incidencia->save();
 
             // HU 6 · T1: confirmar es el momento en que el caso del auxiliar
             // ingresa efectivamente a la central de riesgos, así que recién ahí
-            // se avisa a cada docente con materia activa del estudiante. El
-            // caso sigue con `tipo_infraccion = sospechoso`, por eso el aviso
-            // se fuerza desde la confirmación.
+            // se avisa a cada docente con materia activa del estudiante; el
+            // aviso se fuerza desde la confirmación.
             app(NotificacionService::class)->notificarCentralRiesgo($incidencia, porConfirmacion: true);
 
             return $incidencia;

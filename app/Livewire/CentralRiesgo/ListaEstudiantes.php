@@ -8,6 +8,7 @@
  * @created 2026-10-10
  *
  * @updated 2026-10-11
+ * @updated 2026-10-24
  *
  * @description
  * Componente Livewire de la central de riesgos (HU 10): lista a los estudiantes
@@ -34,11 +35,13 @@
  *   incidencia sube la versión), así abrir el detalle o repetir una búsqueda no
  *   vuelve a consultar Supabase. Las dos consultas de dominio bajan a una sola
  *   sentencia cada una.
+ * - 2026-10-24  [Valery D. Ortuno P]  refactor: se quita el usuario que llegaba
+ *   por la URL (`?usuario=`) y el usuario por defecto de antes del login:
+ *   "Mis materias" usa siempre el usuario de la sesión.
  */
 
 namespace App\Livewire\CentralRiesgo;
 
-use App\Livewire\Monitoreo\RegistrarIncidencia;
 use App\Services\CentralRiesgo\CacheCentralRiesgo;
 use App\Services\CentralRiesgo\ConsultarDetalleIncidenciaService;
 use App\Services\CentralRiesgo\ListarIncidenciasTramposoService;
@@ -48,7 +51,6 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Cache;
 use Livewire\Attributes\Computed;
-use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class ListaEstudiantes extends Component
@@ -66,16 +68,6 @@ class ListaEstudiantes extends Component
      */
     public ?int $idSeleccionado = null;
 
-    /**
-     * Usuario dueño de "Mis materias".
-     *
-     * Es el autenticado cuando hay sesión. Mientras no exista login (#69) llega
-     * por la URL, igual que en el registro de incidencias, y si tampoco viene
-     * se usa el mismo usuario por defecto que ese formulario.
-     */
-    #[Locked]
-    public int $usuario = RegistrarIncidencia::USUARIO_POR_DEFECTO;
-
     private const POR_PAGINA = 8;
 
     private ListarIncidenciasTramposoService $servicioLista;
@@ -89,12 +81,6 @@ class ListaEstudiantes extends Component
         $this->servicioLista = app(ListarIncidenciasTramposoService::class);
         $this->servicioDetalle = app(ConsultarDetalleIncidenciaService::class);
         $this->servicioBusqueda = app(BusquedaEstudianteService::class);
-    }
-
-    public function mount(): void
-    {
-        $this->usuario = (int) (auth()->id()
-            ?? request()->query('usuario', RegistrarIncidencia::USUARIO_POR_DEFECTO));
     }
 
     /**
@@ -118,10 +104,14 @@ class ListaEstudiantes extends Component
         // Caché local por filtro y orden: abrir/cerrar el detalle o repetir una
         // búsqueda no vuelve a viajar a Supabase (~1.6 s por request). Cada
         // escritura de una incidencia sube la versión y renueva la clave.
+        // "Mis materias" es siempre del usuario de la sesión (la ruta exige
+        // login y rol docente), nunca de uno que venga por la URL.
+        $usuario = (int) auth()->id();
+
         $incidencias = Cache::remember(
-            CacheCentralRiesgo::claveLista($this->usuario, $this->alcance, $busqueda, $this->ordenAlfabetico),
+            CacheCentralRiesgo::claveLista($usuario, $this->alcance, $busqueda, $this->ordenAlfabetico),
             CacheCentralRiesgo::ttlLista(),
-            fn () => $this->servicioLista->ejecutar($this->usuario, $this->alcance, $busqueda, $orden),
+            fn () => $this->servicioLista->ejecutar($usuario, $this->alcance, $busqueda, $orden),
         );
 
         // Una página que ya no existe (quedó de un filtro anterior) cae en la

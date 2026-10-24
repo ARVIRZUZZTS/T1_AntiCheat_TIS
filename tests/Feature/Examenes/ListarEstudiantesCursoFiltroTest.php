@@ -33,6 +33,8 @@
  *   `id_examen`, `sis_estudiante` y `motivo` (NOT NULL desde #70, el insert
  *   fallaba) y el tramposo va confirmado, porque el filtro "tramposos" ahora
  *   cuenta a los estudiantes que están en la central de riesgos.
+ * - 2026-10-24  [Valery D. Ortuno P]  test: la incidencia guarda `id_curso`,
+ *   que es lo que ahora usa el filtro "tramposos" para ubicarla en el curso.
  */
 
 namespace Tests\Feature\Examenes;
@@ -154,12 +156,13 @@ class ListarEstudiantesCursoFiltroTest extends TestCase
             $idRiesgo++;
 
             // Desde #70 la incidencia guarda su propio examen y estudiante (no
-            // pasa por `id_ingreso`). El tramposo va confirmado: así está en la
-            // central de riesgos, que es lo que cuenta el filtro "tramposos".
+            // pasa por `id_ingreso`). El filtro "tramposos" cuenta a los que
+            // están en la central por este curso: tramposo y con su `id_curso`.
             CentralRiesgo::create([
                 'id_registro' => $idRiesgo,
                 'id_registrador' => self::ID_DOCENTE,
                 'id_examen' => self::ID_EXAMEN,
+                'id_curso' => self::ID_CURSO,
                 'sis_estudiante' => $sis,
                 'motivo' => Motivo::UsoDeMaterialNoAutorizado,
                 'detalle_motivo' => 'Motivo de prueba',

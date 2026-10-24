@@ -8,6 +8,7 @@
  * @created 2026-10-09
  *
  * @updated 2026-10-09
+ * @updated 2026-10-24
  *
  * @description
  * Pruebas de integración del endpoint /api/central-riesgo: listado completo
@@ -33,6 +34,10 @@
  *   orden alfabético fijo; la respuesta trae la lista completa.
  * - 2026-10-11  [Valery D. Ortuno P]  test: la API solo devuelve incidencias
  *   confirmadas; un `tramposo` pendiente no aparece.
+ * - 2026-10-24  [Valery D. Ortuno P]  test: la lista va por tipo de infracción
+ *   (tramposo se lista aunque `estado_incidencia` diga Pendiente) y por el
+ *   curso registrado (`id_curso`): materia sin el grupo, "Mis materias" por el
+ *   docente de ese curso y sin curso la materia queda vacía.
  */
 
 namespace Tests\Feature\CentralRiesgo;
@@ -101,7 +106,9 @@ class ListarIncidenciasTramposoTest extends TestCase
             ]);
         }
 
-        $this->crearCurso(self::CURSO_A, 'Calculo I', self::DOCENTE_A);
+        // Calculo I sigue el formato de Crear curso ("Materia - Grupo X") para
+        // probar que la lista devuelve la materia sin el grupo.
+        $this->crearCurso(self::CURSO_A, 'Calculo I - Grupo 2', self::DOCENTE_A);
         $this->crearCurso(self::CURSO_B, 'Fisica I', self::DOCENTE_B);
         $this->crearCurso(self::CURSO_C, 'Quimica II', self::DOCENTE_C);
 
@@ -112,33 +119,32 @@ class ListarIncidenciasTramposoTest extends TestCase
 
         // Ana: tramposo en Calculo I (su curso).
         $this->crearEstudiante('900000001', 'Ana', 'Zapata Ruiz', [self::CURSO_A]);
-        $this->crearIncidencia('900000001', self::EXAMEN_A, 'tramposo', '2026-10-01 08:30:00');
+        $this->crearIncidencia('900000001', self::EXAMEN_A, self::CURSO_A, 'tramposo', '2026-10-01 08:30:00');
 
         // Luis: tramposo en Calculo I, fecha más reciente.
         $this->crearEstudiante('900000002', 'Luis', 'Alvarez Gomez', [self::CURSO_A]);
-        $this->crearIncidencia('900000002', self::EXAMEN_A, 'tramposo', '2026-10-03 10:00:00');
+        $this->crearIncidencia('900000002', self::EXAMEN_A, self::CURSO_A, 'tramposo', '2026-10-03 10:00:00');
 
         // Maria: tramposo en Fisica I, curso de otro docente.
         $this->crearEstudiante('900000003', 'Maria', 'Bernales Soto', [self::CURSO_B]);
-        $this->crearIncidencia('900000003', self::EXAMEN_B, 'tramposo', '2026-10-02 09:15:00');
+        $this->crearIncidencia('900000003', self::EXAMEN_B, self::CURSO_B, 'tramposo', '2026-10-02 09:15:00');
 
         // Pedro: sospechoso, no debe aparecer en el listado.
         $this->crearEstudiante('900000004', 'Pedro', 'Acosta Lima', [self::CURSO_A]);
-        $this->crearIncidencia('900000004', self::EXAMEN_A, 'sospechoso', '2026-10-04 11:00:00');
+        $this->crearIncidencia('900000004', self::EXAMEN_A, self::CURSO_A, 'sospechoso', '2026-10-04 11:00:00');
 
         // Carla: tramposo en Calculo I, mismo apellido que Ana para el orden A-Z.
         $this->crearEstudiante('900000005', 'Carla', 'Zapata Ruiz', [self::CURSO_A]);
-        $this->crearIncidencia('900000005', self::EXAMEN_A, 'tramposo', '2026-09-30 12:00:00');
+        $this->crearIncidencia('900000005', self::EXAMEN_A, self::CURSO_A, 'tramposo', '2026-09-30 12:00:00');
 
-        // Rosa: tramposo en Quimica II sin estar inscrita en el curso del
-        // examen, la materia queda en el primer curso del examen (fallback).
-        $this->crearEstudiante('900000006', 'Rosa', 'Isla Mena', [self::CURSO_A]);
-        $this->crearIncidencia('900000006', self::EXAMEN_C, 'tramposo', '2026-09-29 15:45:00');
+        // Rosa: tramposo registrado en Quimica II.
+        $this->crearEstudiante('900000006', 'Rosa', 'Isla Mena', [self::CURSO_C]);
+        $this->crearIncidencia('900000006', self::EXAMEN_C, self::CURSO_C, 'tramposo', '2026-09-29 15:45:00');
 
-        // Jaime: tramposo en un examen con dos cursos (A y B); el examen A es
-        // el de menor id, pero su curso es Fisica I, que es el que debe salir.
+        // Jaime: tramposo en un examen con dos cursos (A y B), registrado en
+        // Fisica I: la lista toma el curso registrado, no los del examen.
         $this->crearEstudiante('900000007', 'Jaime', 'Paredes Rojas', [self::CURSO_B]);
-        $this->crearIncidencia('900000007', self::EXAMEN_D, 'tramposo', '2026-09-28 09:00:00');
+        $this->crearIncidencia('900000007', self::EXAMEN_D, self::CURSO_B, 'tramposo', '2026-09-28 09:00:00');
     }
 
     private function crearCurso(int $id, string $nombre, int $docente): void
@@ -188,7 +194,7 @@ class ListarIncidenciasTramposoTest extends TestCase
         }
     }
 
-    private function crearIncidencia(string $sis, int $idExamen, string $tipo, string $fecha, string $estado = 'Confirmado'): void
+    private function crearIncidencia(string $sis, int $idExamen, ?int $idCurso, string $tipo, string $fecha, string $estado = 'Confirmado'): void
     {
         static $idRiesgo = 900000;
 
@@ -202,6 +208,7 @@ class ListarIncidenciasTramposoTest extends TestCase
             'tipo_infraccion' => $tipo,
             'estado_incidencia' => $estado,
             'id_examen' => $idExamen,
+            'id_curso' => $idCurso,
             'sis_estudiante' => $sis,
             'motivo' => 'uso de dispositivos electronicos',
         ]);
@@ -235,18 +242,20 @@ class ListarIncidenciasTramposoTest extends TestCase
         $this->assertNotContains('900000004', $this->sisDeLaRespuesta());
     }
 
-    public function test_no_devuelve_tramposos_pendientes_de_confirmar(): void
+    /** Tramposo equivale a confirmado: `estado_incidencia` ya no decide. */
+    public function test_un_tramposo_se_lista_aunque_estado_incidencia_diga_pendiente(): void
     {
         $this->crearEstudiante('900000008', 'Nadia', 'Cordero Vargas', [self::CURSO_A]);
-        $this->crearIncidencia('900000008', self::EXAMEN_A, 'tramposo', '2026-10-04 09:00:00', 'Pendiente');
+        $this->crearIncidencia('900000008', self::EXAMEN_A, self::CURSO_A, 'tramposo', '2026-10-04 09:00:00', 'Pendiente');
 
-        $this->assertNotContains('900000008', $this->sisDeLaRespuesta());
+        $this->assertContains('900000008', $this->sisDeLaRespuesta());
     }
 
+    /** Solo los cursos registrados del docente: Jaime (examen compartido) quedó en Fisica I. */
     public function test_alcance_mis_materias_solo_muestra_los_cursos_del_usuario(): void
     {
         $this->assertEquals(
-            ['900000002', '900000007', '900000001', '900000005'],
+            ['900000002', '900000001', '900000005'],
             $this->sisDeLaRespuesta('alcance=mis-materias&usuario='.self::DOCENTE_A)
         );
     }
@@ -300,11 +309,11 @@ class ListarIncidenciasTramposoTest extends TestCase
     public function test_devuelve_la_lista_completa_sin_paginar(): void
     {
         $this->crearEstudiante('900000008', 'Sara', 'Mena Torres', [self::CURSO_A]);
-        $this->crearIncidencia('900000008', self::EXAMEN_A, 'tramposo', '2026-09-27 08:00:00');
+        $this->crearIncidencia('900000008', self::EXAMEN_A, self::CURSO_A, 'tramposo', '2026-09-27 08:00:00');
         $this->crearEstudiante('900000009', 'Hugo', 'Mena Torres', [self::CURSO_A]);
-        $this->crearIncidencia('900000009', self::EXAMEN_A, 'tramposo', '2026-09-26 08:00:00');
+        $this->crearIncidencia('900000009', self::EXAMEN_A, self::CURSO_A, 'tramposo', '2026-09-26 08:00:00');
         $this->crearEstudiante('900000010', 'Ivan', 'Soto Ramos', [self::CURSO_A]);
-        $this->crearIncidencia('900000010', self::EXAMEN_A, 'tramposo', '2026-09-25 08:00:00');
+        $this->crearIncidencia('900000010', self::EXAMEN_A, self::CURSO_A, 'tramposo', '2026-09-25 08:00:00');
 
         $response = $this->getJson($this->endpoint());
 
@@ -321,25 +330,30 @@ class ListarIncidenciasTramposoTest extends TestCase
         );
     }
 
-    public function test_materia_es_el_curso_del_estudiante_dentro_del_examen(): void
+    /** La materia es la del curso registrado, sin el grupo; el curso va completo. */
+    public function test_materia_es_la_del_curso_registrado_sin_el_grupo(): void
     {
         $datos = collect($this->getJson($this->endpoint('busqueda=900000001'))->json('datos'));
 
         $this->assertEquals('Calculo I', $datos->first()['materia']);
+        $this->assertEquals('Calculo I - Grupo 2', $datos->first()['curso']);
     }
 
-    public function test_materia_elige_el_curso_del_estudiante_y_no_el_primero_del_examen(): void
+    public function test_materia_es_la_del_curso_registrado_y_no_la_del_examen(): void
     {
         $datos = collect($this->getJson($this->endpoint('busqueda=900000007'))->json('datos'));
 
         $this->assertEquals('Fisica I', $datos->first()['materia']);
     }
 
-    public function test_materia_usa_el_primer_curso_del_examen_cuando_el_estudiante_no_pertenece_a_ninguno(): void
+    public function test_sin_curso_registrado_la_materia_queda_vacia(): void
     {
-        $datos = collect($this->getJson($this->endpoint('busqueda=900000006'))->json('datos'));
+        $this->crearEstudiante('900000008', 'Nadia', 'Cordero Vargas', [self::CURSO_A]);
+        $this->crearIncidencia('900000008', self::EXAMEN_A, null, 'tramposo', '2026-10-04 09:00:00');
 
-        $this->assertEquals('Quimica II', $datos->first()['materia']);
+        $datos = collect($this->getJson($this->endpoint('busqueda=900000008'))->json('datos'));
+
+        $this->assertNull($datos->first()['materia']);
     }
 
     public function test_devuelve_los_campos_esperados_por_registro(): void

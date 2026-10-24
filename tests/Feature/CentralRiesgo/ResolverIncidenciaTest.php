@@ -8,11 +8,14 @@
  * @created 2026-10-09
  *
  * @updated 2026-10-09
+ * @updated 2026-10-24
  *
  * @description Pruebas HTTP y transaccionales con SQLite en memoria, sin usar Supabase.
  *
  * @changelog
  * - 2026-10-09  [Diego Tejerina]  test: cubrir revisión, permisos y duplicados (#142).
+ * - 2026-10-24  [Valery D. Ortuno P]  test: confirmar deja el caso como
+ *   `tramposo` (antes seguía como sospechoso).
  */
 
 namespace Tests\Feature\CentralRiesgo;
@@ -61,9 +64,11 @@ class ResolverIncidenciaTest extends TestCase
             ]);
 
         $this->assertDatabaseCount('central_riesgo', 2);
+        // Confirmar pasa el caso a tramposo: la central de riesgos lista por
+        // tipo de infracción (tramposo = confirmado).
         $this->assertDatabaseHas('central_riesgo', [
             'id_registro' => 1, 'estado_incidencia' => 'Confirmado', 'id_confirmador' => 1,
-            'id_registrador' => 2, 'tipo_infraccion' => 'sospechoso',
+            'id_registrador' => 2, 'tipo_infraccion' => 'tramposo',
         ]);
         $this->assertSame(EstadoIncidencia::Confirmado, CentralRiesgo::findOrFail(1)->estado_incidencia);
     }
