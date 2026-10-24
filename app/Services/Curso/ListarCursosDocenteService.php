@@ -20,6 +20,8 @@
  *
  * @changelog
  * - 2026-10-24  [Valery D. Ortuno P]  feat: creación inicial del servicio.
+ * - 2026-10-24  [Valery D. Ortuno P]  feat: cada curso de conMetricas() trae su
+ *   gestión con año ("Segundo semestre 2026") para la lista de cursos.
  *
  * @see  App\Services\Curso\ListarMateriasConMetricasService
  * @see  App\Http\Controllers\CursoController
@@ -32,6 +34,8 @@ use App\Enums\CursoEstado;
 use App\Models\Curso;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class ListarCursosDocenteService
 {
@@ -46,7 +50,8 @@ class ListarCursosDocenteService
      *
      * @param  int  $idDocente  ID del docente (`curso.sis_doc`).
      *
-     * @return Collection<int, array<string, mixed>>  Filas de ListarMateriasConMetricasService ordenadas.
+     * @return Collection<int, array<string, mixed>>  Filas de ListarMateriasConMetricasService
+     *         ordenadas, cada una con `gestion` ("Segundo semestre 2026" o null).
      *
      * @author Valery D. Ortuno P <valerydariana98@gmail.com>
      * @since  2026-10-24
@@ -64,9 +69,30 @@ class ListarCursosDocenteService
             return collect();
         }
 
+        $gestiones = $this->gestionesPorCurso($idsCursos);
+
         return $this->metricas->ejecutar($idsCursos)
+            ->map(fn (array $fila): array => $fila + ['gestion' => $gestiones->get($fila['curso']->id_curso)])
             ->sortBy(fn (array $fila): array => $this->claveDeOrden($fila['curso']))
             ->values();
+    }
+
+    /**
+     * Gestión con año de cada curso, en una sola consulta.
+     *
+     * @param  array<int, int>  $idsCursos  Cursos del docente.
+     *
+     * @return Collection<int, string>  id_curso => "Segundo semestre 2026".
+     */
+    private function gestionesPorCurso(array $idsCursos): Collection
+    {
+        return DB::table('curso_tipo_gestion as ctg')
+            ->join('tipo_gestion as tg', 'tg.id_tipo_gestion', '=', 'ctg.id_tg')
+            ->whereIn('ctg.id_curso', $idsCursos)
+            ->get(['ctg.id_curso', 'tg.nombre_tipo_gestion', 'ctg.anio'])
+            ->mapWithKeys(fn (object $fila): array => [
+                (int) $fila->id_curso => Str::ucfirst($fila->nombre_tipo_gestion).' '.$fila->anio,
+            ]);
     }
 
     /**

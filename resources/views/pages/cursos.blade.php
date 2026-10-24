@@ -19,9 +19,9 @@
     dentro de la ventana del examen más reciente del curso), no una columna de
     la base; solo resalta el borde de la card.
 
-    El Figma muestra "SIS-3340 · Grupo 2" bajo el nombre: la tabla `curso` NO
-    tiene columnas de sigla ni de grupo (ver ListarMateriasConMetricasService),
-    así que esa línea no se puede mostrar y se omite.
+    El grupo ya va dentro del nombre ("Calculo I - Grupo 2", ver Crear curso)
+    y bajo el nombre se muestra la gestión con su año ("Segundo semestre
+    2026"), que llega de ListarCursosDocenteService.
 
     La búsqueda y los filtros son solo de Alpine (mostrar/ocultar las cards
     ya traídas): la lista de cursos es chica y ya viaja completa en la
@@ -45,6 +45,11 @@
       arriba quedan "Crear curso" y "Ver curso", que se activa al seleccionar la
       card de un curso (en vez de un botón por card). Un clic fuera de las cards
       suelta la selección.
+    - 2026-10-24  [Valery D. Ortuno P]  feat: muestra el aviso "Curso creado con
+      exito" al volver de Crear curso y el mensaje de lista vacia pasa a "No
+      existen cursos registrados.". Los cursos sin estudiantes ya no se pintan
+      de amarillo: un curso recien creado siempre empieza sin inscritos. Debajo
+      del nombre se muestra la gestión con su año ("Segundo semestre 2026").
 
     @see  App\Http\Controllers\CursoController
     @see  App\Services\Curso\ListarCursosDocenteService
@@ -121,6 +126,11 @@
             $pillInactiva = 'text-body bg-neutral-primary-soft border-default hover:bg-neutral-secondary-medium hover:text-heading focus:ring-neutral-tertiary-soft';
         @endphp
 
+        {{-- Aviso de éxito del alta: "Crear curso" vuelve acá al guardar. --}}
+        @if (session('mensaje'))
+            <x-ui.modal-aviso :mensaje="session('mensaje')" />
+        @endif
+
         <div class="flex gap-2 overflow-x-auto" role="group" aria-label="Acciones de cursos">
             <x-ui.button :href="route('cursos.crear')" variant="default" class="shrink-0 whitespace-nowrap px-6 font-semibold">
                 Crear curso
@@ -165,7 +175,6 @@
                 @php
                     $curso = $fila['curso'];
                     $esActivo = $curso->estado === 'EnCurso';
-                    $sinEstudiantes = $fila['inscritos'] === 0;
                     $examenActivo = $fila['examen_activo'];
 
                     $metricas = [
@@ -188,11 +197,9 @@
                     @keydown.enter.prevent="seleccionado = {{ $curso->id_curso }}"
                     @keydown.space.prevent="seleccionado = {{ $curso->id_curso }}"
                     @class([
-                        'cursor-pointer rounded-base shadow-xs p-4 sm:p-5 flex flex-col gap-4 sm:flex-row sm:items-center border',
+                        'cursor-pointer rounded-base bg-neutral-primary-soft shadow-xs p-4 sm:p-5 flex flex-col gap-4 sm:flex-row sm:items-center border',
                         'border-brand border-2' => $examenActivo,
                         'border-default' => ! $examenActivo,
-                        'bg-warning-soft' => $sinEstudiantes,
-                        'bg-neutral-primary-soft' => ! $sinEstudiantes,
                     ])
                 >
                     {{-- Ícono + nombre + badge de estado. --}}
@@ -207,6 +214,9 @@
                                     {{ $esActivo ? 'Activo' : 'Finalizado' }}
                                 </x-ui.badge>
                             </div>
+                            @if ($fila['gestion'])
+                                <p class="text-xs text-body">{{ $fila['gestion'] }}</p>
+                            @endif
                         </div>
                     </div>
 
@@ -221,7 +231,7 @@
                     </div>
                 </div>
             @empty
-                <p class="text-sm text-body text-center py-8">No tienes cursos registrados.</p>
+                <p class="text-sm text-body text-center py-8">No existen cursos registrados.</p>
             @endforelse
 
             @if ($cursos->isNotEmpty())

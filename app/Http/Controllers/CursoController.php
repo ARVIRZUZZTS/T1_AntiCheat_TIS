@@ -9,8 +9,8 @@
  *
  * @description
  * Controlador HTTP de la sección Cursos del docente: la lista de sus cursos,
- * el formulario de alta ("Crear curso") y la vista de un curso con sus
- * estudiantes y habilitaciones. Solo orquesta: los datos los
+ * el formulario de alta ("Crear curso"), el alta del curso y la vista de un
+ * curso con sus estudiantes y habilitaciones. Solo orquesta: los datos los
  * resuelven los Services y la pertenencia del curso la decide CursoPolicy.
  *
  * Reemplaza a las closures de `/materias` y `/materias/{curso}` que vivían
@@ -18,18 +18,27 @@
  *
  * @changelog
  * - 2026-10-24  [Valery D. Ortuno P]  feat: creación inicial del controlador.
+ * - 2026-10-24  [Valery D. Ortuno P]  feat: alta de curso con materia y grupo
+ *   concatenados y su gestión con año; al guardar vuelve a la lista de cursos.
  *
  * @see  App\Services\Curso\ListarCursosDocenteService
+ * @see  App\Services\Curso\ListarGestionesService
+ * @see  App\Services\Curso\RegistrarCursoService
  * @see  App\Services\Examen\ListarEstudiantesCursoConEstadoService
+ * @see  App\Http\Requests\StoreCursoRequest
  * @see  App\Policies\CursoPolicy
  */
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\StoreCursoRequest;
 use App\Models\Curso;
 use App\Services\Curso\ListarCursosDocenteService;
+use App\Services\Curso\ListarGestionesService;
+use App\Services\Curso\RegistrarCursoService;
 use App\Services\Examen\ListarEstudiantesCursoConEstadoService;
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 
@@ -56,16 +65,44 @@ class CursoController extends Controller
     /**
      * "Crear curso": formulario de alta de un curso.
      *
+     * @param  ListarGestionesService  $gestiones  Catálogo del selector "Gestion".
+     *
      * @return View  Vista pages.curso-crear.
      *
      * @author Valery D. Ortuno P <valerydariana98@gmail.com>
      * @since  2026-10-24
      */
-    public function crear(): View
+    public function crear(ListarGestionesService $gestiones): View
     {
         return view('pages.curso-crear', [
+            'gestiones' => $gestiones->ejecutar(),
             'backRoute' => route('cursos'),
         ]);
+    }
+
+    /**
+     * Guarda el curso creado desde el formulario y vuelve a la lista de
+     * cursos, donde se muestra el aviso de éxito.
+     *
+     * @param  StoreCursoRequest  $request  Datos validados (materia, grupo y gestión).
+     * @param  RegistrarCursoService  $servicio  Servicio de alta.
+     *
+     * @return RedirectResponse  Redirige al listado de cursos con mensaje de éxito.
+     *
+     * @author Valery D. Ortuno P <valerydariana98@gmail.com>
+     * @since  2026-10-24
+     */
+    public function store(StoreCursoRequest $request, RegistrarCursoService $servicio): RedirectResponse
+    {
+        $servicio->ejecutar(
+            $request->nombreCurso(),
+            (int) $request->user()->id_usuario,
+            $request->gestion(),
+        );
+
+        return redirect()
+            ->route('cursos')
+            ->with('mensaje', 'Curso creado con exito');
     }
 
     /**
