@@ -1,24 +1,25 @@
 {{--
-    @file    materia-examenes.blade.php
+    @file    examenes-curso.blade.php
     @author  Alex Candia <alex.leonar.candia@gmail.com>
     @created 2026-10-05
     @updated 2026-10-10
+    @updated 2026-10-24
 
     @description
-    Sección "Exámenes" de la vista de detalle de una materia: lista los exámenes
+    Listado de exámenes de un curso (página examenes-curso): lista los exámenes
     del curso en tarjetas horizontales con el ícono del archivo, el tipo, el
     estado (Programado o Finalizado), la fecha, el horario, los ambientes
-    asignados y la cantidad de estudiantes que registraron su ingreso, más el
-    botón "Crear examen", que abre el modal de alta.
+    asignados y la cantidad de estudiantes que registraron su ingreso.
+
+    Arriba van los botones "Invitar docente" y "Dividir examen". Actúan sobre
+    un examen concreto: se activan recién cuando se toca una tarjeta para
+    seleccionarla. Por ahora no hacen
+    nada; su funcionalidad llega con sus HUs.
 
     El listado no llega con la página: el parcial declara un x-data de Alpine
     que consulta GET /api/cursos/{idCurso}/examenes (CursoExamenController)
-    cuando se inicializa —la sección vive en un template x-if de la página, así
-    que solo se monta al abrir la pestaña— y dibuja los tres estados: cargando
-    (placeholders), error (con botón de reintento) y listo (con los ítems o el
-    vacío). Es el primer uso de fetch del proyecto; los datos del modal
-    (ambientes, materiales y normas) siguen llegando resueltos por la ruta
-    materias.detalle.
+    cuando se inicializa y dibuja los tres estados: cargando (placeholders),
+    error (con botón de reintento) y listo (con los ítems o el vacío).
 
     Los estados "Programado"/"Finalizado" vienen tal cual del endpoint, que
     colapsa el "en curso" interno del servicio en "Programado". La fecha se
@@ -42,19 +43,32 @@
       ícono, badge invertido (Programado gris / Finalizado brand con ícono) y grid
       de datos con labels en mayúsculas y valores mono; la fecha pasa a dd/mm/yyyy y
       el guion del horario a " - ".
+    - 2026-10-24  [Valery D. Ortuno P]  refactor: el parcial pasa de
+      materia-examenes.blade.php a examenes-curso.blade.php y lo incrusta la
+      página de exámenes del curso. El botón "Crear examen" y el modal de alta
+      salen (el alta es una página propia desde la sección Exámenes); se suman
+      "Invitar docente" y "Dividir examen", que se activan al seleccionar una
+      tarjeta; un clic fuera de las tarjetas suelta la selección. Los textos
+      visibles van sin acentos.
 
     @see  App\Http\Controllers\Api\CursoExamenController
-    @see  App\Services\Ambiente\ListarAmbientesService
-    @see  App\Services\Material\ListarMaterialesService
-    @see  App\Services\Norma\ListarNormasService
-    @see  resources\views\components\ui\modal-crear-examen.blade.php
-    @see  resources/views/pages/materia-estudiantes.blade.php
+    @see  resources/views/pages/examenes-curso.blade.php
 --}}
+
+@php
+    // Clases de x-ui.button: se repiten acá porque el estado deshabilitado
+    // depende de la selección de Alpine y el componente lo resuelve en Blade.
+    $botonBase = 'inline-flex items-center justify-center box-border border focus:ring-4 shadow-xs font-medium leading-5 focus:outline-none rounded-base px-6 py-2.5 text-sm font-semibold shrink-0 whitespace-nowrap';
+    $botonPorExamen = 'text-body bg-neutral-primary-soft border-default hover:bg-neutral-secondary-medium hover:text-heading focus:ring-neutral-tertiary-soft cursor-pointer';
+    $botonInactivo = 'text-fg-disabled bg-disabled border-default-medium cursor-not-allowed';
+@endphp
 
 <div class="flex flex-col gap-4"
      x-data="{
          examenes: [],
          estado: 'cargando',
+         // Examen elegido para Invitar docente / Dividir examen.
+         seleccionado: null,
          async cargar() {
              this.estado = 'cargando';
              try {
@@ -85,19 +99,41 @@
          ambientesDe(examen) {
              return (examen.ambientes || []).map((ambiente) => ambiente.nombre).join(', ') || '—';
          },
-     }">
-    {{-- Aviso de éxito del alta. Los errores de validación se muestran dentro
-         del modal, que además se reabre solo (ver `abrir` más abajo). --}}
+         // Un clic que no cae en una tarjeta ni en los botones que la usan
+         // suelta la selección. Los clics fuera del componente los cubre
+         // @click.outside.
+         soltarSeleccion(evento) {
+             if (! evento.target.closest('[data-seleccionable], [data-accion-seleccion]')) {
+                 this.seleccionado = null;
+             }
+         },
+     }"
+     @click="soltarSeleccion($event)"
+     @click.outside="seleccionado = null">
+    {{-- Aviso de éxito del alta: el formulario de crear examen vuelve acá. --}}
     @if (session('mensaje'))
         <x-ui.modal-aviso :mensaje="session('mensaje')" />
     @endif
 
-    <header class="flex items-center justify-between px-3">
-        <h2 class="text-2xl font-bold text-heading">Exámenes</h2>
+    <header class="flex flex-col gap-3">
+        <h2 class="px-3 text-2xl font-bold text-heading">Examenes</h2>
 
-        <x-ui.button variant="default" class="px-6 font-semibold" @click="$dispatch('abrir-modal-crear-examen')">
-            Crear examen
-        </x-ui.button>
+        <div class="flex gap-2 overflow-x-auto" role="group" aria-label="Acciones de examenes">
+            <button type="button" class="{{ $botonBase }}" data-accion-seleccion
+                    :class="seleccionado === null ? '{{ $botonInactivo }}' : '{{ $botonPorExamen }}'"
+                    :disabled="seleccionado === null">
+                Invitar docente
+            </button>
+            <button type="button" class="{{ $botonBase }}" data-accion-seleccion
+                    :class="seleccionado === null ? '{{ $botonInactivo }}' : '{{ $botonPorExamen }}'"
+                    :disabled="seleccionado === null">
+                Dividir examen
+            </button>
+        </div>
+
+        <p class="px-3 text-sm text-body" x-show="estado === 'listo' && examenes.length > 0 && seleccionado === null">
+            Selecciona un examen para invitar a un docente o dividirlo.
+        </p>
     </header>
 
     {{-- Cargando: placeholders con el mismo contorno que las tarjetas. --}}
@@ -123,8 +159,8 @@
 
     {{-- Error de la consulta, con reintento. --}}
     <div x-show="estado === 'error'" x-cloak>
-        <x-ui.alert type="danger" title="No se pudieron cargar los exámenes">
-            Ocurrió un problema al consultar el listado.
+        <x-ui.alert type="danger" title="No se pudieron cargar los examenes">
+            Ocurrio un problema al consultar el listado.
             <div class="mt-2">
                 <x-ui.button variant="secondary" @click="cargar()">Reintentar</x-ui.button>
             </div>
@@ -134,7 +170,13 @@
     {{-- Listado: las tarjetas salen del JSON del endpoint, no de Blade. --}}
     <ul class="flex flex-col gap-4" x-show="estado === 'listo'" x-cloak>
         <template x-for="examen in examenes" :key="examen.id">
-            <li class="flex flex-col gap-4 border border-default bg-neutral-primary-soft rounded-base shadow-xs px-5 py-6 sm:px-8 lg:flex-row lg:items-center lg:gap-6">
+            <li class="flex cursor-pointer flex-col gap-4 border bg-neutral-primary-soft rounded-base shadow-xs px-5 py-6 sm:px-8 lg:flex-row lg:items-center lg:gap-6"
+                role="button" tabindex="0" data-seleccionable
+                :aria-pressed="seleccionado === examen.id ? 'true' : 'false'"
+                :class="seleccionado === examen.id ? 'border-brand ring-2 ring-brand' : 'border-default hover:border-brand-subtle'"
+                @click="seleccionado = examen.id"
+                @keydown.enter.prevent="seleccionado = examen.id"
+                @keydown.space.prevent="seleccionado = examen.id">
                 {{-- Ícono, tipo y estado. --}}
                 <div class="flex items-center gap-4 lg:w-72">
                     <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-brand-softer text-fg-brand-strong">
@@ -181,16 +223,7 @@
         <li x-show="examenes.length === 0"
             class="flex flex-col items-center gap-2 p-8 text-center bg-neutral-primary-soft border border-default rounded-base shadow-xs">
             <svg class="w-6 h-6 text-fg-disabled" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-width="2" d="M4 10h16m-8-3V4M7 7V4m10 3V4M5 20h14a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2Zm3-7h.01v.01H8V13Zm4 0h.01v.01H12V13Zm4 0h.01v.01H16V13Zm-8 4h.01v.01H8V17Zm4 0h.01v.01H12V17Zm4 0h.01v.01H16V17Z"/></svg>
-            <p class="text-sm text-body">Esta materia aún no tiene exámenes registrados.</p>
+            <p class="text-sm text-body">Este curso aun no tiene examenes registrados.</p>
         </li>
     </ul>
-
-    <x-ui.modal-crear-examen
-        :materia="$curso->nombre_curso"
-        :ambientes="$ambientes"
-        :materiales="$materiales"
-        :normas="$normas"
-        :curso-id="$curso->id_curso"
-        :abrir="$errors->any()"
-    />
 </div>
