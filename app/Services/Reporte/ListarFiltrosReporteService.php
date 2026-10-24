@@ -9,23 +9,21 @@
  *
  * @description
  * Arma los datos de los dos selectores de la pantalla de reportes: la lista de
- * materias (`id_curso => nombre_curso`) y los exámenes de cada curso
- * (`id_curso => [id, etiqueta]`). La etiqueta del examen ya viene legible
+ * materias (id_curso => nombre_curso) y los examenes de cada curso
+ * (id_curso => [id, etiqueta]). La etiqueta del examen ya viene legible
  * ("Examen final — 20/10/2026"), resuelta con el enum de tipo y la fecha.
  *
- * Solo devuelve las materias y exámenes que le corresponden al usuario:
- * - Docente: los cursos donde `curso.sis_doc` es su `id_usuario`.
- * - Auxiliar: los cursos asignados en `auxiliar_curso`.
- * - Con ambos roles: la unión de los dos conjuntos.
+ * Solo devuelve las materias y examenes que le corresponden al usuario:
+ * - Docente: los cursos donde curso.sis_doc es su id_usuario.
+ * - Auxiliar: los cursos asignados en auxiliar_curso.
+ * - Con ambos roles: la union de los dos conjuntos.
  * - Sin ninguno de esos roles: nada.
+ * - Si se pasa solo el id de docente (compatibilidad con rutas antiguas),
+ *   se filtran por ese docente.
  *
  * Todo se resuelve en pocas consultas agrupadas (una por roles, una por
- * materias, una por exámenes): nunca una consulta por curso, aunque la lista de
+ * materias, una por examenes): nunca una consulta por curso, aunque la lista de
  * materias crezca.
- *
- * La lógica vive acá y no en `routes/web.php` porque las rutas son solo la
- * capa HTTP de entrada: no deben contener consultas ni reglas de negocio
- * (ver arquitectura.md, secciones 4 y 8).
  *
  * @see  App\Services\Curso\ListarMateriasConMetricasService
  * @see  App\Enums\TipoExamen
@@ -33,9 +31,11 @@
  * @see  resources/views/pages/reportes.blade.php
  *
  * @changelog
- * - 2026-10-21  [Alex Candia]  feat: creación inicial del servicio.
- * - 2026-10-21  [Alex Candia]  feat: filtrar materias y exámenes por el usuario
+ * - 2026-10-21  [Alex Candia]  feat: creacion inicial del servicio.
+ * - 2026-10-21  [Alex Candia]  feat: filtrar materias y examenes por el usuario
  *   autenticado (cursos del docente y cursos asignados al auxiliar).
+ * - 2026-10-23  [Alex Candia]  fix: compatibilidad con llamada por id_docente
+ *   y asegurar retorno array.
  */
 
 namespace App\Services\Reporte;
@@ -63,8 +63,12 @@ class ListarFiltrosReporteService
      *     examenesPorCurso: array<int, list<array{id: int, etiqueta: string}>>
      * }
      */
-    public function ejecutar(?Usuario $usuario): array
+    public function ejecutar(Usuario|int|null $usuario = null): array
     {
+        if (is_int($usuario)) {
+            $usuario = Usuario::query()->find($usuario);
+        }
+
         $roles = $usuario === null
             ? collect()
             : $usuario->roles()->pluck('nombre_rol');
@@ -76,17 +80,15 @@ class ListarFiltrosReporteService
             'opcionesMaterias' => $this->opcionesMaterias($idsCursos),
             'examenesPorCurso' => $this->examenesPorCurso(
                 $idsCursos,
-                $roles->contains(Rol::NOMBRE_DOCENTE) ? $usuario : null,
+                ($usuario instanceof Usuario && $roles->contains(Rol::NOMBRE_DOCENTE)) ? $usuario : null,
             ),
         ];
     }
 
     /**
-     * IDs de los cursos que le corresponden al usuario según sus roles.
-     * Docente ve los cursos que dicta (`sis_doc`); auxiliar, los que tiene
-     * asignados en `auxiliar_curso`. Si tiene ambos roles, se unen.
+     * IDs de los cursos que le corresponden al usuario segun sus roles.
      *
-     * @param  Collection<int, string>  $roles
+     * @param Collection<int, string> $roles
      * @return Collection<int, int>
      */
     private function idsCursosDelUsuario(Usuario $usuario, Collection $roles): Collection
@@ -113,16 +115,20 @@ class ListarFiltrosReporteService
     }
 
     /**
-     * Materias en el formato que espera `x-ui.select` (id => nombre), tomadas
-     * del mismo servicio que usa la página `/materias` pero acotadas a los
-     * cursos del usuario.
+     * Materias en el formato que espera x-ui.select (id => nombre).
      *
-     * @param  Collection<int, int>  $idsCursos
+     * @param Collection<int, int> $idsCursos
      * @return array<int, string>
      */
     private function opcionesMaterias(Collection $idsCursos): array
     {
-        return $this->listarMaterias->ejecutar($idsCursos->all())
+        if ($idsCursos->isEmpty()) {
+            return [];
+        }
+
+        $todas = $this->listarMaterias->ejecutar($idsCursos->all());
+
+        return $todas
             ->mapWithKeys(fn (array $fila): array => [
                 $fila['curso']->id_curso => $fila['curso']->nombre_curso,
             ])
@@ -130,11 +136,9 @@ class ListarFiltrosReporteService
     }
 
     /**
-     * Exámenes de los cursos del usuario en una sola consulta, agrupados por
-     * curso. Un examen puede estar compartido entre cursos, por eso se agrupa
-     * por la fila de `examen_curso` y no por `id_examen`.
+     * Examenes de los cursos del usuario en una sola consulta, agrupados por curso.
      *
-     * @param  Collection<int, int>  $idsCursos
+     * @param Collection<int, int> $idsCursos
      * @return array<int, list<array{id: int, etiqueta: string}>>
      */
     private function examenesPorCurso(Collection $idsCursos, ?Usuario $docente): array
@@ -143,11 +147,11 @@ class ListarFiltrosReporteService
             return [];
         }
 
-        return DB::table('examen')
+        $consulta = DB::table('examen')
             ->join('examen_curso', 'examen_curso.id_examen', '=', 'examen.id_examen')
             ->leftJoin('tipo_examen', 'tipo_examen.id_tipo_examen', '=', 'examen.tipo_examen')
-            ->whereIn('examen_curso.id_curso', $idsCursos)
-            ->when($docente !== null, fn ($consulta) => $consulta->where(
+            ->whereIn('examen_curso.id_curso', $idsCursos->all())
+            ->when($docente !== null, fn ($query) => $query->where(
                 fn ($acceso) => $acceso
                     ->where('examen.creador', $docente->id_usuario)
                     ->orWhereExists(fn ($invitacion) => $invitacion
@@ -164,10 +168,6 @@ class ListarFiltrosReporteService
                 'tipo_examen.nombre_tipo_examen',
             );
 
-        if ($idsCursos !== null) {
-            $consulta->whereIn('examen_curso.id_curso', $idsCursos);
-        }
-
         return $consulta
             ->orderByDesc('examen.fecha')
             ->get()
@@ -183,9 +183,9 @@ class ListarFiltrosReporteService
     }
 
     /**
-     * Etiqueta legible del examen: tipo (mayúscula inicial) + fecha.
+     * Etiqueta legible del examen.
      *
-     * @param  object{nombre_tipo_examen: ?string, fecha: ?string}  $examen
+     * @param object{nombre_tipo_examen: ?string, fecha: ?string} $examen
      */
     private function etiquetaExamen(object $examen): string
     {

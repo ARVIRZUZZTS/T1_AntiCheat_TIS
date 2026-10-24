@@ -10,9 +10,9 @@
     cada reporte queda aislado en su archivo.
 
     Los ids del curso y del examen no se pasan como props porque cambian con
-    Alpine. La página dispara el evento `reporte-horario-actualizar` cuando
-    cambia el examen y este parcial lo escucha en window. Al recibirlo consulta
-    el endpoint; si el examen queda vacío solo limpia el estado.
+    Alpine. La página dispara `reporte-seleccion-actualizada` cuando cambia la
+    selección y este parcial lo escucha en window. Al recibirlo consulta el
+    endpoint; si el examen queda vacío solo limpia el estado.
 
     El reporte no tiene filtros ni resumen: solo muestra la tabla con el
     listado de ingresos del examen elegido.
@@ -39,20 +39,42 @@
         horario: null,
         cargando: false,
         errorReporte: '',
+        cache: {},
+        abortController: null,
 
         get hayDatos() {
             return this.horario !== null && ! this.horario.sin_datos;
         },
 
         actualizarSeleccion(evento) {
-            this.idCurso = evento.detail.idCurso;
-            this.idExamen = evento.detail.idExamen;
-            this.horario = null;
+            const detalle = evento && evento.detail ? evento.detail : {};
+            this.idCurso = detalle.idCurso ?? null;
+            this.idExamen = detalle.idExamen ?? null;
             this.errorReporte = '';
 
-            if (this.idCurso && this.idExamen) {
-                this.cargar();
+            if (! this.idCurso || ! this.idExamen) {
+                if (this.abortController) {
+                    this.abortController.abort();
+                    this.abortController = null;
+                }
+                this.horario = null;
+                this.cargando = false;
+                return;
             }
+
+            const clave = this.idCurso + '|' + this.idExamen;
+            if (this.cache[clave]) {
+                if (this.abortController) {
+                    this.abortController.abort();
+                    this.abortController = null;
+                }
+                this.horario = this.cache[clave];
+                this.cargando = false;
+                return;
+            }
+
+            this.horario = null;
+            this.cargar();
         },
 
         parametros() {
@@ -66,13 +88,23 @@
         async cargar() {
             if (! this.idCurso || ! this.idExamen) { return; }
 
+            const curso = this.idCurso;
+            const examen = this.idExamen;
+
+            if (this.abortController) {
+                this.abortController.abort();
+            }
+            const controller = new AbortController();
+            this.abortController = controller;
+
             this.cargando = true;
             this.errorReporte = '';
 
             try {
-                const respuesta = await fetch(this.endpoint + '?' + this.parametros().toString(), {
+                const respuesta = await fetch(this.endpoint + '?' + new URLSearchParams({ id_curso: curso, id_examen: examen }).toString(), {
                     headers: { Accept: 'application/json' },
-                    credentials: 'same-origin'
+                    credentials: 'same-origin',
+                    signal: controller.signal
                 });
 
                 if (! respuesta.ok) {
@@ -80,12 +112,24 @@
                 }
 
                 const payload = await respuesta.json();
-                this.horario = payload.datos;
+
+                if (this.abortController === controller && this.idCurso === curso && this.idExamen === examen) {
+                    this.horario = payload.datos;
+                    this.cache[curso + '|' + examen] = payload.datos;
+                }
             } catch (error) {
-                this.horario = null;
-                this.errorReporte = 'No se pudo cargar el reporte. Intenta nuevamente.';
+                if (error && error.name === 'AbortError') {
+                    return;
+                }
+                if (this.abortController === controller && this.idCurso === curso && this.idExamen === examen) {
+                    this.horario = null;
+                    this.errorReporte = 'No se pudo cargar el reporte. Intenta nuevamente.';
+                }
             } finally {
-                this.cargando = false;
+                if (this.abortController === controller) {
+                    this.cargando = false;
+                    this.abortController = null;
+                }
             }
         },
 
@@ -95,18 +139,18 @@
             window.location.href = this.endpointExportar + '?' + this.parametros().toString();
         }
     }"
-    x-on:reporte-horario-actualizar.window="actualizarSeleccion($event)"
+    x-on:reporte-seleccion-actualizada.window="actualizarSeleccion($event)"
     class="space-y-6"
 >
     <p x-show="cargando" x-cloak class="rounded-base border border-default bg-neutral-primary-soft p-6 text-center text-sm text-body">
         Cargando reporte...
     </p>
 
-    <x-ui.alert x-show="errorReporte" x-cloak type="danger">
+    <x-ui.alert x-show="errorReporte && ! cargando" x-cloak type="danger">
         <span x-text="errorReporte"></span>
     </x-ui.alert>
 
-    <template x-if="horario && ! cargando">
+    <template x-if="horario && ! cargando && ! errorReporte">
         <div class="space-y-6">
             <div class="flex flex-wrap items-start justify-between gap-3">
                 <div class="min-w-0">
@@ -129,44 +173,19 @@
             </p>
 
             <div x-show="! horario.sin_datos" class="space-y-4">
-                <div class="space-y-3 sm:hidden">
-                    <template x-for="estudiante in horario.estudiantes" :key="estudiante.sis + estudiante.hora_ingreso">
-                        <article class="rounded-xl border border-default bg-neutral-primary-soft p-4">
-                            <div class="flex items-start justify-between gap-3">
-                                <div class="min-w-0">
-                                    <p class="break-words text-sm font-bold text-fg-brand" x-text="estudiante.apellidos + ', ' + estudiante.nombres"></p>
-                                    <p class="mt-1 break-words text-xs text-body" x-text="estudiante.sis + ' - ' + (estudiante.aula || 'Sin aula')"></p>
-                                </div>
-                                <span class="shrink-0 rounded-base bg-neutral-secondary-soft px-2 py-1 text-xs font-semibold text-heading" x-text="estudiante.hora_ingreso || 'Sin registro'"></span>
-                            </div>
-                        </article>
-                    </template>
-                </div>
-
-                <div class="hidden overflow-x-auto rounded-base border border-default bg-neutral-primary-soft shadow-xs sm:block">
-                    <table class="w-full min-w-[640px] text-left text-sm text-body">
-                        <thead class="border-b border-default bg-neutral-secondary-soft text-sm text-body">
-                            <tr>
-                                <th scope="col" class="px-6 py-3 font-medium">Nombres</th>
-                                <th scope="col" class="px-6 py-3 font-medium">Apellidos</th>
-                                <th scope="col" class="px-6 py-3 font-medium">Código SIS</th>
-                                <th scope="col" class="px-6 py-3 font-medium">Aula</th>
-                                <th scope="col" class="px-6 py-3 font-medium">Hora de ingreso</th>
+                <x-ui.table :headers="['Nombres', 'Apellidos', 'Código SIS', 'Aula', 'Hora de ingreso']" min-width="min-w-[640px]">
+                    <x-slot:body>
+                        <template x-for="estudiante in horario.estudiantes" :key="estudiante.sis + estudiante.hora_ingreso">
+                            <tr class="border-b border-default bg-neutral-primary last:border-0">
+                                <td class="px-6 py-4" x-text="estudiante.nombres"></td>
+                                <td class="px-6 py-4" x-text="estudiante.apellidos"></td>
+                                <td class="px-6 py-4" x-text="estudiante.sis"></td>
+                                <td class="px-6 py-4" x-text="estudiante.aula || 'Sin aula'"></td>
+                                <td class="px-6 py-4 font-medium text-heading" x-text="estudiante.hora_ingreso || 'Sin registro'"></td>
                             </tr>
-                        </thead>
-                        <tbody>
-                            <template x-for="estudiante in horario.estudiantes" :key="estudiante.sis + estudiante.hora_ingreso">
-                                <tr class="border-b border-default last:border-0">
-                                    <td class="px-6 py-4" x-text="estudiante.nombres"></td>
-                                    <td class="px-6 py-4" x-text="estudiante.apellidos"></td>
-                                    <td class="px-6 py-4" x-text="estudiante.sis"></td>
-                                    <td class="px-6 py-4" x-text="estudiante.aula || 'Sin aula'"></td>
-                                    <td class="px-6 py-4 font-medium text-heading" x-text="estudiante.hora_ingreso || 'Sin registro'"></td>
-                                </tr>
-                            </template>
-                        </tbody>
-                    </table>
-                </div>
+                        </template>
+                    </x-slot:body>
+                </x-ui.table>
             </div>
         </div>
     </template>

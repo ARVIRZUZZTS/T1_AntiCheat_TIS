@@ -23,14 +23,8 @@
       cards de conteo de materia-estudiantes.blade.php y
       monitor-en-vivo.blade.php (antes duplicadas, con el mismo bug de
       ícono aplastado en las dos).
-    - 2026-10-12  [Diego Tejerina]  fix: $icon pasa a opcional. Con 6
-      columnas (o 2 en mobile), "08:00 – 09:30" + el recuadro del ícono no
-      entran juntos en el ancho de la card: el texto, aunque en una sola
-      línea, se desbordaba por debajo del ícono y quedaba tapado. La card
-      "En curso" deja de pasar ícono (ver monitor-en-vivo.blade.php) y acá
-      se agrega `overflow-hidden` al valor en una sola línea como resguardo,
-      para que si algún día no entra, se recorte en vez de taparse con el
-      ícono.
+    - 2026-10-23  [Alex Candia]  feat: soporte de slot nombrado `metric` para
+      valores dinámicos con Alpine (x-text) sin romper el comportamiento actual.
 --}}
 
 @props([
@@ -55,9 +49,21 @@
     <div class="min-w-0">
         @if ($labelFirst)
             <p class="text-sm text-body truncate">{{ $label }}</p>
-            <p @class(['font-semibold text-sm sm:text-base' => $nowrap, 'text-lg sm:text-2xl' => ! $nowrap, $colorTexto => true, 'whitespace-nowrap overflow-hidden' => $nowrap])>{{ $value }}</p>
+            <p @class(['font-semibold text-sm sm:text-base' => $nowrap, 'text-lg sm:text-2xl' => ! $nowrap, $colorTexto => true, 'whitespace-nowrap overflow-hidden' => $nowrap])>
+                @isset($metric)
+                    {{ $metric }}
+                @else
+                    {{ $value }}
+                @endisset
+            </p>
         @else
-            <p @class(['font-semibold text-xl sm:text-3xl truncate' => true, $colorTexto => true, 'whitespace-nowrap overflow-hidden' => $nowrap])>{{ $value }}</p>
+            <p @class(['font-semibold text-xl sm:text-3xl truncate' => true, $colorTexto => true, 'whitespace-nowrap overflow-hidden' => $nowrap])>
+                @isset($metric)
+                    {{ $metric }}
+                @else
+                    {{ $value }}
+                @endisset
+            </p>
             <p class="text-sm text-body truncate">{{ $label }}</p>
         @endif
     </div>

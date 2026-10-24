@@ -86,7 +86,7 @@ use Illuminate\Support\Facades\Route;
 Route::middleware('auth')->group(function (): void {
 Route::view('/', 'pages.inicio')->name('inicio');
 
-Route::view('/inicio', 'pages.inicio')->name('inicio');
+Route::view('/inicio', 'pages.inicio');
 Route::get('/materias', fn () => view('pages.materias', [
     'materias' => app(ListarMateriasConMetricasService::class)->ejecutar(),
 ]))->name('materias');

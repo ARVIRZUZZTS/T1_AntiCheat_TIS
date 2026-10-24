@@ -17,6 +17,9 @@
     cada fila para filtrarla desde el navegador. Con $compact, las filas
     bajan de py-4 a py-2.5 (~44px de alto).
 
+    El slot nombrado `body` reemplaza el bucle de $rows y sirve para tablas
+    cuyas filas las dibuja Alpine con x-for (reportes).
+
     @see  resources/views/pages/materia-estudiantes.blade.php
 
     @changelog
@@ -31,6 +34,8 @@
       ancho de la pantalla; el scroll queda contenido en este componente
       (`overflow-x-auto` del div envolvente), nunca en la página. Sin este
       prop el comportamiento no cambia.
+    - 2026-10-23  [Alex Candia]  feat: slot `body` para filas dinámicas de
+      Alpine sin duplicar el contenedor ni los encabezados en cada reporte.
 --}}
 
 @props([
@@ -54,36 +59,40 @@
             </tr>
         </thead>
         <tbody>
-            @foreach ($rows as $row)
-                @if (is_array($row) && array_key_exists('__separator', $row))
-                    <tr>
-                        <td colspan="{{ count($headers) }}" class="px-4 py-2">
-                            <hr class="border-default">
-                        </td>
+            @if (isset($body) && $body->isNotEmpty())
+                {{ $body }}
+            @else
+                @foreach ($rows as $row)
+                    @if (is_array($row) && array_key_exists('__separator', $row))
+                        <tr>
+                            <td colspan="{{ count($headers) }}" class="px-4 py-2">
+                                <hr class="border-default">
+                            </td>
+                        </tr>
+                        @continue
+                    @endif
+                    @php
+                        $rowClass = is_array($row) ? ($row['__rowClass'] ?? null) : null;
+                        $rowXShow = is_array($row) ? ($row['__xShow'] ?? null) : null;
+                        $rowAttrs = is_array($row) ? ($row['__rowAttrs'] ?? []) : [];
+                    @endphp
+                    <tr @class([
+                        $loop->last ? 'bg-neutral-primary' : 'bg-neutral-primary border-b border-default',
+                        $rowClass => $rowClass,
+                    ]) @foreach ($rowAttrs as $attr => $valor) {{ $attr }}="{{ $valor }}" @endforeach @if ($rowXShow !== null) x-show="{{ $rowXShow }}" @endif>
+                        @foreach ($row as $key => $cell)
+                            @continue(in_array($key, ['__rowClass', '__xShow', '__rowAttrs'], true))
+                            @if (is_array($cell) && ! empty($cell['html']))
+                                <td class="{{ $cellPad }}">{!! $cell['html'] !!}</td>
+                            @elseif (is_array($cell) && ! empty($cell['heading']))
+                                <th scope="row" class="{{ $cellPad }} font-medium text-heading whitespace-nowrap">{{ $cell['value'] }}</th>
+                            @else
+                                <td class="{{ $cellPad }}">{{ is_array($cell) ? $cell['value'] : $cell }}</td>
+                            @endif
+                        @endforeach
                     </tr>
-                    @continue
-                @endif
-                @php
-                    $rowClass = is_array($row) ? ($row['__rowClass'] ?? null) : null;
-                    $rowXShow = is_array($row) ? ($row['__xShow'] ?? null) : null;
-                    $rowAttrs = is_array($row) ? ($row['__rowAttrs'] ?? []) : [];
-                @endphp
-                <tr @class([
-                    $loop->last ? 'bg-neutral-primary' : 'bg-neutral-primary border-b border-default',
-                    $rowClass => $rowClass,
-                ]) @foreach ($rowAttrs as $attr => $valor) {{ $attr }}="{{ $valor }}" @endforeach @if ($rowXShow !== null) x-show="{{ $rowXShow }}" @endif>
-                    @foreach ($row as $key => $cell)
-                        @continue(in_array($key, ['__rowClass', '__xShow', '__rowAttrs'], true))
-                        @if (is_array($cell) && ! empty($cell['html']))
-                            <td class="{{ $cellPad }}">{!! $cell['html'] !!}</td>
-                        @elseif (is_array($cell) && ! empty($cell['heading']))
-                            <th scope="row" class="{{ $cellPad }} font-medium text-heading whitespace-nowrap">{{ $cell['value'] }}</th>
-                        @else
-                            <td class="{{ $cellPad }}">{{ is_array($cell) ? $cell['value'] : $cell }}</td>
-                        @endif
-                    @endforeach
-                </tr>
-            @endforeach
+                @endforeach
+            @endif
         </tbody>
     </table>
 
