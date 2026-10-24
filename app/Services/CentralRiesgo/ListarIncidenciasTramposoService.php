@@ -9,25 +9,24 @@
  *
  * @updated 2026-10-10
  * @updated 2026-10-11
+ * @updated 2026-10-24
  *
  * @description
  * Servicio de dominio que lista las incidencias de la central de riesgos con
- * tipo de infracción `tramposo` y estado `Confirmado`. Devuelve por registro el
- * id y `id_registro`
- * (lo que abre el detalle), el nombre y el código SIS del estudiante, la
- * materia, el motivo y su etiqueta, el estado y la fecha/hora, con filtro por
- * alcance y búsqueda. El orden por defecto es alfabético (A-Z) por apellidos y
- * nombre; la pantalla de la central pide además el orden por fecha, de la más
- * reciente a la más antigua. La respuesta es la lista completa, sin paginación.
+ * tipo de infracción `tramposo` (que equivale a confirmada). Devuelve por
+ * registro el id y `id_registro` (lo que abre el detalle), el nombre y el
+ * código SIS del estudiante, la materia y el curso, el motivo y su etiqueta,
+ * el estado y la fecha/hora, con filtro por alcance y búsqueda. El orden por
+ * defecto es alfabético (A-Z) por apellidos y nombre; la pantalla de la
+ * central pide además el orden por fecha, de la más reciente a la más antigua.
+ * La respuesta es la lista completa, sin paginación.
  *
- * El estudiante y el examen son columnas propias de `central_riesgo`
- * (`sis_estudiante`, `id_examen`), así que no hace falta pasar por
- * `registro_asistencia`. La materia se resuelve por la intersección de los
- * cursos del estudiante con los cursos del examen; si el estudiante no está
- * inscrito en ningún curso del examen, la materia queda en el primer curso del
- * examen (ordenado por id). Cuando la incidencia guardó el curso elegido
- * (`id_curso`), ese manda sobre la intersección. El motivo se devuelve como string: el enum de la
- * base usa espacios y el enum de dominio guiones bajos, así que no se castea.
+ * El estudiante y el curso son columnas propias de `central_riesgo`
+ * (`sis_estudiante`, `id_curso`): la lista muestra lo que quedó registrado,
+ * sin deducir el curso desde el examen. `curso` es el nombre completo
+ * ("Calculo I - Grupo 2") y `materia` solo la materia ("Calculo I"). El
+ * motivo se devuelve como string: el enum de la base usa espacios y el enum de
+ * dominio guiones bajos, así que no se castea.
  *
  * El criterio de la búsqueda (modo, saneo y validación) lo aporta
  * {@see BusquedaEstudianteService}, la misma fuente que usa la lista de
@@ -61,6 +60,11 @@
  *   `curso`, `examen.cursos` y `estudiante.cursos`. Contra un PostgreSQL remoto
  *   cada viaje de red pesa ~380 ms; el orden A-Z y el contrato de salida no
  *   cambian.
+ * - 2026-10-24  [Valery D. Ortuno P]  refactor: la central lista por tipo de
+ *   infracción (`tramposo` = confirmado) en vez de `estado_incidencia`, que se
+ *   dejará de usar. El curso sale solo de `central_riesgo.id_curso` (sin
+ *   deducirlo del examen), "Mis materias" filtra por el docente de ese curso y
+ *   cada registro trae `curso` (nombre completo) y `materia` (sin el grupo).
  */
 
 namespace App\Services\CentralRiesgo;
@@ -69,6 +73,7 @@ use App\Enums\EstadoIncidencia;
 use App\Enums\TipoInfraccion;
 use App\Models\CentralRiesgo;
 use App\Services\Examen\BusquedaEstudianteService;
+use App\Support\NombreCurso;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
@@ -124,36 +129,19 @@ class ListarIncidenciasTramposoService
         $this->validarAlcance($alcance, $usuario);
         $this->validarOrden($orden);
 
-        // Una sola consulta: el estudiante entra por el join y la materia se
-        // resuelve con subconsultas, en vez de precargar `estudiante`, `curso`,
-        // `examen.cursos` y `estudiante.cursos` (cuatro viajes de red más).
+        // Una sola consulta: el estudiante y el curso entran por join en vez de
+        // precargarlos (cada viaje de red a la base remota pesa).
         $query = CentralRiesgo::query()
             ->join('estudiante', 'estudiante.sis_estudiante', '=', 'central_riesgo.sis_estudiante')
             ->leftJoin('curso', 'curso.id_curso', '=', 'central_riesgo.id_curso')
+            // Tramposo equivale a confirmado (sospechoso a pendiente): la central
+            // solo lista sanciones, no reportes que el docente aún no revisó.
             ->where('central_riesgo.tipo_infraccion', TipoInfraccion::Tramposo->value)
-            // Solo las confirmadas entran a la central: una incidencia pendiente
-            // todavía no es una sanción y no debe mostrarse como tramposo.
-            ->where('central_riesgo.estado_incidencia', EstadoIncidencia::Confirmado->value)
             ->select('central_riesgo.*')
             ->selectRaw('estudiante.nombre_estudiante as lista_est_nombre')
             ->selectRaw('estudiante.apellido_estudiante as lista_est_apellido')
-            // Misma regla que la materia que armaba el servicio en PHP: el curso
-            // guardado manda; si no, el primer curso del examen donde el
-            // estudiante está inscrito y, en último caso, el primer curso del
-            // examen. Todo dentro de la misma consulta.
-            ->selectRaw(
-                'coalesce(curso.nombre_curso,'
-                .' (select c.nombre_curso from examen_curso ec'
-                .' join curso c on c.id_curso = ec.id_curso'
-                .' join estudiante_curso ecur on ecur.id_curso = ec.id_curso'
-                .' and ecur.sis_estudiante = central_riesgo.sis_estudiante'
-                .' where ec.id_examen = central_riesgo.id_examen'
-                .' order by ec.id_curso limit 1),'
-                .' (select c.nombre_curso from examen_curso ec'
-                .' join curso c on c.id_curso = ec.id_curso'
-                .' where ec.id_examen = central_riesgo.id_examen'
-                .' order by ec.id_curso limit 1)) as lista_materia'
-            );
+            // El curso es el que quedó registrado en la incidencia.
+            ->selectRaw('curso.nombre_curso as lista_curso');
 
         if ($alcance === self::ALCANCE_MIS_MATERIAS) {
             $this->filtrarPorMisMaterias($query, (int) $usuario);
@@ -213,16 +201,14 @@ class ListarIncidenciasTramposoService
     }
 
     /**
-     * Deja solo las incidencias cuyo examen tenga al menos un curso del usuario.
+     * Deja solo las incidencias registradas en un curso del usuario.
      *
-     * @param  Builder<CentralRiesgo>  $query  Consulta de incidencias.
-     * @param  int  $usuario  ID del usuario dueño de los cursos.
+     * @param  Builder<CentralRiesgo>  $query  Consulta de incidencias (con el join a `curso`).
+     * @param  int  $usuario  ID del docente dueño de los cursos.
      */
     private function filtrarPorMisMaterias(Builder $query, int $usuario): void
     {
-        $query->whereHas('examen.cursos', function (Builder $q) use ($usuario) {
-            $q->where('curso.sis_doc', $usuario);
-        });
+        $query->where('curso.sis_doc', $usuario);
     }
 
     /**
@@ -302,24 +288,25 @@ class ListarIncidenciasTramposoService
     /**
      * Convierte una incidencia en el arreglo de datos que consume la API.
      *
-     * @param  CentralRiesgo  $incidencia  Incidencia con relaciones precargadas.
-     * @return array<string, mixed> Datos del estudiante, materia, motivo, estado y fecha.
+     * @param  CentralRiesgo  $incidencia  Incidencia con estudiante y curso del join.
+     * @return array<string, mixed> Datos del estudiante, curso, materia, motivo, estado y fecha.
      */
     private function mapear(CentralRiesgo $incidencia): array
     {
+        $curso = $incidencia->getAttribute('lista_curso');
+
         return [
             'id' => $incidencia->id_registro,
             'id_registro' => $incidencia->id_registro,
             'nombre' => $incidencia->getAttribute('lista_est_nombre'),
             'apellido' => $incidencia->getAttribute('lista_est_apellido'),
             'sis' => $incidencia->getAttribute('sis_estudiante'),
-            'materia' => $incidencia->getAttribute('lista_materia'),
+            'curso' => $curso,
+            'materia' => $curso !== null ? NombreCurso::materia($curso) : null,
             'motivo' => $incidencia->motivo,
             'motivo_etiqueta' => $incidencia->motivo->etiqueta(),
-            // El modelo castea `estado_incidencia` a EstadoIncidencia; se
-            // devuelve el string del enum para que el JSON y Blade lo muestren
-            // igual que la columna Estado.
-            'estado' => $incidencia->estado_incidencia->value,
+            // La central solo lista tramposos, y tramposo equivale a confirmado.
+            'estado' => EstadoIncidencia::Confirmado->value,
             'fecha' => $incidencia->fecha_registro->toDateTimeString(),
         ];
     }

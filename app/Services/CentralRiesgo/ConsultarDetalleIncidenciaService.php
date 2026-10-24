@@ -8,10 +8,11 @@
  * @created 2026-10-09
  *
  * @updated 2026-10-11
+ * @updated 2026-10-24
  *
  * @description
  * Servicio de dominio que devuelve el detalle de una incidencia de la
- * central de riesgos: estudiante, SIS, motivo, materia, quien la reportó,
+ * central de riesgos: estudiante, SIS, motivo, curso (materia y grupo), quien la reportó,
  * fecha y hora, estado y descripción del hecho. Trabaja contra el esquema
  * actual de `central_riesgo` (ver bd.md): el estudiante y el examen se
  * resuelven por las columnas propias `sis_estudiante` e `id_examen` y sus
@@ -44,6 +45,11 @@
  *   con joins y subconsultas dentro de la consulta base, en vez de eager loads
  *   contra un PostgreSQL remoto (~380 ms por viaje de red). El contrato de
  *   salida no cambia y DetalleIncidenciaTest lo verifica.
+ * - 2026-10-24  [Valery D. Ortuno P]  refactor: el curso sale solo de
+ *   `central_riesgo.id_curso` (sin deducirlo del examen) y el detalle trae
+ *   `curso`, `materia` y `grupo`; el estado se deriva del tipo de infracción
+ *   (tramposo = Confirmado, sospechoso = Pendiente) en vez de
+ *   `estado_incidencia`, que se dejará de usar.
  *
  * @see  App\Policies\CentralRiesgoPolicy
  * @see  App\Models\CentralRiesgo
@@ -56,7 +62,7 @@ use App\Enums\EstadoIncidencia;
 use App\Enums\Motivo;
 use App\Enums\TipoInfraccion;
 use App\Models\CentralRiesgo;
-use App\Models\Curso;
+use App\Support\NombreCurso;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 class ConsultarDetalleIncidenciaService
@@ -72,11 +78,14 @@ class ConsultarDetalleIncidenciaService
     public function ejecutar(int $idIncidencia): array
     {
         // Una sola consulta: contra un PostgreSQL remoto cada viaje de red pesa
-        // (~380 ms), así que el estudiante, el registrador, su rol y la materia
-        // del examen se traen con joins y subconsultas en lugar de eager loads.
+        // (~380 ms), así que el estudiante, el curso, el registrador y su rol
+        // se traen con joins y subconsultas en lugar de eager loads.
         $incidencia = CentralRiesgo::query()
             ->leftJoin('estudiante', 'estudiante.sis_estudiante', '=', 'central_riesgo.sis_estudiante')
             ->leftJoin('usuario', 'usuario.id_usuario', '=', 'central_riesgo.id_registrador')
+            // El curso es el que quedó registrado en la incidencia, igual que en
+            // la lista de la central.
+            ->leftJoin('curso', 'curso.id_curso', '=', 'central_riesgo.id_curso')
             ->where('central_riesgo.id_registro', $idIncidencia)
             ->select('central_riesgo.*')
             ->selectRaw('estudiante.nombre_estudiante as det_est_nombre')
@@ -84,14 +93,7 @@ class ConsultarDetalleIncidenciaService
             ->selectRaw('estudiante.sis_estudiante as det_est_sis')
             ->selectRaw('usuario.nombre_usuario as det_usr_nombre')
             ->selectRaw('usuario.apellido as det_usr_apellido')
-            // Primer curso del examen: la misma fuente que CentralRiesgo::materia()
-            // usa cuando la incidencia no guardó un curso propio.
-            ->selectRaw(
-                '(select c.nombre_curso from examen_curso ec'
-                .' join curso c on c.id_curso = ec.id_curso'
-                .' where ec.id_examen = central_riesgo.id_examen'
-                .' order by ec.id_curso limit 1) as det_materia_examen'
-            )
+            ->selectRaw('curso.nombre_curso as det_curso')
             // Rol (docente/auxiliar) del registrador, sin segunda consulta.
             ->selectRaw(
                 '(select r.nombre_rol from rol_usuario ru'
@@ -109,6 +111,7 @@ class ConsultarDetalleIncidenciaService
         $apellidoEstudiante = $incidencia->getAttribute('det_est_apellido');
         $nombreRegistrador = $incidencia->getAttribute('det_usr_nombre');
         $apellidoRegistrador = $incidencia->getAttribute('det_usr_apellido');
+        $curso = $incidencia->getAttribute('det_curso');
 
         return [
             'id_registro' => $incidencia->id_registro,
@@ -118,7 +121,10 @@ class ConsultarDetalleIncidenciaService
             'sis_estudiante' => $incidencia->getAttribute('sis_estudiante')
                 ?? $incidencia->getAttribute('det_est_sis'),
             'motivo' => $this->etiquetaMotivo($incidencia),
-            'materia' => $this->materia($incidencia),
+            // "Calculo I - Grupo 2" completo, y por separado materia y grupo.
+            'curso' => $curso,
+            'materia' => $curso !== null ? NombreCurso::materia($curso) : null,
+            'grupo' => $curso !== null ? NombreCurso::grupo($curso) : null,
             'reportado_por' => $nombreRegistrador !== null
                 ? trim($nombreRegistrador.' '.(string) $apellidoRegistrador)
                 : null,
@@ -130,28 +136,6 @@ class ConsultarDetalleIncidenciaService
             'estado' => $this->estado($incidencia),
             'descripcion' => $incidencia->detalle_motivo,
         ];
-    }
-
-    /**
-     * Materia de la incidencia con la misma regla que `CentralRiesgo::materia()`:
-     * el curso elegido al registrar (`id_curso`) manda; si no, el primer curso
-     * del examen, que ya viene resuelto en `det_materia_examen`.
-     *
-     * El curso elegido se busca aparte (y solo cuando existe) porque
-     * `id_curso` puede no estar en el esquema mínimo de las pruebas.
-     *
-     * @param  CentralRiesgo  $incidencia  Incidencia ya consultada.
-     * @return ?string Nombre de la materia, o null si no se puede resolver.
-     */
-    private function materia(CentralRiesgo $incidencia): ?string
-    {
-        $idCurso = $incidencia->getAttribute('id_curso');
-
-        $materia = $idCurso !== null
-            ? Curso::query()->whereKey($idCurso)->value('nombre_curso')
-            : null;
-
-        return $materia ?? $incidencia->getAttribute('det_materia_examen');
     }
 
     private function etiquetaMotivo(CentralRiesgo $incidencia): ?string
@@ -170,29 +154,15 @@ class ConsultarDetalleIncidenciaService
     }
 
     /**
-     * Estado de revisión de la incidencia.
-     *
-     * Sale de `estado_incidencia` cuando la base o el modelo lo tiene. Si no,
-     * se deriva del tipo de infracción con la misma regla que usa la
-     * migración: `tramposo` es un caso confirmado y `sospechoso` uno pendiente.
+     * Estado de revisión de la incidencia, según su tipo de infracción:
+     * `tramposo` es un caso confirmado y `sospechoso` uno pendiente.
+     * `estado_incidencia` ya no se lee porque se va a dejar de usar.
      *
      * @param  CentralRiesgo  $incidencia  Incidencia consultada.
-     * @return string Valor del estado ('Confirmado', 'Pendiente', etc.).
+     * @return string Valor del estado ('Confirmado' o 'Pendiente').
      */
     private function estado(CentralRiesgo $incidencia): string
     {
-        $guardado = $incidencia->getAttribute('estado_incidencia');
-
-        if ($guardado instanceof EstadoIncidencia) {
-            return $guardado->value;
-        }
-
-        if (is_string($guardado)) {
-            $estadoEnum = EstadoIncidencia::tryFrom($guardado);
-
-            return $estadoEnum !== null ? $estadoEnum->value : $guardado;
-        }
-
         return $incidencia->tipo_infraccion === TipoInfraccion::Tramposo
             ? EstadoIncidencia::Confirmado->value
             : EstadoIncidencia::Pendiente->value;
