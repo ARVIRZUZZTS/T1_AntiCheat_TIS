@@ -37,6 +37,8 @@
  *   rechazaba las 06:45 exactas, que son una hora válida del rango.
  * - 2026-10-24  [Valery D. Ortuno P]  feat: authorize() exige que el curso sea
  *   del docente autenticado (CursoPolicy), ahora que existe el login.
+ * - 2026-10-24  [Valery D. Ortuno P]  feat: no se crean exámenes en cursos
+ *   finalizados (CursoPolicy::crearExamen) y los mensajes van sin acentos.
  */
 
 namespace App\Http\Requests;
@@ -50,17 +52,18 @@ use Illuminate\Validation\Validator;
 class StoreExamenRequest extends FormRequest
 {
     /**
-     * Solo el docente responsable del curso puede crearle exámenes: el rol lo
-     * exige el middleware `docente` y la pertenencia la decide CursoPolicy.
+     * Solo el docente responsable del curso puede crearle exámenes, y solo
+     * mientras el curso siga en curso: el rol lo exige el middleware `docente`
+     * y la pertenencia y el estado los decide CursoPolicy::crearExamen().
      *
-     * @return bool  Si el usuario autenticado gestiona el curso de la URL.
+     * @return bool  Si el usuario autenticado puede crear exámenes en el curso de la URL.
      *
      * @author Valery D. Ortuno P <valerydariana98@gmail.com>
      * @since  2026-10-24
      */
     public function authorize(): bool
     {
-        return $this->user()?->can('gestionar', $this->route('curso')) ?? false;
+        return $this->user()?->can('crearExamen', $this->route('curso')) ?? false;
     }
 
     /**
@@ -82,7 +85,7 @@ class StoreExamenRequest extends FormRequest
             $anio = (int) $coincidencias[1];
 
             if ($anio < 1900 || $anio > 2099) {
-                $validator->errors()->add('fecha', 'Ingrese un año válido.');
+                $validator->errors()->add('fecha', 'Ingrese un año valido.');
             }
         });
     }
@@ -142,19 +145,19 @@ class StoreExamenRequest extends FormRequest
         return [
             'tipo_examen.required' => 'Seleccione el tipo de examen.',
             'fecha.required' => 'Ingrese la fecha.',
-            'fecha.regex' => 'Ingrese una fecha válida.',
-            'fecha.date_format' => 'Ingrese una fecha válida.',
+            'fecha.regex' => 'Ingrese una fecha valida.',
+            'fecha.date_format' => 'Ingrese una fecha valida.',
             'hora_inicio.required' => 'Ingrese la hora de inicio.',
-            'hora_inicio.date_format' => 'Ingrese una hora válida.',
-            'hora_inicio.regex' => 'Ingrese una hora válida.',
+            'hora_inicio.date_format' => 'Ingrese una hora valida.',
+            'hora_inicio.regex' => 'Ingrese una hora valida.',
             'hora_inicio.after_or_equal' => 'La hora de inicio no puede ser anterior a las '
                 .RegistrarExamenService::HORA_INICIO_MINIMA.'.',
             'hora_inicio.before_or_equal' => 'La hora de inicio no puede ser posterior a las '
                 .RegistrarExamenService::HORA_INICIO_MAXIMA.'.',
-            'duracion.required' => 'Ingrese la duración del examen.',
-            'duracion.integer' => 'La duración debe estar en minutos, solo números.',
-            'duracion.min' => 'La duración debe ser de al menos 1 minuto.',
-            'duracion.max' => 'La duración no debe superar los 300 minutos.',
+            'duracion.required' => 'Ingrese la duracion del examen.',
+            'duracion.integer' => 'La duracion debe estar en minutos, solo numeros.',
+            'duracion.min' => 'La duracion debe ser de al menos 1 minuto.',
+            'duracion.max' => 'La duracion no debe superar los 300 minutos.',
             'ambientes.required' => 'Seleccione al menos un ambiente.',
             'ambientes.min' => 'Seleccione al menos un ambiente.',
             'ambientes.*.exists' => 'Uno de los ambientes seleccionados no existe.',
@@ -174,7 +177,7 @@ class StoreExamenRequest extends FormRequest
             'tipo_examen' => 'tipo de examen',
             'fecha' => 'fecha',
             'hora_inicio' => 'hora de inicio',
-            'duracion' => 'duración',
+            'duracion' => 'duracion',
             'ambientes' => 'ambientes',
             'materiales' => 'material permitido',
             'normas' => 'normas',

@@ -28,6 +28,9 @@
  * - 2026-10-24  [Valery D. Ortuno P]  feat: acciones index, curso y crear de la
  *   sección Exámenes; el alta ya no vuelve al detalle de la materia sino a los
  *   exámenes del curso, y las vistas de un curso exigen que sea del docente.
+ * - 2026-10-24  [Valery D. Ortuno P]  feat: el formulario de alta exige que el
+ *   curso siga en curso (CursoPolicy::crearExamen) y el aviso de éxito va sin
+ *   acentos.
  *
  * @see  StoreExamenRequest
  * @see  App\Services\Examen\RegistrarExamenService
@@ -99,14 +102,14 @@ class ExamenController extends Controller
      *
      * @return View  Vista pages.examen-crear.
      *
-     * @throws \Illuminate\Auth\Access\AuthorizationException  Si el curso no es del docente (403).
+     * @throws \Illuminate\Auth\Access\AuthorizationException  Si el curso no es del docente o ya finalizó (403).
      *
      * @author Valery D. Ortuno P <valerydariana98@gmail.com>
      * @since  2026-10-24
      */
     public function crear(Curso $curso): View
     {
-        Gate::authorize('gestionar', $curso);
+        Gate::authorize('crearExamen', $curso);
 
         return view('pages.examen-crear', [
             'curso' => $curso,
@@ -125,6 +128,6 @@ class ExamenController extends Controller
 
         return redirect()
             ->route('examenes.curso', $curso->id_curso)
-            ->with('mensaje', 'Examen creado con éxito');
+            ->with('mensaje', 'Examen creado con exito');
     }
 }
