@@ -30,7 +30,7 @@
     <div class="px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
         <div class="mx-auto w-full max-w-2xl rounded-base border border-default bg-neutral-primary-soft p-4 shadow-sm md:p-6">
             <x-ui.form-crear-examen
-                :materia="$curso->nombre_curso"
+                :nombre-curso="$curso->nombre_curso"
                 :ambientes="$ambientes"
                 :materiales="$materiales"
                 :normas="$normas"

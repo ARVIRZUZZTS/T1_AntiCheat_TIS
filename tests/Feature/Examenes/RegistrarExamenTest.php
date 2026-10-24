@@ -33,6 +33,9 @@
  * - 2026-10-24  [Valery D. Ortuno P]  test: las pruebas inician sesión con el
  *   docente del curso (rol docente) y el alta redirige a los exámenes del
  *   curso (`examenes.curso`) en vez del detalle de la materia.
+ * - 2026-10-24  [Valery D. Ortuno P]  test: mensajes sin acentos, hora en
+ *   punto válida y bloqueo de cursos
+ *   finalizados.
  */
 
 namespace Tests\Feature\Examenes;
@@ -184,7 +187,7 @@ class RegistrarExamenTest extends TestCase
     {
         $this->post(route('cursos.examenes.store', self::ID_CURSO), $this->datosValidos([
             'fecha' => '31/02/2026',
-        ]))->assertSessionHasErrors(['fecha' => 'Ingrese una fecha válida.']);
+        ]))->assertSessionHasErrors(['fecha' => 'Ingrese una fecha valida.']);
     }
 
     /** Un año fuera de 19xx/20xx tiene su propio mensaje. */
@@ -192,7 +195,7 @@ class RegistrarExamenTest extends TestCase
     {
         $this->post(route('cursos.examenes.store', self::ID_CURSO), $this->datosValidos([
             'fecha' => '10/12/1826',
-        ]))->assertSessionHasErrors(['fecha' => 'Ingrese un año válido.']);
+        ]))->assertSessionHasErrors(['fecha' => 'Ingrese un año valido.']);
     }
 
     /** Una hora fuera de 00:00-23:59 da el mensaje de hora inválida. */
@@ -200,7 +203,7 @@ class RegistrarExamenTest extends TestCase
     {
         $this->post(route('cursos.examenes.store', self::ID_CURSO), $this->datosValidos([
             'hora_inicio' => '25:78',
-        ]))->assertSessionHasErrors(['hora_inicio' => 'Ingrese una hora válida.']);
+        ]))->assertSessionHasErrors(['hora_inicio' => 'Ingrese una hora valida.']);
     }
 
     /** La duración no puede superar el tope del servicio. */
@@ -208,7 +211,26 @@ class RegistrarExamenTest extends TestCase
     {
         $this->post(route('cursos.examenes.store', self::ID_CURSO), $this->datosValidos([
             'duracion' => 301,
-        ]))->assertSessionHasErrors(['duracion' => 'La duración no debe superar los 300 minutos.']);
+        ]))->assertSessionHasErrors(['duracion' => 'La duracion no debe superar los 300 minutos.']);
+    }
+
+    /** Una hora en punto es válida (antes el campo la volvía 08:01). */
+    public function test_acepta_una_hora_en_punto(): void
+    {
+        $this->post(route('cursos.examenes.store', self::ID_CURSO), $this->datosValidos([
+            'hora_inicio' => '08:00',
+        ]))->assertSessionHasNoErrors();
+    }
+
+
+    /** En un curso finalizado no se crean exámenes, ni el formulario se abre. */
+    public function test_no_crea_examenes_en_un_curso_finalizado(): void
+    {
+        DB::table('curso')->where('id_curso', self::ID_CURSO)->update(['estado' => 'Finalizo']);
+
+        $this->get(route('examenes.crear', self::ID_CURSO))->assertForbidden();
+        $this->post(route('cursos.examenes.store', self::ID_CURSO), $this->datosValidos())
+            ->assertForbidden();
     }
 
     /**
