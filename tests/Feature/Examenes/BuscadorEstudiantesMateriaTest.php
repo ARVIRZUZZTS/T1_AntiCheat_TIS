@@ -8,16 +8,17 @@
  * @created 2026-09-26
  *
  * @updated 2026-09-26
+ * @updated 2026-10-24
  *
  * @description
- * Pruebas del render del buscador de la pestaña Estudiantes de
- * `pages/materia-estudiantes`. La vista ya no trae filas mock: delega la tabla,
+ * Pruebas del render del buscador de la pestaña Ver estudiantes de
+ * `pages/curso-detalle`. La vista ya no trae filas mock: delega la tabla,
  * el buscador y los filtros al componente Livewire `EstudiantesCurso`, que a su
  * vez usa el parcial compartido y toma sus parametros del Service. Se verifica
  * que ese contrato se siga manteniendo y que la pagina no vuelva a renderizar
  * datos mock ni tags de componente sin compilar.
  *
- * @see  resources/views/pages/materia-estudiantes.blade.php
+ * @see  resources/views/pages/curso-detalle.blade.php
  * @see  resources/views/livewire/examenes/estudiantes-curso.blade.php
  * @see  resources/views/partials/busqueda-estudiante.blade.php
  * @see  resources/views/components/ui/table.blade.php
@@ -33,11 +34,15 @@
  * - 2026-09-28  [T1]  test: el buscador y la tabla pasan al componente
  *   Livewire; las aserciones que cubrian el markup mock de la pagina (#28) se
  *   repuntan al componente y la pagina se cubre sin datos mock.
+ * - 2026-10-24  [Valery D. Ortuno P]  test: la página pasa a
+ *   pages/curso-detalle y se
+ *   renderiza con la sesión del docente del curso.
  */
 
 namespace Tests\Feature\Examenes;
 
 use App\Models\Curso;
+use App\Models\Usuario;
 use App\Services\Examen\BusquedaEstudianteService;
 use App\Services\Examen\ListarEstudiantesCursoConEstadoService;
 use Illuminate\Support\Js;
@@ -47,17 +52,20 @@ use Tests\TestCase;
 class BuscadorEstudiantesMateriaTest extends TestCase
 {
     /**
-     * Renderiza la vista de la materia con los mismos datos que le pasa la
-     * ruta `materias.detalle`.
+     * Renderiza la vista del curso con los mismos datos que le pasa
+     * CursoController::detalle(). El componente Livewire que incrusta exige
+     * que el curso sea del usuario autenticado, así que se entra como su docente.
      */
     private function renderPagina(): string
     {
         $curso = Curso::query()->firstOrFail();
+        $servicio = app(ListarEstudiantesCursoConEstadoService::class);
 
-        return view('pages.materia-estudiantes', [
+        $this->actingAs(Usuario::query()->findOrFail($curso->sis_doc));
+
+        return view('pages.curso-detalle', [
             'curso' => $curso,
-            'conteos' => app(ListarEstudiantesCursoConEstadoService::class)
-                ->conteosPorEstado($curso->id_curso),
+            'conteos' => $servicio->conteosPorEstado($curso->id_curso),
         ])->render();
     }
 
