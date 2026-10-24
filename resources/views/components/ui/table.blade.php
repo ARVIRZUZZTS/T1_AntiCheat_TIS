@@ -20,7 +20,7 @@
     El slot nombrado `body` reemplaza el bucle de $rows y sirve para tablas
     cuyas filas las dibuja Alpine con x-for (reportes).
 
-    @see  resources/views/pages/materia-estudiantes.blade.php
+    @see  resources/views/pages/curso-detalle.blade.php
 
     @changelog
     - 2026-09-23  [David E. Chavez T.]  feat: creación inicial del componente.

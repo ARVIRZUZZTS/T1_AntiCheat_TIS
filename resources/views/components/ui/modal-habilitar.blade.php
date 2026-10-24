@@ -23,7 +23,7 @@
       ("Estudiante: Ana Lopez (SIS: 202201013)") y un <span> en medio lo
       parte en dos strings. Envolverlo rompía ese assert.
 
-    @see  resources/views/pages/materia-estudiantes.blade.php
+    @see  resources/views/pages/curso-detalle.blade.php
     @see  resources/views/livewire/examenes/estudiantes-curso.blade.php
     @see  resources/views/components/ui/modal-deshabilitar.blade.php
 --}}

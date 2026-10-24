@@ -18,7 +18,7 @@
  * necesita un `termino` normalizado para que el navegador compare.
  *
  * @see  App\Services\Material\ListarMaterialesService
- * @see  resources/views/components/ui/modal-crear-examen.blade.php
+ * @see  resources/views/components/ui/form-crear-examen.blade.php
  *
  * @changelog
  * - 2026-10-05  [Alex Candia]  feat: creación inicial del servicio.
