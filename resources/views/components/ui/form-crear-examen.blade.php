@@ -13,7 +13,8 @@
     que no se abre ni se cierra: "Cancelar" vuelve a `cancelarUrl`.
 
     La fecha se escribe dd/mm/aaaa con los separadores colocados a mano (así el
-    formato no depende del navegador) y la duración son solo dígitos en un
+    formato no depende del navegador); las barras se ponen solas y el año en
+    curso se completa al terminar el mes, aunque se puede cambiar. La duración son solo dígitos en un
     `type="text"`, para que no aparezcan las flechitas del input number, que en
     móvil se comen medio campo. No hay hora de fin: el examen dura lo que diga
     la duración.
@@ -30,8 +31,8 @@
 
     El material permitido y las normas tienen dos mitades cada uno: lo que sale
     del catálogo, en casillas de verificación todas desmarcadas, y lo que la
-    persona escribe a mano, en un campo de texto con tope de 300 caracteres que
-    impone el `maxlength`. Las casillas usan un `x-model` que es un array: cada
+    persona escribe a mano, en un textarea (un ítem por renglón) con tope de
+    300 caracteres que impone el `maxlength`. Las casillas usan un `x-model` que es un array: cada
     una marcada empuja su id y la que se desmarca lo saca.
 
     Ninguno de los tres bloques lleva contador: la lista de elegidos y los
@@ -124,6 +125,19 @@
       la página pages/examen-crear lo muestre como formulario propio. "Cancelar"
       vuelve a `cancelarUrl` (prop nueva, reemplaza a `abrir`). Los campos, sus
       validaciones y el envío no cambian.
+    - 2026-10-24  [Valery D. Ortuno P]  feat: la fecha se lee por tramos
+      dia/mes/año: el año en curso se completa al terminar el mes y ahora se
+      puede cambiar, borrar ya no repone barras, y el dia o mes de un digito se
+      completa con cero al salir del campo. Placeholders: dd/mm/aaaa, 00:00 en
+      la hora, 00 en la duración y "Buscar ambiente" sin puntos suspensivos.
+    - 2026-10-24  [Valery D. Ortuno P]  fix: "Cancelar" vuelve a la página
+      anterior; la URL iba con la directiva js dentro del atributo del
+      componente, que Blade no compila, y el clic daba error.
+    - 2026-10-24  [Valery D. Ortuno P]  fix: la hora de inicio acepta minutos
+      00 (08:00 quedaba en 08:01, porque el piso de los minutos era 1).
+    - 2026-10-24  [Valery D. Ortuno P]  feat: "Materiales personalizados" pasa a
+      textarea de 3 renglones, igual que "Normas personalizadas"; la duración
+      corta a 3 digitos también al pegar, y los textos visibles van sin acentos.
 
     @see  resources/views/pages/examen-crear.blade.php
     @see  App\Enums\TipoExamen
@@ -159,8 +173,11 @@
     $horaMinima = RegistrarExamenService::HORA_INICIO_MINIMA;
     $horaMaxima = RegistrarExamenService::HORA_INICIO_MAXIMA;
 
-    // El año lo pone el campo solo, no la persona: es el año en curso.
+    // El año en curso lo completa el campo solo al terminar el mes; la
+    // persona puede cambiarlo si el examen es de otro año.
     $anioActual = (string) now()->year;
+
+    $urlCancelar = $cancelarUrl ?? url()->previous();
 @endphp
 
 <div
@@ -215,28 +232,96 @@
         claseErrorDe(campo) {
             return this.errorDe(campo) ? '{{ $claseError }}' : '';
         },
-        sanearFecha() {
-            const digitos = this.fecha.replace(/\D/g, '');
-            const diaDeDos = parseInt(digitos.slice(0, 2), 10);
-            const diaDeUno = parseInt(digitos.slice(0, 1), 10);
-            const diaDeUnDigito = digitos.length >= 3
-                && (diaDeDos === 0 || diaDeDos > 31)
-                && diaDeUno >= 1
-                && diaDeUno <= 9;
+        // La fecha se lee por tramos (dia/mes/año). Las barras se ponen solas
+        // al completar el dia y el mes, y el año en curso se escribe solo al
+        // terminar el mes; despues se puede cambiar. Al borrar no se reponen
+        // barras ni año, para que la tecla de borrar no quede trabada.
+        sanearFecha(evento) {
+            const borrando = String(evento?.inputType ?? '').startsWith('delete');
+            const partes = this.fecha.split('/');
+            let dia;
+            let mes;
+            let anio;
 
-            const diaCrudo = digitos.slice(0, diaDeUnDigito ? 1 : 2);
-            const mesCrudo = digitos.slice(diaDeUnDigito ? 1 : 2, diaDeUnDigito ? 3 : 4);
+            if (partes.length >= 3) {
+                dia = partes[0].replace(/\D/g, '');
+                mes = partes[1].replace(/\D/g, '');
+                anio = partes.slice(2).join('').replace(/\D/g, '').slice(0, 4);
+            } else {
+                // Todavia no hay segunda barra: se lee como ddmm corrido.
+                const digitos = this.fecha.replace(/\D/g, '');
+                dia = digitos.slice(0, 2);
+                mes = digitos.slice(2, 4);
+                anio = digitos.slice(4, 8);
+            }
 
-            if (mesCrudo === '') {
-                this.fecha = diaDeUnDigito ? diaCrudo : digitos;
+            // Lo que sobra del dia pasa al mes (se siguio escribiendo en el tramo).
+            if (dia.length > 2) {
+                mes = dia.slice(2) + mes;
+                dia = dia.slice(0, 2);
+            }
+
+            // Al teclear '9' y luego '1' no se quiere el dia 91: es 09 y el
+            // mes empieza con 1. Lo mismo un primer digito que ya no admite
+            // otro (4 a 9 en el dia, 2 a 9 en el mes).
+            if (dia.length === 2 && dia[0] !== '0' && parseInt(dia, 10) > 31) {
+                mes = dia.slice(1) + mes;
+                dia = '0' + dia[0];
+            }
+
+            if (dia.length === 1 && parseInt(dia, 10) > 3) {
+                dia = '0' + dia;
+            }
+
+            mes = mes.slice(0, 2);
+
+            if (mes.length === 1 && parseInt(mes, 10) > 1) {
+                mes = '0' + mes;
+            }
+
+            dia = this.acotar(dia, 31);
+            mes = this.acotar(mes, 12);
+
+            // El año en curso entra solo cuando se acaba de completar el mes
+            // (aun no habia segunda barra); si la persona borra el año para
+            // escribir otro, no se le vuelve a poner.
+            if (! borrando && mes.length === 2 && anio === '' && partes.length < 3) {
+                anio = this.anioActual;
+            }
+
+            let texto = dia;
+
+            if (mes !== '' || (dia.length === 2 && ! borrando) || partes.length >= 2) {
+                texto += '/' + mes;
+            }
+
+            if (anio !== '' || (mes.length === 2 && ! borrando) || partes.length >= 3) {
+                texto += '/' + anio;
+            }
+
+            this.fecha = texto;
+        },
+
+        // Al salir del campo, un dia o un mes de un solo digito se completa
+        // con cero (1/3 -> 01/03), que es el formato que valida el servidor,
+        // y si quedo sin año se pone el año en curso.
+        completarFecha() {
+            if (this.fecha.replace(/\D/g, '') === '') {
+                this.fecha = '';
 
                 return;
             }
 
-            const dia = String(Math.min(Math.max(parseInt(diaCrudo, 10) || 1, 1), 31)).padStart(2, '0');
-            const mes = this.acotar(mesCrudo, 12);
+            const [dia = '', mes = '', anio = ''] = this.fecha.split('/');
+            const conCero = (tramo) => tramo.length === 1 && tramo !== '0' ? '0' + tramo : tramo;
 
-            this.fecha = dia + '/' + mes + '/' + this.anioActual;
+            // Sin mes no hay nada que completar: se deja como esta y la
+            // validacion avisa que la fecha no es valida.
+            if (mes === '') {
+                return;
+            }
+
+            this.fecha = conCero(dia) + '/' + conCero(mes) + '/' + (anio !== '' ? anio : this.anioActual);
         },
 
         sanearHora() {
@@ -260,7 +345,9 @@
                 return;
             }
 
-            let minimo = 1;
+            // Los minutos van de 00 a 59: con piso 1 era imposible poner una
+            // hora en punto (08:00 quedaba en 08:01).
+            let minimo = 0;
             let maximo = 59;
 
             if (hora === horaMinima) {
@@ -287,7 +374,9 @@
         },
 
         sanearDuracion(campo) {
-            const digitos = this.duracion.replace(/\D/g, '');
+            // Tres digitos como tope de escritura (tambien al pegar); el maximo
+            // de 300 minutos lo avisa la validacion al guardar.
+            const digitos = this.duracion.replace(/\D/g, '').slice(0, 3);
 
             this.duracion = digitos;
 
@@ -384,9 +473,9 @@
             type="text"
             placeholder="dd/mm/aaaa"
             inputmode="numeric"
-            maxlength="10"
             x-model="fecha"
-            @input="sanearFecha()"
+            @input="sanearFecha($event)"
+            @blur="completarFecha()"
             x-bind:class="claseErrorDe('fecha')"
             x-bind:aria-invalid="errorDe('fecha') ? 'true' : null"
             required
@@ -401,7 +490,7 @@
             type="text"
             inputmode="numeric"
             maxlength="5"
-            placeholder="06:45"
+            placeholder="00:00"
             x-model="horaInicio"
             @input="sanearHora()"
             x-bind:class="claseErrorDe('hora_inicio')"
@@ -412,13 +501,14 @@
            class="mt-1 text-sm text-fg-danger-strong"></p>
 
         <x-ui.input
-            label="Duración (minutos)"
+            label="Duracion (minutos)"
             id="duracion_examen"
             name="duracion"
             type="text"
             inputmode="numeric"
             pattern="[0-9]*"
             maxlength="3"
+            placeholder="00"
             x-model="duracion"
             @input="sanearDuracion($event.target)"
             x-bind:class="claseErrorDe('duracion')"
@@ -445,7 +535,7 @@
                    @keydown.up.prevent="moverResaltado(-1)"
                    @keydown.enter.prevent="elegirResaltado()"
                    @keydown.escape="listaAbierta = false"
-                   placeholder="Buscar ambiente..."
+                   placeholder="Buscar ambiente"
                    x-bind:class="claseErrorDe('ambientes')"
                    x-bind:aria-invalid="errorDe('ambientes') ? 'true' : null"
                    class="block w-full p-3 border border-default-medium bg-neutral-secondary-medium text-heading text-sm rounded-base focus:ring-brand focus:border-brand shadow-xs placeholder:text-body" />
@@ -467,7 +557,7 @@
                 </template>
 
                 <li x-show="ambientesVisibles().length === 0" class="px-3 py-2.5 text-sm text-body">
-                    No hay ambientes que coincidan con la búsqueda.
+                    No hay ambientes que coincidan con la busqueda.
                 </li>
             </ul>
 
@@ -515,7 +605,7 @@
                         />
                     </li>
                 @empty
-                    <li class="text-sm text-body">Todavía no hay materiales cargados en el catálogo.</li>
+                    <li class="text-sm text-body">Todavia no hay materiales cargados en el catalogo.</li>
                 @endforelse
             </ul>
 
@@ -523,13 +613,14 @@
                class="mt-1 text-sm text-fg-danger-strong"></p>
         </div>
 
-        {{-- Materiales que no estan en el catalogo: texto libre. El
-             maxlength del input es lo que corta a 300. --}}
-        <x-ui.input
+        {{-- Materiales que no estan en el catalogo: texto libre, igual que las
+             normas personalizadas (un material por renglon). El maxlength del
+             textarea es lo que corta a 300. --}}
+        <x-ui.textarea
             label="Materiales personalizados"
             id="materiales_personalizados_examen"
             name="materiales_personalizados"
-            type="text"
+            rows="3"
             maxlength="300"
             placeholder="Ingrese materiales personalizados para el examen"
             x-model="materialesPersonalizados"
@@ -559,7 +650,7 @@
                         />
                     </li>
                 @empty
-                    <li class="text-sm text-body">Todavía no hay normas cargadas en el catálogo.</li>
+                    <li class="text-sm text-body">Todavia no hay normas cargadas en el catalogo.</li>
                 @endforelse
             </ul>
 
@@ -584,7 +675,10 @@
            class="mt-1 text-sm text-fg-danger-strong"></p>
     </div>
     <div class="border-t border-default pt-4 flex flex-col-reverse gap-[2vh] sm:flex-row">
-        <x-ui.button-cancelar class="flex-1" @click="window.location.href = @js($cancelarUrl ?? url()->previous())">Cancelar</x-ui.button-cancelar>
+        {{-- {{ }} y no la directiva js: dentro del atributo de un componente
+             Blade las directivas no se compilan y llegaban tal cual al
+             navegador, así que el clic fallaba y no volvía. --}}
+        <x-ui.button-cancelar class="flex-1" @click="window.location.href = {{ \Illuminate\Support\Js::from($urlCancelar) }}">Cancelar</x-ui.button-cancelar>
         <x-ui.button type="submit" variant="default" class="flex-1">Guardar examen</x-ui.button>
     </div>
     </form>
