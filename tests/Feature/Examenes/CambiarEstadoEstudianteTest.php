@@ -8,6 +8,7 @@
  * @created 2026-09-26
  *
  * @updated 2026-10-10
+ * @updated 2026-10-24
  *
  * @description
  * Pruebas de integración del cambio de estado de un estudiante (issue #27),
@@ -26,6 +27,8 @@
  * - 2026-09-26  [T1]  test: creación inicial.
  * - 2026-10-10  [Valery D. Ortuno P]  test: el dato de tipo_examen usa un valor
  *   real del catálogo (examen parcial); 'PP' ya no existe en el enum.
+ * - 2026-10-24  [Valery D. Ortuno P]  test: las pruebas inician sesión con el
+ *   docente del curso, que ahora el componente exige (CursoPolicy).
  */
 
 namespace Tests\Feature\Examenes;
@@ -35,6 +38,7 @@ use App\Models\Curso;
 use App\Models\Estudiante;
 use App\Models\EstudianteExamen;
 use App\Models\Examen;
+use App\Models\Usuario;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
@@ -140,6 +144,9 @@ class CambiarEstadoEstudianteTest extends TestCase
             'fecha_creacion' => now()->toDateString(),
             'estado' => 'EnCurso',
         ]);
+
+        // El componente exige que el curso sea del docente autenticado.
+        $this->actingAs(Usuario::findOrFail(self::ID_DOCENTE));
     }
 
     private function curso(): Curso

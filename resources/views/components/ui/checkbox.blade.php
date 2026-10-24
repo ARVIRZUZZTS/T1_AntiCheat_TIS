@@ -20,7 +20,7 @@
       <input> y se agrega la prop `value`, para poder armar grupos de casillas
       con x-model. El renglón pierde su `mb-4`, que ahora pone quien arma la lista.
 
-    @see  resources/views/components/ui/modal-crear-examen.blade.php
+    @see  resources/views/components/ui/form-crear-examen.blade.php
 --}}
 
 @props([

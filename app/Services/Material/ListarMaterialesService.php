@@ -18,7 +18,7 @@
  * navegador nunca tiene que comparar contra un texto.
  *
  * @see  App\Services\Ambiente\ListarAmbientesService
- * @see  resources/views/components/ui/modal-crear-examen.blade.php
+ * @see  resources/views/components/ui/form-crear-examen.blade.php
  *
  * @changelog
  * - 2026-10-05  [Alex Candia]  feat: creación inicial del servicio.

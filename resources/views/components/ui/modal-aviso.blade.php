@@ -14,7 +14,7 @@
     @changelog
     - 2026-10-10  [Alex Candia]  feat: creación inicial del componente.
 
-    @see  resources/views/partials/materia-examenes.blade.php
+    @see  resources/views/partials/examenes-curso.blade.php
     @see  resources/views/components/ui/alert.blade.php
 --}}
 

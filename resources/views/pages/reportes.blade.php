@@ -3,6 +3,7 @@
     @author  Alex Candia <alex.leonar.candia@gmail.com>
     @created 2026-09-29
     @updated 2026-10-23
+    @updated 2026-10-24
 
     @description
     Pantalla de reportes por materia y examen. Dos selectores dinámicos
@@ -31,6 +32,9 @@
     - 2026-10-23  [Alex Candia]  refactor: se unifican las tablas con
       `x-ui.table` y scroll horizontal. Se extrae "intentos no autorizados" a
       `partials/reportes/ingresos-ilegales.blade.php` y se mantienen los resúmenes.
+    - 2026-10-24  [Valery D. Ortuno P]  style: la fila de pestañas pierde la
+      línea inferior que la separaba del contenido, igual que en la vista del
+      curso, para que las pestañas tengan el mismo formato en todo el sistema.
 
     @see  resources/views/partials/reportes/horario-ingreso.blade.php
 --}}
@@ -119,7 +123,7 @@
                 $tabInactivo = 'text-body bg-neutral-secondary-medium border-default-medium hover:bg-neutral-tertiary-medium hover:text-heading focus:ring-neutral-tertiary';
             @endphp
 
-            <nav class="flex gap-2 overflow-x-auto border-b border-default px-4 pb-4 sm:px-6 lg:px-8" aria-label="Tipos de reporte">
+            <nav class="flex gap-2 overflow-x-auto px-4 sm:px-6 lg:px-8" aria-label="Tipos de reporte">
                 <button type="button" @click="tab = 'asistencia'" :class="tab === 'asistencia' ? '{{ $tabActivo }}' : '{{ $tabInactivo }}'" class="{{ $tabClases }}">Reporte de asistencia</button>
                 <button type="button" @click="tab = 'ingresos'" :class="tab === 'ingresos' ? '{{ $tabActivo }}' : '{{ $tabInactivo }}'" class="{{ $tabClases }}">Reporte de intentos no autorizados</button>
                 <button type="button" @click="tab = 'horarios'" :class="tab === 'horarios' ? '{{ $tabActivo }}' : '{{ $tabInactivo }}'" class="{{ $tabClases }}">Reporte de Hora de ingreso</button>

@@ -24,7 +24,7 @@
  * @see  App\Enums\TipoExamen
  * @see  App\Models\Curso
  * @see  App\Models\TipoExamen
- * @see  resources/views/partials/materia-examenes.blade.php
+ * @see  resources/views/partials/examenes-curso.blade.php
  *
  * @changelog
  * - 2026-10-05  [Alex Candia]  feat: creación inicial del servicio.

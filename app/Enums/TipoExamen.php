@@ -31,7 +31,7 @@
  *   así que el alta de examen fallaba al resolver el tipo.
  *
  * @see  App\Services\Examen\ListarExamenesCursoService
- * @see  resources/views/components/ui/modal-crear-examen.blade.php
+ * @see  resources/views/components/ui/form-crear-examen.blade.php
  */
 
 namespace App\Enums;

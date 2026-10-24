@@ -8,9 +8,10 @@
  * @created 2026-10-05
  *
  * @updated 2026-10-10
+ * @updated 2026-10-24
  *
  * @description
- * Validación del alta de examen del modal de la materia. Los nombres de campo
+ * Validación del alta de examen del formulario de crear examen. Los nombres de campo
  * son los que emite el formulario: tipo_examen, fecha (dd/mm/aaaa), hora_inicio
  * (H:i), duracion, y los arrays ambientes[], materiales[] y normas[], más los dos
  * textos de material y normas escritas a mano.
@@ -20,7 +21,7 @@
  *
  * @see  App\Http\Controllers\ExamenController
  * @see  App\Services\Examen\RegistrarExamenService
- * @see  resources/views/components/ui/modal-crear-examen.blade.php
+ * @see  resources/views/components/ui/form-crear-examen.blade.php
  *
  * @changelog
  * - 2026-10-05  [Alex Candia]  feat: creación inicial del request.
@@ -34,6 +35,8 @@
  * - 2026-10-10  [Alex Candia]  fix: el piso horario pasa de `after` a
  *   `after_or_equal` (con su clave de mensaje). `after` es estricto, así que
  *   rechazaba las 06:45 exactas, que son una hora válida del rango.
+ * - 2026-10-24  [Valery D. Ortuno P]  feat: authorize() exige que el curso sea
+ *   del docente autenticado (CursoPolicy), ahora que existe el login.
  */
 
 namespace App\Http\Requests;
@@ -47,13 +50,17 @@ use Illuminate\Validation\Validator;
 class StoreExamenRequest extends FormRequest
 {
     /**
-     * El panel todavía no tiene login (#29), así que no hay usuario contra el
-     * cual autorizar. Cuando exista la sesión, esta es la regla que decide quién
-     * puede crear exámenes.
+     * Solo el docente responsable del curso puede crearle exámenes: el rol lo
+     * exige el middleware `docente` y la pertenencia la decide CursoPolicy.
+     *
+     * @return bool  Si el usuario autenticado gestiona el curso de la URL.
+     *
+     * @author Valery D. Ortuno P <valerydariana98@gmail.com>
+     * @since  2026-10-24
      */
     public function authorize(): bool
     {
-        return true;
+        return $this->user()?->can('gestionar', $this->route('curso')) ?? false;
     }
 
     /**

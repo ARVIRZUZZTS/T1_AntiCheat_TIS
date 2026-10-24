@@ -8,6 +8,7 @@
  * @created 2026-09-25
  *
  * @updated 2026-10-10
+ * @updated 2026-10-24
  *
  * @description
  * Pruebas de integración del filtrado de estudiantes por estado (issue #29),
@@ -28,11 +29,16 @@
  *   por modo (cifra, letra).
  * - 2026-10-10  [Valery D. Ortuno P]  test: el dato de tipo_examen usa un valor
  *   real del catálogo (examen parcial); 'PP' ya no existe en el enum.
+ * - 2026-10-24  [Valery D. Ortuno P]  test: la incidencia de prueba guarda
+ *   `id_examen`, `sis_estudiante` y `motivo` (NOT NULL desde #70, el insert
+ *   fallaba) y el tramposo va confirmado, porque el filtro "tramposos" ahora
+ *   cuenta a los estudiantes que están en la central de riesgos.
  */
 
 namespace Tests\Feature\Examenes;
 
 use App\Enums\EstadoIncidencia;
+use App\Enums\Motivo;
 use App\Models\CentralRiesgo;
 use App\Models\Curso;
 use App\Models\Estudiante;
@@ -147,14 +153,21 @@ class ListarEstudiantesCursoFiltroTest extends TestCase
 
             $idRiesgo++;
 
+            // Desde #70 la incidencia guarda su propio examen y estudiante (no
+            // pasa por `id_ingreso`). El tramposo va confirmado: así está en la
+            // central de riesgos, que es lo que cuenta el filtro "tramposos".
             CentralRiesgo::create([
                 'id_registro' => $idRiesgo,
-                'id_ingreso' => $idIngreso,
                 'id_registrador' => self::ID_DOCENTE,
+                'id_examen' => self::ID_EXAMEN,
+                'sis_estudiante' => $sis,
+                'motivo' => Motivo::UsoDeMaterialNoAutorizado,
                 'detalle_motivo' => 'Motivo de prueba',
                 'fecha_registro' => now()->toDateString(),
                 'tipo_infraccion' => $infraccion,
-                'estado_incidencia' => EstadoIncidencia::Pendiente,
+                'estado_incidencia' => $infraccion === 'tramposo'
+                    ? EstadoIncidencia::Confirmado
+                    : EstadoIncidencia::Pendiente,
             ]);
         }
     }

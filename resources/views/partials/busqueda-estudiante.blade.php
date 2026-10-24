@@ -29,7 +29,7 @@
     - 2026-09-26  [Alisson D. Alvarado]  feat: creación inicial del parcial.
 
     @see  App\Services\Examen\BusquedaEstudianteService
-    @see  resources/views/pages/materia-estudiantes.blade.php
+    @see  resources/views/pages/curso-detalle.blade.php
     @see  resources/views/livewire/examenes/estudiantes-curso.blade.php
 --}}
 

@@ -11,6 +11,7 @@
  * @updated 2026-10-11
  * @updated 2026-10-12
  * @updated 2026-10-21
+ * @updated 2026-10-24
  *
  * @description
  * Definición de rutas web del panel. Incluye vistas estáticas y componentes Livewire.
@@ -59,9 +60,15 @@
  * - 2026-10-21  [Alex Candia]  feat: /reportes deja de ser vista mock. La ruta
  *   delega en ListarFiltrosReporteService, que entrega las materias y los
  *   exámenes agrupados por curso para los selectores dinámicos.
+ * - 2026-10-24  [Valery D. Ortuno P]  refactor: "Materias" pasa a ser la
+ *   sección Cursos (/cursos, /cursos/crear, /cursos/{curso}) y Exámenes deja
+ *   de ser un mock (/examenes, /examenes/curso/{curso} y su /crear). Las
+ *   closures de /materias se reemplazan por CursoController y ExamenController,
+ *   y estas rutas quedan solo para docentes. El auxiliar tiene /mis-cursos.
  */
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\CursoController;
 use App\Http\Controllers\ExamenController;
 use App\Http\Controllers\Reporte\ExportarReporteIngresosIlegalesController;
 use App\Http\Controllers\Reporte\ListarReporteIngresosIlegalesController;
@@ -70,13 +77,7 @@ use App\Livewire\Monitoreo\MonitorEnVivo;
 use App\Livewire\Monitoreo\AccesoMonitor;
 use App\Livewire\Monitoreo\RegistrarIncidencia;
 use App\Livewire\Auxiliares\GestionAuxiliares;
-use App\Models\Curso;
-use App\Services\Curso\ListarMateriasConMetricasService;
 use App\Models\Usuario;
-use App\Services\Ambiente\ListarAmbientesService;
-use App\Services\Examen\ListarEstudiantesCursoConEstadoService;
-use App\Services\Material\ListarMaterialesService;
-use App\Services\Norma\ListarNormasService;
 use App\Services\Reporte\ListarFiltrosReporteService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -87,10 +88,9 @@ Route::middleware('auth')->group(function (): void {
 Route::view('/', 'pages.inicio')->name('inicio');
 
 Route::view('/inicio', 'pages.inicio');
-Route::get('/materias', fn () => view('pages.materias', [
-    'materias' => app(ListarMateriasConMetricasService::class)->ejecutar(),
-]))->name('materias');
-Route::view('/examenes', 'pages.examenes')->name('examenes');
+// Destino de "Cursos" en el sidebar del auxiliar. Su contenido (cursos a los
+// que está asignado y sus exámenes) se define en una HU posterior.
+Route::view('/mis-cursos', 'pages.auxiliar-cursos')->name('auxiliar.cursos');
 Route::get('/monitoreo', MonitorEnVivo::class)->name('monitoreo');
 Route::get('/monitoreo/acceso', AccesoMonitor::class)->name('monitoreo.acceso');
 Route::get('/auxiliares', GestionAuxiliares::class)->name('auxiliares');
@@ -109,32 +109,6 @@ Route::get('/reportes/ingresos-ilegales/exportar/{examen}', ExportarReporteIngre
 Route::get('/reportes/ingresos-ilegales', ListarReporteIngresosIlegalesController::class)
     ->name('reportes.ingresos-ilegales');
 Route::view('/notificaciones', 'pages.notificaciones')->name('notificaciones');
-
-Route::get('/cursos/{curso}/estudiantes/estado', EstudiantesCurso::class)
-    ->name('cursos.estudiantes.estado');
-
-Route::get('/materias/{curso}', function (Curso $curso) {
-    $conteos = app(ListarEstudiantesCursoConEstadoService::class)
-        ->conteosPorEstado($curso->id_curso);
-
-    return view('pages.materia-estudiantes', [
-        'curso' => $curso,
-        'conteos' => $conteos,
-        // Catálogos del modal de alta de examen: el buscador de ambientes los
-        // filtra en el navegador, así que se resuelven enteros y no por curso.
-        'ambientes' => app(ListarAmbientesService::class)->ejecutar(),
-        'materiales' => app(ListarMaterialesService::class)->ejecutar(),
-        'normas' => app(ListarNormasService::class)->ejecutar(),
-        // Vista de detalle: x-ui.page-header muestra la flecha "Volver" en vez
-        // del hamburguesa cuando se le pasa $backRoute.
-        'backRoute' => route('materias'),
-    ]);
-})->name('materias.detalle');
-
-// Alta de examen desde el modal de la pestaña Exámenes. La validación vive en
-// StoreExamenRequest y el alta en RegistrarExamenService; la ruta solo enruta.
-Route::post('/cursos/{curso}/examenes', [ExamenController::class, 'store'])
-    ->name('cursos.examenes.store');
 
 // Destino de "Ver detalle" de las notificaciones (HU 12 · T4). La pantalla de
 // detalle aún no existe: se deja la ruta lista con un placeholder navegable.
@@ -159,4 +133,31 @@ Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
 Route::middleware(['auth', 'docente'])->group(function (): void {
     Route::view('/docentes', 'pages.docentes')->name('docentes');
+
+    // Sección Cursos: "Ver cursos" y "Crear curso" son dos páginas hermanas, y
+    // cada curso abre su vista con estudiantes y habilitaciones. Que el curso
+    // sea del docente lo decide CursoPolicy en el controlador.
+    Route::get('/cursos', [CursoController::class, 'index'])->name('cursos');
+    Route::get('/cursos/crear', [CursoController::class, 'crear'])->name('cursos.crear');
+    Route::get('/cursos/{curso}', [CursoController::class, 'detalle'])
+        ->whereNumber('curso')
+        ->name('cursos.detalle');
+
+    Route::get('/cursos/{curso}/estudiantes/estado', EstudiantesCurso::class)
+        ->name('cursos.estudiantes.estado');
+
+    // Sección Exámenes: se elige un curso activo y desde ahí se ven sus
+    // exámenes o se abre el formulario de alta.
+    Route::get('/examenes', [ExamenController::class, 'index'])->name('examenes');
+    Route::get('/examenes/curso/{curso}', [ExamenController::class, 'curso'])
+        ->whereNumber('curso')
+        ->name('examenes.curso');
+    Route::get('/examenes/curso/{curso}/crear', [ExamenController::class, 'crear'])
+        ->whereNumber('curso')
+        ->name('examenes.crear');
+
+    // Alta de examen desde su formulario. La validación vive en
+    // StoreExamenRequest y el alta en RegistrarExamenService.
+    Route::post('/cursos/{curso}/examenes', [ExamenController::class, 'store'])
+        ->name('cursos.examenes.store');
 });

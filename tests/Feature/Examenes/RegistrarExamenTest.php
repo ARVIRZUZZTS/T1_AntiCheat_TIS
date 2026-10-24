@@ -8,9 +8,10 @@
  * @created 2026-10-10
  *
  * @updated 2026-10-10
+ * @updated 2026-10-24
  *
  * @description
- * Pruebas de integración del alta de examen del modal de la materia
+ * Pruebas de integración del alta de examen del formulario de crear examen
  * (POST /cursos/{curso}/examenes), contra el esquema real de desarrollo.
  *
  * El esquema de estas tablas viene de una migración con SQL crudo
@@ -27,11 +28,18 @@
  * @see  App\Http\Controllers\ExamenController
  * @see  App\Http\Requests\StoreExamenRequest
  * @see  App\Services\Examen\RegistrarExamenService
+ *
+ * @changelog
+ * - 2026-10-24  [Valery D. Ortuno P]  test: las pruebas inician sesión con el
+ *   docente del curso (rol docente) y el alta redirige a los exámenes del
+ *   curso (`examenes.curso`) en vez del detalle de la materia.
  */
 
 namespace Tests\Feature\Examenes;
 
 use App\Models\Examen;
+use App\Models\Rol;
+use App\Models\Usuario;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -84,6 +92,14 @@ class RegistrarExamenTest extends TestCase
             'id_norma' => self::ID_NORMA,
             'detalle_norma' => 'No usar celular',
         ]);
+
+        // El alta es solo para docentes y solo en sus propios cursos.
+        DB::table('rol_usuario')->insert([
+            'id_usuario' => self::ID_DOCENTE,
+            'id_rol' => DB::table('rol')->where('nombre_rol', Rol::NOMBRE_DOCENTE)->value('id_rol'),
+        ]);
+
+        $this->actingAs(Usuario::findOrFail(self::ID_DOCENTE));
     }
 
     /**
@@ -94,7 +110,7 @@ class RegistrarExamenTest extends TestCase
         $this->post(route('cursos.examenes.store', self::ID_CURSO), $this->datosValidos([
             'materiales_personalizados' => "Calculadora simple\nFormulario de fórmulas",
             'normas_personalizadas' => 'No usar celular',
-        ]))->assertRedirect(route('materias.detalle', self::ID_CURSO));
+        ]))->assertRedirect(route('examenes.curso', self::ID_CURSO));
 
         $examen = Examen::query()->where('creador', self::ID_DOCENTE)->firstOrFail();
 
@@ -148,7 +164,7 @@ class RegistrarExamenTest extends TestCase
         $this->post(route('cursos.examenes.store', self::ID_CURSO), $this->datosValidos([
             'hora_inicio' => '23:30',
             'duracion' => 90,
-        ]))->assertRedirect(route('materias.detalle', self::ID_CURSO));
+        ]))->assertRedirect(route('examenes.curso', self::ID_CURSO));
 
         $examen = Examen::query()->where('creador', self::ID_DOCENTE)->firstOrFail();
 

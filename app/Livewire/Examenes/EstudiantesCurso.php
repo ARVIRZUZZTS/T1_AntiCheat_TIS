@@ -8,6 +8,7 @@
  * @created 2026-09-24
  *
  * @updated 2026-09-26
+ * @updated 2026-10-24
  *
  * @description
  * Componente Livewire de la feature Examenes: lista los estudiantes de un curso
@@ -29,6 +30,11 @@
  * - 2026-09-26  [Diego Tejerina]  feat: agregar mensaje de éxito al habilitar (#25).
  * - 2026-09-26  [Alisson D. Alvarado]        refactor: el criterio del buscador
  *   pasa a BusquedaEstudianteService y el componente guarda el modo resuelto.
+ * - 2026-10-24  [Valery D. Ortuno P]  refactor: la página suelta usa el
+ *   sidebar general en vez de un menú propio, la flecha de volver apunta a
+ *   Cursos (antes Materias) y el componente exige que el
+ *   curso sea del docente autenticado (CursoPolicy). Se quita el filtro
+ *   Sospechosos y Tramposos pasa a llamarse "Central de Riesgo".
  */
 
 namespace App\Livewire\Examenes;
@@ -41,6 +47,7 @@ use App\Services\Examen\CambiarEstadoEstudianteService;
 use App\Services\Examen\ListarEstudiantesCursoConEstadoService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\Gate;
 use InvalidArgumentException;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
@@ -50,18 +57,13 @@ use Livewire\Component;
 use RuntimeException;
 
 #[Layout('layouts.app', [
-    'sidebarItems' => [
-        ['label' => 'Inicio', 'route' => 'inicio'],
-        ['label' => 'Materias', 'route' => 'materias'],
-        ['label' => 'Monitor en vivo', 'route' => 'monitoreo'],
-    ],
     // Es una vista de detalle: x-ui.page-header muestra la flecha de
     // "volver" en vez del hamburguesa cuando se le pasa $backRoute. El
-    // titulo es generico y la ruta de vuelta va literal ('/materias', no
-    // route('materias')) porque los argumentos de un atributo de PHP tienen
+    // titulo es generico y la ruta de vuelta va literal ('/cursos', no
+    // route('cursos')) porque los argumentos de un atributo de PHP tienen
     // que ser constantes: no se puede llamar a una funcion aca.
     'title' => 'Estudiantes del curso',
-    'backRoute' => '/materias',
+    'backRoute' => '/cursos',
 ])]
 #[Title('Estudiantes del curso — Anticheat TIS')]
 class EstudiantesCurso extends Component
@@ -118,6 +120,10 @@ class EstudiantesCurso extends Component
 
     public function mount(Curso $curso): void
     {
+        // La ruta /cursos/{curso}/estudiantes/estado monta el componente
+        // solo, sin pasar por CursoController: la pertenencia se valida acá.
+        Gate::authorize('gestionar', $curso);
+
         $this->curso = $curso;
     }
 
@@ -159,8 +165,7 @@ class EstudiantesCurso extends Component
             ListarEstudiantesCursoConEstadoService::FILTRO_TODOS => 'Todos',
             ListarEstudiantesCursoConEstadoService::FILTRO_HABILITADOS => 'Habilitados',
             ListarEstudiantesCursoConEstadoService::FILTRO_DESHABILITADOS => 'Deshabilitados',
-            ListarEstudiantesCursoConEstadoService::FILTRO_SOSPECHOSOS => 'Sospechosos',
-            ListarEstudiantesCursoConEstadoService::FILTRO_TRAMPOSOS => 'Tramposos',
+            ListarEstudiantesCursoConEstadoService::FILTRO_TRAMPOSOS => 'Central de Riesgo',
         ];
     }
 
