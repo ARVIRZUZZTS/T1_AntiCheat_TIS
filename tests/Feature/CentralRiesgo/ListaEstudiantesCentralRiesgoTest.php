@@ -8,6 +8,7 @@
  * @created 2026-10-10
  *
  * @updated 2026-10-10
+ * @updated 2026-10-24
  *
  * @description
  * Pruebas de la lista de estudiantes de la central de riesgos (HU 10), sobre el
@@ -35,6 +36,11 @@
  *   `Pendiente` no aparece en la central (solo las confirmadas).
  * - 2026-10-11  [Valery D. Ortuno P]  test: una escritura por Eloquent invalida
  *   la caché de la lista (la invalidación por versión no deja datos viejos).
+ * - 2026-10-24  [Valery D. Ortuno P]  test: las pruebas inician sesión como el
+ *   docente (ya no hay usuario por defecto); cada incidencia trae su curso
+ *   registrado, un tramposo se lista aunque `estado_incidencia` diga
+ *   Pendiente, sin curso se lista "Sin materia", el detalle muestra materia y
+ *   grupo, y los textos esperados van sin acentos.
  */
 
 namespace Tests\Feature\CentralRiesgo;
@@ -98,6 +104,10 @@ class ListaEstudiantesCentralRiesgoTest extends TestCase
         DB::setDefaultConnection('central_pruebas');
         $this->crearEsquema();
         $this->crearDatos();
+
+        // "Mis materias" es siempre del usuario de la sesión: el componente ya
+        // no toma un usuario por defecto ni de la URL.
+        $this->actingAs(Usuario::query()->findOrFail(self::DOCENTE_A));
     }
 
     protected function tearDown(): void
@@ -116,19 +126,29 @@ class ListaEstudiantesCentralRiesgoTest extends TestCase
         $this->assertNotContains(self::PEDRO_SOSPECHOSO, $this->sisListados($this->institucion()));
     }
 
-    public function test_una_incidencia_pendiente_no_se_muestra_como_tramposo(): void
+    /** Tramposo equivale a confirmado: `estado_incidencia` ya no decide. */
+    public function test_un_tramposo_se_muestra_aunque_estado_incidencia_diga_pendiente(): void
     {
         $this->crearEstudiante('900000040', 'Nadia', 'Cordero Vargas');
         $this->crearIncidencia('900000040', self::EXAMEN_A, 'tramposo', '2026-10-05 09:00:00', self::DOCENTE_A, 'Pendiente');
 
-        $this->assertNotContains('900000040', $this->sisListados($this->institucion()));
+        $this->assertContains('900000040', $this->sisListados($this->institucion()));
+    }
+
+    /** Sin curso registrado la incidencia se lista igual, sin materia. */
+    public function test_una_incidencia_sin_curso_registrado_se_lista_sin_materia(): void
+    {
+        $this->crearEstudiante('900000041', 'Nadia', 'Cordero Vargas');
+        $this->crearIncidencia('900000041', self::EXAMEN_A, 'tramposo', '2026-10-05 09:00:00', self::DOCENTE_A, 'Confirmado', null);
+
+        $this->institucion()->assertSee('Sin materia');
     }
 
     public function test_la_lista_muestra_estudiante_codigo_sis_materia_motivo_y_ver_detalle(): void
     {
         $componente = $this->institucion();
 
-        $this->assertTextoEnOrden($componente, ['Estudiante', 'Código SIS', 'Materia', 'Motivo']);
+        $this->assertTextoEnOrden($componente, ['Estudiante', 'Codigo SIS', 'Materia', 'Motivo']);
         $componente
             ->assertSee('Luis Alvarez Gomez')
             ->assertSee(self::LUIS)
@@ -232,7 +252,7 @@ class ListaEstudiantesCentralRiesgoTest extends TestCase
     {
         $this->institucion()
             ->set('busqueda', 'Zzzz')
-            ->assertSee('No se encontró ninguna coincidencia')
+            ->assertSee('No se encontro ninguna coincidencia')
             ->assertDontSee('No hay estudiantes registrados');
     }
 
@@ -242,7 +262,7 @@ class ListaEstudiantesCentralRiesgoTest extends TestCase
 
         $this->institucion()
             ->assertSee('No hay estudiantes registrados')
-            ->assertDontSee('No se encontró ninguna coincidencia');
+            ->assertDontSee('No se encontro ninguna coincidencia');
     }
 
     public function test_con_ocho_registros_o_menos_no_hay_paginacion(): void
@@ -303,19 +323,21 @@ class ListaEstudiantesCentralRiesgoTest extends TestCase
         $this->assertTextoEnOrden($componente, [
             'Detalles de la incidencia',
             'Luis Alvarez Gomez',
-            'Código SIS:',
+            'Codigo SIS:',
             self::LUIS,
             'Motivo',
             'Uso de dispositivos electrónicos no autorizados',
             'Materia',
             'Calculo I',
-            'Docente que reportó',
+            'Grupo',
+            '2',
+            'Docente que reporto',
             'Roberto Silva',
             'Fecha y hora',
             '03/10/2026 10:00',
             'Estado',
             'Confirmado',
-            'Descripción del hecho',
+            'Descripcion del hecho',
             'Motivo de prueba '.self::LUIS,
         ]);
     }
@@ -327,9 +349,9 @@ class ListaEstudiantesCentralRiesgoTest extends TestCase
 
         $this->institucion()
             ->call('verDetalle', $this->idDeIncidencia('900000030'))
-            ->assertSee('Auxiliar que reportó')
+            ->assertSee('Auxiliar que reporto')
             ->assertSee('Diego Mendoza')
-            ->assertDontSee('Docente que reportó');
+            ->assertDontSee('Docente que reporto');
     }
 
     public function test_cerrar_el_detalle_vuelve_a_la_lista_con_el_orden_el_filtro_y_la_pagina(): void
@@ -414,7 +436,7 @@ class ListaEstudiantesCentralRiesgoTest extends TestCase
         $this->withoutVite()
             ->get(route('central-riesgo'))
             ->assertOk()
-            ->assertSeeInOrder(['Central de riesgos', 'Toda la institución', 'Mis materias', 'Ordenar A-Z'])
+            ->assertSeeInOrder(['Central de riesgos', 'Toda la institucion', 'Mis materias', 'Ordenar A-Z'])
             ->assertSee('href="'.route('central-riesgo').'"', false)
             ->assertSee('Luis Alvarez Gomez');
     }
@@ -496,6 +518,10 @@ class ListaEstudiantesCentralRiesgoTest extends TestCase
         ]);
     }
 
+    /**
+     * @param  int|null|false  $curso  Curso registrado; false toma el curso del
+     *         examen (el examen compartido queda en el curso del usuario).
+     */
     private function crearIncidencia(
         string $sis,
         int $idExamen,
@@ -503,10 +529,18 @@ class ListaEstudiantesCentralRiesgoTest extends TestCase
         string $fecha,
         int $registrador = self::DOCENTE_A,
         string $estado = 'Confirmado',
+        int|null|false $curso = false,
     ): void {
+        $cursoPorExamen = [
+            self::EXAMEN_A => self::CURSO_A,
+            self::EXAMEN_B => self::CURSO_B,
+            self::EXAMEN_COMPARTIDO => self::CURSO_A,
+        ];
+
         DB::table('central_riesgo')->insert([
             'id_registro' => ++$this->ultimoIdRegistro,
             'id_examen' => $idExamen,
+            'id_curso' => $curso === false ? $cursoPorExamen[$idExamen] : $curso,
             'sis_estudiante' => $sis,
             'id_registrador' => $registrador,
             'motivo' => 'uso de dispositivos electronicos',
@@ -587,7 +621,9 @@ class ListaEstudiantesCentralRiesgoTest extends TestCase
             ['id_usuario' => self::AUXILIAR, 'id_rol' => 2],
         ]);
         DB::table('curso')->insert([
-            ['id_curso' => self::CURSO_A, 'nombre_curso' => 'Calculo I', 'sis_doc' => self::DOCENTE_A],
+            // Formato de Crear curso: la lista muestra "Calculo I" y el detalle
+            // suma el grupo "2".
+            ['id_curso' => self::CURSO_A, 'nombre_curso' => 'Calculo I - Grupo 2', 'sis_doc' => self::DOCENTE_A],
             ['id_curso' => self::CURSO_B, 'nombre_curso' => 'Fisica I', 'sis_doc' => self::DOCENTE_B],
         ]);
         DB::table('examen')->insert([
@@ -618,7 +654,7 @@ class ListaEstudiantesCentralRiesgoTest extends TestCase
         $this->crearEstudiante(self::CARLA, 'Carla', 'Zapata Ruiz');
         $this->crearIncidencia(self::CARLA, self::EXAMEN_A, 'tramposo', '2026-09-30 12:00:00');
 
-        // Jaime: examen compartido entre una materia del usuario y otra ajena.
+        // Jaime: examen compartido, registrado en la materia del usuario.
         $this->crearEstudiante(self::JAIME, 'Jaime', 'Paredes Rojas');
         $this->crearIncidencia(self::JAIME, self::EXAMEN_COMPARTIDO, 'tramposo', '2026-09-28 09:00:00');
     }
