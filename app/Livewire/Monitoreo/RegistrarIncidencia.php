@@ -5,6 +5,7 @@
  * @author  Valery D. Ortuno P. <valerydariana98@gmail.com>
  * @created 2026-09-25
  * @updated 2026-10-12
+ * @updated 2026-10-24
  *
  * @description
  * Componente de página con el formulario de registro de una incidencia en la
@@ -92,6 +93,10 @@
  *   dejan de apuntar a esa ruta (ya no existe) para `ORIGEN_MONITOREO` y
  *   vuelven a caer en el monitor en vivo, como el resto de los orígenes sin
  *   pantalla propia.
+ * - 2026-10-24  [Valery D. Ortuno P]  fix: si el examen tiene varios cursos y
+ *   no se eligió ninguno, la incidencia se guarda en el curso del examen en el
+ *   que está inscrito el estudiante (ResolverCursoIncidenciaService), para que
+ *   aparezca con materia en la central de riesgos (HU 10).
  */
 namespace App\Livewire\Monitoreo;
 
@@ -103,6 +108,7 @@ use App\Models\Estudiante;
 use App\Models\EstudianteExamen;
 use App\Models\Examen;
 use App\Models\Rol;
+use App\Services\CentralRiesgo\ResolverCursoIncidenciaService;
 use App\Services\Notificacion\NotificacionService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
@@ -1098,16 +1104,21 @@ class RegistrarIncidencia extends Component
            ninguna incidencia que lo justifique. */
         $registro = DB::transaction(function (): CentralRiesgo {
             $estudiante = $this->resolverEstudiante();
+            $idExamen = $this->resolverExamen($estudiante);
+
+            // Curso elegido (o el único del examen); si no hubo elección, el
+            // curso del examen en el que está inscrito el estudiante, porque la
+            // central de riesgos lista por el curso registrado.
+            $idCurso = $this->idCursoParaGuardar()
+                ?? app(ResolverCursoIncidenciaService::class)->ejecutar($estudiante->sis_estudiante, (int) $idExamen);
 
             $registro = CentralRiesgo::create([
                 // La tabla no tiene secuencia: el id lo calcula la aplicación con
                 // la tabla bloqueada, igual que el alta de examen.
                 'id_registro' => $this->siguienteIdRegistro(),
                 'sis_estudiante' => $estudiante->sis_estudiante,
-                'id_examen' => $this->resolverExamen($estudiante),
-                // Curso elegido cuando el examen se comparte; null cuando el
-                // examen es de un solo curso (la materia igual sale del examen).
-                'id_curso' => $this->idCursoParaGuardar(),
+                'id_examen' => $idExamen,
+                'id_curso' => $idCurso,
                 'id_registrador' => $this->usuario,
                 'motivo' => Motivo::from($this->tipoIncidencia),
                 // La descripción es opcional con los motivos del catálogo, así que
