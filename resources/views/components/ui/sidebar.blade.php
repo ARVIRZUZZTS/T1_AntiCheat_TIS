@@ -3,6 +3,7 @@
 @author  Valery D. Ortuno P. <valerydariana98@gmail.com>
     @created 2026-09-24
     @updated 2026-10-10
+    @updated 2026-10-24
 
     @description
     Sidebar de navegación del panel. $items es un arreglo de ítems:
@@ -48,6 +49,12 @@
       $showTrigger (ya no aplica). $title se reemplaza por $titleMain/$titleSub
       (nombre de la app en 2 líneas) y se agrega el bloque del usuario
       autenticado al final, debajo de Notificaciones.
+    - 2026-10-24  [Valery D. Ortuno P]  refactor: "Materias" pasa a "Cursos"
+      (ruta `cursos`) y el "Mis materias" del auxiliar pasa a "Cursos", que
+      apunta a su propia ruta `auxiliar.cursos`.
+    - 2026-10-24  [Valery D. Ortuno P]  refactor: se quita "Inicio" del menú,
+      "Exámenes" pasa a "Examenes" y Monitor en vivo y Central de riesgos pasan
+      al final, en ese orden.
 --}}
 
 @props([
@@ -62,14 +69,13 @@
     $current = (string) \Illuminate\Support\Facades\Route::currentRouteName();
 
     $defaultItems = [
-        ['label' => 'Inicio', 'route' => 'inicio'],
-        ['label' => 'Materias', 'route' => 'materias'],
-        ['label' => 'Exámenes', 'route' => 'examenes'],
-        ['label' => 'Monitor en vivo', 'route' => 'monitoreo'],
-        ['label' => 'Central de riesgos', 'route' => 'central-riesgo'],
+        ['label' => 'Cursos', 'route' => 'cursos'],
+        ['label' => 'Examenes', 'route' => 'examenes'],
         ['label' => 'Reportes', 'route' => 'reportes'],
         ['label' => 'Docentes', 'route' => 'docentes', 'count' => 3],
         ['label' => 'Auxiliares', 'route' => 'auxiliares'],
+        ['label' => 'Monitor en vivo', 'route' => 'monitoreo'],
+        ['label' => 'Central de riesgos', 'route' => 'central-riesgo'],
     ];
 
     $usuario = auth()->user();
@@ -77,7 +83,8 @@
     $rolUsuario = $usuario?->roles->first()?->nombre_rol;
 
     $auxiliarItems = [
-        ['label' => 'Mis materias', 'route' => 'materias'],
+        // Sus cursos no son los del docente: tiene su propia ruta (HU aparte).
+        ['label' => 'Cursos', 'route' => 'auxiliar.cursos'],
         ['label' => 'Monitor en vivo', 'route' => 'monitoreo'],
     ];
 
