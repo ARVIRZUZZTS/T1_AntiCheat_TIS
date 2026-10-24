@@ -65,6 +65,8 @@
  *   de ser un mock (/examenes, /examenes/curso/{curso} y su /crear). Las
  *   closures de /materias se reemplazan por CursoController y ExamenController,
  *   y estas rutas quedan solo para docentes. El auxiliar tiene /mis-cursos.
+ * - 2026-10-24  [Valery D. Ortuno P]  feat: POST /cursos (`cursos.store`), alta
+ *   de curso desde el formulario "Crear curso".
  */
 
 use App\Http\Controllers\AuthController;
@@ -134,11 +136,12 @@ Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 Route::middleware(['auth', 'docente'])->group(function (): void {
     Route::view('/docentes', 'pages.docentes')->name('docentes');
 
-    // Sección Cursos: "Ver cursos" y "Crear curso" son dos páginas hermanas, y
-    // cada curso abre su vista con estudiantes y habilitaciones. Que el curso
-    // sea del docente lo decide CursoPolicy en el controlador.
+    // Sección Cursos: la lista, el formulario "Crear curso" (y su envío) y la
+    // vista de cada curso con estudiantes y habilitaciones. Que el curso sea
+    // del docente lo decide CursoPolicy en el controlador.
     Route::get('/cursos', [CursoController::class, 'index'])->name('cursos');
     Route::get('/cursos/crear', [CursoController::class, 'crear'])->name('cursos.crear');
+    Route::post('/cursos', [CursoController::class, 'store'])->name('cursos.store');
     Route::get('/cursos/{curso}', [CursoController::class, 'detalle'])
         ->whereNumber('curso')
         ->name('cursos.detalle');
