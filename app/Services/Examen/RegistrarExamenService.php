@@ -4,10 +4,12 @@
  * @file    RegistrarExamenService.php
  *
  * @author  Alex Candia <alex.leonar.candia@gmail.com>
+ * @author  Alisson D. Alvarado <alvaradoalissondalet@gmail.com>
  *
  * @created 2026-10-05
  *
  * @updated 2026-10-10
+ * @updated 2026-10-24
  *
  * @description
  * Servicio de la feature Examen que da de alta un examen con todo lo que se
@@ -19,20 +21,22 @@
  *  1. `examen.id_examen` es un entero sin secuencia ni default, así que el id
  *     se calcula como max(id)+1 dentro de la transacción, con la tabla bloqueada
  *     para que dos altas simultáneas no se queden con el mismo.
- *  2. La hora de fin no se guarda: es un dato derivado (hora de inicio más
+ * 2. La hora de fin no se guarda: es un dato derivado (hora de inicio más
  *     duración) que calcula el propio modelo (`Examen::getHoraFinAttribute()`),
  *     para que no pueda quedar desincronizada con la duración.
- *  3. `material_personalizado` y `norma_personalizada` guardan una fila por
+ * 3. `material_personalizado` y `norma_personalizada` guardan una fila por
  *     renglón escrito, numerada desde 1.
  *
  * @see  App\Http\Requests\StoreExamenRequest
  * @see  App\Http\Controllers\ExamenController
  * @see  resources/views/components/ui/form-crear-examen.blade.php
+ * @see  App\Services\Examen\DividirExamenService
  *
  * @changelog
  * - 2026-10-05  [Alex Candia]  feat: creación inicial del servicio.
  * - 2026-10-10  [Alex Candia]  refactor: deja de calcular y escribir `hora_fin`;
  *   la columna se eliminó y la hora de fin pasa a ser un accesor del modelo.
+ * - 2026-10-24  [Alisson D. Alvarado]  feat: delega la lógica de división de estudiantes por ambientes a DividirExamenService.
  * - 2026-10-24  [Diego Tejerina]  feat: crearParaCurso() registra el examen
  *   inicial de HU-16 dentro de la transaccion que administra el alta del curso.
  */
@@ -72,6 +76,11 @@ class RegistrarExamenService
      */
     public const HORA_INICIO_MAXIMA = '20:15';
 
+    public function __construct(
+        private readonly DividirExamenService $dividirExamenService
+    ) {
+    }
+
     /**
      * Crea el examen y todo lo que se le eligió.
      *
@@ -98,6 +107,7 @@ class RegistrarExamenService
 
             $examen->cursos()->attach($curso->id_curso);
             $this->inscribirEstudiantes($examen, $curso);
+            $this->asignarEstudiantesAAmbientes($examen, $datos);
             $examen->ambientes()->sync($datos['ambientes']);
             $examen->normas()->sync($datos['normas'] ?? []);
             $examen->materialesPermitidos()->sync($datos['materiales'] ?? []);
@@ -219,6 +229,25 @@ class RegistrarExamenService
         if ($filas !== []) {
             EstudianteExamen::query()->insert($filas);
         }
+    }
+
+    /**
+     * Asigna a los estudiantes del examen a los ambientes elegidos delegando
+     * la división al servicio correspondiente.
+     */
+    private function asignarEstudiantesAAmbientes(Examen $examen, array $datos): void
+    {
+        $ambientes = $datos['ambientes'] ?? [];
+        if (! is_array($ambientes) || $ambientes === []) {
+            return;
+        }
+
+        $divisionPor = $datos['division_por'] ?? null;
+        if (! in_array($divisionPor, ['apellido', 'carrera'], true)) {
+            return;
+        }
+
+        $this->dividirExamenService->dividir($examen, $ambientes, $divisionPor);
     }
 
     /**
