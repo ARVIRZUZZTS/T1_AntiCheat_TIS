@@ -133,7 +133,7 @@
 
         <template x-if="!cargando && !errorReporte && horario">
             <div class="space-y-6">
-                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2" x-show="!horario.sin_datos && Array.isArray(horario.estudiantes) && horario.estudiantes.length > 0">
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2" x-show="horario && horario.materia && horario.examen">
                     <x-ui.stat-card label="Primer ingreso" tone="brand">
                         <x-slot:metric><span x-text="(horario && horario.resumen && horario.resumen.primer_ingreso) ? horario.resumen.primer_ingreso : '-'"></span></x-slot:metric>
                     </x-ui.stat-card>
@@ -152,8 +152,8 @@
                         variant="success"
                         @click="exportar()"
                         class="w-full sm:w-auto"
-                        x-bind:disabled="! hayDatos"
-                        x-bind:class="hayDatos ? 'w-full sm:w-auto' : 'w-full sm:w-auto opacity-50 cursor-not-allowed'"
+                        x-bind:disabled="horario.sin_datos || !Array.isArray(horario.estudiantes) || horario.estudiantes.length === 0"
+                        x-bind:class="(horario.sin_datos || !Array.isArray(horario.estudiantes) || horario.estudiantes.length === 0) ? 'w-full sm:w-auto opacity-50 cursor-not-allowed' : 'w-full sm:w-auto'"
                     >
                         Exportar a Excel
                     </x-ui.button>
