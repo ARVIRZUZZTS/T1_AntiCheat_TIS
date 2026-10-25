@@ -36,6 +36,9 @@
  * - 2026-10-24  [Valery D. Ortuno P]  test: mensajes sin acentos, hora en
  *   punto válida y bloqueo de cursos
  *   finalizados.
+ * - 2026-10-25  [Valery D. Ortuno P]  test: alta en un curso con varios
+ *   estudiantes (cada inscripción con su propio id); antes ninguna prueba
+ *   cubría un curso con estudiantes y el bug de los ids repetidos pasaba.
  */
 
 namespace Tests\Feature\Examenes;
@@ -231,6 +234,35 @@ class RegistrarExamenTest extends TestCase
         $this->get(route('examenes.crear', self::ID_CURSO))->assertForbidden();
         $this->post(route('cursos.examenes.store', self::ID_CURSO), $this->datosValidos())
             ->assertForbidden();
+    }
+
+    /**
+     * Con varios estudiantes en el curso, cada uno queda inscrito con su propio
+     * id. Antes todos recibían el mismo y el alta fallaba por clave duplicada.
+     */
+    public function test_inscribe_a_cada_estudiante_del_curso_con_su_propio_id(): void
+    {
+        foreach (['90030101', '90030102', '90030103'] as $sis) {
+            DB::table('estudiante')->insert([
+                'sis_estudiante' => $sis,
+                'nombre_estudiante' => 'Estudiante',
+                'apellido_estudiante' => 'De Prueba '.$sis,
+                'carrera' => 'Sistemas',
+            ]);
+            DB::table('estudiante_curso')->insert([
+                'sis_estudiante' => $sis,
+                'id_curso' => self::ID_CURSO,
+            ]);
+        }
+
+        $this->post(route('cursos.examenes.store', self::ID_CURSO), $this->datosValidos())
+            ->assertRedirect(route('examenes.curso', self::ID_CURSO));
+
+        $examen = Examen::query()->where('creador', self::ID_DOCENTE)->firstOrFail();
+        $ids = DB::table('estudiante_examen')->where('id_examen', $examen->id_examen)->pluck('id_estudiante_examen');
+
+        $this->assertCount(3, $ids);
+        $this->assertCount(3, $ids->unique());
     }
 
     /**

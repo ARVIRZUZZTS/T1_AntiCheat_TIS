@@ -20,9 +20,6 @@
  * - 2026-10-24  [Valery D. Ortuno P]  feat: creación inicial del controlador.
  * - 2026-10-24  [Valery D. Ortuno P]  feat: alta de curso con materia y grupo
  *   concatenados y su gestión con año; al guardar vuelve a la lista de cursos.
- * - 2026-10-24  [Diego Tejerina]  feat: el alta acepta los exámenes del curso y
- *   deja el resumen (datos del curso y cantidad de exámenes) en la sesión para
- *   el modal de confirmación.
  *
  * @see  App\Services\Curso\ListarCursosDocenteService
  * @see  App\Services\Curso\ListarGestionesService
@@ -40,7 +37,6 @@ use App\Services\Curso\ListarCursosDocenteService;
 use App\Services\Curso\ListarGestionesService;
 use App\Services\Curso\RegistrarCursoService;
 use App\Services\Examen\ListarEstudiantesCursoConEstadoService;
-use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -53,10 +49,10 @@ class CursoController extends Controller
      *
      * @param  Request  $request  Request con el docente autenticado.
      * @param  ListarCursosDocenteService  $cursos  Servicio de cursos del docente.
-     * @return View Vista pages.cursos.
+     *
+     * @return View  Vista pages.cursos.
      *
      * @author Valery D. Ortuno P <valerydariana98@gmail.com>
-     *
      * @since  2026-10-24
      */
     public function index(Request $request, ListarCursosDocenteService $cursos): View
@@ -70,10 +66,10 @@ class CursoController extends Controller
      * "Crear curso": formulario de alta de un curso.
      *
      * @param  ListarGestionesService  $gestiones  Catálogo del selector "Gestion".
-     * @return View Vista pages.curso-crear.
+     *
+     * @return View  Vista pages.curso-crear.
      *
      * @author Valery D. Ortuno P <valerydariana98@gmail.com>
-     *
      * @since  2026-10-24
      */
     public function crear(ListarGestionesService $gestiones): View
@@ -88,23 +84,25 @@ class CursoController extends Controller
      * Guarda el curso creado desde el formulario y vuelve a la lista de
      * cursos, donde se muestra el aviso de éxito.
      *
-     * @param  StoreCursoRequest  $request  Datos validados (materia, grupo, gestión y exámenes).
+     * @param  StoreCursoRequest  $request  Datos validados (materia, grupo y gestión).
      * @param  RegistrarCursoService  $servicio  Servicio de alta.
-     * @return RedirectResponse Redirige al listado de cursos con el mensaje y el
-     *                          resumen del curso para el modal de confirmación.
+     *
+     * @return RedirectResponse  Redirige al listado de cursos con mensaje de éxito.
      *
      * @author Valery D. Ortuno P <valerydariana98@gmail.com>
-     *
      * @since  2026-10-24
      */
     public function store(StoreCursoRequest $request, RegistrarCursoService $servicio): RedirectResponse
     {
-        $resumen = $servicio->ejecutar($request->user(), $request->datos());
+        $servicio->ejecutar(
+            $request->nombreCurso(),
+            (int) $request->user()->id_usuario,
+            $request->gestion(),
+        );
 
         return redirect()
             ->route('cursos')
-            ->with('mensaje', 'Curso creado con exito')
-            ->with('resumen', $resumen->toArray());
+            ->with('mensaje', 'Curso creado con exito');
     }
 
     /**
@@ -113,12 +111,12 @@ class CursoController extends Controller
      *
      * @param  Curso  $curso  Curso de la URL.
      * @param  ListarEstudiantesCursoConEstadoService  $estudiantes  Servicio de conteos del curso.
-     * @return View Vista pages.curso-detalle.
      *
-     * @throws AuthorizationException Si el curso no es del docente (403).
+     * @return View  Vista pages.curso-detalle.
+     *
+     * @throws \Illuminate\Auth\Access\AuthorizationException  Si el curso no es del docente (403).
      *
      * @author Valery D. Ortuno P <valerydariana98@gmail.com>
-     *
      * @since  2026-10-24
      */
     public function detalle(Curso $curso, ListarEstudiantesCursoConEstadoService $estudiantes): View

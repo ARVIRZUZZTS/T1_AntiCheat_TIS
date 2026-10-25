@@ -10,6 +10,7 @@
  *
  * @updated 2026-10-10
  * @updated 2026-10-24
+ * @updated 2026-10-25
  *
  * @description
  * Servicio de la feature Examen que da de alta un examen con todo lo que se
@@ -39,6 +40,12 @@
  * - 2026-10-24  [Alisson D. Alvarado]  feat: delega la lógica de división de estudiantes por ambientes a DividirExamenService.
  * - 2026-10-24  [Diego Tejerina]  feat: crearParaCurso() registra el examen
  *   inicial de HU-16 dentro de la transaccion que administra el alta del curso.
+ * - 2026-10-25  [Valery D. Ortuno P]  fix: inscribirEstudiantes() daba el mismo
+ *   id a todos los estudiantes (`$siguienteId++` dentro de una arrow function
+ *   no avanza), así que crear un examen fallaba en cualquier curso con dos o
+ *   más estudiantes; ahora el id sale del índice y la tabla se bloquea.
+ * - 2026-10-25  [Valery D. Ortuno P]  revert: se quita crearParaCurso(); Crear
+ *   curso vuelve a pedir solo materia, grupo, gestión y año (sin exámenes).
  */
 
 namespace App\Services\Examen;
@@ -50,7 +57,6 @@ use App\Models\Estudiante;
 use App\Models\EstudianteExamen;
 use App\Models\Examen;
 use App\Models\TipoExamen as TipoExamenCatalogo;
-use App\Support\DTO\ExamenCursoDTO;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -123,75 +129,6 @@ class RegistrarExamenService
     }
 
     /**
-     * Crea un examen inicial de HU-16 dentro de la transaccion del curso.
-     * El tipo y la programacion horaria se completan luego desde el flujo de
-     * alta de examen existente; el nombre y la fecha opcional nacen con el curso.
-     */
-    public function crearParaCurso(
-        Curso $curso,
-        ExamenCursoDTO $datos,
-        int $creador,
-        int $idAmbiente,
-    ): Examen {
-        $examen = new Examen;
-        $examen->id_examen = $this->siguienteIdExamen();
-        $examen->nombre_examen = $datos->nombre;
-        $examen->fecha = $datos->fecha;
-        $examen->hora_inicio = null;
-        $examen->duracion = null;
-        $examen->creador = $creador;
-        $examen->tipo_examen = null;
-        $examen->save();
-
-        $examen->cursos()->attach($curso->id_curso);
-        $examen->ambientes()->attach($idAmbiente);
-        $examen->normas()->attach($datos->normasIds);
-        $examen->materialesPermitidos()->attach($datos->materialesIds);
-
-        $this->insertarPersonalizados(
-            'norma_personalizada',
-            'numero_norma',
-            'descripcion_norma',
-            (int) $examen->id_examen,
-            $datos->normasPersonalizadas,
-        );
-        $this->insertarPersonalizados(
-            'material_personalizado',
-            'numero_material',
-            'descripcion_material',
-            (int) $examen->id_examen,
-            $datos->materialesPersonalizados,
-        );
-
-        $this->configuraciones->crearPara($examen, $creador);
-
-        return $examen;
-    }
-
-    /** @param list<string> $descripciones */
-    private function insertarPersonalizados(
-        string $tabla,
-        string $columnaNumero,
-        string $columnaDescripcion,
-        int $idExamen,
-        array $descripciones,
-    ): void {
-        $filas = [];
-
-        foreach ($descripciones as $indice => $descripcion) {
-            $filas[] = [
-                'id_examen' => $idExamen,
-                $columnaNumero => $indice + 1,
-                $columnaDescripcion => $descripcion,
-            ];
-        }
-
-        if ($filas !== []) {
-            DB::table($tabla)->insert($filas);
-        }
-    }
-
-    /**
      * Próximo id de examen.
      *
      * `max()` por sí solo no bloquea: dos altas simultáneas leerían el mismo
@@ -214,20 +151,28 @@ class RegistrarExamenService
      *
      * `id_estudiante_examen` es entero sin secuencia (como `id_examen`), así que
      * el id se calcula como max()+1 dentro de la misma transacción que crea el
-     * examen.
+     * examen, con la tabla bloqueada igual que en siguienteIdExamen().
+     *
+     * El id de cada fila sale del índice y no de `$siguienteId++`: una arrow
+     * function captura las variables por valor, así que el `++` no avanzaba y
+     * todos los estudiantes recibían el mismo id (el insert fallaba por clave
+     * duplicada en cualquier curso con dos o más estudiantes).
      */
     private function inscribirEstudiantes(
         Examen $examen,
         Curso $curso,
         ConfiguracionExamenDocente $configuracion,
     ): void {
-        $siguienteId = (int) EstudianteExamen::query()->max('id_estudiante_examen') + 1;
+        DB::statement('LOCK TABLE estudiante_examen IN SHARE ROW EXCLUSIVE MODE');
+
+        $primerId = (int) EstudianteExamen::query()->max('id_estudiante_examen') + 1;
 
         $filas = $curso->estudiantes()
             ->orderBy('sis_estudiante')
             ->get()
-            ->map(fn (Estudiante $estudiante): array => [
-                'id_estudiante_examen' => $siguienteId++,
+            ->values()
+            ->map(fn (Estudiante $estudiante, int $indice): array => [
+                'id_estudiante_examen' => $primerId + $indice,
                 'sis_estudiante' => $estudiante->sis_estudiante,
                 'id_examen' => $examen->id_examen,
                 'id_curso' => $curso->id_curso,
