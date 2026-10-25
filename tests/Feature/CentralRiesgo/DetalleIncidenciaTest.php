@@ -9,6 +9,7 @@
  *
  * @updated 2026-10-11
  * @updated 2026-10-24
+ * @updated 2026-10-25
  *
  * @description Pruebas HTTP con SQLite en memoria, sin usar Supabase, del
  * endpoint GET /api/incidencias/{idIncidencia}: datos completos del detalle
@@ -27,6 +28,9 @@
  *   prueba suma `id_curso`; el detalle trae `curso`, `materia` y `grupo` del
  *   curso registrado y el estado sale del tipo de infracción (tramposo =
  *   Confirmado aunque `estado_incidencia` diga Pendiente).
+ * - 2026-10-25  [Valery D. Ortuno P]  test: el detalle trae
+ *   `estudiante_verificado` y el esquema de prueba suma `estudiante.verificado`;
+ *   las etiquetas de motivo van sin acentos (HU 5).
  *
  * @see App\Http\Controllers\Api\DetalleIncidenciaController
  * @see App\Services\CentralRiesgo\ConsultarDetalleIncidenciaService
@@ -70,6 +74,7 @@ class DetalleIncidenciaTest extends TestCase
                     'id_registro' => 1,
                     'estudiante_nombre' => 'María Gómez',
                     'sis_estudiante' => '20181111111',
+                    'estudiante_verificado' => true,
                     'motivo' => 'Copia o intercambio de respuestas',
                     'curso' => 'Matemática Discreta - Grupo 3',
                     'materia' => 'Matemática Discreta',
@@ -123,6 +128,7 @@ class DetalleIncidenciaTest extends TestCase
             $tabla->string('nombre_estudiante');
             $tabla->string('apellido_estudiante');
             $tabla->string('carrera')->nullable();
+            $tabla->boolean('verificado')->default(true);
         });
         Schema::create('curso', function (Blueprint $tabla): void {
             $tabla->integer('id_curso')->primary();

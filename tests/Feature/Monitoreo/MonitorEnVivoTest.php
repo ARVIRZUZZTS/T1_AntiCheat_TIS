@@ -8,6 +8,7 @@
  * @created 2026-10-10
  *
  * @updated 2026-10-10
+ * @updated 2026-10-25
  *
  * @description
  * Pruebas de integración del monitor en vivo (issue de ingreso con Livewire):
@@ -30,6 +31,10 @@
  *   ingreso (persiste `registro_asistencia` y marca `presente`), rechazar y
  *   permitir (cambian la habilitación), registrar tramposo (crea la incidencia)
  *   y un motivo inválido (no escribe y avisa).
+ * - 2026-10-25  [Valery D. Ortuno P]  test: el registro pasa por
+ *   RegistrarIncidenciaService (HU 5): motivos según la vista, modal de
+ *   confirmación y alta de un estudiante no verificado; sin sesión
+ *   el registrador es el creador del examen.
  */
 
 namespace Tests\Feature\Monitoreo;
@@ -38,7 +43,6 @@ use App\Enums\EstadoEstudianteExamen;
 use App\Enums\Motivo;
 use App\Enums\TipoInfraccion;
 use App\Livewire\Monitoreo\MonitorEnVivo;
-use App\Livewire\Monitoreo\RegistrarIncidencia;
 use App\Models\CentralRiesgo;
 use App\Models\Estudiante;
 use App\Models\EstudianteExamen;
@@ -103,7 +107,8 @@ class MonitorEnVivoTest extends TestCase
         $this->assertDatabaseHas('registro_asistencia', [
             'id_examen' => $this->idExamen,
             'id_estudiante' => self::SIS,
-            'id_registrador' => RegistrarIncidencia::USUARIO_POR_DEFECTO,
+            // Sin sesión, el registrador es el creador del examen.
+            'id_registrador' => Examen::query()->findOrFail($this->idExamen)->creador,
         ]);
 
         $registro = RegistroAsistencia::query()
@@ -143,9 +148,10 @@ class MonitorEnVivoTest extends TestCase
         ]);
     }
 
-    public function test_registrar_tramposo_crea_la_incidencia(): void
+    public function test_registrar_tramposo_crea_la_incidencia_y_muestra_la_confirmacion(): void
     {
-        Livewire::test(MonitorEnVivo::class)
+        $componente = Livewire::test(MonitorEnVivo::class)
+            ->call('cambiarVista', 'monitor')
             ->call('registrarTramposo', self::SIS, Motivo::CopiaOIntercambioDeRespuestas->value, 'Visto copiando.')
             ->assertSet('mensajeError', '');
 
@@ -155,6 +161,9 @@ class MonitorEnVivoTest extends TestCase
             'tipo_infraccion' => TipoInfraccion::Tramposo->value,
             'motivo' => Motivo::CopiaOIntercambioDeRespuestas->value,
         ]);
+
+        $componente->assertSet('incidenciaRegistrada', true);
+        $componente->assertSee('Estudiante agregado a la central de riesgos');
     }
 
     public function test_motivo_invalido_no_registra_incidencia(): void
@@ -163,12 +172,40 @@ class MonitorEnVivoTest extends TestCase
 
         Livewire::test(MonitorEnVivo::class)
             ->call('registrarTramposo', self::SIS, 'motivo-que-no-existe')
-            ->assertSet('mensajeError', 'Seleccione un motivo válido de la lista.');
+            ->assertSet('mensajeError', 'Seleccione un motivo de la lista.')
+            ->assertSet('incidenciaRegistrada', false);
 
         $this->assertSame(
             $antes,
             CentralRiesgo::query()->where('id_examen', $this->idExamen)->count(),
             'Con un motivo inválido no se debe escribir ninguna incidencia.',
         );
+    }
+
+    /** Los motivos dependen de la vista: uno del monitor no vale en el ingreso. */
+    public function test_un_motivo_del_monitor_no_vale_en_el_ingreso(): void
+    {
+        Livewire::test(MonitorEnVivo::class)
+            ->call('registrarTramposo', self::SIS, Motivo::CopiaOIntercambioDeRespuestas->value)
+            ->assertSet('mensajeError', 'Seleccione un motivo de la lista.');
+    }
+
+    /** Un SIS que no está en la base se registra como estudiante no verificado. */
+    public function test_registrar_no_inscrito_da_de_alta_un_estudiante_no_verificado(): void
+    {
+        Livewire::test(MonitorEnVivo::class)
+            ->call('registrarNoInscrito', '900199991', Motivo::IntentoDeIngresoNoAutorizado->value, null, 'Juan Carlos', 'Perez Rojas')
+            ->assertSet('mensajeError', '');
+
+        $this->assertDatabaseHas('estudiante', [
+            'sis_estudiante' => '900199991',
+            'nombre_estudiante' => 'Juan Carlos',
+            'apellido_estudiante' => 'Perez Rojas',
+            'verificado' => false,
+        ]);
+        $this->assertDatabaseHas('central_riesgo', [
+            'sis_estudiante' => '900199991',
+            'id_examen' => $this->idExamen,
+        ]);
     }
 }

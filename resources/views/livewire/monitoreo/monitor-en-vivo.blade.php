@@ -67,6 +67,11 @@
     - 2026-10-12  [T1]  refactor: el botón "Registrar incidencia" abre directo
       el formulario (antes pasaba por la pantalla intermedia "Registro ingreso")
       y le manda el examen en curso, el rol de docente y el usuario por la URL.
+    - 2026-10-25  [Valery D. Ortuno P]  feat: se quita el botón oculto que
+      llevaba a la página de registro (retirada); "Reportar SIS" pasa a
+      "Registrar incidencia" y abre el modal del estudiante no inscrito, y se
+      suman el modal de confirmación del registro y el estado (Confirmado o En
+      revision) según el rol en los modales (HU 5).
 --}}
 
 @section('title', 'Monitor en vivo')
@@ -263,23 +268,6 @@
      nunca pasara por x-ui.page-header). --}}
 @section('subtitle', $subtituloExamen)
 
-@section('header-actions')
-    {{-- Abre directamente el formulario de incidencia, con el examen del
-         monitor, el rol y el usuario que hoy lee el formulario por la URL:
-         ya no hay pantalla intermedia "Registro ingreso" de por medio. --}}
-    <a href="{{ route('registrar-incidencia', [
-            'origen' => \App\Livewire\Monitoreo\RegistrarIncidencia::ORIGEN_MONITOREO,
-            'examen' => $examen->id_examen,
-            'rol' => \App\Models\Rol::NOMBRE_DOCENTE,
-            'usuario' => auth()->id() ?? \App\Livewire\Monitoreo\RegistrarIncidencia::USUARIO_POR_DEFECTO,
-        ]) }}"
-       aria-label="Registrar incidencia"
-       class="inline-flex items-center justify-center gap-1.5 rounded-full border border-transparent bg-brand px-3 py-2.5 sm:px-4 text-sm font-medium leading-5 text-white shadow-xs hover:bg-brand-strong focus:outline-none focus:ring-4 focus:ring-brand-medium" style="display: none;">
-        <svg class="w-4 h-4 shrink-0" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-        <span class="hidden sm:inline">Registrar incidencia</span>
-    </a>
-@endsection
-
 <div class="flex flex-col gap-6 px-[2vh] mt-[2vh]">
     {{-- Los dos avisos se autodescartan a los 4s: antes se quedaban en
          pantalla para siempre hasta la próxima acción. `limpiarMensajes()`
@@ -395,8 +383,11 @@
         <div class="mt-4">
             @if ($this->estudiantes->total() === 0)
                 <p class="text-center text-sm text-body py-6">No se encontraron estudiantes con ese criterio.</p>
+                {{-- Un estudiante que no está en la lista (no inscrito o no
+                     registrado en la base) también se puede registrar: abre el
+                     modal del no inscrito con el SIS buscado precargado. --}}
                 <div class="text-center pb-6">
-                    <x-ui.button wire:click="reportarSisNoEncontrado" variant="secondary">Reportar SIS</x-ui.button>
+                    <x-ui.button wire:click="abrirRegistroNoInscrito" variant="danger">Registrar incidencia</x-ui.button>
                 </div>
             @else
                 {{-- Mobile: una tarjeta por estudiante con scroll vertical
@@ -485,7 +476,12 @@
     <x-ui.modal-estudiante-ingresado />
     <x-ui.modal-no-habilitado />
     <x-ui.modal-central-riesgos />
-    <x-ui.modal-registrar-tramposo :contexto="$modoVista" />
+    <x-ui.modal-registrar-tramposo :contexto="$modoVista" :como-auxiliar="$this->registraComoAuxiliar" />
+    <x-ui.modal-registrar-no-inscrito :contexto="$modoVista" :como-auxiliar="$this->registraComoAuxiliar" />
     <x-ui.modal-opciones-rechazo />
+
+    @if ($incidenciaRegistrada)
+        <x-ui.modal-incidencia-registrada />
+    @endif
 
 </div>

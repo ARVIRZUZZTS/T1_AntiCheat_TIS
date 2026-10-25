@@ -9,6 +9,7 @@
  *
  * @updated 2026-10-10
  * @updated 2026-10-24
+ * @updated 2026-10-25
  *
  * @description
  * Pruebas de la lista de estudiantes de la central de riesgos (HU 10), sobre el
@@ -41,6 +42,9 @@
  *   registrado, un tramposo se lista aunque `estado_incidencia` diga
  *   Pendiente, sin curso se lista "Sin materia", el detalle muestra materia y
  *   grupo, y los textos esperados van sin acentos.
+ * - 2026-10-25  [Valery D. Ortuno P]  test: etiqueta "No verificado" para los
+ *   estudiantes dados de alta desde una incidencia; el esquema de prueba suma
+ *   `estudiante.verificado` y las etiquetas de motivo van sin acentos (HU 5).
  */
 
 namespace Tests\Feature\CentralRiesgo;
@@ -144,6 +148,17 @@ class ListaEstudiantesCentralRiesgoTest extends TestCase
         $this->institucion()->assertSee('Sin materia');
     }
 
+    /** Un estudiante dado de alta desde una incidencia se marca como no verificado. */
+    public function test_un_estudiante_no_verificado_lleva_su_etiqueta(): void
+    {
+        $this->crearEstudiante('900000042', 'Nadia', 'Cordero Vargas');
+        DB::table('estudiante')->where('sis_estudiante', '900000042')->update(['verificado' => false]);
+        $this->crearIncidencia('900000042', self::EXAMEN_A, 'tramposo', '2026-10-05 09:00:00');
+
+        $this->institucion()->assertSee('No verificado');
+        $this->assertStringNotContainsString('No verificado', Livewire::test(ListaEstudiantes::class)->set('busqueda', self::LUIS)->html());
+    }
+
     public function test_la_lista_muestra_estudiante_codigo_sis_materia_motivo_y_ver_detalle(): void
     {
         $componente = $this->institucion();
@@ -153,7 +168,7 @@ class ListaEstudiantesCentralRiesgoTest extends TestCase
             ->assertSee('Luis Alvarez Gomez')
             ->assertSee(self::LUIS)
             ->assertSee('Calculo I')
-            ->assertSee('Uso de dispositivos electrónicos no autorizados')
+            ->assertSee('Uso de dispositivos electronicos no autorizados')
             ->assertSee('Ver detalle');
     }
 
@@ -326,7 +341,7 @@ class ListaEstudiantesCentralRiesgoTest extends TestCase
             'Codigo SIS:',
             self::LUIS,
             'Motivo',
-            'Uso de dispositivos electrónicos no autorizados',
+            'Uso de dispositivos electronicos no autorizados',
             'Materia',
             'Calculo I',
             'Grupo',
@@ -573,6 +588,7 @@ class ListaEstudiantesCentralRiesgoTest extends TestCase
             $tabla->string('nombre_estudiante');
             $tabla->string('apellido_estudiante');
             $tabla->string('carrera')->nullable();
+            $tabla->boolean('verificado')->default(true);
         });
         Schema::create('curso', function (Blueprint $tabla): void {
             $tabla->integer('id_curso')->primary();

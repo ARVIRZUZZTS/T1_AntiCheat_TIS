@@ -9,13 +9,13 @@
  *
  * @updated 2026-10-10
  * @updated 2026-10-24
+ * @updated 2026-10-25
  *
  * @description
- * Servicio del control de ingreso del monitor en vivo. Persiste las cuatro
- * acciones que disparan los modales: registrar el ingreso de un estudiante
+ * Servicio del control de ingreso del monitor en vivo. Persiste las tres
+ * acciones de ingreso que disparan los modales: registrar el ingreso de un estudiante
  * (fila en `registro_asistencia` con hora y registrador), rechazarlo (queda
- * deshabilitado en `estudiante_examen`), permitir su ingreso (lo habilita) y
- * registrar una incidencia de tramposo en `central_riesgo`.
+ * deshabilitado en `estudiante_examen`) y permitir su ingreso (lo habilita).
  *
  * Los PK de estas tablas son enteros NOT NULL sin secuencia (así los define el
  * esquema), de modo que el id se calcula como max + 1 dentro de la transacción,
@@ -31,6 +31,8 @@
  * - 2026-10-24  [Valery D. Ortuno P]  fix: registrarIncidencia() guarda el curso
  *   (`id_curso`) con ResolverCursoIncidenciaService; sin él la incidencia no
  *   aparecía con materia en la central de riesgos (HU 10).
+ * - 2026-10-25  [Valery D. Ortuno P]  refactor: se quita registrarIncidencia();
+ *   el registro de incidencias pasa a RegistrarIncidenciaService (HU 5).
  *
  * @see  App\Livewire\Monitoreo\MonitorEnVivo
  * @see  App\Services\Examen\CambiarEstadoEstudianteService
@@ -39,14 +41,8 @@
 namespace App\Services\Asistencia;
 
 use App\Enums\EstadoEstudianteExamen;
-use App\Enums\Motivo;
-use App\Enums\TipoInfraccion;
-use App\Models\CentralRiesgo;
-use App\Models\Estudiante;
 use App\Models\EstudianteExamen;
 use App\Models\RegistroAsistencia;
-use App\Services\CentralRiesgo\ResolverCursoIncidenciaService;
-use App\Services\Notificacion\NotificacionService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -144,59 +140,6 @@ class RegistroIngresoService
         ?int $idDocente = null,
     ): EstudianteExamen {
         return $this->cambiarEstado($sisEstudiante, $idExamen, EstadoEstudianteExamen::Habilitado, null, $idRegistrador, $idDocente);
-    }
-
-    /**
-     * Registra una incidencia de tramposo en la central de riesgos.
-     *
-     * @param  string  $sisEstudiante  Código SIS del estudiante.
-     * @param  int  $idExamen  Examen en el que ocurrió.
-     * @param  int  $idRegistrador  Usuario que registra.
-     * @param  Motivo  $motivo  Motivo de la incidencia.
-     * @param  ?string  $detalle  Detalle libre (obligatorio solo con `Otro`).
-     * @return CentralRiesgo Fila creada.
-     *
-     * @throws InvalidArgumentException Si el estudiante no existe.
-     */
-    public function registrarIncidencia(
-        string $sisEstudiante,
-        int $idExamen,
-        int $idRegistrador,
-        Motivo $motivo,
-        ?string $detalle = null,
-        ?int $idDocente = null,
-    ): CentralRiesgo {
-        return DB::transaction(function () use ($sisEstudiante, $idExamen, $idRegistrador, $motivo, $detalle, $idDocente) {
-            if (! Estudiante::query()->where('sis_estudiante', $sisEstudiante)->exists()) {
-                throw new InvalidArgumentException('El estudiante no existe.');
-            }
-
-            $detalle = $detalle === null ? null : trim($detalle);
-            $inscripcion = $this->obtenerInscripcion($sisEstudiante, $idExamen, $idDocente);
-
-            $registro = CentralRiesgo::create([
-                'id_registro' => $this->siguienteId(CentralRiesgo::class, 'id_registro'),
-                'sis_estudiante' => $sisEstudiante,
-                'id_examen' => $idExamen,
-                // La central de riesgos lista por el curso registrado: sin él la
-                // incidencia quedaba "Sin materia" y fuera de "Mis materias".
-                'id_curso' => $inscripcion->id_curso
-                    ?? app(ResolverCursoIncidenciaService::class)->ejecutar($sisEstudiante, $idExamen, $idDocente),
-                'id_estudiante_examen' => $inscripcion->id_estudiante_examen,
-                'id_registrador' => $idRegistrador,
-                'motivo' => $motivo->value,
-                'detalle_motivo' => $detalle === '' ? null : $detalle,
-                'fecha_registro' => now(),
-                'tipo_infraccion' => TipoInfraccion::Tramposo->value,
-            ]);
-
-            // HU 6 · T1: el monitor siempre registra tramposos directos, así que
-            // cada docente con una materia activa del estudiante recibe su aviso
-            // "Estudiante ingresado a central de riesgo".
-            app(NotificacionService::class)->notificarCentralRiesgo($registro);
-
-            return $registro;
-        });
     }
 
     /**

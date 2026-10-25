@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Relations\HasManyThrough;
  * @property string $nombre_estudiante
  * @property string $apellido_estudiante
  * @property ?string $carrera
+ * @property bool $verificado  False si se dio de alta desde una incidencia (HU 5).
  */
 class Estudiante extends Model
 {
@@ -30,7 +31,16 @@ class Estudiante extends Model
         'nombre_estudiante',
         'apellido_estudiante',
         'carrera',
+        'verificado',
     ];
+
+    /** @return array<string, string> */
+    protected function casts(): array
+    {
+        return [
+            'verificado' => 'boolean',
+        ];
+    }
 
     /** @return BelongsToMany<Curso, $this> */
     public function cursos(): BelongsToMany

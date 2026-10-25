@@ -4,6 +4,7 @@
     @created 2026-10-10
     @updated 2026-10-11
     @updated 2026-10-24
+    @updated 2026-10-25
 
     @description
     Vista del componente Livewire ListaEstudiantes (HU 10): tabs de alcance
@@ -34,6 +35,9 @@
     - 2026-10-24  [Valery D. Ortuno P]  feat: la lista muestra solo la materia
       del curso registrado y el detalle suma el grupo por separado; los textos
       visibles van sin acentos.
+    - 2026-10-25  [Valery D. Ortuno P]  feat: etiqueta "No verificado" en la lista
+      y aviso en el detalle para los estudiantes dados de alta desde una
+      incidencia (HU 5).
 
     @see  App\Livewire\CentralRiesgo\ListaEstudiantes
     @see  resources/views/partials/busqueda-estudiante.blade.php
@@ -129,6 +133,9 @@
                                      partir la línea y ensanchaba la página en pantallas chicas. --}}
                                 <div class="min-w-0">
                                     <p class="break-words text-sm font-bold text-fg-brand">{{ $nombreListado }}</p>
+                                    @if (! ($estudiante['verificado'] ?? true))
+                                        <x-ui.badge type="warning" class="mt-1">No verificado</x-ui.badge>
+                                    @endif
                                     <p class="break-words text-[11px] text-body">{{ $estudiante['sis'] }} · {{ $estudiante['materia'] ?? 'Sin materia' }}</p>
                                 </div>
                             </div>
@@ -175,6 +182,9 @@
                                         ])>
                                         <td class="px-4 py-4">
                                             <p class="text-sm font-bold text-fg-brand">{{ $nombreListado }}</p>
+                                            @if (! ($estudiante['verificado'] ?? true))
+                                                <x-ui.badge type="warning" class="mt-1">No verificado</x-ui.badge>
+                                            @endif
                                         </td>
                                         <td class="px-4 py-4 font-mono text-body">{{ $estudiante['sis'] }}</td>
                                         <td class="px-4 py-4 text-body">{{ $estudiante['materia'] ?? 'Sin materia' }}</td>
@@ -239,6 +249,9 @@
                         <div class="rounded-xl border border-danger-subtle bg-danger-soft p-4">
                             <p class="font-semibold text-fg-danger-strong">{{ $detalle['estudiante_nombre'] ?? 'Estudiante desconocido' }}</p>
                             <p class="mt-1 text-sm text-fg-danger">Codigo SIS: <span class="font-mono">{{ $detalle['sis_estudiante'] }}</span></p>
+                            @if (! ($detalle['estudiante_verificado'] ?? true))
+                                <p class="mt-1 text-xs text-fg-danger">Estudiante no verificado: sus datos se registraron desde una incidencia.</p>
+                            @endif
                         </div>
 
                         <dl class="space-y-4 text-sm">
