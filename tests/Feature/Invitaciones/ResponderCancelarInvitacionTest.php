@@ -2,9 +2,8 @@
 
 namespace Tests\Feature\Invitaciones;
 
-use App\Services\Invitacion\CancelarInvitacionExamenService;
-use App\Services\Invitacion\ResponderInvitacionExamenService;
 use App\Models\Usuario;
+use App\Services\Invitacion\ResponderInvitacionExamenService;
 use App\Services\Notificacion\NotificacionService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
@@ -104,6 +103,10 @@ class ResponderCancelarInvitacionTest extends TestCase
         $this->assertDatabaseHas('invitacion_examen_compartido', [
             'id_invitacion' => self::INVITACION,
             'estado' => 'aceptado',
+        ]);
+        $this->assertDatabaseHas('configuracion_examen_docente', [
+            'id_examen' => self::EXAMEN,
+            'id_docente' => self::INVITADO,
         ]);
 
         // El aviso se reutiliza: ahora apunta al invitador y cambia de tipo, sin
