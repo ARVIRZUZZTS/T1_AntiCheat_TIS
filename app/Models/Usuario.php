@@ -115,4 +115,9 @@ class Usuario extends Authenticatable
     {
         return $this->hasMany(InvitacionExamenCompartido::class, 'id_docente_invitado', 'id_usuario');
     }
+
+    public function configuracionesExamen(): HasMany
+    {
+        return $this->hasMany(ConfiguracionExamenDocente::class, 'id_docente', 'id_usuario');
+    }
 }

@@ -35,17 +35,13 @@ class CentralRiesgoPolicy
             return false;
         }
 
-        // Supabase enlaza el examen directamente; el esquema original usa el ingreso.
-        $idExamen = $incidencia->getAttribute('id_examen')
-            ?? $incidencia->registroAsistencia?->id_examen;
-
-        if ($idExamen === null) {
+        if ($incidencia->id_curso === null) {
             return false;
         }
 
         return Curso::query()
+            ->where('id_curso', $incidencia->id_curso)
             ->where('sis_doc', $usuario->id_usuario)
-            ->whereHas('examenes', fn ($consulta) => $consulta->where('examen.id_examen', $idExamen))
             ->exists();
     }
 }

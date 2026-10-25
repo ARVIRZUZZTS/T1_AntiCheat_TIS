@@ -72,6 +72,7 @@ use App\Enums\EstadoEstudianteExamen;
 use App\Enums\EstadoIncidencia;
 use App\Enums\Motivo;
 use App\Models\CentralRiesgo;
+use App\Models\ConfiguracionExamenDocente;
 use App\Models\EstudianteExamen;
 use App\Models\Examen;
 use App\Models\RegistroAsistencia;
@@ -93,33 +94,59 @@ class GenerarReporteAsistenciaService
      *                              original; el estado ya no depende de la hora, sino de lo persistido.
      * @return array{examen: Examen, estudiantes: Collection}
      */
-    public function ejecutar(int $idExamen, ?Carbon $ahora = null): array
+    public function ejecutar(int $idExamen, ?Carbon $ahora = null, ?int $idDocente = null): array
     {
         $examen = Examen::query()
-            ->with(['cursos', 'ambientes', 'materialesPermitidos', 'tipoExamen'])
+            ->with([
+                'cursos' => fn ($query) => $query->when(
+                    $idDocente !== null,
+                    fn ($cursos) => $cursos->where('curso.sis_doc', $idDocente)
+                ),
+                'ambientes',
+                'materialesPermitidos',
+                'normas',
+                'materialesPersonalizados',
+                'normasPersonalizadas',
+                'tipoExamen',
+            ])
             ->findOrFail($idExamen);
+
+        $configuracion = $this->configuracion($examen, $idDocente);
+        if ($configuracion !== null) {
+            $examen->setRelation('materialesPermitidos', $configuracion->materialesPermitidos);
+            $examen->setRelation('normas', $configuracion->normas);
+            $examen->setRelation('materialesPersonalizados', $configuracion->materialesPersonalizados);
+            $examen->setRelation('normasPersonalizadas', $configuracion->normasPersonalizadas);
+        }
 
         $registros = RegistroAsistencia::query()
             ->where('id_examen', $examen->id_examen)
+            ->when($idDocente !== null, fn ($query) => $query->delDocente($idDocente))
             ->with('registrador')
             ->get()
-            ->keyBy('id_estudiante');
+            ->keyBy(fn (RegistroAsistencia $registro): string => $this->clave(
+                $registro->id_estudiante_examen,
+                $registro->id_estudiante,
+            ));
 
-        $incidencias = $this->incidenciasPorEstudiante($examen->id_examen);
+        $incidencias = $this->incidenciasPorEstudiante($examen->id_examen, $idDocente);
 
         $estudiantes = EstudianteExamen::query()
             ->where('id_examen', $examen->id_examen)
+            ->when($idDocente !== null, fn ($query) => $query->delDocente($idDocente))
             ->with('estudiante')
             ->get()
             ->map(function (EstudianteExamen $inscripcion) use ($registros, $incidencias) {
                 $estudiante = $inscripcion->estudiante;
-                $registro = $registros->get($estudiante->sis_estudiante);
-                $incidencia = $incidencias->get($estudiante->sis_estudiante);
+                $clave = $this->clave($inscripcion->id_estudiante_examen, $estudiante->sis_estudiante);
+                $registro = $registros->get($clave);
+                $incidencia = $incidencias->get($clave);
 
                 $habilitado = $inscripcion->estado === EstadoEstudianteExamen::Habilitado;
 
                 return [
                     'sis' => $estudiante->sis_estudiante,
+                    'id_inscripcion' => (int) $inscripcion->id_estudiante_examen,
                     'nombre' => $estudiante->nombre_estudiante,
                     'apellido' => $estudiante->apellido_estudiante,
                     'habilitado' => $habilitado,
@@ -148,13 +175,17 @@ class GenerarReporteAsistenciaService
      * @param  int  $idExamen  ID del examen.
      * @return Collection<string, array{tipo: string, fecha: string, estado: string, motivo_etiqueta: string}>
      */
-    private function incidenciasPorEstudiante(int $idExamen): Collection
+    private function incidenciasPorEstudiante(int $idExamen, ?int $idDocente): Collection
     {
         return CentralRiesgo::query()
             ->where('id_examen', $idExamen)
+            ->when($idDocente !== null, fn ($query) => $query->delDocente($idDocente))
             ->orderBy('id_registro')
             ->get()
-            ->keyBy('sis_estudiante')
+            ->keyBy(fn (CentralRiesgo $riesgo): string => $this->clave(
+                $riesgo->id_estudiante_examen,
+                $riesgo->sis_estudiante,
+            ))
             ->map(fn (CentralRiesgo $riesgo): array => [
                 'tipo' => (string) $riesgo->tipo_infraccion?->value,
                 'fecha' => $riesgo->fecha_registro?->format('d/m/Y') ?? '',
@@ -170,6 +201,24 @@ class GenerarReporteAsistenciaService
                     ? $riesgo->motivo->etiqueta()
                     : (Motivo::tryFrom((string) $riesgo->motivo)?->etiqueta() ?? (string) $riesgo->motivo),
             ]);
+    }
+
+    private function configuracion(Examen $examen, ?int $idDocente): ?ConfiguracionExamenDocente
+    {
+        if ($idDocente === null) {
+            return null;
+        }
+
+        return ConfiguracionExamenDocente::query()
+            ->where('id_examen', $examen->id_examen)
+            ->delDocente($idDocente)
+            ->with(['normas', 'materialesPermitidos', 'normasPersonalizadas', 'materialesPersonalizados'])
+            ->firstOrFail();
+    }
+
+    private function clave(mixed $idInscripcion, mixed $sis): string
+    {
+        return $idInscripcion === null ? 'sis:'.$sis : 'inscripcion:'.$idInscripcion;
     }
 
     /**

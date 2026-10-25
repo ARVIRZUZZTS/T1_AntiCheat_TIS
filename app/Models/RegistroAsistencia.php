@@ -33,6 +33,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -43,6 +44,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int $id_examen
  * @property string $id_estudiante
  * @property int $id_registrador
+ * @property ?int $id_estudiante_examen
  */
 class RegistroAsistencia extends Model
 {
@@ -62,6 +64,7 @@ class RegistroAsistencia extends Model
         'id_examen',
         'id_estudiante',
         'id_registrador',
+        'id_estudiante_examen',
     ];
 
     /** @return BelongsTo<Estudiante, $this> */
@@ -86,5 +89,21 @@ class RegistroAsistencia extends Model
     public function centralRiesgos(): HasMany
     {
         return $this->hasMany(CentralRiesgo::class, 'id_ingreso');
+    }
+
+    public function inscripcion(): BelongsTo
+    {
+        return $this->belongsTo(EstudianteExamen::class, 'id_estudiante_examen');
+    }
+
+    public function scopeDelDocente(Builder $query, int $idDocente): Builder
+    {
+        return $query->whereHas(
+            'inscripcion',
+            fn (Builder $inscripcion): Builder => $inscripcion->whereHas(
+                'configuracion',
+                fn (Builder $configuracion): Builder => $configuracion->where('id_docente', $idDocente)
+            )
+        );
     }
 }

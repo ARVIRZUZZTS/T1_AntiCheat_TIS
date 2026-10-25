@@ -33,6 +33,7 @@
 namespace App\Models;
 
 use App\Enums\EstadoEstudianteExamen;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
@@ -45,6 +46,8 @@ use Illuminate\Support\Carbon;
  * @property ?string $motivo
  * @property ?int $modificado_por
  * @property ?Carbon $fecha_modificacion
+ * @property ?int $id_configuracion_examen
+ * @property ?int $id_curso
  */
 class EstudianteExamen extends Model
 {
@@ -66,6 +69,8 @@ class EstudianteExamen extends Model
         'motivo',
         'modificado_por',
         'fecha_modificacion',
+        'id_configuracion_examen',
+        'id_curso',
     ];
 
     protected function casts(): array
@@ -92,5 +97,28 @@ class EstudianteExamen extends Model
     public function modificadoPor(): BelongsTo
     {
         return $this->belongsTo(Usuario::class, 'modificado_por', 'id_usuario');
+    }
+
+    public function configuracion(): BelongsTo
+    {
+        return $this->belongsTo(ConfiguracionExamenDocente::class, 'id_configuracion_examen');
+    }
+
+    public function curso(): BelongsTo
+    {
+        return $this->belongsTo(Curso::class, 'id_curso', 'id_curso');
+    }
+
+    public function scopeDelDocente(Builder $query, int $idDocente): Builder
+    {
+        return $query->whereHas(
+            'configuracion',
+            fn (Builder $configuracion): Builder => $configuracion->where('id_docente', $idDocente)
+        );
+    }
+
+    public function scopeDelCurso(Builder $query, int $idCurso): Builder
+    {
+        return $query->where($this->qualifyColumn('id_curso'), $idCurso);
     }
 }

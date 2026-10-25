@@ -25,16 +25,39 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Examen;
+use App\Models\Rol;
 use App\Services\Monitoreo\GenerarReporteAsistenciaService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 
 class ExamenMonitoreoController extends Controller
 {
     public function asistencia(
         int $idExamen,
+        Request $request,
         GenerarReporteAsistenciaService $servicio
     ): JsonResponse {
-        $reporte = $servicio->ejecutar($idExamen);
+        $examenAutorizado = Examen::query()->findOrFail($idExamen);
+        Gate::forUser($request->user())->authorize('monitorear', $examenAutorizado);
+
+        $idDocente = (int) $request->user()->id_usuario;
+        if ($request->user()->roles->contains('nombre_rol', Rol::NOMBRE_AUXILIAR)) {
+            $idDocente = (int) DB::table('examen_curso as ec')
+                ->join('auxiliar_curso as ac', 'ac.id_curso', '=', 'ec.id_curso')
+                ->join('curso as c', 'c.id_curso', '=', 'ec.id_curso')
+                ->where('ec.id_examen', $idExamen)
+                ->where('ac.id_auxiliar', $request->user()->id_usuario)
+                ->orderBy('c.id_curso')
+                ->value('c.sis_doc');
+        }
+
+        $reporte = $servicio->ejecutar(
+            $idExamen,
+            idDocente: $idDocente,
+        );
         $examen = $reporte['examen'];
 
         return response()->json([

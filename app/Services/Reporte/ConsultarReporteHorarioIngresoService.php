@@ -58,7 +58,7 @@ class ConsultarReporteHorarioIngresoService
         Gate::forUser($docente)->authorize('reporteHorarioIngreso', [$examen, $idCurso]);
 
         $aulasExamen = $this->aulasDelExamen($examen);
-        $estudiantes = $this->estudiantes($idExamen, $aulasExamen, $idAula, $horaDesde, $horaHasta);
+        $estudiantes = $this->estudiantes($idExamen, $idCurso, $aulasExamen, $idAula, $horaDesde, $horaHasta);
         $horas = $estudiantes->pluck('hora_ingreso_orden')->filter()->values();
 
         return [
@@ -125,6 +125,7 @@ class ConsultarReporteHorarioIngresoService
      */
     private function estudiantes(
         int $idExamen,
+        int $idCurso,
         Collection $aulasExamen,
         ?int $idAula,
         ?string $horaDesde,
@@ -132,13 +133,11 @@ class ConsultarReporteHorarioIngresoService
     ): Collection {
         $filas = DB::table('registro_asistencia as ra')
             ->join('estudiante as e', 'e.sis_estudiante', '=', 'ra.id_estudiante')
-            ->leftJoin('estudiante_examen as ee', function ($join): void {
-                $join->on('ee.id_examen', '=', 'ra.id_examen')
-                    ->on('ee.sis_estudiante', '=', 'ra.id_estudiante');
-            })
+            ->join('estudiante_examen as ee', 'ee.id_estudiante_examen', '=', 'ra.id_estudiante_examen')
             ->leftJoin('estudiante_examen_ambiente as eea', 'eea.id_ee', '=', 'ee.id_estudiante_examen')
             ->leftJoin('ambiente as a', 'a.id_ambiente', '=', 'eea.id_ambiente')
             ->where('ra.id_examen', $idExamen)
+            ->where('ee.id_curso', $idCurso)
             ->when($horaDesde, fn ($consulta, $hora) => $consulta->where('ra.hora_ingreso', '>=', $hora.':00'))
             ->when($horaHasta, fn ($consulta, $hora) => $consulta->where('ra.hora_ingreso', '<=', $hora.':00'))
             ->orderBy('ra.hora_ingreso')

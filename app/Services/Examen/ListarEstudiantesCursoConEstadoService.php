@@ -86,9 +86,6 @@ class ListarEstudiantesCursoConEstadoService
      */
     private readonly BusquedaEstudianteService $busqueda;
 
-    /**
-     * @param  BusquedaEstudianteService|null  $busqueda
-     */
     public function __construct(?BusquedaEstudianteService $busqueda = null)
     {
         $this->busqueda = $busqueda ?? app(BusquedaEstudianteService::class);
@@ -117,19 +114,29 @@ class ListarEstudiantesCursoConEstadoService
 
         $curso = Curso::findOrFail($idCurso);
         $examen = $curso->examenActual();
+        $idConfiguracion = $this->idConfiguracion($curso, $examen);
 
         $query = $curso->estudiantes()
-            ->with(['estudianteExamenes', 'centralRiesgos']);
+            ->with([
+                'estudianteExamenes' => fn ($q) => $q
+                    ->when($idConfiguracion !== null, fn ($inscripciones) => $inscripciones
+                        ->where('id_configuracion_examen', $idConfiguracion)),
+                'centralRiesgos' => fn ($q) => $q->where('id_curso', $idCurso),
+            ]);
 
         $this->busqueda->aplicar($query, $busqueda);
 
         $idExamen = $examen?->id_examen;
-        $this->aplicarFiltro($query, $filtro, $idExamen);
+        $this->aplicarFiltro($query, $filtro, $idExamen, $idConfiguracion);
 
         $paginador = $query->paginate($porPagina, ['*'], 'page', $pagina);
 
         $datos = collect($paginador->items())
-            ->map(fn (Estudiante $estudiante): array => $this->mapearEstudiante($estudiante, $idExamen));
+            ->map(fn (Estudiante $estudiante): array => $this->mapearEstudiante(
+                $estudiante,
+                $idExamen,
+                $idConfiguracion,
+            ));
 
         return new LengthAwarePaginator(
             $datos,
@@ -154,11 +161,12 @@ class ListarEstudiantesCursoConEstadoService
         $curso = Curso::findOrFail($idCurso);
         $examen = $curso->examenActual();
         $idExamen = $examen?->id_examen;
+        $idConfiguracion = $this->idConfiguracion($curso, $examen);
 
         return [
             self::FILTRO_TODOS => (int) $curso->estudiantes()->count(),
-            self::FILTRO_HABILITADOS => $this->contarHabilitacion($curso, $idExamen, EstadoEstudianteExamen::Habilitado->value),
-            self::FILTRO_DESHABILITADOS => $this->contarHabilitacion($curso, $idExamen, EstadoEstudianteExamen::Deshabilitado->value),
+            self::FILTRO_HABILITADOS => $this->contarHabilitacion($curso, $idExamen, $idConfiguracion, EstadoEstudianteExamen::Habilitado->value),
+            self::FILTRO_DESHABILITADOS => $this->contarHabilitacion($curso, $idExamen, $idConfiguracion, EstadoEstudianteExamen::Deshabilitado->value),
             self::FILTRO_SOSPECHOSOS => $this->contarInfraccion($curso, $idExamen, TipoInfraccion::Sospechoso->value),
             self::FILTRO_TRAMPOSOS => (int) $curso->estudiantes()
                 ->whereHas('centralRiesgos', fn (Builder $q) => $this->delCursoEnCentralRiesgo($q, $idCurso))
@@ -192,15 +200,22 @@ class ListarEstudiantesCursoConEstadoService
      * @param  string  $filtro  Clave de filtro (habilitados/deshabilitados/sospechosos/tramposos).
      * @param  ?int  $idExamen  ID del examen actual del curso.
      */
-    private function aplicarFiltro(BelongsToMany $query, string $filtro, ?int $idExamen): void
-    {
+    private function aplicarFiltro(
+        BelongsToMany $query,
+        string $filtro,
+        ?int $idExamen,
+        ?int $idConfiguracion,
+    ): void {
         if ($filtro === self::FILTRO_HABILITADOS || $filtro === self::FILTRO_DESHABILITADOS) {
             $estado = $filtro === self::FILTRO_HABILITADOS
                 ? EstadoEstudianteExamen::Habilitado->value
                 : EstadoEstudianteExamen::Deshabilitado->value;
 
-            $query->whereHas('estudianteExamenes', function (Builder $q) use ($idExamen, $estado) {
-                $q->where('id_examen', $idExamen)->where('estado', $estado);
+            $query->whereHas('estudianteExamenes', function (Builder $q) use ($idExamen, $idConfiguracion, $estado) {
+                $q->where('id_examen', $idExamen)
+                    ->when($idConfiguracion !== null, fn ($inscripciones) => $inscripciones
+                        ->where('id_configuracion_examen', $idConfiguracion))
+                    ->where('estado', $estado);
             });
 
             return;
@@ -239,6 +254,7 @@ class ListarEstudiantesCursoConEstadoService
      * @param  int  $idCurso  ID del curso.
      *
      * @author Valery D. Ortuno P <valerydariana98@gmail.com>
+     *
      * @since  2026-10-24
      */
     private function delCursoEnCentralRiesgo(Builder $q, int $idCurso): void
@@ -255,11 +271,18 @@ class ListarEstudiantesCursoConEstadoService
      * @param  string  $estado  Valor de estado (habilitado/deshabilitado).
      * @return int Cantidad de estudiantes.
      */
-    private function contarHabilitacion(Curso $curso, ?int $idExamen, string $estado): int
-    {
+    private function contarHabilitacion(
+        Curso $curso,
+        ?int $idExamen,
+        ?int $idConfiguracion,
+        string $estado,
+    ): int {
         return (int) $curso->estudiantes()
-            ->whereHas('estudianteExamenes', function (Builder $q) use ($idExamen, $estado) {
-                $q->where('id_examen', $idExamen)->where('estado', $estado);
+            ->whereHas('estudianteExamenes', function (Builder $q) use ($idExamen, $idConfiguracion, $estado) {
+                $q->where('id_examen', $idExamen)
+                    ->when($idConfiguracion !== null, fn ($inscripciones) => $inscripciones
+                        ->where('id_configuracion_examen', $idConfiguracion))
+                    ->where('estado', $estado);
             })
             ->count();
     }
@@ -289,10 +312,14 @@ class ListarEstudiantesCursoConEstadoService
      * @param  ?int  $idExamen  ID del examen actual (para ubicar el estado).
      * @return array<string, mixed> Datos del estudiante con estado, motivo y observación.
      */
-    private function mapearEstudiante(Estudiante $estudiante, ?int $idExamen): array
-    {
+    private function mapearEstudiante(
+        Estudiante $estudiante,
+        ?int $idExamen,
+        ?int $idConfiguracion,
+    ): array {
         $estado = $estudiante->estudianteExamenes->first(
             fn (EstudianteExamen $ee) => $ee->id_examen === $idExamen
+                && ($idConfiguracion === null || $ee->id_configuracion_examen === $idConfiguracion)
         );
 
         return [
@@ -304,6 +331,17 @@ class ListarEstudiantesCursoConEstadoService
             'motivo' => $estado?->motivo,
             'observacion' => $this->ultimaInfraccionDe($estudiante, $idExamen),
         ];
+    }
+
+    private function idConfiguracion(Curso $curso, ?Examen $examen): ?int
+    {
+        if ($examen === null) {
+            return null;
+        }
+
+        return $examen->configuracionesDocentes()
+            ->where('id_docente', $curso->sis_doc)
+            ->value('id_configuracion_examen');
     }
 
     /**

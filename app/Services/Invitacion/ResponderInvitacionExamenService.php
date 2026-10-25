@@ -5,6 +5,7 @@ namespace App\Services\Invitacion;
 use App\Enums\InvitacionEstado;
 use App\Models\InvitacionExamenCompartido;
 use App\Models\Usuario;
+use App\Services\Examen\ConfiguracionExamenDocenteService;
 use App\Services\Notificacion\NotificacionService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -26,6 +27,7 @@ class ResponderInvitacionExamenService
 
     public function __construct(
         private readonly NotificacionService $notificaciones,
+        private readonly ConfiguracionExamenDocenteService $configuraciones,
     ) {}
 
     /**
@@ -74,6 +76,18 @@ class ResponderInvitacionExamenService
 
             $bloqueada->estado = $nuevoEstado;
             $bloqueada->save();
+
+            if ($nuevoEstado === InvitacionEstado::Aceptada) {
+                $bloqueada->loadMissing('examen');
+                $origen = $bloqueada->examen->configuracionDe((int) $bloqueada->id_docente_invitador)
+                    ?? $bloqueada->examen->configuracionDe((int) $bloqueada->examen->creador);
+
+                $this->configuraciones->crearPara(
+                    $bloqueada->examen,
+                    (int) $bloqueada->id_docente_invitado,
+                    $origen,
+                );
+            }
 
             $this->notificaciones->notificarRespuestaInvitacion($bloqueada);
 

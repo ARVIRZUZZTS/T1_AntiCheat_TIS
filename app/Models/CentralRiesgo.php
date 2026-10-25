@@ -49,6 +49,7 @@ use App\Enums\EstadoIncidencia;
 use App\Enums\Motivo;
 use App\Enums\TipoInfraccion;
 use App\Services\CentralRiesgo\CacheCentralRiesgo;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
@@ -65,6 +66,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon $fecha_registro
  * @property TipoInfraccion $tipo_infraccion
  * @property EstadoIncidencia $estado_incidencia
+ * @property ?int $id_estudiante_examen
  */
 class CentralRiesgo extends Model
 {
@@ -90,6 +92,7 @@ class CentralRiesgo extends Model
         'fecha_registro',
         'tipo_infraccion',
         'estado_incidencia',
+        'id_estudiante_examen',
     ];
 
     protected function casts(): array
@@ -151,6 +154,17 @@ class CentralRiesgo extends Model
     public function curso(): BelongsTo
     {
         return $this->belongsTo(Curso::class, 'id_curso', 'id_curso');
+    }
+
+    public function inscripcion(): BelongsTo
+    {
+        return $this->belongsTo(EstudianteExamen::class, 'id_estudiante_examen');
+    }
+
+    public function scopeDelDocente(Builder $query, int $idDocente): Builder
+    {
+        return $query->whereHas('curso', fn (Builder $curso): Builder => $curso
+            ->where('sis_doc', $idDocente));
     }
 
     /**

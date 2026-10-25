@@ -44,6 +44,7 @@
 namespace App\Services\Examen;
 
 use App\Enums\EstadoEstudianteExamen;
+use App\Models\ConfiguracionExamenDocente;
 use App\Models\Curso;
 use App\Models\Estudiante;
 use App\Models\EstudianteExamen;
@@ -77,9 +78,9 @@ class RegistrarExamenService
     public const HORA_INICIO_MAXIMA = '20:15';
 
     public function __construct(
-        private readonly DividirExamenService $dividirExamenService
-    ) {
-    }
+        private readonly DividirExamenService $dividirExamenService,
+        private readonly ConfiguracionExamenDocenteService $configuraciones,
+    ) {}
 
     /**
      * Crea el examen y todo lo que se le eligió.
@@ -106,14 +107,16 @@ class RegistrarExamenService
             $examen->save();
 
             $examen->cursos()->attach($curso->id_curso);
-            $this->inscribirEstudiantes($examen, $curso);
-            $this->asignarEstudiantesAAmbientes($examen, $datos);
             $examen->ambientes()->sync($datos['ambientes']);
             $examen->normas()->sync($datos['normas'] ?? []);
             $examen->materialesPermitidos()->sync($datos['materiales'] ?? []);
 
             $this->guardarMaterialesPersonalizados($examen, $datos['materiales_personalizados'] ?? null);
             $this->guardarNormasPersonalizadas($examen, $datos['normas_personalizadas'] ?? null);
+
+            $configuracion = $this->configuraciones->crearPara($examen, $creador);
+            $this->inscribirEstudiantes($examen, $curso, $configuracion);
+            $this->asignarEstudiantesAAmbientes($examen, $datos);
 
             return $examen;
         });
@@ -159,6 +162,8 @@ class RegistrarExamenService
             (int) $examen->id_examen,
             $datos->materialesPersonalizados,
         );
+
+        $this->configuraciones->crearPara($examen, $creador);
 
         return $examen;
     }
@@ -211,8 +216,11 @@ class RegistrarExamenService
      * el id se calcula como max()+1 dentro de la misma transacción que crea el
      * examen.
      */
-    private function inscribirEstudiantes(Examen $examen, Curso $curso): void
-    {
+    private function inscribirEstudiantes(
+        Examen $examen,
+        Curso $curso,
+        ConfiguracionExamenDocente $configuracion,
+    ): void {
         $siguienteId = (int) EstudianteExamen::query()->max('id_estudiante_examen') + 1;
 
         $filas = $curso->estudiantes()
@@ -222,6 +230,8 @@ class RegistrarExamenService
                 'id_estudiante_examen' => $siguienteId++,
                 'sis_estudiante' => $estudiante->sis_estudiante,
                 'id_examen' => $examen->id_examen,
+                'id_curso' => $curso->id_curso,
+                'id_configuracion_examen' => $configuracion->id_configuracion_examen,
                 'estado' => EstadoEstudianteExamen::Habilitado->value,
             ])
             ->all();

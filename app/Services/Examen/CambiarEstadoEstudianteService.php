@@ -185,8 +185,17 @@ class CambiarEstadoEstudianteService
             throw new InvalidArgumentException('El estudiante no pertenece a este curso');
         }
 
+        $idConfiguracion = $examen->configuracionesDocentes()
+            ->where('id_docente', $curso->sis_doc)
+            ->value('id_configuracion_examen');
+
+        if ($idConfiguracion === null) {
+            throw new RuntimeException('El docente no tiene configuración para este examen');
+        }
+
         $registro = EstudianteExamen::where('sis_estudiante', $sisEstudiante)
             ->where('id_examen', $examen->id_examen)
+            ->where('id_configuracion_examen', $idConfiguracion)
             ->lockForUpdate()
             ->first();
 
@@ -200,6 +209,8 @@ class CambiarEstadoEstudianteService
             'id_estudiante_examen' => $siguienteId,
             'sis_estudiante' => $sisEstudiante,
             'id_examen' => $examen->id_examen,
+            'id_curso' => $curso->id_curso,
+            'id_configuracion_examen' => $idConfiguracion,
             'estado' => EstadoEstudianteExamen::Habilitado->value,
             'motivo' => null,
         ]);

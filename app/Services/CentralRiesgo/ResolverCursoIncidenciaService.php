@@ -39,18 +39,20 @@ class ResolverCursoIncidenciaService
      *
      * @param  string  $sisEstudiante  Código SIS del estudiante.
      * @param  int  $idExamen  Examen en el que ocurrió la incidencia.
-     *
-     * @return ?int  id_curso, o null si no se puede decidir.
+     * @return ?int id_curso, o null si no se puede decidir.
      *
      * @author Valery D. Ortuno P <valerydariana98@gmail.com>
+     *
      * @since  2026-10-24
      */
-    public function ejecutar(string $sisEstudiante, int $idExamen): ?int
+    public function ejecutar(string $sisEstudiante, int $idExamen, ?int $idDocente = null): ?int
     {
         $inscrito = DB::table('examen_curso as ec')
             ->join('estudiante_curso as ecur', 'ecur.id_curso', '=', 'ec.id_curso')
+            ->join('curso as c', 'c.id_curso', '=', 'ec.id_curso')
             ->where('ec.id_examen', $idExamen)
             ->where('ecur.sis_estudiante', $sisEstudiante)
+            ->when($idDocente !== null, fn ($query) => $query->where('c.sis_doc', $idDocente))
             ->orderBy('ec.id_curso')
             ->value('ec.id_curso');
 
@@ -59,8 +61,10 @@ class ResolverCursoIncidenciaService
         }
 
         $cursosDelExamen = DB::table('examen_curso')
+            ->join('curso', 'curso.id_curso', '=', 'examen_curso.id_curso')
             ->where('id_examen', $idExamen)
-            ->pluck('id_curso');
+            ->when($idDocente !== null, fn ($query) => $query->where('curso.sis_doc', $idDocente))
+            ->pluck('examen_curso.id_curso');
 
         return $cursosDelExamen->count() === 1 ? (int) $cursosDelExamen->first() : null;
     }
