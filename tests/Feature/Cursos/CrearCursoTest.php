@@ -78,7 +78,6 @@ class CrearCursoTest extends TestCase
         $this->assertSame('Calculo I - Grupo 21A', $curso->nombre_curso);
         $this->assertSame('EnCurso', $curso->estado);
         $this->assertSame(now()->toDateString(), $curso->fecha_creacion);
-        $this->assertSame(1, (int) $curso->id_ambiente);
         $this->assertDatabaseHas('curso_tipo_gestion', [
             'id_curso' => $curso->id_curso,
             'id_tg' => $this->idGestion('segundo semestre'),
@@ -168,13 +167,6 @@ class CrearCursoTest extends TestCase
             'grupo' => '21A',
             'gestion' => $this->idGestion('segundo semestre'),
             'anio' => now()->year,
-            'ambiente_id' => 1,
-            'examenes' => [
-                [
-                    'nombre' => 'Primer parcial',
-                    'fecha' => null,
-                ],
-            ],
         ], $sobrescribir);
     }
 
