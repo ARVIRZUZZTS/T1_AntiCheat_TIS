@@ -133,7 +133,16 @@
 
         <template x-if="!cargando && !errorReporte && horario">
             <div class="space-y-6">
-                <div class="flex flex-wrap items-start justify-between gap-3">
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2" x-show="!horario.sin_datos && Array.isArray(horario.estudiantes) && horario.estudiantes.length > 0">
+                    <x-ui.stat-card label="Primer ingreso" tone="brand">
+                        <x-slot:metric><span x-text="(horario && horario.resumen && horario.resumen.primer_ingreso) ? horario.resumen.primer_ingreso : '-'"></span></x-slot:metric>
+                    </x-ui.stat-card>
+                    <x-ui.stat-card label="Último ingreso" tone="brand">
+                        <x-slot:metric><span x-text="(horario && horario.resumen && horario.resumen.ultimo_ingreso) ? horario.resumen.ultimo_ingreso : '-'"></span></x-slot:metric>
+                    </x-ui.stat-card>
+                </div>
+
+                <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
                     <div class="min-w-0">
                         <h2 class="text-lg font-semibold text-heading" x-text="'Horarios de ingreso - ' + (horario.materia ? horario.materia.nombre : '')"></h2>
                         <p class="mt-1 text-sm text-body" x-text="(horario.examen ? horario.examen.tipo : '') + (horario.examen && horario.examen.fecha_formateada ? ' · ' + horario.examen.fecha_formateada : '')"></p>
@@ -142,8 +151,9 @@
                     <x-ui.button
                         variant="success"
                         @click="exportar()"
+                        class="w-full sm:w-auto"
                         x-bind:disabled="! hayDatos"
-                        x-bind:class="hayDatos ? '' : 'opacity-50 cursor-not-allowed'"
+                        x-bind:class="hayDatos ? 'w-full sm:w-auto' : 'w-full sm:w-auto opacity-50 cursor-not-allowed'"
                     >
                         Exportar a Excel
                     </x-ui.button>
