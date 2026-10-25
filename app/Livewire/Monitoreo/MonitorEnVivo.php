@@ -65,12 +65,16 @@ namespace App\Livewire\Monitoreo;
 use App\Enums\Motivo;
 use App\Enums\TipoInfraccion;
 use App\Models\Examen;
+use App\Models\Rol;
 use App\Services\Asistencia\RegistroIngresoService;
 use App\Services\Monitoreo\GenerarReporteAsistenciaService;
+use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Livewire\Attributes\Computed;
@@ -91,6 +95,9 @@ class MonitorEnVivo extends Component
      */
     #[Locked]
     public int $idExamen = 0;
+
+    #[Locked]
+    public int $idDocenteConfiguracion = 0;
 
     /**
      * Página actual de la tabla de estudiantes.
@@ -163,18 +170,7 @@ class MonitorEnVivo extends Component
     {
         $ahora = now();
 
-        $consulta = Examen::query();
-
-        if (auth()->check() && auth()->user()->roles->contains('nombre_rol', \App\Models\Rol::NOMBRE_AUXILIAR)) {
-            $idAuxiliar = (int) auth()->id();
-            $cursosAsignados = \Illuminate\Support\Facades\DB::table('auxiliar_curso')
-                ->where('id_auxiliar', $idAuxiliar)
-                ->pluck('id_curso');
-
-            $consulta->whereHas('cursos', function ($query) use ($cursosAsignados): void {
-                $query->whereIn('id_curso', $cursosAsignados);
-            });
-        }
+        $consulta = $this->consultaExamenesAccesibles();
 
         $examen = $consulta
             ->where(function ($query) use ($ahora): void {
@@ -189,18 +185,7 @@ class MonitorEnVivo extends Component
             ->first();
 
         if ($examen === null) {
-            $fallback = Examen::query();
-
-            if (auth()->check() && auth()->user()->roles->contains('nombre_rol', \App\Models\Rol::NOMBRE_AUXILIAR)) {
-                $idAuxiliar = (int) auth()->id();
-                $cursosAsignados = \Illuminate\Support\Facades\DB::table('auxiliar_curso')
-                    ->where('id_auxiliar', $idAuxiliar)
-                    ->pluck('id_curso');
-
-                $fallback->whereHas('cursos', function ($query) use ($cursosAsignados): void {
-                    $query->whereIn('id_curso', $cursosAsignados);
-                });
-            }
+            $fallback = $this->consultaExamenesAccesibles();
 
             $examen = $fallback
                 ->orderByDesc('fecha')
@@ -209,6 +194,11 @@ class MonitorEnVivo extends Component
         }
 
         $this->idExamen = (int) $examen->id_examen;
+        $this->idDocenteConfiguracion = $this->resolverDocenteConfiguracion($examen);
+
+        if (auth()->check()) {
+            Gate::authorize('monitorear', $examen);
+        }
     }
 
     /**
@@ -227,9 +217,12 @@ class MonitorEnVivo extends Component
     public function informe(): array
     {
         return Cache::remember(
-            self::CACHE_INFORME_PREFIJO.$this->idExamen,
+            $this->claveCacheInforme(),
             now()->addMinutes(self::CACHE_INFORME_MINUTOS),
-            fn (): array => $this->servicioReporte->ejecutar($this->idExamen),
+            fn (): array => $this->servicioReporte->ejecutar(
+                $this->idExamen,
+                idDocente: $this->idDocenteConfiguracion,
+            ),
         );
     }
 
@@ -382,7 +375,7 @@ class MonitorEnVivo extends Component
         $examen->hora_inicio = $nuevaHora->format('H:i:s');
         $examen->save();
 
-        Cache::forget(self::CACHE_INFORME_PREFIJO.$this->idExamen);
+        Cache::forget($this->claveCacheInforme());
     }
 
     public function cambiarVista(string $vista): void
@@ -445,12 +438,12 @@ class MonitorEnVivo extends Component
         }
 
         return redirect()->route('registrar-incidencia', [
-            'origen' => \App\Livewire\Monitoreo\RegistrarIncidencia::ORIGEN_MONITOREO,
+            'origen' => RegistrarIncidencia::ORIGEN_MONITOREO,
             'examen' => $this->idExamen,
-            'rol' => \App\Models\Rol::NOMBRE_DOCENTE,
-            'usuario' => auth()->id() ?? \App\Livewire\Monitoreo\RegistrarIncidencia::USUARIO_POR_DEFECTO,
+            'rol' => Rol::NOMBRE_DOCENTE,
+            'usuario' => auth()->id() ?? RegistrarIncidencia::USUARIO_POR_DEFECTO,
             'sis' => $sis,
-            'motivo' => \App\Enums\Motivo::IntentoDeIngresoNoAutorizado->value,
+            'motivo' => Motivo::IntentoDeIngresoNoAutorizado->value,
         ]);
     }
 
@@ -464,7 +457,12 @@ class MonitorEnVivo extends Component
     public function confirmarIngreso(string $sis, ?string $hora = null): void
     {
         $this->ejecutarAccion(
-            fn () => $this->servicioIngreso->registrar($sis, $this->idExamen, $this->registradorId()),
+            fn () => $this->servicioIngreso->registrar(
+                $sis,
+                $this->idExamen,
+                $this->registradorId(),
+                $this->idDocenteConfiguracion,
+            ),
             'Ingreso registrado correctamente.',
         );
     }
@@ -478,7 +476,12 @@ class MonitorEnVivo extends Component
     public function rechazarIngreso(string $sis): void
     {
         $this->ejecutarAccion(
-            fn () => $this->servicioIngreso->rechazar($sis, $this->idExamen, $this->registradorId()),
+            fn () => $this->servicioIngreso->rechazar(
+                $sis,
+                $this->idExamen,
+                $this->registradorId(),
+                idDocente: $this->idDocenteConfiguracion,
+            ),
             'Ingreso rechazado.',
         );
     }
@@ -492,7 +495,12 @@ class MonitorEnVivo extends Component
     public function permitirIngreso(string $sis): void
     {
         $this->ejecutarAccion(
-            fn () => $this->servicioIngreso->permitir($sis, $this->idExamen, $this->registradorId()),
+            fn () => $this->servicioIngreso->permitir(
+                $sis,
+                $this->idExamen,
+                $this->registradorId(),
+                $this->idDocenteConfiguracion,
+            ),
             'Ingreso permitido y estudiante habilitado.',
         );
     }
@@ -523,6 +531,7 @@ class MonitorEnVivo extends Component
                 $this->registradorId(),
                 $motivoEnum,
                 $detalle,
+                $this->idDocenteConfiguracion,
             ),
             'Incidencia registrada en la central de riesgos.',
         );
@@ -539,9 +548,9 @@ class MonitorEnVivo extends Component
     public function estadoAcceso(): string
     {
         $examen = $this->examen;
-        $inicio = \Carbon\Carbon::parse($examen->fecha.' '.$examen->hora_inicio);
+        $inicio = Carbon::parse($examen->fecha.' '.$examen->hora_inicio);
         $fin = $examen->hora_fin
-            ? \Carbon\Carbon::parse($examen->fecha.' '.$examen->hora_fin)
+            ? Carbon::parse($examen->fecha.' '.$examen->hora_fin)
             : $inicio->copy()->addMinutes((int) $examen->duracion);
         $apertura = $inicio->copy()->subMinutes(15);
         $ahora = now();
@@ -562,7 +571,7 @@ class MonitorEnVivo extends Component
     public function minutosParaInicio(): int
     {
         $examen = $this->examen;
-        $inicio = \Carbon\Carbon::parse($examen->fecha.' '.$examen->hora_inicio);
+        $inicio = Carbon::parse($examen->fecha.' '.$examen->hora_inicio);
 
         return (int) now()->diffInMinutes($inicio, false);
     }
@@ -584,7 +593,7 @@ class MonitorEnVivo extends Component
 
         try {
             $accion();
-            Cache::forget(self::CACHE_INFORME_PREFIJO.$this->idExamen);
+            Cache::forget($this->claveCacheInforme());
             $this->mensajeExito = $exito;
         } catch (InvalidArgumentException $e) {
             $this->mensajeError = $e->getMessage();
@@ -616,5 +625,59 @@ class MonitorEnVivo extends Component
         return auth()->check()
             ? (int) auth()->id()
             : RegistrarIncidencia::USUARIO_POR_DEFECTO;
+    }
+
+    private function consultaExamenesAccesibles()
+    {
+        $consulta = Examen::query();
+
+        if (! auth()->check()) {
+            return $consulta;
+        }
+
+        $usuario = auth()->user();
+        if ($usuario->roles->contains('nombre_rol', Rol::NOMBRE_DOCENTE)) {
+            return $consulta
+                ->paraDocente((int) $usuario->id_usuario)
+                ->whereHas('cursos', fn ($cursos) => $cursos
+                    ->where('curso.sis_doc', $usuario->id_usuario));
+        }
+
+        $cursosAsignados = DB::table('auxiliar_curso')
+            ->where('id_auxiliar', $usuario->id_usuario)
+            ->pluck('id_curso');
+
+        return $consulta->whereHas(
+            'cursos',
+            fn ($cursos) => $cursos->whereIn('curso.id_curso', $cursosAsignados)
+        );
+    }
+
+    private function resolverDocenteConfiguracion(Examen $examen): int
+    {
+        if (auth()->check() && auth()->user()->roles->contains('nombre_rol', Rol::NOMBRE_DOCENTE)) {
+            return (int) auth()->id();
+        }
+
+        if (auth()->check()) {
+            $docente = DB::table('examen_curso as ec')
+                ->join('auxiliar_curso as ac', 'ac.id_curso', '=', 'ec.id_curso')
+                ->join('curso as c', 'c.id_curso', '=', 'ec.id_curso')
+                ->where('ec.id_examen', $examen->id_examen)
+                ->where('ac.id_auxiliar', auth()->id())
+                ->orderBy('c.id_curso')
+                ->value('c.sis_doc');
+
+            if ($docente !== null) {
+                return (int) $docente;
+            }
+        }
+
+        return (int) $examen->creador;
+    }
+
+    private function claveCacheInforme(): string
+    {
+        return self::CACHE_INFORME_PREFIJO.$this->idExamen.'.docente.'.$this->idDocenteConfiguracion;
     }
 }

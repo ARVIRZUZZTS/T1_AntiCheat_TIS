@@ -24,18 +24,7 @@ class AccesoMonitor extends Component
         }
 
         $ahora = now();
-        $consulta = Examen::query();
-
-        if (auth()->check() && auth()->user()->roles->contains('nombre_rol', Rol::NOMBRE_AUXILIAR)) {
-            $idAuxiliar = (int) auth()->id();
-            $cursosAsignados = DB::table('auxiliar_curso')
-                ->where('id_auxiliar', $idAuxiliar)
-                ->pluck('id_curso');
-
-            $consulta->whereHas('cursos', function ($query) use ($cursosAsignados): void {
-                $query->whereIn('id_curso', $cursosAsignados);
-            });
-        }
+        $consulta = $this->consultaExamenesAccesibles();
 
         $examen = $consulta
             ->where(function ($query) use ($ahora): void {
@@ -50,18 +39,7 @@ class AccesoMonitor extends Component
             ->first();
 
         if ($examen === null) {
-            $fallback = Examen::query();
-
-            if (auth()->check() && auth()->user()->roles->contains('nombre_rol', Rol::NOMBRE_AUXILIAR)) {
-                $idAuxiliar = (int) auth()->id();
-                $cursosAsignados = DB::table('auxiliar_curso')
-                    ->where('id_auxiliar', $idAuxiliar)
-                    ->pluck('id_curso');
-
-                $fallback->whereHas('cursos', function ($query) use ($cursosAsignados): void {
-                    $query->whereIn('id_curso', $cursosAsignados);
-                });
-            }
+            $fallback = $this->consultaExamenesAccesibles();
 
             $examen = $fallback
                 ->orderByDesc('fecha')
@@ -129,18 +107,7 @@ class AccesoMonitor extends Component
 
     public function proximosExamenes()
     {
-        $consulta = Examen::query()->with('cursos');
-
-        if (auth()->check() && auth()->user()->roles->contains('nombre_rol', Rol::NOMBRE_AUXILIAR)) {
-            $idAuxiliar = (int) auth()->id();
-            $cursosAsignados = DB::table('auxiliar_curso')
-                ->where('id_auxiliar', $idAuxiliar)
-                ->pluck('id_curso');
-
-            $consulta->whereHas('cursos', function ($query) use ($cursosAsignados): void {
-                $query->whereIn('id_curso', $cursosAsignados);
-            });
-        }
+        $consulta = $this->consultaExamenesAccesibles()->with('cursos');
 
         $examenes = $consulta
             ->where('fecha', '>=', now()->toDateString())
@@ -171,7 +138,7 @@ class AccesoMonitor extends Component
     }
 
     public function auxiliares()
-{
+    {
         if (! auth()->check()) {
             return collect();
         }
@@ -194,5 +161,30 @@ class AccesoMonitor extends Component
     public function render()
     {
         return view('livewire.monitoreo.acceso-monitor')->extends('layouts.app');
+    }
+
+    private function consultaExamenesAccesibles()
+    {
+        $consulta = Examen::query();
+
+        if (! auth()->check()) {
+            return $consulta;
+        }
+
+        if (auth()->user()->roles->contains('nombre_rol', Rol::NOMBRE_DOCENTE)) {
+            return $consulta
+                ->paraDocente((int) auth()->id())
+                ->whereHas('cursos', fn ($cursos) => $cursos
+                    ->where('curso.sis_doc', auth()->id()));
+        }
+
+        $cursosAsignados = DB::table('auxiliar_curso')
+            ->where('id_auxiliar', auth()->id())
+            ->pluck('id_curso');
+
+        return $consulta->whereHas(
+            'cursos',
+            fn ($cursos) => $cursos->whereIn('curso.id_curso', $cursosAsignados)
+        );
     }
 }
