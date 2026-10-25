@@ -65,6 +65,21 @@ Route::middleware(['web', 'auth:web'])->group(function (): void {
         ->middleware('docente')
         ->name('api.examenes.invitaciones.enviar');
 
+    Route::post('/invitaciones/{invitacion}/aceptar', [InvitacionExamenController::class, 'aceptar'])
+        ->whereNumber('invitacion')
+        ->middleware('docente')
+        ->name('api.invitaciones.aceptar');
+
+    Route::post('/invitaciones/{invitacion}/rechazar', [InvitacionExamenController::class, 'rechazar'])
+        ->whereNumber('invitacion')
+        ->middleware('docente')
+        ->name('api.invitaciones.rechazar');
+
+    Route::post('/invitaciones/{invitacion}/cancelar', [InvitacionExamenController::class, 'cancelar'])
+        ->whereNumber('invitacion')
+        ->middleware('docente')
+        ->name('api.invitaciones.cancelar');
+
     Route::get('/reportes/horarios-ingreso', [ReporteHorarioIngresoController::class, 'index'])
         ->name('api.reportes.horarios-ingreso');
 
