@@ -30,18 +30,18 @@
  * @see  App\Http\Requests\StoreExamenRequest
  * @see  App\Http\Controllers\ExamenController
  * @see  resources/views/components/ui/form-crear-examen.blade.php
+ * @see  App\Services\Examen\DividirExamenService
  *
  * @changelog
  * - 2026-10-05  [Alex Candia]  feat: creación inicial del servicio.
  * - 2026-10-10  [Alex Candia]  refactor: deja de calcular y escribir `hora_fin`;
  *   la columna se eliminó y la hora de fin pasa a ser un accesor del modelo.
- * - 2026-10-24  [Alisson D. Alvarado]  feat: lógica para dividir estudiantes por apellido o por carrera según ambientes.
+ * - 2026-10-24  [Alisson D. Alvarado]  feat: delega la lógica de división de estudiantes por ambientes a DividirExamenService.
  */
 
 namespace App\Services\Examen;
 
 use App\Enums\EstadoEstudianteExamen;
-use App\Enums\TipoExamen;
 use App\Models\Curso;
 use App\Models\Estudiante;
 use App\Models\Examen;
@@ -73,6 +73,11 @@ class RegistrarExamenService
      */
     public const HORA_INICIO_MAXIMA = '20:15';
 
+    public function __construct(
+        private readonly DividirExamenService $dividirExamenService
+    ) {
+    }
+
     /**
      * Crea el examen y todo lo que se le eligió.
      *
@@ -99,7 +104,7 @@ class RegistrarExamenService
 
             $examen->cursos()->attach($curso->id_curso);
             $this->inscribirEstudiantes($examen, $curso);
-            $this->asignarEstudiantesAAmbientes($examen, $curso, $datos);
+            $this->asignarEstudiantesAAmbientes($examen, $datos);
             $examen->ambientes()->sync($datos['ambientes']);
             $examen->normas()->sync($datos['normas'] ?? []);
             $examen->materialesPermitidos()->sync($datos['materiales'] ?? []);
@@ -157,74 +162,22 @@ class RegistrarExamenService
     }
 
     /**
-     * Asigna a los estudiantes del examen a los ambientes elegidos, dividiéndolos
-     * por apellido o por carrera según lo indicado en los datos del formulario.
-     *
-     * Se apoya en la tabla puente `estudiante_examen_ambiente` (id_ee, id_ambiente).
-     * La división es lógica en backend: si se indica `division_por` = `apellido`,
-     * se ordena por apellido_estudiante; si es `carrera`, por carrera. Los grupos
-     * se reparten equitativamente entre los ambientes seleccionados.
+     * Asigna a los estudiantes del examen a los ambientes elegidos delegando
+     * la división al servicio correspondiente.
      */
-    private function asignarEstudiantesAAmbientes(Examen $examen, Curso $curso, array $datos): void
+    private function asignarEstudiantesAAmbientes(Examen $examen, array $datos): void
     {
         $ambientes = $datos['ambientes'] ?? [];
         if (! is_array($ambientes) || $ambientes === []) {
             return;
         }
 
-        $ambientes = array_values(array_map(static fn ($id): int => (int) $id, $ambientes));
-
         $divisionPor = $datos['division_por'] ?? null;
         if (! in_array($divisionPor, ['apellido', 'carrera'], true)) {
             return;
         }
 
-        $inscripciones = EstudianteExamen::query()
-            ->with('estudiante')
-            ->where('id_examen', $examen->id_examen)
-            ->get();
-
-        if ($inscripciones->isEmpty()) {
-            return;
-        }
-
-        if ($divisionPor === 'apellido') {
-            $inscripciones = $inscripciones->sortBy(function (EstudianteExamen $inscripcion): string {
-                $estudiante = $inscripcion->estudiante;
-                $apellido = $estudiante?->apellido_estudiante ?? '';
-                $nombre = $estudiante?->nombre_estudiante ?? '';
-                $sis = $inscripcion->sis_estudiante ?? '';
-
-                return mb_strtolower($apellido.' '.$nombre.' '.$sis);
-            });
-        } else {
-            $inscripciones = $inscripciones->sortBy(function (EstudianteExamen $inscripcion): string {
-                $estudiante = $inscripcion->estudiante;
-                $carrera = $estudiante?->carrera ?? '';
-                $apellido = $estudiante?->apellido_estudiante ?? '';
-                $nombre = $estudiante?->nombre_estudiante ?? '';
-                $sis = $inscripcion->sis_estudiante ?? '';
-
-                return mb_strtolower($carrera.'|'.$apellido.' '.$nombre.' '.$sis);
-            });
-        }
-
-        $filas = [];
-        $indiceAmbiente = 0;
-        $cantidadAmbientes = count($ambientes);
-
-        foreach ($inscripciones as $inscripcion) {
-            $ambienteId = $ambientes[$indiceAmbiente % $cantidadAmbientes];
-            $filas[] = [
-                'id_ee' => $inscripcion->id_estudiante_examen,
-                'id_ambiente' => $ambienteId,
-            ];
-            $indiceAmbiente++;
-        }
-
-        if ($filas !== []) {
-            DB::table('estudiante_examen_ambiente')->insert($filas);
-        }
+        $this->dividirExamenService->dividir($examen, $ambientes, $divisionPor);
     }
 
     /**
