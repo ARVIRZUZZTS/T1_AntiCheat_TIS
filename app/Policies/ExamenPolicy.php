@@ -25,8 +25,25 @@ class ExamenPolicy
 {
     public function invitarDocente(Usuario $usuario, Examen $examen): bool
     {
-        return (int) $examen->creador === (int) $usuario->id_usuario
-            && $usuario->roles()->where('nombre_rol', Rol::NOMBRE_DOCENTE)->exists();
+        $esDocente = $usuario->roles()
+            ->where('nombre_rol', Rol::NOMBRE_DOCENTE)
+            ->exists();
+
+        if (! $esDocente) {
+            return false;
+        }
+
+        if ((int) $examen->creador === (int) $usuario->id_usuario) {
+            return true;
+        }
+
+        // Un docente que aceptó la invitación al examen también puede invitar a
+        // otros docentes a compartirlo.
+        return DB::table('invitacion_examen_compartido')
+            ->where('id_examen', $examen->id_examen)
+            ->where('id_docente_invitado', $usuario->id_usuario)
+            ->where('estado', 'aceptado')
+            ->exists();
     }
 
     public function reporteHorarioIngreso(Usuario $usuario, Examen $examen, int $idCurso): bool
