@@ -107,6 +107,9 @@ Route::get('/reportes', function (Request $request, ListarFiltrosReporteService 
 Route::get('/reportes/ingresos-ilegales/exportar/{examen}', ExportarReporteIngresosIlegalesController::class)
     ->name('reportes.ingresos-ilegales.exportar');
 
+Route::get('/reportes/asistencia/exportar/{examen}', [\App\Http\Controllers\Reporte\ExportarReporteAsistenciaController::class, 'exportar'])
+    ->name('reportes.asistencia.exportar');
+
 Route::get('/reportes/ingresos-ilegales', ListarReporteIngresosIlegalesController::class)
     ->name('reportes.ingresos-ilegales');
 Route::view('/notificaciones', 'pages.notificaciones')->name('notificaciones');
