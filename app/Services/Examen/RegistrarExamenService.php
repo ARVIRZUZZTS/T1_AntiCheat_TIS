@@ -4,10 +4,12 @@
  * @file    RegistrarExamenService.php
  *
  * @author  Alex Candia <alex.leonar.candia@gmail.com>
+ * @author  Alisson D. Alvarado <alvaradoalissondalet@gmail.com>
  *
  * @created 2026-10-05
  *
  * @updated 2026-10-10
+ * @updated 2026-10-24
  *
  * @description
  * Servicio de la feature Examen que da de alta un examen con todo lo que se
@@ -19,10 +21,10 @@
  *  1. `examen.id_examen` es un entero sin secuencia ni default, así que el id
  *     se calcula como max(id)+1 dentro de la transacción, con la tabla bloqueada
  *     para que dos altas simultáneas no se queden con el mismo.
- *  2. La hora de fin no se guarda: es un dato derivado (hora de inicio más
+ * 2. La hora de fin no se guarda: es un dato derivado (hora de inicio más
  *     duración) que calcula el propio modelo (`Examen::getHoraFinAttribute()`),
  *     para que no pueda quedar desincronizada con la duración.
- *  3. `material_personalizado` y `norma_personalizada` guardan una fila por
+ * 3. `material_personalizado` y `norma_personalizada` guardan una fila por
  *     renglón escrito, numerada desde 1.
  *
  * @see  App\Http\Requests\StoreExamenRequest
@@ -33,6 +35,7 @@
  * - 2026-10-05  [Alex Candia]  feat: creación inicial del servicio.
  * - 2026-10-10  [Alex Candia]  refactor: deja de calcular y escribir `hora_fin`;
  *   la columna se eliminó y la hora de fin pasa a ser un accesor del modelo.
+ * - 2026-10-24  [Alisson D. Alvarado]  feat: lógica para dividir estudiantes por apellido o por carrera según ambientes.
  */
 
 namespace App\Services\Examen;
@@ -96,6 +99,7 @@ class RegistrarExamenService
 
             $examen->cursos()->attach($curso->id_curso);
             $this->inscribirEstudiantes($examen, $curso);
+            $this->asignarEstudiantesAAmbientes($examen, $curso, $datos);
             $examen->ambientes()->sync($datos['ambientes']);
             $examen->normas()->sync($datos['normas'] ?? []);
             $examen->materialesPermitidos()->sync($datos['materiales'] ?? []);
@@ -149,6 +153,77 @@ class RegistrarExamenService
 
         if ($filas !== []) {
             EstudianteExamen::query()->insert($filas);
+        }
+    }
+
+    /**
+     * Asigna a los estudiantes del examen a los ambientes elegidos, dividiéndolos
+     * por apellido o por carrera según lo indicado en los datos del formulario.
+     *
+     * Se apoya en la tabla puente `estudiante_examen_ambiente` (id_ee, id_ambiente).
+     * La división es lógica en backend: si se indica `division_por` = `apellido`,
+     * se ordena por apellido_estudiante; si es `carrera`, por carrera. Los grupos
+     * se reparten equitativamente entre los ambientes seleccionados.
+     */
+    private function asignarEstudiantesAAmbientes(Examen $examen, Curso $curso, array $datos): void
+    {
+        $ambientes = $datos['ambientes'] ?? [];
+        if (! is_array($ambientes) || $ambientes === []) {
+            return;
+        }
+
+        $ambientes = array_values(array_map(static fn ($id): int => (int) $id, $ambientes));
+
+        $divisionPor = $datos['division_por'] ?? null;
+        if (! in_array($divisionPor, ['apellido', 'carrera'], true)) {
+            return;
+        }
+
+        $inscripciones = EstudianteExamen::query()
+            ->with('estudiante')
+            ->where('id_examen', $examen->id_examen)
+            ->get();
+
+        if ($inscripciones->isEmpty()) {
+            return;
+        }
+
+        if ($divisionPor === 'apellido') {
+            $inscripciones = $inscripciones->sortBy(function (EstudianteExamen $inscripcion): string {
+                $estudiante = $inscripcion->estudiante;
+                $apellido = $estudiante?->apellido_estudiante ?? '';
+                $nombre = $estudiante?->nombre_estudiante ?? '';
+                $sis = $inscripcion->sis_estudiante ?? '';
+
+                return mb_strtolower($apellido.' '.$nombre.' '.$sis);
+            });
+        } else {
+            $inscripciones = $inscripciones->sortBy(function (EstudianteExamen $inscripcion): string {
+                $estudiante = $inscripcion->estudiante;
+                $carrera = $estudiante?->carrera ?? '';
+                $apellido = $estudiante?->apellido_estudiante ?? '';
+                $nombre = $estudiante?->nombre_estudiante ?? '';
+                $sis = $inscripcion->sis_estudiante ?? '';
+
+                return mb_strtolower($carrera.'|'.$apellido.' '.$nombre.' '.$sis);
+            });
+        }
+
+        $filas = [];
+        $indiceAmbiente = 0;
+        $cantidadAmbientes = count($ambientes);
+
+        foreach ($inscripciones as $inscripcion) {
+            $ambienteId = $ambientes[$indiceAmbiente % $cantidadAmbientes];
+            $filas[] = [
+                'id_ee' => $inscripcion->id_estudiante_examen,
+                'id_ambiente' => $ambienteId,
+            ];
+            $indiceAmbiente++;
+        }
+
+        if ($filas !== []) {
+            DB::table('estudiante_examen_ambiente')->insert($filas);
         }
     }
 
