@@ -39,9 +39,11 @@ namespace App\Services\Notificacion;
 use App\Enums\CursoEstado;
 use App\Enums\TipoInfraccion;
 use App\Models\CentralRiesgo;
+use App\Models\InvitacionExamenCompartido;
 use App\Models\NotificacionDocente;
 use App\Models\Rol;
 use App\Models\Usuario;
+use Carbon\CarbonInterface;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -57,6 +59,8 @@ class NotificacionService
     /** Título del aviso de la HU 6: el estudiante ya está en la central. */
     public const TITULO_CENTRAL_RIESGO = 'Estudiante ingresado a central de riesgo';
 
+    public const TITULO_INVITACION_EXAMEN = 'Invitación para compartir un examen';
+
     /**
      * Tipos de aviso (columna `tipo` de `notificacion_docente`). La pantalla
      * pinta una tarjeta distinta según el valor.
@@ -64,6 +68,8 @@ class NotificacionService
     public const TIPO_POSIBLE_TRAMPOSO = 'posible_tramposo';
 
     public const TIPO_CENTRAL_RIESGO = 'central_riesgo';
+
+    public const TIPO_INVITACION_EXAMEN = 'invitacion_examen';
 
     /** Estado inicial con el que nace un aviso, del enum `estado_notificacion`. */
     public const ESTADO_RECIBIDO = 'recibido';
@@ -126,8 +132,8 @@ class NotificacionService
      *
      * @param  CentralRiesgo  $registro  Caso recién registrado o confirmado.
      * @param  bool  $porConfirmacion  True cuando el ingreso a la central se
-     *   produce por la confirmación de un caso que el auxiliar reportó como
-     *   sospechoso (sigue teniendo `tipo_infraccion = sospechoso`).
+     *                                 produce por la confirmación de un caso que el auxiliar reportó como
+     *                                 sospechoso (sigue teniendo `tipo_infraccion = sospechoso`).
      * @return array<int, NotificacionDocente> Avisos creados (uno por curso activo).
      */
     public function notificarCentralRiesgo(CentralRiesgo $registro, bool $porConfirmacion = false): array
@@ -177,6 +183,23 @@ class NotificacionService
         });
     }
 
+    public function notificarInvitacionExamen(InvitacionExamenCompartido $invitacion): NotificacionDocente
+    {
+        return DB::transaction(function () use ($invitacion): NotificacionDocente {
+            $this->bloquearTabla();
+
+            return NotificacionDocente::create([
+                'id_notificacion' => (int) NotificacionDocente::query()->max('id_notificacion') + 1,
+                'id_central_riesgo' => null,
+                'id_curso' => null,
+                'id_docente_destinatario' => $invitacion->id_docente_invitado,
+                'id_invitacion' => $invitacion->id_invitacion,
+                'tipo' => self::TIPO_INVITACION_EXAMEN,
+                'estado' => self::ESTADO_RECIBIDO,
+            ]);
+        });
+    }
+
     /**
      * Cursos activos (`estado = EnCurso`) en los que cursa el estudiante del
      * caso, de más reciente a más antiguo para un reparto determinista.
@@ -213,12 +236,22 @@ class NotificacionService
 
         $notificaciones = NotificacionDocente::query()
             ->where('oculta', false)
-            ->whereHas('curso', fn (Builder $query): Builder => $query->where('sis_doc', $usuario->id_usuario))
+            ->where(function (Builder $query) use ($usuario): void {
+                $query->where('id_docente_destinatario', $usuario->id_usuario)
+                    ->orWhere(function (Builder $notificacionLegacy) use ($usuario): void {
+                        $notificacionLegacy
+                            ->whereNull('id_docente_destinatario')
+                            ->whereHas('curso', fn (Builder $curso): Builder => $curso->where('sis_doc', $usuario->id_usuario));
+                    });
+            })
             ->with([
                 'curso',
                 'centralRiesgo.estudiante',
                 'centralRiesgo.examen.tipoExamen',
                 'centralRiesgo.registrador',
+                'invitacion.invitador',
+                'invitacion.examen.tipoExamen',
+                'invitacion.examen.cursos',
             ])
             ->get();
 
@@ -237,7 +270,7 @@ class NotificacionService
     public function preparar(Collection $notificaciones): Collection
     {
         return $notificaciones
-            ->sortByDesc(fn (NotificacionDocente $notificacion): int => $notificacion->centralRiesgo?->fecha_registro?->getTimestamp() ?? 0)
+            ->sortByDesc(fn (NotificacionDocente $notificacion): int => $this->fechaDe($notificacion)?->getTimestamp() ?? 0)
             ->values()
             ->map(fn (NotificacionDocente $notificacion): array => $this->mapear($notificacion));
     }
@@ -254,7 +287,7 @@ class NotificacionService
      */
     public function ocultar(int $idNotificacion, Usuario $usuario): void
     {
-        $notificacion = NotificacionDocente::query()->with('curso')->findOrFail($idNotificacion);
+        $notificacion = NotificacionDocente::query()->with(['curso', 'invitacion'])->findOrFail($idNotificacion);
 
         Gate::forUser($usuario)->authorize('ocultar', $notificacion);
 
@@ -287,6 +320,10 @@ class NotificacionService
      */
     private function mapear(NotificacionDocente $notificacion): array
     {
+        if ($notificacion->tipo === self::TIPO_INVITACION_EXAMEN) {
+            return $this->mapearInvitacion($notificacion);
+        }
+
         $registro = $notificacion->centralRiesgo;
         $fecha = $registro?->fecha_registro;
         $auxiliar = $registro?->registrador;
@@ -325,6 +362,50 @@ class NotificacionService
                     $materia,
                 ),
         ];
+    }
+
+    /** @return array<string, mixed> */
+    private function mapearInvitacion(NotificacionDocente $notificacion): array
+    {
+        $invitacion = $notificacion->invitacion;
+        $examen = $invitacion?->examen;
+        $invitador = $invitacion?->invitador;
+        $tipoExamen = $examen?->tipoExamen?->nombre_tipo_examen ?? ($examen !== null ? 'Examen #'.$examen->id_examen : '');
+        $materias = $examen === null
+            ? []
+            : $examen->cursos->pluck('nombre_curso')->filter()->values()->all();
+        $detalleMaterias = $materias !== [] ? ' de '.implode(', ', $materias) : '';
+        $fecha = $invitacion?->created_at;
+
+        return [
+            'id' => (int) $notificacion->id_notificacion,
+            'tipo' => self::TIPO_INVITACION_EXAMEN,
+            'titulo' => self::TITULO_INVITACION_EXAMEN,
+            'descripcion' => sprintf(
+                '%s te invitó a compartir el examen %s%s.',
+                $this->nombreCompleto($invitador),
+                $tipoExamen,
+                $detalleMaterias,
+            ),
+            'referencia' => (int) $invitacion?->id_invitacion,
+            'estado' => $invitacion?->estado?->value,
+            'fecha_registro' => $fecha?->toISOString(),
+            'hace' => $fecha !== null ? $this->tiempo->enEspanol($fecha) : '',
+            'datos' => [
+                'invitacion_id' => (int) $invitacion?->id_invitacion,
+                'examen_id' => (int) $examen?->id_examen,
+                'examen' => $tipoExamen,
+                'materias' => $materias,
+                'invitador' => $this->nombreCompleto($invitador),
+            ],
+        ];
+    }
+
+    private function fechaDe(NotificacionDocente $notificacion): ?CarbonInterface
+    {
+        return $notificacion->tipo === self::TIPO_INVITACION_EXAMEN
+            ? $notificacion->invitacion?->created_at
+            : $notificacion->centralRiesgo?->fecha_registro;
     }
 
     /** Nombre completo de un estudiante o de un usuario, según sus columnas. */

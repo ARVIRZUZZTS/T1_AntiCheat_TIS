@@ -42,8 +42,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * @property int $id_notificacion
- * @property int $id_central_riesgo
- * @property int $id_curso
+ * @property ?int $id_central_riesgo
+ * @property ?int $id_curso
+ * @property ?int $id_docente_destinatario
+ * @property ?int $id_invitacion
  * @property string $tipo
  * @property string $estado
  * @property bool $oculta
@@ -65,6 +67,8 @@ class NotificacionDocente extends Model
         'id_notificacion',
         'id_central_riesgo',
         'id_curso',
+        'id_docente_destinatario',
+        'id_invitacion',
         'tipo',
         'estado',
         'oculta',
@@ -87,5 +91,17 @@ class NotificacionDocente extends Model
     public function curso(): BelongsTo
     {
         return $this->belongsTo(Curso::class, 'id_curso', 'id_curso');
+    }
+
+    /** @return BelongsTo<Usuario, $this> */
+    public function destinatario(): BelongsTo
+    {
+        return $this->belongsTo(Usuario::class, 'id_docente_destinatario', 'id_usuario');
+    }
+
+    /** @return BelongsTo<InvitacionExamenCompartido, $this> */
+    public function invitacion(): BelongsTo
+    {
+        return $this->belongsTo(InvitacionExamenCompartido::class, 'id_invitacion', 'id_invitacion');
     }
 }

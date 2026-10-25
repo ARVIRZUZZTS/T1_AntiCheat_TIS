@@ -33,6 +33,10 @@ class NotificacionDocentePolicy
             return false;
         }
 
+        if ($notificacion->id_docente_destinatario !== null) {
+            return (int) $notificacion->id_docente_destinatario === (int) $usuario->id_usuario;
+        }
+
         return (int) $notificacion->curso?->sis_doc === (int) $usuario->id_usuario;
     }
 }
