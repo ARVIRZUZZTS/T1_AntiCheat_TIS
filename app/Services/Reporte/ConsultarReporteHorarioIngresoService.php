@@ -40,7 +40,7 @@ class ConsultarReporteHorarioIngresoService
      *     aulas: list<array{id: int, nombre: string}>,
      *     filtros: array{id_aula: ?int, hora_desde: ?string, hora_hasta: ?string},
      *     resumen: array{total: int, primer_ingreso: ?string, ultimo_ingreso: ?string},
-     *     estudiantes: list<array{sis: string, nombres: string, apellidos: string, aula: string, hora_ingreso: ?string, fecha_ingreso: ?string}>,
+     *     estudiantes: list<array{sis: string, nombres: string, apellidos: string, aula: string, hora_ingreso: ?string, hora_salida: ?string, fecha_ingreso: ?string}>,
      *     sin_datos: bool
      * }
      */
@@ -94,14 +94,15 @@ class ConsultarReporteHorarioIngresoService
                 'ultimo_ingreso' => $this->formatearHora($horas->max()),
             ],
             'estudiantes' => $estudiantes
-                ->map(fn (array $estudiante): array => [
-                    'sis' => $estudiante['sis'],
-                    'nombres' => $estudiante['nombres'],
-                    'apellidos' => $estudiante['apellidos'],
-                    'aula' => $estudiante['aula'],
-                    'hora_ingreso' => $estudiante['hora_ingreso'],
-                    'fecha_ingreso' => $examen->fecha,
-                ])
+            ->map(fn (array $estudiante): array => [
+                'sis' => $estudiante['sis'],
+                'nombres' => $estudiante['nombres'],
+                'apellidos' => $estudiante['apellidos'],
+                'aula' => $estudiante['aula'],
+                'hora_ingreso' => $estudiante['hora_ingreso'],
+                'hora_salida' => $estudiante['hora_salida'] ?? null,
+                'fecha_ingreso' => $examen->fecha,
+            ])
                 ->values()
                 ->all(),
             'sin_datos' => $estudiantes->isEmpty(),
@@ -185,6 +186,7 @@ class ConsultarReporteHorarioIngresoService
                     'apellidos' => $primera['apellido_estudiante'],
                     'aula' => $aulas->map(fn (array $aula): string => $aula['nombre'])->implode(', '),
                     'hora_ingreso' => $this->formatearHora($primera['hora_ingreso']),
+                    'hora_salida' => null,
                     'hora_ingreso_orden' => $primera['hora_ingreso'],
                     'aulas_ids' => array_values($aulas->map(fn (array $aula): int => $aula['id'])->all()),
                 ];

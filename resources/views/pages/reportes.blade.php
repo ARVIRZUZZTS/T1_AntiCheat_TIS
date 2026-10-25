@@ -126,10 +126,11 @@
             <nav class="flex gap-2 overflow-x-auto px-4 sm:px-6 lg:px-8" aria-label="Tipos de reporte">
                 <button type="button" @click="tab = 'asistencia'" :class="tab === 'asistencia' ? '{{ $tabActivo }}' : '{{ $tabInactivo }}'" class="{{ $tabClases }}">Reporte de asistencia</button>
                 <button type="button" @click="tab = 'ingresos'" :class="tab === 'ingresos' ? '{{ $tabActivo }}' : '{{ $tabInactivo }}'" class="{{ $tabClases }}">Reporte de intentos no autorizados</button>
-                <button type="button" @click="tab = 'horarios'" :class="tab === 'horarios' ? '{{ $tabActivo }}' : '{{ $tabInactivo }}'" class="{{ $tabClases }}">Reporte de Hora de ingreso</button>
+                <button type="button" @click="tab = 'horarios'" :class="tab === 'horarios' ? '{{ $tabActivo }}' : '{{ $tabInactivo }}'" class="{{ $tabClases }}">Reporte de horarios de ingreso</button>
             </nav>
 
             <section x-show="tab === 'asistencia' && materiaId && examenId" x-cloak class="mt-4 px-4 sm:px-6 lg:px-8">
+                @include('partials.reportes.asistencia')
             </section>
             <section x-show="tab === 'ingresos' && materiaId && examenId" x-cloak class="mt-4 px-4 sm:px-6 lg:px-8">
                 @include('partials.reportes.ingresos-ilegales')
@@ -138,5 +139,6 @@
                 @include('partials.reportes.horario-ingreso')
             </section>
         </div>
+        @include('partials.reportes.test-datos')
     </div>
 @endsection

@@ -2,31 +2,12 @@
     @file    horario-ingreso.blade.php
     @author  Alex Candia <alex.leonar.candia@gmail.com>
     @created 2026-10-23
-    @updated 2026-10-23
+    @updated 2026-10-25
 
     @description
-    Pestaña "Reporte de Hora de ingreso". Es un parcial con su propio x-data:
-    así la página de reportes solo conserva los selectores de materia/examen y
-    cada reporte queda aislado en su archivo.
-
-    Los ids del curso y del examen no se pasan como props porque cambian con
-    Alpine. La página dispara `reporte-seleccion-actualizada` cuando cambia la
-    selección y este parcial lo escucha en window. Al recibirlo consulta el
-    endpoint; si el examen queda vacío solo limpia el estado.
-
-    El reporte no tiene filtros ni resumen: solo muestra la tabla con el
-    listado de ingresos del examen elegido.
-
-    @changelog
-    - 2026-10-23  [Alex Candia]  refactor: se extrae la pestaña de
-      reportes.blade.php a un parcial con su propio estado de Alpine.
-    - 2026-10-23  [Alex Candia]  fix: se eliminan los filtros por aula y rango
-      horario; el reporte muestra todos los ingresos del examen.
-    - 2026-10-23  [Alex Candia]  fix: se quitan el resumen de totales y primeros/últimos
-      ingresos; solo se muestra el listado.
-
-    @see  resources/views/pages/reportes.blade.php
-    @see  App\Http\Controllers\Api\ReporteHorarioIngresoController
+    Pestaña "Reporte de horarios de ingreso". Solo muestra tabla con
+    nombres, apellidos, código SIS, aula, hora de ingreso y hora de salida.
+    Orden por hora de ingreso del más temprano al más tardío.
 --}}
 
 <div
@@ -43,7 +24,7 @@
         abortController: null,
 
         get hayDatos() {
-            return this.horario !== null && ! this.horario.sin_datos;
+            return this.horario !== null && this.horario && ! this.horario.sin_datos && Array.isArray(this.horario.estudiantes) && this.horario.estudiantes.length > 0;
         },
 
         actualizarSeleccion(evento) {
@@ -52,7 +33,7 @@
             this.idExamen = detalle.idExamen ?? null;
             this.errorReporte = '';
 
-            if (! this.idCurso || ! this.idExamen) {
+            if (this.idCurso === undefined || this.idCurso === '' || this.idExamen === undefined || this.idExamen === '') {
                 if (this.abortController) {
                     this.abortController.abort();
                     this.abortController = null;
@@ -150,43 +131,54 @@
         <span x-text="errorReporte"></span>
     </x-ui.alert>
 
-    <template x-if="horario && ! cargando && ! errorReporte">
-        <div class="space-y-6">
-            <div class="flex flex-wrap items-start justify-between gap-3">
-                <div class="min-w-0">
-                    <h2 class="text-lg font-semibold text-heading" x-text="'Ingresos de ' + horario.materia.nombre"></h2>
-                    <p class="mt-1 text-sm text-body" x-text="horario.examen.tipo + (horario.examen.fecha_formateada ? ' - ' + horario.examen.fecha_formateada : '')"></p>
+        <template x-if="!cargando && !errorReporte && horario">
+            <div class="space-y-6">
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2" x-show="horario && horario.materia && horario.examen">
+                    <x-ui.stat-card label="Primer ingreso" tone="brand">
+                        <x-slot:metric><span x-text="(horario && horario.resumen && horario.resumen.primer_ingreso) ? horario.resumen.primer_ingreso : '-'"></span></x-slot:metric>
+                    </x-ui.stat-card>
+                    <x-ui.stat-card label="Último ingreso" tone="brand">
+                        <x-slot:metric><span x-text="(horario && horario.resumen && horario.resumen.ultimo_ingreso) ? horario.resumen.ultimo_ingreso : '-'"></span></x-slot:metric>
+                    </x-ui.stat-card>
                 </div>
 
-                <x-ui.button
-                    variant="success"
-                    @click="exportar()"
-                    x-bind:disabled="! hayDatos"
-                    x-bind:class="hayDatos ? '' : 'opacity-50 cursor-not-allowed'"
-                >
-                    Exportar a Excel
-                </x-ui.button>
-            </div>
+                <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
+                    <div class="min-w-0">
+                        <h2 class="text-lg font-semibold text-heading" x-text="'Horarios de ingreso - ' + (horario.materia ? horario.materia.nombre : '')"></h2>
+                        <p class="mt-1 text-sm text-body" x-text="(horario.examen ? horario.examen.tipo : '') + (horario.examen && horario.examen.fecha_formateada ? ' · ' + horario.examen.fecha_formateada : '')"></p>
+                    </div>
 
-            <p x-show="horario.sin_datos" class="rounded-base border border-default bg-neutral-primary-soft p-8 text-center text-sm text-body">
-                No hay ingresos registrados.
-            </p>
+                    <x-ui.button
+                        variant="success"
+                        @click="exportar()"
+                        class="w-full sm:w-auto"
+                        x-bind:disabled="horario.sin_datos || !Array.isArray(horario.estudiantes) || horario.estudiantes.length === 0"
+                        x-bind:class="(horario.sin_datos || !Array.isArray(horario.estudiantes) || horario.estudiantes.length === 0) ? 'w-full sm:w-auto opacity-50 cursor-not-allowed' : 'w-full sm:w-auto'"
+                    >
+                        Exportar a Excel
+                    </x-ui.button>
+                </div>
 
-            <div x-show="! horario.sin_datos" class="space-y-4">
-                <x-ui.table :headers="['Nombres', 'Apellidos', 'Código SIS', 'Aula', 'Hora de ingreso']" min-width="min-w-[640px]">
-                    <x-slot:body>
-                        <template x-for="estudiante in horario.estudiantes" :key="estudiante.sis + estudiante.hora_ingreso">
-                            <tr class="border-b border-default bg-neutral-primary last:border-0">
-                                <td class="px-6 py-4" x-text="estudiante.nombres"></td>
-                                <td class="px-6 py-4" x-text="estudiante.apellidos"></td>
-                                <td class="px-6 py-4" x-text="estudiante.sis"></td>
-                                <td class="px-6 py-4" x-text="estudiante.aula || 'Sin aula'"></td>
-                                <td class="px-6 py-4 font-medium text-heading" x-text="estudiante.hora_ingreso || 'Sin registro'"></td>
-                            </tr>
-                        </template>
-                    </x-slot:body>
-                </x-ui.table>
+                <p x-show="horario.sin_datos || !Array.isArray(horario.estudiantes) || horario.estudiantes.length === 0" class="rounded-base border border-default bg-neutral-primary-soft p-8 text-center text-sm text-body">
+                    No hay ingresos registrados.
+                </p>
+
+                <div x-show="!horario.sin_datos && Array.isArray(horario.estudiantes) && horario.estudiantes.length > 0" class="space-y-4 overflow-x-auto">
+                    <x-ui.table :headers="['Nombres', 'Apellidos', 'Código SIS', 'Aula', 'Hora de ingreso', 'Hora de salida']" min-width="min-w-[720px]">
+                        <x-slot:body>
+                            <template x-for="estudiante in [...horario.estudiantes].sort((a,b)=>((a.hora_ingreso||'').localeCompare(b.hora_ingreso||'')))" :key="estudiante.sis + estudiante.hora_ingreso">
+                                <tr class="border-b border-default bg-neutral-primary last:border-0">
+                                    <td class="px-6 py-4" x-text="estudiante.nombres"></td>
+                                    <td class="px-6 py-4" x-text="estudiante.apellidos"></td>
+                                    <td class="px-6 py-4 font-mono" x-text="estudiante.sis"></td>
+                                    <td class="px-6 py-4" x-text="estudiante.aula || 'Sin aula'"></td>
+                                    <td class="px-6 py-4 font-medium text-heading" x-text="estudiante.hora_ingreso || 'Sin registro'"></td>
+                                    <td class="px-6 py-4 text-heading" x-text="(estudiante.hora_salida && estudiante.hora_salida !== '') ? estudiante.hora_salida : '-'"></td>
+                                </tr>
+                            </template>
+                        </x-slot:body>
+                    </x-ui.table>
+                </div>
             </div>
-        </div>
-    </template>
+        </template>
 </div>

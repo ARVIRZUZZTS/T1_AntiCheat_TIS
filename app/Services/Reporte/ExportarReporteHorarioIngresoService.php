@@ -29,32 +29,15 @@ class ExportarReporteHorarioIngresoService
      *     aulas: list<array{id: int, nombre: string}>,
      *     filtros: array{id_aula: ?int, hora_desde: ?string, hora_hasta: ?string},
      *     resumen: array{total: int, primer_ingreso: ?string, ultimo_ingreso: ?string},
-     *     estudiantes: list<array{sis: string, nombres: string, apellidos: string, aula: string, hora_ingreso: ?string, fecha_ingreso: ?string}>,
+     *     estudiantes: list<array{sis: string, nombres: string, apellidos: string, aula: string, hora_ingreso: ?string, hora_salida: ?string, fecha_ingreso: ?string}>,
      *     sin_datos: bool
      * }  $reporte
      * @return array{nombre: string, contenido: string}
      */
     public function ejecutar(array $reporte): array
     {
-        $aula = $this->filtroAula($reporte);
-        $horario = $this->filtroHorario($reporte['filtros']);
-
-        $resumen = [
-            ['Reporte de horarios de ingreso'],
-            [],
-            ['Materia', $reporte['materia']['nombre']],
-            ['Examen', $reporte['examen']['tipo'].($reporte['examen']['fecha_formateada'] === null ? '' : ' - '.$reporte['examen']['fecha_formateada'])],
-            ['Fecha del examen', $reporte['examen']['fecha_formateada'] ?? 'Sin fecha'],
-            ['Aula', $aula],
-            ['Rango de horario', $horario],
-            [],
-            ['Total de estudiantes que ingresaron', $reporte['resumen']['total']],
-            ['Hora del primer ingreso', $reporte['resumen']['primer_ingreso'] ?? 'Sin registros'],
-            ['Hora del ultimo ingreso', $reporte['resumen']['ultimo_ingreso'] ?? 'Sin registros'],
-        ];
-
         $detalle = [
-            ['Nombres', 'Apellidos', 'Codigo SIS', 'Aula', 'Hora de ingreso', 'Fecha del examen'],
+            ['Nombres', 'Apellidos', 'Codigo SIS', 'Aula', 'Hora de ingreso', 'Hora de salida'],
         ];
 
         foreach ($reporte['estudiantes'] as $estudiante) {
@@ -63,15 +46,14 @@ class ExportarReporteHorarioIngresoService
                 $estudiante['apellidos'],
                 $estudiante['sis'],
                 $estudiante['aula'],
-                $estudiante['hora_ingreso'] ?? 'Sin registro',
-                $reporte['examen']['fecha_formateada'] ?? 'Sin fecha',
+                $estudiante['hora_ingreso'] ?? '-',
+                (isset($estudiante['hora_salida']) && $estudiante['hora_salida'] !== null && $estudiante['hora_salida'] !== '') ? $estudiante['hora_salida'] : '-',
             ];
         }
 
         return [
             'nombre' => $this->nombreArchivo($reporte),
             'contenido' => $this->generarXlsx->generar([
-                ['nombre' => 'Resumen', 'filas' => $resumen],
                 ['nombre' => 'Detalle', 'filas' => $detalle],
             ]),
         ];
