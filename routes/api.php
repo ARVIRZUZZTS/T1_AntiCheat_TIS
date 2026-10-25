@@ -24,6 +24,7 @@ use App\Http\Controllers\Api\CursoExamenController;
 use App\Http\Controllers\Api\DetalleIncidenciaController;
 use App\Http\Controllers\Api\EstudianteExamenController;
 use App\Http\Controllers\Api\ExamenMonitoreoController;
+use App\Http\Controllers\Api\InvitacionExamenController;
 use App\Http\Controllers\Api\NotificacionController;
 use App\Http\Controllers\Api\ReporteHorarioIngresoController;
 use App\Http\Controllers\Api\ResolverIncidenciaController;
@@ -53,6 +54,11 @@ Route::middleware(['web', 'auth:web'])->group(function (): void {
     Route::patch('/notificaciones/{idNotificacion}/ocultar', [NotificacionController::class, 'ocultar'])
         ->whereNumber('idNotificacion')
         ->name('api.notificaciones.ocultar');
+
+    Route::get('/examenes/{examen}/docentes-invitables', [InvitacionExamenController::class, 'docentesInvitables'])
+        ->whereNumber('examen')
+        ->middleware('docente')
+        ->name('api.examenes.docentes-invitables');
 
     Route::get('/reportes/horarios-ingreso', [ReporteHorarioIngresoController::class, 'index'])
         ->name('api.reportes.horarios-ingreso');
