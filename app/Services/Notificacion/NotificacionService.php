@@ -370,7 +370,9 @@ class NotificacionService
         $invitacion = $notificacion->invitacion;
         $examen = $invitacion?->examen;
         $invitador = $invitacion?->invitador;
-        $tipoExamen = $examen?->tipoExamen?->nombre_tipo_examen ?? ($examen !== null ? 'Examen #'.$examen->id_examen : '');
+        $tipoExamen = $examen !== null
+            ? $examen->tipoExamen->nombre_tipo_examen
+            : '';
         $materias = $examen === null
             ? []
             : $examen->cursos->pluck('nombre_curso')->filter()->values()->all();

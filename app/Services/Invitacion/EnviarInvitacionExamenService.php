@@ -116,7 +116,7 @@ class EnviarInvitacionExamenService
         return [
             'id' => (int) $invitacion->id_invitacion,
             'estado' => $invitacion->estado->value,
-            'enviada_en' => $invitacion->created_at?->toISOString(),
+            'enviada_en' => $invitacion->created_at->toISOString(),
             'examen' => [
                 'id' => (int) $examen->id_examen,
                 'tipo' => $examen->tipoExamen?->nombre_tipo_examen,

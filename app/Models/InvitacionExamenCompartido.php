@@ -6,7 +6,17 @@ use App\Enums\InvitacionEstado;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Carbon;
 
+/**
+ * @property int $id_invitacion
+ * @property int $id_docente_invitador
+ * @property int $id_docente_invitado
+ * @property int $id_examen
+ * @property InvitacionEstado $estado
+ * @property Carbon $created_at
+ * @property Carbon $updated_at
+ */
 class InvitacionExamenCompartido extends Model
 {
     protected $table = 'invitacion_examen_compartido';

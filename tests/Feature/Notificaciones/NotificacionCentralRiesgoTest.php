@@ -208,6 +208,7 @@ class NotificacionCentralRiesgoTest extends TestCase
         Schema::create('usuario', function (Blueprint $tabla): void {
             $tabla->integer('id_usuario')->primary();
             $tabla->string('cod_sis');
+            $tabla->string('correo')->nullable();
             $tabla->string('password');
             $tabla->string('nombre_usuario');
             $tabla->string('apellido');
@@ -239,6 +240,14 @@ class NotificacionCentralRiesgoTest extends TestCase
             $tabla->integer('id_examen');
             $tabla->integer('id_curso');
         });
+        Schema::create('invitacion_examen_compartido', function (Blueprint $tabla): void {
+            $tabla->integer('id_invitacion')->primary();
+            $tabla->integer('id_docente_invitador');
+            $tabla->integer('id_docente_invitado');
+            $tabla->integer('id_examen');
+            $tabla->string('estado');
+            $tabla->timestamps();
+        });
         Schema::create('estudiante', function (Blueprint $tabla): void {
             $tabla->string('sis_estudiante')->primary();
             $tabla->string('nombre_estudiante');
@@ -264,8 +273,10 @@ class NotificacionCentralRiesgoTest extends TestCase
         });
         Schema::create('notificacion_docente', function (Blueprint $tabla): void {
             $tabla->integer('id_notificacion')->primary();
-            $tabla->integer('id_central_riesgo');
-            $tabla->integer('id_curso');
+            $tabla->integer('id_central_riesgo')->nullable();
+            $tabla->integer('id_curso')->nullable();
+            $tabla->integer('id_docente_destinatario')->nullable();
+            $tabla->integer('id_invitacion')->nullable();
             $tabla->string('estado');
         });
     }
