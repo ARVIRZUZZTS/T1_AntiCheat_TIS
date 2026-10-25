@@ -53,12 +53,13 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * @property int $id_examen
+ * @property ?string $nombre_examen
  * @property ?string $fecha
  * @property ?string $hora_inicio
  * @property ?string $hora_fin Hora derivada (inicio + duración); no es columna.
  * @property ?int $duracion
  * @property int $creador
- * @property int $tipo_examen
+ * @property ?int $tipo_examen
  */
 class Examen extends Model
 {
@@ -74,6 +75,7 @@ class Examen extends Model
 
     protected $fillable = [
         'id_examen',
+        'nombre_examen',
         'fecha',
         'hora_inicio',
         'duracion',

@@ -33,17 +33,19 @@
  * - 2026-10-05  [Alex Candia]  feat: creación inicial del servicio.
  * - 2026-10-10  [Alex Candia]  refactor: deja de calcular y escribir `hora_fin`;
  *   la columna se eliminó y la hora de fin pasa a ser un accesor del modelo.
+ * - 2026-10-24  [Diego Tejerina]  feat: crearParaCurso() registra el examen
+ *   inicial de HU-16 dentro de la transaccion que administra el alta del curso.
  */
 
 namespace App\Services\Examen;
 
 use App\Enums\EstadoEstudianteExamen;
-use App\Enums\TipoExamen;
 use App\Models\Curso;
 use App\Models\Estudiante;
-use App\Models\Examen;
 use App\Models\EstudianteExamen;
+use App\Models\Examen;
 use App\Models\TipoExamen as TipoExamenCatalogo;
+use App\Support\DTO\ExamenCursoDTO;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -105,6 +107,73 @@ class RegistrarExamenService
 
             return $examen;
         });
+    }
+
+    /**
+     * Crea un examen inicial de HU-16 dentro de la transaccion del curso.
+     * El tipo y la programacion horaria se completan luego desde el flujo de
+     * alta de examen existente; el nombre y la fecha opcional nacen con el curso.
+     */
+    public function crearParaCurso(
+        Curso $curso,
+        ExamenCursoDTO $datos,
+        int $creador,
+        int $idAmbiente,
+    ): Examen {
+        $examen = new Examen;
+        $examen->id_examen = $this->siguienteIdExamen();
+        $examen->nombre_examen = $datos->nombre;
+        $examen->fecha = $datos->fecha;
+        $examen->hora_inicio = null;
+        $examen->duracion = null;
+        $examen->creador = $creador;
+        $examen->tipo_examen = null;
+        $examen->save();
+
+        $examen->cursos()->attach($curso->id_curso);
+        $examen->ambientes()->attach($idAmbiente);
+        $examen->normas()->attach($datos->normasIds);
+        $examen->materialesPermitidos()->attach($datos->materialesIds);
+
+        $this->insertarPersonalizados(
+            'norma_personalizada',
+            'numero_norma',
+            'descripcion_norma',
+            (int) $examen->id_examen,
+            $datos->normasPersonalizadas,
+        );
+        $this->insertarPersonalizados(
+            'material_personalizado',
+            'numero_material',
+            'descripcion_material',
+            (int) $examen->id_examen,
+            $datos->materialesPersonalizados,
+        );
+
+        return $examen;
+    }
+
+    /** @param list<string> $descripciones */
+    private function insertarPersonalizados(
+        string $tabla,
+        string $columnaNumero,
+        string $columnaDescripcion,
+        int $idExamen,
+        array $descripciones,
+    ): void {
+        $filas = [];
+
+        foreach ($descripciones as $indice => $descripcion) {
+            $filas[] = [
+                'id_examen' => $idExamen,
+                $columnaNumero => $indice + 1,
+                $columnaDescripcion => $descripcion,
+            ];
+        }
+
+        if ($filas !== []) {
+            DB::table($tabla)->insert($filas);
+        }
     }
 
     /**
