@@ -40,6 +40,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 /**
  * @property int $id_usuario
  * @property string $cod_sis
+ * @property ?string $correo
  * @property string $password
  * @property string $nombre_usuario
  * @property string $apellido
@@ -63,6 +64,7 @@ class Usuario extends Authenticatable
     protected $fillable = [
         'id_usuario',
         'cod_sis',
+        'correo',
         'password',
         'nombre_usuario',
         'apellido',
@@ -95,5 +97,22 @@ class Usuario extends Authenticatable
     {
         return $this->hasMany(RegistroAsistencia::class, 'id_registrador');
     }
-}
 
+    /** @return HasMany<Examen, $this> */
+    public function examenesCreados(): HasMany
+    {
+        return $this->hasMany(Examen::class, 'creador', 'id_usuario');
+    }
+
+    /** @return HasMany<InvitacionExamenCompartido, $this> */
+    public function invitacionesEnviadas(): HasMany
+    {
+        return $this->hasMany(InvitacionExamenCompartido::class, 'id_docente_invitador', 'id_usuario');
+    }
+
+    /** @return HasMany<InvitacionExamenCompartido, $this> */
+    public function invitacionesRecibidas(): HasMany
+    {
+        return $this->hasMany(InvitacionExamenCompartido::class, 'id_docente_invitado', 'id_usuario');
+    }
+}
