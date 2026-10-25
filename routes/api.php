@@ -60,6 +60,11 @@ Route::middleware(['web', 'auth:web'])->group(function (): void {
         ->middleware('docente')
         ->name('api.examenes.docentes-invitables');
 
+    Route::post('/examenes/{examen}/invitaciones', [InvitacionExamenController::class, 'enviar'])
+        ->whereNumber('examen')
+        ->middleware('docente')
+        ->name('api.examenes.invitaciones.enviar');
+
     Route::get('/reportes/horarios-ingreso', [ReporteHorarioIngresoController::class, 'index'])
         ->name('api.reportes.horarios-ingreso');
 
