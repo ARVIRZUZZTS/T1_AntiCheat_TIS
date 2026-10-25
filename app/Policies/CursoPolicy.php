@@ -25,10 +25,19 @@ namespace App\Policies;
 
 use App\Enums\CursoEstado;
 use App\Models\Curso;
+use App\Models\Rol;
 use App\Models\Usuario;
 
 class CursoPolicy
 {
+    /** Solo un usuario con rol docente puede registrar cursos. */
+    public function create(Usuario $usuario): bool
+    {
+        return $usuario->roles()
+            ->where('nombre_rol', Rol::NOMBRE_DOCENTE)
+            ->exists();
+    }
+
     /**
      * Indica si el usuario es el docente responsable del curso.
      *
@@ -38,10 +47,10 @@ class CursoPolicy
      *
      * @param  Usuario  $usuario  Usuario autenticado.
      * @param  Curso  $curso  Curso que se quiere gestionar.
-     *
      * @return bool Si el curso pertenece al usuario.
      *
      * @author Valery D. Ortuno P <valerydariana98@gmail.com>
+     *
      * @since  2026-10-24
      */
     public function gestionar(Usuario $usuario, Curso $curso): bool
@@ -57,10 +66,10 @@ class CursoPolicy
      *
      * @param  Usuario  $usuario  Usuario autenticado.
      * @param  Curso  $curso  Curso en el que se quiere crear el examen.
-     *
      * @return bool Si puede crear exámenes en el curso.
      *
      * @author Valery D. Ortuno P <valerydariana98@gmail.com>
+     *
      * @since  2026-10-24
      */
     public function crearExamen(Usuario $usuario, Curso $curso): bool
