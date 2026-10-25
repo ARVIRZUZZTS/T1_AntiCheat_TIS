@@ -12,6 +12,7 @@
  * @updated 2026-10-12
  * @updated 2026-10-21
  * @updated 2026-10-24
+ * @updated 2026-10-25
  *
  * @description
  * Definición de rutas web del panel. Incluye vistas estáticas y componentes Livewire.
@@ -69,6 +70,8 @@
  *   de curso desde el formulario "Crear curso".
  * - 2026-10-24  [Valery D. Ortuno P]  feat: /central-riesgo queda solo para
  *   docentes (HU 10); antes un auxiliar podía abrirla por URL.
+ * - 2026-10-25  [Valery D. Ortuno P]  refactor: se retira /registrar-incidencia;
+ *   las incidencias se registran desde los modales del monitor en vivo (HU 5).
  */
 
 use App\Http\Controllers\AuthController;
@@ -79,7 +82,6 @@ use App\Http\Controllers\Reporte\ListarReporteIngresosIlegalesController;
 use App\Livewire\Examenes\EstudiantesCurso;
 use App\Livewire\Monitoreo\MonitorEnVivo;
 use App\Livewire\Monitoreo\AccesoMonitor;
-use App\Livewire\Monitoreo\RegistrarIncidencia;
 use App\Livewire\Auxiliares\GestionAuxiliares;
 use App\Models\Usuario;
 use App\Services\Reporte\ListarFiltrosReporteService;
@@ -119,10 +121,6 @@ Route::view('/notificaciones', 'pages.notificaciones')->name('notificaciones');
 Route::get('/incidencias/{id}', fn (int $id) => view('pages.incidencia-detalle', ['id' => $id]))
     ->whereNumber('id')
     ->name('incidencias.detalle');
-
-// TODO(@valerydariana98, 2026-09-25): proteger con el middleware de rol que
-// restringe el registro de incidencias a docentes y auxiliares (#69).
-Route::get('/registrar-incidencia', RegistrarIncidencia::class)->name('registrar-incidencia');
 });
 
 // Autenticación real (reemplaza a /dev/login).

@@ -8,6 +8,7 @@
  * @created 2026-10-10
  *
  * @updated 2026-10-10
+ * @updated 2026-10-25
  *
  * @description
  * Componente Livewire de página completa del monitor en vivo: resuelve el
@@ -31,7 +32,7 @@
  *
  * @see  \App\Services\Monitoreo\GenerarReporteAsistenciaService
  * @see  \App\Services\Asistencia\RegistroIngresoService
- * @see  \App\Livewire\Monitoreo\RegistrarIncidencia
+ * @see  \App\Services\CentralRiesgo\RegistrarIncidenciaService
  *
  * @changelog
  * - 2026-10-10  [David E. Chavez T.]  feat: creación inicial. La pantalla deja
@@ -58,16 +59,26 @@
  *   sintiéndose muy lento. Se invalida en `ejecutarAccion()` y también desde
  *   `RegistrarIncidencia::registrar()`, que puede escribir en el mismo
  *   examen desde el buscador de registro de ingreso.
+ * - 2026-10-25  [Valery D. Ortuno P]  feat: el registro de incidencias pasa a
+ *   RegistrarIncidenciaService (HU 5): motivos según la vista, tipo según el
+ *   rol (auxiliar = sospechoso), modal de confirmación y registro
+ *   de estudiantes no inscritos o no registrados (abrirRegistroNoInscrito(),
+ *   consultarEstudiante(), registrarNoInscrito()), que reemplaza al botón
+ *   "Reportar SIS" que llevaba a la página de registro, ya retirada; si se
+ *   buscó un nombre, llega repartido entre nombres y apellidos.
  */
 
 namespace App\Livewire\Monitoreo;
 
-use App\Enums\Motivo;
 use App\Enums\TipoInfraccion;
+use App\Models\Estudiante;
 use App\Models\Examen;
 use App\Models\Rol;
+use App\Models\Usuario;
 use App\Services\Asistencia\RegistroIngresoService;
+use App\Services\CentralRiesgo\RegistrarIncidenciaService;
 use App\Services\Monitoreo\GenerarReporteAsistenciaService;
+use App\Support\DTO\RegistroIncidenciaDTO;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -131,6 +142,12 @@ class MonitorEnVivo extends Component
     public string $mensajeError = '';
 
     /**
+     * True mientras se muestra el modal de confirmación de una incidencia
+     * recién registrada; vuelve a false al presionar "Aceptar".
+     */
+    public bool $incidenciaRegistrada = false;
+
+    /**
      * Servicio que arma el reporte de asistencia del examen.
      */
     private GenerarReporteAsistenciaService $servicioReporte;
@@ -143,9 +160,8 @@ class MonitorEnVivo extends Component
     /**
      * Prefijo de la clave de caché del informe de asistencia, una por examen.
      *
-     * Pública porque `RegistrarIncidencia::registrar()` también escribe en
-     * `central_riesgo` para un examen que este monitor puede estar mostrando
-     * (origen `ORIGEN_MONITOREO`), y tiene que poder invalidar la misma clave.
+     * Pública para que otras pantallas que escriban en el mismo examen puedan
+     * invalidar la misma clave.
      */
     public const CACHE_INFORME_PREFIJO = 'monitoreo.informe.';
 
@@ -429,22 +445,100 @@ class MonitorEnVivo extends Component
         $this->pagina = 1;
     }
 
-    public function reportarSisNoEncontrado(): mixed
+    /**
+     * Abre el registro de incidencia de un estudiante que no está en la lista
+     * del examen (no inscrito o no registrado en la base). Si lo buscado son
+     * dígitos, el SIS llega precargado; si es un nombre, llegan precargados
+     * los nombres y apellidos (separarNombreCompleto()).
+     *
+     * @author Valery D. Ortuno P <valerydariana98@gmail.com>
+     * @since  2026-10-25
+     */
+    public function abrirRegistroNoInscrito(): void
     {
-        $sis = trim($this->busqueda);
+        $termino = trim($this->busqueda);
+        $esSis = preg_match('/^\d+$/', $termino) === 1;
 
-        if ($sis === '') {
-            return null;
-        }
+        $this->dispatch(
+            'abrir-modal-no-inscrito',
+            estudiante: $this->datosEstudiante($esSis ? $termino : ''),
+            sugerido: $this->separarNombreCompleto($esSis ? '' : $termino),
+        );
+    }
 
-        return redirect()->route('registrar-incidencia', [
-            'origen' => RegistrarIncidencia::ORIGEN_MONITOREO,
-            'examen' => $this->idExamen,
-            'rol' => Rol::NOMBRE_DOCENTE,
-            'usuario' => auth()->id() ?? RegistrarIncidencia::USUARIO_POR_DEFECTO,
+    /**
+     * Reparte un nombre completo buscado entre nombres y apellidos: con 2
+     * palabras, 1 y 1; con 3, 1 nombre y 2 apellidos; con 4, 2 y 2; con 5 o
+     * más, los 2 primeros son nombres y el resto apellidos.
+     *
+     * @param  string  $nombreCompleto  Lo escrito en el buscador.
+     * @return array{nombre: string, apellido: string}
+     *
+     * @author Valery D. Ortuno P <valerydariana98@gmail.com>
+     * @since  2026-10-25
+     */
+    private function separarNombreCompleto(string $nombreCompleto): array
+    {
+        $palabras = preg_split('/\s+/', trim($nombreCompleto), -1, PREG_SPLIT_NO_EMPTY);
+        $cantidadNombres = count($palabras) <= 3 ? 1 : 2;
+
+        return [
+            'nombre' => implode(' ', array_slice($palabras, 0, $cantidadNombres)),
+            'apellido' => implode(' ', array_slice($palabras, $cantidadNombres)),
+        ];
+    }
+
+    /**
+     * El modal del no inscrito pregunta por un SIS mientras se escribe: si
+     * existe muestra sus nombres y apellidos; si no, los pide. Responde con
+     * un evento para que el componente UI no dependa de Livewire.
+     *
+     * @param  string  $sis  Código SIS escrito en el modal.
+     *
+     * @author Valery D. Ortuno P <valerydariana98@gmail.com>
+     * @since  2026-10-25
+     */
+    #[On('consultar-no-inscrito')]
+    public function consultarEstudiante(string $sis): void
+    {
+        $this->dispatch('estudiante-no-inscrito-consultado', estudiante: $this->datosEstudiante($sis));
+    }
+
+    /**
+     * @return array{sis: string, existe: bool, nombre: string, apellido: string, verificado: bool}
+     */
+    private function datosEstudiante(string $sis): array
+    {
+        $sis = trim($sis);
+        $estudiante = $sis === '' ? null : Estudiante::query()->find($sis);
+
+        return [
             'sis' => $sis,
-            'motivo' => Motivo::IntentoDeIngresoNoAutorizado->value,
-        ]);
+            'existe' => $estudiante !== null,
+            'nombre' => (string) ($estudiante?->nombre_estudiante ?? ''),
+            'apellido' => (string) ($estudiante?->apellido_estudiante ?? ''),
+            'verificado' => (bool) ($estudiante?->verificado ?? true),
+        ];
+    }
+
+    /**
+     * Rol con el que registra el usuario, para mostrar el estado en los modales:
+     * un auxiliar registra "En revision" y un docente "Confirmado".
+     *
+     * @author Valery D. Ortuno P <valerydariana98@gmail.com>
+     * @since  2026-10-25
+     */
+    #[Computed]
+    public function registraComoAuxiliar(): bool
+    {
+        return RegistrarIncidenciaService::esAuxiliar($this->registrador());
+    }
+
+    /** Cierra el modal de confirmación del registro (botón Aceptar). */
+    #[On('cerrar-resumen-incidencia')]
+    public function cerrarResumen(): void
+    {
+        $this->incidenciaRegistrada = false;
     }
 
     /**
@@ -506,7 +600,8 @@ class MonitorEnVivo extends Component
     }
 
     /**
-     * Registra una incidencia de tramposo (modal M5).
+     * Registro rápido de incidencia de un estudiante de la lista (modal M5),
+     * con los motivos de la vista activa (ingreso o monitor).
      *
      * @param  string  $sis  Código SIS del estudiante.
      * @param  ?string  $motivo  Valor de un caso de `Motivo`.
@@ -515,26 +610,65 @@ class MonitorEnVivo extends Component
     #[On('registrar-tramposo')]
     public function registrarTramposo(string $sis, ?string $motivo = null, ?string $detalle = null): void
     {
-        $motivoEnum = Motivo::tryFrom((string) $motivo);
+        $this->registrarIncidencia(new RegistroIncidenciaDTO(
+            sis: $sis,
+            idExamen: $this->idExamen,
+            origen: $this->modoVista,
+            motivo: (string) $motivo,
+            detalle: $detalle,
+        ));
+    }
 
-        if ($motivoEnum === null) {
-            $this->limpiarMensajes();
-            $this->mensajeError = 'Seleccione un motivo válido de la lista.';
+    /**
+     * Registro de incidencia de un estudiante que no está en la lista del
+     * examen. Si el SIS no existe en la base, se da de alta con los nombres y
+     * apellidos que se escribieron (como no verificado).
+     *
+     * @author Valery D. Ortuno P <valerydariana98@gmail.com>
+     * @since  2026-10-25
+     */
+    #[On('registrar-no-inscrito')]
+    public function registrarNoInscrito(
+        string $sis,
+        ?string $motivo = null,
+        ?string $detalle = null,
+        ?string $nombre = null,
+        ?string $apellido = null,
+    ): void {
+        $this->registrarIncidencia(new RegistroIncidenciaDTO(
+            sis: $sis,
+            idExamen: $this->idExamen,
+            origen: $this->modoVista,
+            motivo: (string) $motivo,
+            detalle: $detalle,
+            nombre: $nombre,
+            apellido: $apellido,
+        ));
+    }
+
+    /**
+     * Registra con RegistrarIncidenciaService y abre el modal de confirmación;
+     * un dato inválido queda en el mensaje de error.
+     */
+    private function registrarIncidencia(RegistroIncidenciaDTO $datos): void
+    {
+        $this->limpiarMensajes();
+        $this->incidenciaRegistrada = false;
+
+        try {
+            app(RegistrarIncidenciaService::class)->ejecutar(
+                $datos,
+                $this->registrador(),
+                $this->idDocenteConfiguracion,
+            );
+        } catch (InvalidArgumentException $e) {
+            $this->mensajeError = $e->getMessage();
 
             return;
         }
 
-        $this->ejecutarAccion(
-            fn () => $this->servicioIngreso->registrarIncidencia(
-                $sis,
-                $this->idExamen,
-                $this->registradorId(),
-                $motivoEnum,
-                $detalle,
-                $this->idDocenteConfiguracion,
-            ),
-            'Incidencia registrada en la central de riesgos.',
-        );
+        Cache::forget($this->claveCacheInforme());
+        $this->incidenciaRegistrada = true;
     }
 
     /**
@@ -616,15 +750,19 @@ class MonitorEnVivo extends Component
     /**
      * Usuario que queda como registrador de la acción.
      *
-     * No hay login conectado a `usuario` todavía, así que sin sesión se usa el
-     * primer usuario sembrado, el mismo por defecto que usa
-     * `RegistrarIncidencia`.
+     * La ruta exige sesión; sin ella (pruebas que montan el componente solo)
+     * se usa el creador del examen, en lugar del usuario por defecto que
+     * tenía la página de registro de incidencias que se retiró.
      */
     private function registradorId(): int
     {
-        return auth()->check()
-            ? (int) auth()->id()
-            : RegistrarIncidencia::USUARIO_POR_DEFECTO;
+        return (int) $this->registrador()->id_usuario;
+    }
+
+    /** Usuario registrador como modelo (el servicio de incidencias lee sus roles). */
+    private function registrador(): Usuario
+    {
+        return auth()->user() ?? Usuario::query()->findOrFail((int) $this->examen->creador);
     }
 
     private function consultaExamenesAccesibles()

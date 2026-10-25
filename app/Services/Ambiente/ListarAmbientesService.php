@@ -9,6 +9,7 @@
  *
  * @updated 2026-10-05
  * @updated 2026-10-12
+ * @updated 2026-10-25
  *
  * @description
  * Servicio que publica el índice de ambientes que el modal de alta de examen usa
@@ -16,21 +17,20 @@
  *
  * Devuelve, además del id y el nombre, el campo `termino`: el nombre ya en
  * minúsculas, normalizado una sola vez al construir el índice. Así el navegador
- * no tiene que componer cadenas ni aplicar toLowerCase en cada tecla, que es el
- * mismo criterio que usa el índice de
- * {@see \App\Livewire\Monitoreo\RegistrarIncidencia} para los estudiantes.
+ * no tiene que componer cadenas ni aplicar toLowerCase en cada tecla.
  *
  * El filtrado NO se hace en PHP a propósito: con el catálogo ya resuelto en la
  * página, filtrar en el cliente responde al instante, mientras que un viaje al
  * servidor por tecla es lo que volvió lento aquel buscador.
  *
- * @see  \App\Livewire\Monitoreo\RegistrarIncidencia
  * @see  resources/views/components/ui/form-crear-examen.blade.php
  *
  * @changelog
  * - 2026-10-05  [Alex Candia]  feat: creación inicial del servicio.
  * - 2026-10-12  [T1]  docs: el @see apunta a RegistrarIncidencia, que ahora es
  *   quien publica el índice de estudiantes (antes lo hacía BuscadorRegistro).
+ * - 2026-10-25  [Valery D. Ortuno P]  docs: se quitan las referencias a
+ *   RegistrarIncidencia, página retirada en la HU 5.
  */
 
 namespace App\Services\Ambiente;
