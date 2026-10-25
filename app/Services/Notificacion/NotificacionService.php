@@ -37,6 +37,7 @@
 namespace App\Services\Notificacion;
 
 use App\Enums\CursoEstado;
+use App\Enums\InvitacionEstado;
 use App\Enums\TipoInfraccion;
 use App\Models\CentralRiesgo;
 use App\Models\InvitacionExamenCompartido;
@@ -61,6 +62,9 @@ class NotificacionService
 
     public const TITULO_INVITACION_EXAMEN = 'Invitación para compartir un examen';
 
+    /** Título del aviso que recibe el invitador cuando responden su invitación. */
+    public const TITULO_RESPUESTA_INVITACION = 'Respuesta a tu invitación de examen';
+
     /**
      * Tipos de aviso (columna `tipo` de `notificacion_docente`). La pantalla
      * pinta una tarjeta distinta según el valor.
@@ -70,6 +74,9 @@ class NotificacionService
     public const TIPO_CENTRAL_RIESGO = 'central_riesgo';
 
     public const TIPO_INVITACION_EXAMEN = 'invitacion_examen';
+
+    /** Aviso para el invitador: el invitado aceptó o rechazó su invitación. */
+    public const TIPO_RESPUESTA_INVITACION = 'respuesta_invitacion';
 
     /** Estado inicial con el que nace un aviso, del enum `estado_notificacion`. */
     public const ESTADO_RECIBIDO = 'recibido';
@@ -201,6 +208,59 @@ class NotificacionService
     }
 
     /**
+     * Avisa al docente que invitó que su invitación fue respondida (aceptada o
+     * rechazada).
+     *
+     * Reutiliza el único aviso de la invitación (la tabla tiene un índice único
+     * por `id_invitacion`): el aviso ya cumplió su fin con el invitado, así que
+     * se reapunta al invitador y cambia de tipo. Si por algún motivo no hubiera
+     * aviso previo, se crea uno.
+     *
+     * @param  InvitacionExamenCompartido  $invitacion  Invitación ya respondida.
+     * @return NotificacionDocente  Aviso dirigido al invitador.
+     */
+    public function notificarRespuestaInvitacion(InvitacionExamenCompartido $invitacion): NotificacionDocente
+    {
+        return DB::transaction(function () use ($invitacion): NotificacionDocente {
+            $this->bloquearTabla();
+
+            $aviso = NotificacionDocente::query()
+                ->where('id_invitacion', $invitacion->id_invitacion)
+                ->first();
+
+            if ($aviso === null) {
+                $aviso = new NotificacionDocente;
+                $aviso->id_notificacion = (int) NotificacionDocente::query()->max('id_notificacion') + 1;
+                $aviso->id_invitacion = $invitacion->id_invitacion;
+            }
+
+            $aviso->id_central_riesgo = null;
+            $aviso->id_curso = null;
+            $aviso->id_docente_destinatario = $invitacion->id_docente_invitador;
+            $aviso->tipo = self::TIPO_RESPUESTA_INVITACION;
+            $aviso->estado = self::ESTADO_RECIBIDO;
+            $aviso->oculta = false;
+            $aviso->save();
+
+            return $aviso;
+        });
+    }
+
+    /**
+     * Oculta el aviso de una invitación (borrado lógico). Se usa al cancelar:
+     * el invitado deja de ver en su bandeja una invitación que ya no puede
+     * responder.
+     *
+     * @param  int  $idInvitacion  Invitación cuyo aviso se oculta.
+     */
+    public function ocultarDeInvitacion(int $idInvitacion): void
+    {
+        NotificacionDocente::query()
+            ->where('id_invitacion', $idInvitacion)
+            ->update(['oculta' => true]);
+    }
+
+    /**
      * Cursos activos (`estado = EnCurso`) en los que cursa el estudiante del
      * caso, de más reciente a más antiguo para un reparto determinista.
      */
@@ -250,6 +310,7 @@ class NotificacionService
                 'centralRiesgo.examen.tipoExamen',
                 'centralRiesgo.registrador',
                 'invitacion.invitador',
+                'invitacion.invitado',
                 'invitacion.examen.tipoExamen',
                 'invitacion.examen.cursos',
             ])
@@ -322,6 +383,10 @@ class NotificacionService
     {
         if ($notificacion->tipo === self::TIPO_INVITACION_EXAMEN) {
             return $this->mapearInvitacion($notificacion);
+        }
+
+        if ($notificacion->tipo === self::TIPO_RESPUESTA_INVITACION) {
+            return $this->mapearRespuestaInvitacion($notificacion);
         }
 
         $registro = $notificacion->centralRiesgo;
@@ -403,11 +468,60 @@ class NotificacionService
         ];
     }
 
+    /**
+     * Aviso que ve el invitador cuando el invitado responde: "Ana aceptó/rechazó
+     * tu invitación...".
+     *
+     * @param  NotificacionDocente  $notificacion  Aviso de respuesta, con la
+     *                                             invitación y su invitado cargados.
+     * @return array<string, mixed> Datos para la pantalla/API.
+     */
+    private function mapearRespuestaInvitacion(NotificacionDocente $notificacion): array
+    {
+        $invitacion = $notificacion->invitacion;
+        $examen = $invitacion?->examen;
+        $invitado = $invitacion?->invitado;
+        $tipoExamen = $examen !== null ? $examen->tipoExamen->nombre_tipo_examen : '';
+        $materias = $examen === null
+            ? []
+            : $examen->cursos->pluck('nombre_curso')->filter()->values()->all();
+        $detalleMaterias = $materias !== [] ? ' de '.implode(', ', $materias) : '';
+        $acepto = $invitacion?->estado === InvitacionEstado::Aceptada;
+        $fecha = $invitacion?->updated_at;
+
+        return [
+            'id' => (int) $notificacion->id_notificacion,
+            'tipo' => self::TIPO_RESPUESTA_INVITACION,
+            'titulo' => self::TITULO_RESPUESTA_INVITACION,
+            'descripcion' => sprintf(
+                '%s %s tu invitación para compartir el examen %s%s.',
+                $this->nombreCompleto($invitado),
+                $acepto ? 'aceptó' : 'rechazó',
+                $tipoExamen,
+                $detalleMaterias,
+            ),
+            'referencia' => (int) $invitacion?->id_invitacion,
+            'estado' => $invitacion?->estado?->value,
+            'fecha_registro' => $fecha?->toISOString(),
+            'hace' => $fecha !== null ? $this->tiempo->enEspanol($fecha) : '',
+            'datos' => [
+                'invitacion_id' => (int) $invitacion?->id_invitacion,
+                'examen_id' => (int) $examen?->id_examen,
+                'examen' => $tipoExamen,
+                'materias' => $materias,
+                'invitado' => $this->nombreCompleto($invitado),
+                'respuesta' => $invitacion?->estado?->value,
+            ],
+        ];
+    }
+
     private function fechaDe(NotificacionDocente $notificacion): ?CarbonInterface
     {
-        return $notificacion->tipo === self::TIPO_INVITACION_EXAMEN
-            ? $notificacion->invitacion?->created_at
-            : $notificacion->centralRiesgo?->fecha_registro;
+        return match ($notificacion->tipo) {
+            self::TIPO_INVITACION_EXAMEN => $notificacion->invitacion?->created_at,
+            self::TIPO_RESPUESTA_INVITACION => $notificacion->invitacion?->updated_at,
+            default => $notificacion->centralRiesgo?->fecha_registro,
+        };
     }
 
     /** Nombre completo de un estudiante o de un usuario, según sus columnas. */
