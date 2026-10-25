@@ -10,6 +10,7 @@
  * @updated 2026-10-10
  * @updated 2026-10-11
  * @updated 2026-10-24
+ * @updated 2026-10-25
  *
  * @description
  * Servicio de dominio que lista las incidencias de la central de riesgos con
@@ -65,6 +66,8 @@
  *   dejará de usar. El curso sale solo de `central_riesgo.id_curso` (sin
  *   deducirlo del examen), "Mis materias" filtra por el docente de ese curso y
  *   cada registro trae `curso` (nombre completo) y `materia` (sin el grupo).
+ * - 2026-10-25  [Valery D. Ortuno P]  feat: cada registro trae `verificado`
+ *   (false si el estudiante se dio de alta desde una incidencia, HU 5).
  */
 
 namespace App\Services\CentralRiesgo;
@@ -140,6 +143,7 @@ class ListarIncidenciasTramposoService
             ->select('central_riesgo.*')
             ->selectRaw('estudiante.nombre_estudiante as lista_est_nombre')
             ->selectRaw('estudiante.apellido_estudiante as lista_est_apellido')
+            ->selectRaw('estudiante.verificado as lista_est_verificado')
             // El curso es el que quedó registrado en la incidencia.
             ->selectRaw('curso.nombre_curso as lista_curso');
 
@@ -300,6 +304,8 @@ class ListarIncidenciasTramposoService
             'id_registro' => $incidencia->id_registro,
             'nombre' => $incidencia->getAttribute('lista_est_nombre'),
             'apellido' => $incidencia->getAttribute('lista_est_apellido'),
+            // False si el estudiante se dio de alta desde una incidencia (HU 5).
+            'verificado' => (bool) ($incidencia->getAttribute('lista_est_verificado') ?? true),
             'sis' => $incidencia->getAttribute('sis_estudiante'),
             'curso' => $curso,
             'materia' => $curso !== null ? NombreCurso::materia($curso) : null,

@@ -9,6 +9,7 @@
  *
  * @updated 2026-10-11
  * @updated 2026-10-24
+ * @updated 2026-10-25
  *
  * @description
  * Servicio de dominio que devuelve el detalle de una incidencia de la
@@ -50,6 +51,8 @@
  *   `curso`, `materia` y `grupo`; el estado se deriva del tipo de infracción
  *   (tramposo = Confirmado, sospechoso = Pendiente) en vez de
  *   `estado_incidencia`, que se dejará de usar.
+ * - 2026-10-25  [Valery D. Ortuno P]  feat: el detalle trae
+ *   `estudiante_verificado` (false si se dio de alta desde una incidencia, HU 5).
  *
  * @see  App\Policies\CentralRiesgoPolicy
  * @see  App\Models\CentralRiesgo
@@ -91,6 +94,7 @@ class ConsultarDetalleIncidenciaService
             ->selectRaw('estudiante.nombre_estudiante as det_est_nombre')
             ->selectRaw('estudiante.apellido_estudiante as det_est_apellido')
             ->selectRaw('estudiante.sis_estudiante as det_est_sis')
+            ->selectRaw('estudiante.verificado as det_est_verificado')
             ->selectRaw('usuario.nombre_usuario as det_usr_nombre')
             ->selectRaw('usuario.apellido as det_usr_apellido')
             ->selectRaw('curso.nombre_curso as det_curso')
@@ -120,6 +124,8 @@ class ConsultarDetalleIncidenciaService
                 : null,
             'sis_estudiante' => $incidencia->getAttribute('sis_estudiante')
                 ?? $incidencia->getAttribute('det_est_sis'),
+            // False si el estudiante se dio de alta desde una incidencia (HU 5).
+            'estudiante_verificado' => (bool) ($incidencia->getAttribute('det_est_verificado') ?? true),
             'motivo' => $this->etiquetaMotivo($incidencia),
             // "Calculo I - Grupo 2" completo, y por separado materia y grupo.
             'curso' => $curso,
