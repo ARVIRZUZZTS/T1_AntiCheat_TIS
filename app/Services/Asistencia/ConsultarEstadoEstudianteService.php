@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @file    ConsultarEstadoEstudianteService.php
  *
@@ -17,6 +18,7 @@
  *   `central_riesgo.sis_estudiante` en vez de unir con `registro_asistencia`,
  *   para que también se encuentre si el estudiante no tiene ingreso (#70).
  */
+
 namespace App\Services\Asistencia;
 
 use App\Enums\EstadoEstudianteExamen;
@@ -26,15 +28,17 @@ use App\Models\EstudianteExamen;
 use App\Models\Examen;
 use App\Models\RegistroAsistencia;
 use App\Support\DTO\EstadoEstudianteDTO;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 class ConsultarEstadoEstudianteService
 {
-    public function consultar(string $sisEstudiante, int $idExamen): EstadoEstudianteDTO
-    {
+    public function consultar(
+        string $sisEstudiante,
+        int $idExamen,
+        ?int $idDocente = null,
+    ): EstadoEstudianteDTO {
         $estudiante = $this->obtenerEstudiante($sisEstudiante);
-        $nombre = $estudiante->nombre_estudiante . ' ' . $estudiante->apellido_estudiante;
-        $estudianteExamen = $this->obtenerEstudianteExamen($sisEstudiante, $idExamen);
+        $nombre = $estudiante->nombre_estudiante.' '.$estudiante->apellido_estudiante;
+        $estudianteExamen = $this->obtenerEstudianteExamen($sisEstudiante, $idExamen, $idDocente);
 
         if ($estudianteExamen === null) {
             return EstadoEstudianteDTO::sinRegistro($sisEstudiante, $nombre);
@@ -60,7 +64,7 @@ class ConsultarEstadoEstudianteService
             );
         }
 
-        return $this->construirCasoNormal($sisEstudiante, $nombre, $idExamen);
+        return $this->construirCasoNormal($sisEstudiante, $nombre, $idExamen, $estudianteExamen);
     }
 
     private function obtenerEstudiante(string $sis): Estudiante
@@ -68,11 +72,12 @@ class ConsultarEstadoEstudianteService
         return Estudiante::findOrFail($sis);
     }
 
-    private function obtenerEstudianteExamen(string $sis, int $idExamen): ?EstudianteExamen
+    private function obtenerEstudianteExamen(string $sis, int $idExamen, ?int $idDocente): ?EstudianteExamen
     {
         return EstudianteExamen::query()
             ->where('sis_estudiante', $sis)
             ->where('id_examen', $idExamen)
+            ->when($idDocente !== null, fn ($query) => $query->delDocente($idDocente))
             ->first();
     }
 
@@ -84,7 +89,7 @@ class ConsultarEstadoEstudianteService
      * sin que el estudiante tenga fila de ingreso.
      *
      * @param  string  $sis  Código SIS del estudiante.
-     * @return ?CentralRiesgo  La incidencia más reciente o null si no tiene ninguna.
+     * @return ?CentralRiesgo La incidencia más reciente o null si no tiene ninguna.
      */
     private function obtenerRiesgoActivo(string $sis): ?CentralRiesgo
     {
@@ -95,13 +100,16 @@ class ConsultarEstadoEstudianteService
             ->first();
     }
 
-    private function construirCasoNormal(string $sis, string $nombre, int $idExamen): EstadoEstudianteDTO
-    {
+    private function construirCasoNormal(
+        string $sis,
+        string $nombre,
+        int $idExamen,
+        EstudianteExamen $inscripcion,
+    ): EstadoEstudianteDTO {
         $examen = Examen::with('tipoExamen')->findOrFail($idExamen);
 
         $asistencia = RegistroAsistencia::query()
-            ->where('id_estudiante', $sis)
-            ->where('id_examen', $idExamen)
+            ->where('id_estudiante_examen', $inscripcion->id_estudiante_examen)
             ->first();
 
         return EstadoEstudianteDTO::normal(

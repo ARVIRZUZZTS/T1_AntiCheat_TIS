@@ -23,6 +23,35 @@ use Illuminate\Support\Facades\DB;
 
 class ExamenPolicy
 {
+    public function configurar(Usuario $usuario, Examen $examen): bool
+    {
+        if (! $usuario->roles()->where('nombre_rol', Rol::NOMBRE_DOCENTE)->exists()) {
+            return false;
+        }
+
+        return $examen->configuracionesDocentes()
+            ->where('id_docente', $usuario->id_usuario)
+            ->exists();
+    }
+
+    public function monitorear(Usuario $usuario, Examen $examen): bool
+    {
+        if ($usuario->roles()->where('nombre_rol', Rol::NOMBRE_DOCENTE)->exists()) {
+            return $this->configurar($usuario, $examen)
+                && $examen->cursos()->where('curso.sis_doc', $usuario->id_usuario)->exists();
+        }
+
+        if (! $usuario->roles()->where('nombre_rol', Rol::NOMBRE_AUXILIAR)->exists()) {
+            return false;
+        }
+
+        return DB::table('auxiliar_curso')
+            ->join('examen_curso', 'examen_curso.id_curso', '=', 'auxiliar_curso.id_curso')
+            ->where('auxiliar_curso.id_auxiliar', $usuario->id_usuario)
+            ->where('examen_curso.id_examen', $examen->id_examen)
+            ->exists();
+    }
+
     public function invitarDocente(Usuario $usuario, Examen $examen): bool
     {
         $esDocente = $usuario->roles()

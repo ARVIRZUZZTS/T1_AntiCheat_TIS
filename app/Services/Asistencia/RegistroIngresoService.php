@@ -71,18 +71,21 @@ class RegistroIngresoService
      * @throws InvalidArgumentException Si el estudiante no está inscrito, no
      *                                  está habilitado o ya tiene un ingreso.
      */
-    public function registrar(string $sisEstudiante, int $idExamen, int $idRegistrador): RegistroAsistencia
-    {
-        return DB::transaction(function () use ($sisEstudiante, $idExamen, $idRegistrador) {
-            $inscripcion = $this->obtenerInscripcion($sisEstudiante, $idExamen);
+    public function registrar(
+        string $sisEstudiante,
+        int $idExamen,
+        int $idRegistrador,
+        ?int $idDocente = null,
+    ): RegistroAsistencia {
+        return DB::transaction(function () use ($sisEstudiante, $idExamen, $idRegistrador, $idDocente) {
+            $inscripcion = $this->obtenerInscripcion($sisEstudiante, $idExamen, $idDocente);
 
             if ($inscripcion->estado !== EstadoEstudianteExamen::Habilitado) {
                 throw new InvalidArgumentException('El estudiante no está habilitado para este examen.');
             }
 
             $existe = RegistroAsistencia::query()
-                ->where('id_estudiante', $sisEstudiante)
-                ->where('id_examen', $idExamen)
+                ->where('id_estudiante_examen', $inscripcion->id_estudiante_examen)
                 ->lockForUpdate()
                 ->exists();
 
@@ -96,6 +99,7 @@ class RegistroIngresoService
                 'id_examen' => $idExamen,
                 'id_estudiante' => $sisEstudiante,
                 'id_registrador' => $idRegistrador,
+                'id_estudiante_examen' => $inscripcion->id_estudiante_examen,
             ]);
         });
     }
@@ -113,9 +117,14 @@ class RegistroIngresoService
      *
      * @throws InvalidArgumentException Si el estudiante no está inscrito.
      */
-    public function rechazar(string $sisEstudiante, int $idExamen, int $idRegistrador, string $motivo = self::MOTIVO_RECHAZO): EstudianteExamen
-    {
-        return $this->cambiarEstado($sisEstudiante, $idExamen, EstadoEstudianteExamen::Deshabilitado, $motivo, $idRegistrador);
+    public function rechazar(
+        string $sisEstudiante,
+        int $idExamen,
+        int $idRegistrador,
+        string $motivo = self::MOTIVO_RECHAZO,
+        ?int $idDocente = null,
+    ): EstudianteExamen {
+        return $this->cambiarEstado($sisEstudiante, $idExamen, EstadoEstudianteExamen::Deshabilitado, $motivo, $idRegistrador, $idDocente);
     }
 
     /**
@@ -128,9 +137,13 @@ class RegistroIngresoService
      *
      * @throws InvalidArgumentException Si el estudiante no está inscrito.
      */
-    public function permitir(string $sisEstudiante, int $idExamen, int $idRegistrador): EstudianteExamen
-    {
-        return $this->cambiarEstado($sisEstudiante, $idExamen, EstadoEstudianteExamen::Habilitado, null, $idRegistrador);
+    public function permitir(
+        string $sisEstudiante,
+        int $idExamen,
+        int $idRegistrador,
+        ?int $idDocente = null,
+    ): EstudianteExamen {
+        return $this->cambiarEstado($sisEstudiante, $idExamen, EstadoEstudianteExamen::Habilitado, null, $idRegistrador, $idDocente);
     }
 
     /**
@@ -151,13 +164,15 @@ class RegistroIngresoService
         int $idRegistrador,
         Motivo $motivo,
         ?string $detalle = null,
+        ?int $idDocente = null,
     ): CentralRiesgo {
-        return DB::transaction(function () use ($sisEstudiante, $idExamen, $idRegistrador, $motivo, $detalle) {
+        return DB::transaction(function () use ($sisEstudiante, $idExamen, $idRegistrador, $motivo, $detalle, $idDocente) {
             if (! Estudiante::query()->where('sis_estudiante', $sisEstudiante)->exists()) {
                 throw new InvalidArgumentException('El estudiante no existe.');
             }
 
             $detalle = $detalle === null ? null : trim($detalle);
+            $inscripcion = $this->obtenerInscripcion($sisEstudiante, $idExamen, $idDocente);
 
             $registro = CentralRiesgo::create([
                 'id_registro' => $this->siguienteId(CentralRiesgo::class, 'id_registro'),
@@ -165,7 +180,9 @@ class RegistroIngresoService
                 'id_examen' => $idExamen,
                 // La central de riesgos lista por el curso registrado: sin él la
                 // incidencia quedaba "Sin materia" y fuera de "Mis materias".
-                'id_curso' => app(ResolverCursoIncidenciaService::class)->ejecutar($sisEstudiante, $idExamen),
+                'id_curso' => $inscripcion->id_curso
+                    ?? app(ResolverCursoIncidenciaService::class)->ejecutar($sisEstudiante, $idExamen, $idDocente),
+                'id_estudiante_examen' => $inscripcion->id_estudiante_examen,
                 'id_registrador' => $idRegistrador,
                 'motivo' => $motivo->value,
                 'detalle_motivo' => $detalle === '' ? null : $detalle,
@@ -200,9 +217,10 @@ class RegistroIngresoService
         EstadoEstudianteExamen $estado,
         ?string $motivo,
         int $idRegistrador,
+        ?int $idDocente,
     ): EstudianteExamen {
-        return DB::transaction(function () use ($sisEstudiante, $idExamen, $estado, $motivo, $idRegistrador) {
-            $inscripcion = $this->obtenerInscripcion($sisEstudiante, $idExamen);
+        return DB::transaction(function () use ($sisEstudiante, $idExamen, $estado, $motivo, $idRegistrador, $idDocente) {
+            $inscripcion = $this->obtenerInscripcion($sisEstudiante, $idExamen, $idDocente);
 
             // Habilitar a alguien ya habilitado es no-op; deshabilitar siempre
             // reescribe (puede traer un motivo nuevo).
@@ -229,11 +247,15 @@ class RegistroIngresoService
      *
      * @throws InvalidArgumentException Si el estudiante no está inscrito.
      */
-    private function obtenerInscripcion(string $sisEstudiante, int $idExamen): EstudianteExamen
-    {
+    private function obtenerInscripcion(
+        string $sisEstudiante,
+        int $idExamen,
+        ?int $idDocente = null,
+    ): EstudianteExamen {
         $inscripcion = EstudianteExamen::query()
             ->where('sis_estudiante', $sisEstudiante)
             ->where('id_examen', $idExamen)
+            ->when($idDocente !== null, fn ($query) => $query->delDocente($idDocente))
             ->lockForUpdate()
             ->first();
 

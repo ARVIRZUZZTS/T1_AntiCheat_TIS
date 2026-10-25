@@ -422,6 +422,14 @@ class RegistrarIncidencia extends Component
         $this->origen = (string) request()->query('origen', '');
         $this->rol = (string) request()->query('rol', Rol::NOMBRE_DOCENTE);
         $this->usuario = (int) request()->query('usuario', self::USUARIO_POR_DEFECTO);
+
+        if (auth()->check()) {
+            $this->usuario = (int) auth()->id();
+            $this->rol = auth()->user()->roles->contains('nombre_rol', Rol::NOMBRE_AUXILIAR)
+                ? Rol::NOMBRE_AUXILIAR
+                : Rol::NOMBRE_DOCENTE;
+        }
+
         $this->idExamen = (int) request()->query('examen', 0);
         $this->idCurso = (int) request()->query('curso', 0);
         $this->resolverCursoInicial();
@@ -587,7 +595,21 @@ class RegistrarIncidencia extends Component
             return [];
         }
 
-        $examen = Examen::query()->with('cursos')->find($this->idExamen);
+        $examen = Examen::query()->with(['cursos' => function ($consulta): void {
+            if (! auth()->check()) {
+                return;
+            }
+
+            if (auth()->user()->roles->contains('nombre_rol', Rol::NOMBRE_DOCENTE)) {
+                $consulta->where('curso.sis_doc', auth()->id());
+
+                return;
+            }
+
+            $consulta->whereIn('curso.id_curso', DB::table('auxiliar_curso')
+                ->where('id_auxiliar', auth()->id())
+                ->select('id_curso'));
+        }])->find($this->idExamen);
 
         if ($examen === null) {
             return [];
@@ -777,10 +799,20 @@ class RegistrarIncidencia extends Component
             return $this->catalogoEstudiantes();
         }
 
+        $inscripciones = EstudianteExamen::query()
+            ->select('sis_estudiante')
+            ->where('id_examen', $this->idExamen);
+
+        if (auth()->check() && auth()->user()->roles->contains('nombre_rol', Rol::NOMBRE_DOCENTE)) {
+            $inscripciones->delDocente((int) auth()->id());
+        } elseif (auth()->check()) {
+            $inscripciones->whereIn('id_curso', DB::table('auxiliar_curso')
+                ->where('id_auxiliar', auth()->id())
+                ->select('id_curso'));
+        }
+
         return Estudiante::query()
-            ->whereIn('sis_estudiante', EstudianteExamen::query()
-                ->select('sis_estudiante')
-                ->where('id_examen', $this->idExamen))
+            ->whereIn('sis_estudiante', $inscripciones)
             ->orderBy('nombre_estudiante')
             ->orderBy('apellido_estudiante')
             ->get(['sis_estudiante', 'nombre_estudiante', 'apellido_estudiante']);
@@ -1110,7 +1142,17 @@ class RegistrarIncidencia extends Component
             // curso del examen en el que está inscrito el estudiante, porque la
             // central de riesgos lista por el curso registrado.
             $idCurso = $this->idCursoParaGuardar()
-                ?? app(ResolverCursoIncidenciaService::class)->ejecutar($estudiante->sis_estudiante, (int) $idExamen);
+                ?? app(ResolverCursoIncidenciaService::class)->ejecutar(
+                    $estudiante->sis_estudiante,
+                    (int) $idExamen,
+                    auth()->check() && $this->rol === Rol::NOMBRE_DOCENTE ? (int) auth()->id() : null,
+                );
+
+            $inscripcion = EstudianteExamen::query()
+                ->where('id_examen', $idExamen)
+                ->where('sis_estudiante', $estudiante->sis_estudiante)
+                ->when($idCurso !== null, fn ($consulta) => $consulta->where('id_curso', $idCurso))
+                ->first();
 
             $registro = CentralRiesgo::create([
                 // La tabla no tiene secuencia: el id lo calcula la aplicación con
@@ -1119,6 +1161,7 @@ class RegistrarIncidencia extends Component
                 'sis_estudiante' => $estudiante->sis_estudiante,
                 'id_examen' => $idExamen,
                 'id_curso' => $idCurso,
+                'id_estudiante_examen' => $inscripcion?->id_estudiante_examen,
                 'id_registrador' => $this->usuario,
                 'motivo' => Motivo::from($this->tipoIncidencia),
                 // La descripción es opcional con los motivos del catálogo, así que
@@ -1145,7 +1188,12 @@ class RegistrarIncidencia extends Component
         // (MonitorEnVivo::informe()); si esta incidencia es de un examen que
         // el monitor está mostrando, sin esto el estudiante seguiría viéndose
         // "pendiente" hasta que la caché expire por su cuenta.
-        Cache::forget(MonitorEnVivo::CACHE_INFORME_PREFIJO.$registro->id_examen);
+        $idDocente = $registro->inscripcion?->configuracion?->id_docente;
+        if ($idDocente !== null) {
+            Cache::forget(
+                MonitorEnVivo::CACHE_INFORME_PREFIJO.$registro->id_examen.'.docente.'.$idDocente
+            );
+        }
 
         $nombreEnBase = $registro->estudiante === null
             ? ''

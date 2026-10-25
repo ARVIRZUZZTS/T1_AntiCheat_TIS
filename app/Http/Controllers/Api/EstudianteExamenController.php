@@ -24,9 +24,11 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Curso;
 use App\Services\Examen\ListarEstudiantesCursoConEstadoService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use InvalidArgumentException;
 
 class EstudianteExamenController extends Controller
@@ -36,6 +38,8 @@ class EstudianteExamenController extends Controller
         Request $request,
         ListarEstudiantesCursoConEstadoService $servicio,
     ): JsonResponse {
+        Gate::forUser($request->user())->authorize('gestionar', Curso::query()->findOrFail($idCurso));
+
         try {
             $estudiantes = $servicio->ejecutar(
                 $idCurso,
