@@ -76,6 +76,7 @@ class ListarExamenesCursoService
      * @param  Carbon|null  $ahora  Momento de referencia (para testing).
      * @return list<array{
      *     id: int,
+     *     nombre: string,
      *     tipo: string|null,
      *     fecha: string|null,
      *     hora_inicio: string|null,
@@ -127,9 +128,15 @@ class ListarExamenesCursoService
      */
     private function mapearExamen(Examen $examen, Carbon $ahora): array
     {
+        $tipo = TipoExamen::etiquetaDe($examen->tipoExamen?->nombre_tipo_examen);
+        $nombre = $examen->nombre_examen ?? $tipo ?? 'Examen #'.$examen->id_examen;
+
         return [
             'id' => $examen->id_examen,
-            'tipo' => TipoExamen::etiquetaDe($examen->tipoExamen?->nombre_tipo_examen),
+            'nombre' => $nombre,
+            // Compatibilidad con las pantallas actuales, que todavia leen
+            // `tipo`: para los examenes de HU-16 se muestra su nombre.
+            'tipo' => $examen->nombre_examen ?? $tipo,
             'fecha' => $examen->fecha,
             'hora_inicio' => $this->recortarHora($examen->hora_inicio),
             'hora_fin' => $this->recortarHora($examen->hora_fin),
