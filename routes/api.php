@@ -19,6 +19,7 @@
  */
 
 use App\Http\Controllers\Api\CentralRiesgoController;
+use App\Http\Controllers\Api\ConfiguracionExamenDocenteController;
 use App\Http\Controllers\Api\CursoEstudianteController;
 use App\Http\Controllers\Api\CursoExamenController;
 use App\Http\Controllers\Api\DetalleIncidenciaController;
@@ -85,19 +86,41 @@ Route::middleware(['web', 'auth:web'])->group(function (): void {
 
     Route::get('/reportes/horarios-ingreso/exportar', [ReporteHorarioIngresoController::class, 'exportar'])
         ->name('api.reportes.horarios-ingreso.exportar');
+
+    Route::get('/examenes/{examen}/configuracion', [ConfiguracionExamenDocenteController::class, 'mostrar'])
+        ->whereNumber('examen')
+        ->middleware('docente')
+        ->name('api.examenes.configuracion.mostrar');
+
+    Route::put('/examenes/{examen}/configuracion', [ConfiguracionExamenDocenteController::class, 'actualizar'])
+        ->whereNumber('examen')
+        ->middleware('docente')
+        ->name('api.examenes.configuracion.actualizar');
+
+    Route::post('/examenes/{examen}/cursos/{curso}', [ConfiguracionExamenDocenteController::class, 'vincularCurso'])
+        ->whereNumber('examen')
+        ->whereNumber('curso')
+        ->middleware('docente')
+        ->name('api.examenes.cursos.vincular');
+
+    Route::get('/cursos/{idCurso}/estudiantes', [CursoEstudianteController::class, 'index'])
+        ->whereNumber('idCurso')
+        ->middleware('docente')
+        ->name('api.cursos.estudiantes.listar');
+
+    Route::get('/cursos/{idCurso}/estudiantes/estado', [EstudianteExamenController::class, 'index'])
+        ->whereNumber('idCurso')
+        ->middleware('docente')
+        ->name('api.cursos.estudiantes.estado.listar');
+
+    Route::get('/examenes/{idExamen}/monitoreo', [ExamenMonitoreoController::class, 'asistencia'])
+        ->whereNumber('idExamen')
+        ->name('api.examenes.monitoreo.asistencia');
+
 });
 Route::get('/cursos/{idCurso}/examenes', [CursoExamenController::class, 'index'])
     ->whereNumber('idCurso')
     ->name('api.cursos.examenes.listar');
-
-Route::get('/cursos/{idCurso}/estudiantes', [CursoEstudianteController::class, 'index'])
-    ->name('api.cursos.estudiantes.listar');
-
-Route::get('/cursos/{idCurso}/estudiantes/estado', [EstudianteExamenController::class, 'index'])
-    ->name('api.cursos.estudiantes.estado.listar');
-
-Route::get('/examenes/{idExamen}/monitoreo', [ExamenMonitoreoController::class, 'asistencia'])
-    ->name('api.examenes.monitoreo.asistencia');
 
 Route::get('/central-riesgo', [CentralRiesgoController::class, 'index'])
     ->name('api.central-riesgo.listar');

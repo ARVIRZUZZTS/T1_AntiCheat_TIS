@@ -46,6 +46,7 @@
 namespace App\Models;
 
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -82,6 +83,14 @@ class Examen extends Model
         'creador',
         'tipo_examen',
     ];
+
+    public function scopeParaDocente(Builder $query, int $idDocente): Builder
+    {
+        return $query->whereHas(
+            'configuracionesDocentes',
+            fn (Builder $configuraciones): Builder => $configuraciones->where('id_docente', $idDocente)
+        );
+    }
 
     /**
      * Hora de fin derivada: la de inicio más la duración.
@@ -161,6 +170,16 @@ class Examen extends Model
     public function invitaciones(): HasMany
     {
         return $this->hasMany(InvitacionExamenCompartido::class, 'id_examen', 'id_examen');
+    }
+
+    public function configuracionesDocentes(): HasMany
+    {
+        return $this->hasMany(ConfiguracionExamenDocente::class, 'id_examen', 'id_examen');
+    }
+
+    public function configuracionDe(int $idDocente): ?ConfiguracionExamenDocente
+    {
+        return $this->configuracionesDocentes()->where('id_docente', $idDocente)->first();
     }
 
     /** @return BelongsToMany<Ambiente, $this> */
