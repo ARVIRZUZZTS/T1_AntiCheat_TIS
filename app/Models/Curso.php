@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
  * @property int $id_curso
  * @property string $nombre_curso
  * @property int $sis_doc
+ * @property ?int $id_ambiente
  * @property ?string $fecha_creacion
  * @property string $estado
  */
@@ -29,6 +30,7 @@ class Curso extends Model
         'id_curso',
         'nombre_curso',
         'sis_doc',
+        'id_ambiente',
         'fecha_creacion',
         'estado',
     ];
@@ -59,6 +61,12 @@ class Curso extends Model
     public function docente(): BelongsTo
     {
         return $this->belongsTo(Usuario::class, 'sis_doc', 'id_usuario');
+    }
+
+    /** @return BelongsTo<Ambiente, $this> */
+    public function ambiente(): BelongsTo
+    {
+        return $this->belongsTo(Ambiente::class, 'id_ambiente');
     }
 
     /**

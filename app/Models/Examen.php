@@ -53,12 +53,13 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * @property int $id_examen
+ * @property ?string $nombre_examen
  * @property ?string $fecha
  * @property ?string $hora_inicio
  * @property ?string $hora_fin Hora derivada (inicio + duración); no es columna.
  * @property ?int $duracion
  * @property int $creador
- * @property int $tipo_examen
+ * @property ?int $tipo_examen
  */
 class Examen extends Model
 {
@@ -74,6 +75,7 @@ class Examen extends Model
 
     protected $fillable = [
         'id_examen',
+        'nombre_examen',
         'fecha',
         'hora_inicio',
         'duracion',
@@ -147,6 +149,18 @@ class Examen extends Model
     public function tipoExamen(): BelongsTo
     {
         return $this->belongsTo(TipoExamen::class, 'tipo_examen');
+    }
+
+    /** @return BelongsTo<Usuario, $this> */
+    public function docenteCreador(): BelongsTo
+    {
+        return $this->belongsTo(Usuario::class, 'creador', 'id_usuario');
+    }
+
+    /** @return HasMany<InvitacionExamenCompartido, $this> */
+    public function invitaciones(): HasMany
+    {
+        return $this->hasMany(InvitacionExamenCompartido::class, 'id_examen', 'id_examen');
     }
 
     /** @return BelongsToMany<Ambiente, $this> */

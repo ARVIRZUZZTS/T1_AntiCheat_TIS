@@ -23,6 +23,12 @@ use Illuminate\Support\Facades\DB;
 
 class ExamenPolicy
 {
+    public function invitarDocente(Usuario $usuario, Examen $examen): bool
+    {
+        return (int) $examen->creador === (int) $usuario->id_usuario
+            && $usuario->roles()->where('nombre_rol', Rol::NOMBRE_DOCENTE)->exists();
+    }
+
     public function reporteHorarioIngreso(Usuario $usuario, Examen $examen, int $idCurso): bool
     {
         $esDocente = $usuario->roles()
