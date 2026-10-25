@@ -149,6 +149,18 @@ class Examen extends Model
         return $this->belongsTo(TipoExamen::class, 'tipo_examen');
     }
 
+    /** @return BelongsTo<Usuario, $this> */
+    public function docenteCreador(): BelongsTo
+    {
+        return $this->belongsTo(Usuario::class, 'creador', 'id_usuario');
+    }
+
+    /** @return HasMany<InvitacionExamenCompartido, $this> */
+    public function invitaciones(): HasMany
+    {
+        return $this->hasMany(InvitacionExamenCompartido::class, 'id_examen', 'id_examen');
+    }
+
     /** @return BelongsToMany<Ambiente, $this> */
     public function ambientes(): BelongsToMany
     {
