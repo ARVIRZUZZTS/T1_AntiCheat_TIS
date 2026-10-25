@@ -2,31 +2,12 @@
     @file    horario-ingreso.blade.php
     @author  Alex Candia <alex.leonar.candia@gmail.com>
     @created 2026-10-23
-    @updated 2026-10-23
+    @updated 2026-10-25
 
     @description
-    Pestaña "Reporte de Hora de ingreso". Es un parcial con su propio x-data:
-    así la página de reportes solo conserva los selectores de materia/examen y
-    cada reporte queda aislado en su archivo.
-
-    Los ids del curso y del examen no se pasan como props porque cambian con
-    Alpine. La página dispara `reporte-seleccion-actualizada` cuando cambia la
-    selección y este parcial lo escucha en window. Al recibirlo consulta el
-    endpoint; si el examen queda vacío solo limpia el estado.
-
-    El reporte no tiene filtros ni resumen: solo muestra la tabla con el
-    listado de ingresos del examen elegido.
-
-    @changelog
-    - 2026-10-23  [Alex Candia]  refactor: se extrae la pestaña de
-      reportes.blade.php a un parcial con su propio estado de Alpine.
-    - 2026-10-23  [Alex Candia]  fix: se eliminan los filtros por aula y rango
-      horario; el reporte muestra todos los ingresos del examen.
-    - 2026-10-23  [Alex Candia]  fix: se quitan el resumen de totales y primeros/últimos
-      ingresos; solo se muestra el listado.
-
-    @see  resources/views/pages/reportes.blade.php
-    @see  App\Http\Controllers\Api\ReporteHorarioIngresoController
+    Pestaña "Reporte de horarios de ingreso". Solo muestra tabla con
+    nombres, apellidos, código SIS, aula, hora de ingreso y hora de salida.
+    Orden por hora de ingreso del más temprano al más tardío.
 --}}
 
 <div
@@ -41,14 +22,8 @@
         errorReporte: '',
         cache: {},
         abortController: null,
-        mostrarPrueba: false,
 
         get hayDatos() {
-            try {
-                if (typeof localStorage !== 'undefined' && this.mostrarPrueba && localStorage.getItem('reportes_pruebas') !== 'off') {
-                    return true;
-                }
-            } catch (e) {}
             return this.horario !== null && this.horario && ! this.horario.sin_datos && Array.isArray(this.horario.estudiantes) && this.horario.estudiantes.length > 0;
         },
 
@@ -158,18 +133,6 @@
 
         <template x-if="!cargando && !errorReporte && horario">
             <div class="space-y-6">
-                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    <x-ui.stat-card label="Estudiantes que ingresaron" tone="brand">
-                        <x-slot:metric><span x-text="(horario && !horario.sin_datos && Array.isArray(horario.estudiantes)) ? horario.estudiantes.length : 0"></span></x-slot:metric>
-                    </x-ui.stat-card>
-                    <x-ui.stat-card label="Primer ingreso" tone="success">
-                        <x-slot:metric><span x-text="(horario && horario.resumen && horario.resumen.primer_ingreso) ? horario.resumen.primer_ingreso : '-'"></span></x-slot:metric>
-                    </x-ui.stat-card>
-                    <x-ui.stat-card label="Último ingreso" tone="warning">
-                        <x-slot:metric><span x-text="(horario && horario.resumen && horario.resumen.ultimo_ingreso) ? horario.resumen.ultimo_ingreso : '-'"></span></x-slot:metric>
-                    </x-ui.stat-card>
-                </div>
-
                 <div class="flex flex-wrap items-start justify-between gap-3">
                     <div class="min-w-0">
                         <h2 class="text-lg font-semibold text-heading" x-text="'Horarios de ingreso - ' + (horario.materia ? horario.materia.nombre : '')"></h2>
@@ -191,7 +154,7 @@
                 </p>
 
                 <div x-show="!horario.sin_datos && Array.isArray(horario.estudiantes) && horario.estudiantes.length > 0" class="space-y-4 overflow-x-auto">
-                    <x-ui.table :headers="['Nombres', 'Apellidos', 'Código SIS', 'Aula', 'Hora de ingreso']" min-width="min-w-[640px]">
+                    <x-ui.table :headers="['Nombres', 'Apellidos', 'Código SIS', 'Aula', 'Hora de ingreso', 'Hora de salida']" min-width="min-w-[720px]">
                         <x-slot:body>
                             <template x-for="estudiante in [...horario.estudiantes].sort((a,b)=>((a.hora_ingreso||'').localeCompare(b.hora_ingreso||'')))" :key="estudiante.sis + estudiante.hora_ingreso">
                                 <tr class="border-b border-default bg-neutral-primary last:border-0">
@@ -200,6 +163,7 @@
                                     <td class="px-6 py-4 font-mono" x-text="estudiante.sis"></td>
                                     <td class="px-6 py-4" x-text="estudiante.aula || 'Sin aula'"></td>
                                     <td class="px-6 py-4 font-medium text-heading" x-text="estudiante.hora_ingreso || 'Sin registro'"></td>
+                                    <td class="px-6 py-4 text-heading" x-text="(estudiante.hora_salida && estudiante.hora_salida !== '') ? estudiante.hora_salida : '-'"></td>
                                 </tr>
                             </template>
                         </x-slot:body>
