@@ -41,9 +41,15 @@
         errorReporte: '',
         cache: {},
         abortController: null,
+        mostrarPrueba: false,
 
         get hayDatos() {
-            return this.horario !== null && ! this.horario.sin_datos;
+            try {
+                if (typeof localStorage !== 'undefined' && this.mostrarPrueba && localStorage.getItem('reportes_pruebas') !== 'off') {
+                    return true;
+                }
+            } catch (e) {}
+            return this.horario !== null && this.horario && ! this.horario.sin_datos && Array.isArray(this.horario.estudiantes) && this.horario.estudiantes.length > 0;
         },
 
         actualizarSeleccion(evento) {
@@ -52,7 +58,7 @@
             this.idExamen = detalle.idExamen ?? null;
             this.errorReporte = '';
 
-            if (! this.idCurso || ! this.idExamen) {
+            if (this.idCurso === undefined || this.idCurso === '' || this.idExamen === undefined || this.idExamen === '') {
                 if (this.abortController) {
                     this.abortController.abort();
                     this.abortController = null;
@@ -150,43 +156,55 @@
         <span x-text="errorReporte"></span>
     </x-ui.alert>
 
-    <template x-if="horario && ! cargando && ! errorReporte">
-        <div class="space-y-6">
-            <div class="flex flex-wrap items-start justify-between gap-3">
-                <div class="min-w-0">
-                    <h2 class="text-lg font-semibold text-heading" x-text="'Ingresos de ' + horario.materia.nombre"></h2>
-                    <p class="mt-1 text-sm text-body" x-text="horario.examen.tipo + (horario.examen.fecha_formateada ? ' - ' + horario.examen.fecha_formateada : '')"></p>
+        <template x-if="!cargando && !errorReporte && horario">
+            <div class="space-y-6">
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    <x-ui.stat-card label="Estudiantes que ingresaron" tone="brand">
+                        <x-slot:metric><span x-text="(horario && !horario.sin_datos && Array.isArray(horario.estudiantes)) ? horario.estudiantes.length : 0"></span></x-slot:metric>
+                    </x-ui.stat-card>
+                    <x-ui.stat-card label="Primer ingreso" tone="success">
+                        <x-slot:metric><span x-text="(horario && horario.resumen && horario.resumen.primer_ingreso) ? horario.resumen.primer_ingreso : '-'"></span></x-slot:metric>
+                    </x-ui.stat-card>
+                    <x-ui.stat-card label="Último ingreso" tone="warning">
+                        <x-slot:metric><span x-text="(horario && horario.resumen && horario.resumen.ultimo_ingreso) ? horario.resumen.ultimo_ingreso : '-'"></span></x-slot:metric>
+                    </x-ui.stat-card>
                 </div>
 
-                <x-ui.button
-                    variant="success"
-                    @click="exportar()"
-                    x-bind:disabled="! hayDatos"
-                    x-bind:class="hayDatos ? '' : 'opacity-50 cursor-not-allowed'"
-                >
-                    Exportar a Excel
-                </x-ui.button>
-            </div>
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div class="min-w-0">
+                        <h2 class="text-lg font-semibold text-heading" x-text="'Horarios de ingreso - ' + (horario.materia ? horario.materia.nombre : '')"></h2>
+                        <p class="mt-1 text-sm text-body" x-text="(horario.examen ? horario.examen.tipo : '') + (horario.examen && horario.examen.fecha_formateada ? ' · ' + horario.examen.fecha_formateada : '')"></p>
+                    </div>
 
-            <p x-show="horario.sin_datos" class="rounded-base border border-default bg-neutral-primary-soft p-8 text-center text-sm text-body">
-                No hay ingresos registrados.
-            </p>
+                    <x-ui.button
+                        variant="success"
+                        @click="exportar()"
+                        x-bind:disabled="! hayDatos"
+                        x-bind:class="hayDatos ? '' : 'opacity-50 cursor-not-allowed'"
+                    >
+                        Exportar a Excel
+                    </x-ui.button>
+                </div>
 
-            <div x-show="! horario.sin_datos" class="space-y-4">
-                <x-ui.table :headers="['Nombres', 'Apellidos', 'Código SIS', 'Aula', 'Hora de ingreso']" min-width="min-w-[640px]">
-                    <x-slot:body>
-                        <template x-for="estudiante in horario.estudiantes" :key="estudiante.sis + estudiante.hora_ingreso">
-                            <tr class="border-b border-default bg-neutral-primary last:border-0">
-                                <td class="px-6 py-4" x-text="estudiante.nombres"></td>
-                                <td class="px-6 py-4" x-text="estudiante.apellidos"></td>
-                                <td class="px-6 py-4" x-text="estudiante.sis"></td>
-                                <td class="px-6 py-4" x-text="estudiante.aula || 'Sin aula'"></td>
-                                <td class="px-6 py-4 font-medium text-heading" x-text="estudiante.hora_ingreso || 'Sin registro'"></td>
-                            </tr>
-                        </template>
-                    </x-slot:body>
-                </x-ui.table>
+                <p x-show="horario.sin_datos || !Array.isArray(horario.estudiantes) || horario.estudiantes.length === 0" class="rounded-base border border-default bg-neutral-primary-soft p-8 text-center text-sm text-body">
+                    No hay ingresos registrados.
+                </p>
+
+                <div x-show="!horario.sin_datos && Array.isArray(horario.estudiantes) && horario.estudiantes.length > 0" class="space-y-4 overflow-x-auto">
+                    <x-ui.table :headers="['Nombres', 'Apellidos', 'Código SIS', 'Aula', 'Hora de ingreso']" min-width="min-w-[640px]">
+                        <x-slot:body>
+                            <template x-for="estudiante in [...horario.estudiantes].sort((a,b)=>((a.hora_ingreso||'').localeCompare(b.hora_ingreso||'')))" :key="estudiante.sis + estudiante.hora_ingreso">
+                                <tr class="border-b border-default bg-neutral-primary last:border-0">
+                                    <td class="px-6 py-4" x-text="estudiante.nombres"></td>
+                                    <td class="px-6 py-4" x-text="estudiante.apellidos"></td>
+                                    <td class="px-6 py-4 font-mono" x-text="estudiante.sis"></td>
+                                    <td class="px-6 py-4" x-text="estudiante.aula || 'Sin aula'"></td>
+                                    <td class="px-6 py-4 font-medium text-heading" x-text="estudiante.hora_ingreso || 'Sin registro'"></td>
+                                </tr>
+                            </template>
+                        </x-slot:body>
+                    </x-ui.table>
+                </div>
             </div>
-        </div>
-    </template>
+        </template>
 </div>
