@@ -5,6 +5,7 @@
     @updated 2026-10-10
     @updated 2026-10-24
     @updated 2026-10-25
+    @updated 2026-10-26
 
     @description
     Exámenes de la materia elegida en la página única Exámenes. Arriba va el
@@ -54,6 +55,8 @@
       y el curso inicial; agrega el selector arriba y oculta las cuatro pestañas
       mientras no haya materia. El fetch, el formulario y las pestañas se
       actualizan sin salir de la página.
+    - 2026-10-26  [Alisson D. Alvarado]  feat: conecta el botón "Dividir" con la
+      vista previa y los modales de división de examen.
 
     @see  App\Http\Controllers\Api\CursoExamenController
     @see  App\Http\Controllers\ExamenController
@@ -99,6 +102,8 @@
          // Examen elegido en las pestañas Invitar y Dividir.
          seleccionado: '',
          criterioDivision: '',
+         errorDivision: '',
+         urlPreviewDivision: @js(route('api.examenes.dividir.preview', ['examen' => '__ID__'])),
          get hayCurso() {
              return this.cursoSeleccionado !== '';
          },
@@ -116,6 +121,7 @@
              this.cursoNombre = this.cursos[this.cursoSeleccionado] ?? '';
              this.seleccionado = '';
              this.criterioDivision = '';
+             this.errorDivision = '';
              this.actualizarUrl();
              this.avisarFormulario();
              this.cargar();
@@ -141,6 +147,7 @@
 
              this.seleccionado = '';
              this.criterioDivision = '';
+             this.errorDivision = '';
 
              if (! this.hayCurso) {
                  this.examenes = [];
@@ -179,6 +186,47 @@
          seleccionar(id) {
              this.seleccionado = id;
              this.criterioDivision = '';
+             this.errorDivision = '';
+         },
+         async abrirModalDivision() {
+             if (this.seleccionado === '' || this.criterioDivision === '' || ! this.puedeDividir) {
+                 return;
+             }
+
+             this.errorDivision = '';
+
+             try {
+                 const url = this.urlPreviewDivision.replace('__ID__', this.seleccionado);
+                 const respuesta = await fetch(url, {
+                     method: 'POST',
+                     headers: {
+                         'Content-Type': 'application/json',
+                         'Accept': 'application/json',
+                         'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content
+                     },
+                     body: JSON.stringify({
+                         ambientes: (this.examenSeleccionado.ambientes || []).map((ambiente) => ambiente.id),
+                         division_por: this.criterioDivision
+                     })
+                 });
+                 const cuerpo = await respuesta.json().catch(() => ({}));
+
+                 if (! respuesta.ok || ! cuerpo.exito) {
+                     this.errorDivision = cuerpo.mensaje || cuerpo.message || 'No se pudo preparar la division.';
+                     return;
+                 }
+
+                 window.dispatchEvent(new CustomEvent('abrir-modal-dividir', {
+                     detail: {
+                         examenId: this.seleccionado,
+                         ambientes: cuerpo.ambientes,
+                         divisionPor: this.criterioDivision,
+                         total: cuerpo.total_estudiantes
+                     }
+                 }));
+             } catch (e) {
+                 this.errorDivision = 'No se pudo conectar con el servidor.';
+             }
          },
          alternarDivision() {
              if (this.seleccionado === null) {
@@ -195,6 +243,7 @@
              this.seleccionado = null;
              this.panelDivision = false;
              this.criterioDivision = '';
+             this.errorDivision = '';
          },
          fechaDe(examen) {
              if (!examen.fecha) {
@@ -432,7 +481,8 @@
         <div x-show="estado === 'listo' && examenes.length > 0" class="flex flex-col gap-4">
             <div class="min-w-0 max-w-md">
                 <label for="examen-dividir" class="block mb-2.5 text-sm font-medium text-heading">Examen</label>
-                <select id="examen-dividir" x-model="seleccionado" @change="criterioDivision = ''"
+                <select id="examen-dividir" x-model="seleccionado"
+                        @change="criterioDivision = ''; errorDivision = ''"
                         class="block w-full px-3 py-2.5 border text-sm rounded-base shadow-xs bg-neutral-secondary-medium border-default-medium text-heading focus:ring-brand focus:border-brand">
                     <option value="" disabled>Selecciona un examen</option>
                     <template x-for="examen in examenes" :key="'dividir-' + examen.id">
@@ -457,6 +507,7 @@
                                 label="Dividir por"
                                 name="division_por"
                                 x-model="criterioDivision"
+                                @change="errorDivision = ''"
                                 :options="$opcionesDivision"
                                 placeholder="Selecciona un criterio"
                             />
@@ -464,11 +515,18 @@
 
                         <x-ui.button
                             variant="default"
+                            @click="abrirModalDivision()"
                             x-bind:disabled="criterioDivision === ''"
                             x-bind:class="criterioDivision === '' ? 'opacity-50 cursor-not-allowed' : ''"
                         >
                             Dividir
                         </x-ui.button>
+                    </div>
+
+                    <div x-show="errorDivision !== ''" x-cloak>
+                        <x-ui.alert type="danger" title="No se pudo preparar la division">
+                            <span x-text="errorDivision"></span>
+                        </x-ui.alert>
                     </div>
                 </div>
             </template>
@@ -476,3 +534,6 @@
     </section>
     </div>
 </div>
+    {{-- Modales de división de examen --}}
+    <x-ui.modal-dividir-examen />
+    <x-ui.modal-division-exitosa />
