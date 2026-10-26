@@ -9,8 +9,9 @@
  *
  * @updated 2026-10-09
  * @updated 2026-10-24
+ * @updated 2026-10-26
  *
- * @description Confirma o descarta incidencias pendientes dentro de una transacción.
+ * @description Confirma o descarta incidencias pendientes (sospechosas) dentro de una transacción.
  *
  * @changelog
  * - 2026-10-09  [Diego Tejerina]  feat: resolver incidencias sin duplicados (#142).
@@ -20,13 +21,15 @@
  *   `tramposo`, porque la central de riesgos ahora lista por tipo de
  *   infracción (tramposo = confirmado); sin esto un caso confirmado no
  *   aparecía en la central.
+ * - 2026-10-26  [Valery D. Ortuno P]  refactor: pendiente es sospechoso y
+ *   confirmar solo lo pasa a tramposo; ya no se escriben `estado_incidencia`
+ *   ni `id_confirmador`, eliminadas de la base.
  *
  * @see App\Policies\CentralRiesgoPolicy
  */
 
 namespace App\Services\CentralRiesgo;
 
-use App\Enums\EstadoIncidencia;
 use App\Enums\TipoInfraccion;
 use App\Models\CentralRiesgo;
 use App\Models\Usuario;
@@ -54,10 +57,7 @@ class ResolverIncidenciaService
             $incidencia = $this->obtenerPendiente($idIncidencia, $docente);
             // Tramposo equivale a confirmado: la central de riesgos lista por
             // tipo de infracción, así que el caso pasa de sospechoso a tramposo.
-            // `estado_incidencia` se sigue escribiendo mientras exista la columna.
             $incidencia->tipo_infraccion = TipoInfraccion::Tramposo;
-            $incidencia->estado_incidencia = EstadoIncidencia::Confirmado;
-            $incidencia->id_confirmador = $docente->id_usuario;
             $incidencia->save();
 
             // HU 6 · T1: confirmar es el momento en que el caso del auxiliar
@@ -95,7 +95,7 @@ class ResolverIncidenciaService
         $incidencia = CentralRiesgo::query()->lockForUpdate()->findOrFail($idIncidencia);
         Gate::forUser($docente)->authorize('resolver', $incidencia);
 
-        if ($incidencia->estado_incidencia !== EstadoIncidencia::Pendiente) {
+        if ($incidencia->tipo_infraccion !== TipoInfraccion::Sospechoso) {
             throw new InvalidArgumentException('Solo se pueden resolver incidencias pendientes de revisión.');
         }
 

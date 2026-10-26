@@ -8,6 +8,7 @@
  * @created 2026-09-24
  *
  * @updated 2026-10-11
+ * @updated 2026-10-26
  *
  * @description
  * Modelo de la tabla `central_riesgo`: mapea las infracciones registradas
@@ -41,11 +42,13 @@
  * - 2026-10-11  [Valery D. Ortuno P]  feat: al guardar o borrar una incidencia
  *   se invalida la caché de la central de riesgos (lista y detalle), para que
  *   las escrituras se vean al instante aunque la pantalla cachee.
+ * - 2026-10-26  [Valery D. Ortuno P]  refactor: se quitan `estado_incidencia`
+ *   e `id_confirmador`, eliminadas de la base; el estado sale de
+ *   `tipo_infraccion` (TipoInfraccion::estado()).
  */
 
 namespace App\Models;
 
-use App\Enums\EstadoIncidencia;
 use App\Enums\Motivo;
 use App\Enums\TipoInfraccion;
 use App\Services\CentralRiesgo\CacheCentralRiesgo;
@@ -60,12 +63,10 @@ use Illuminate\Support\Carbon;
  * @property int $id_examen
  * @property ?int $id_curso
  * @property int $id_registrador
- * @property int $id_confirmador
  * @property Motivo $motivo
  * @property ?string $detalle_motivo
  * @property Carbon $fecha_registro
  * @property TipoInfraccion $tipo_infraccion
- * @property EstadoIncidencia $estado_incidencia
  * @property ?int $id_estudiante_examen
  */
 class CentralRiesgo extends Model
@@ -86,12 +87,10 @@ class CentralRiesgo extends Model
         'id_examen',
         'id_curso',
         'id_registrador',
-        'id_confirmador',
         'motivo',
         'detalle_motivo',
         'fecha_registro',
         'tipo_infraccion',
-        'estado_incidencia',
         'id_estudiante_examen',
     ];
 
@@ -101,7 +100,6 @@ class CentralRiesgo extends Model
             'fecha_registro' => 'datetime',
             'motivo' => Motivo::class,
             'tipo_infraccion' => TipoInfraccion::class,
-            'estado_incidencia' => EstadoIncidencia::class,
         ];
     }
 

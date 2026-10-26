@@ -8,11 +8,15 @@
  * @created 2026-10-09
  *
  * @updated 2026-10-09
+ * @updated 2026-10-26
  *
  * @description Endpoints JSON de confirmación y rechazo de incidencias pendientes.
  *
  * @changelog
  * - 2026-10-09  [Diego Tejerina]  feat: agregar endpoints de resolución (#142).
+ * - 2026-10-26  [Valery D. Ortuno P]  refactor: la respuesta lleva
+ *   `tipo_infraccion` en vez de `estado_incidencia` e `id_confirmador`,
+ *   eliminadas de la base.
  */
 
 namespace App\Http\Controllers\Api;
@@ -49,7 +53,10 @@ class ResolverIncidenciaController extends Controller
         }
 
         return response()->json([
-            'datos' => $incidencia->only(['id_registro', 'estado_incidencia', 'id_confirmador']),
+            'datos' => [
+                'id_registro' => $incidencia->id_registro,
+                'tipo_infraccion' => $incidencia->tipo_infraccion->value,
+            ],
             'mensaje' => 'Incidencia confirmada correctamente.',
         ]);
     }
@@ -75,7 +82,7 @@ class ResolverIncidenciaController extends Controller
         }
 
         return response()->json([
-            'datos' => ['id_registro' => $idIncidencia, 'estado_incidencia' => 'Rechazado'],
+            'datos' => ['id_registro' => $idIncidencia],
             'mensaje' => 'Incidencia rechazada correctamente.',
         ]);
     }
