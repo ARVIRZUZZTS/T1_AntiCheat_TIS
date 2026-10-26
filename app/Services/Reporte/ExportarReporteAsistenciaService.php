@@ -1,8 +1,34 @@
 <?php
 
+/**
+ * @file    ExportarReporteAsistenciaService.php
+ *
+ * @author  Candy <camitkdos@gmail.com>
+ *
+ * @created 2026-10-25
+ *
+ * @updated 2026-10-26
+ *
+ * @description
+ * Servicio que arma el Excel del reporte de asistencia de un examen a partir
+ * de `GenerarReporteAsistenciaService`: hoja de resumen por aula y docente,
+ * detalle de presentes y detalle de ausentes, empaquetado por
+ * `GenerarXlsxService`.
+ *
+ * @changelog
+ * - 2026-10-25  [Candy]  feat: creación inicial con exportación a Excel del
+ *   reporte de asistencia (resumen, presentes y ausentes).
+ * - 2026-10-26  [OchoaCesar]  fix: la columna "Docente a cargo" toma
+ *   `docente_cargo` (el docente real de la configuración del estudiante) en
+ *   vez del registrador: salía "Sin registro" para los ingresos aún no
+ *   confirmados en el monitor.
+ *
+ * @see  App\Services\Monitoreo\GenerarReporteAsistenciaService
+ * @see  App\Services\Reporte\GenerarXlsxService
+ */
+
 namespace App\Services\Reporte;
 
-use App\Models\Examen;
 use App\Services\Monitoreo\GenerarReporteAsistenciaService;
 use Illuminate\Support\Str;
 
@@ -32,13 +58,13 @@ class ExportarReporteAsistenciaService
             if (is_array($aula)) {
                 $aula = implode(', ', $aula);
             }
-            $docente = $e['registrador'] ?? '';
+            $docente = $e['docente_cargo'] ?? ($e['registrador'] ?? '');
             if (is_array($docente)) {
                 $docente = trim(($docente['nombre_usuario'] ?? '').' '.($docente['apellido'] ?? ''));
             }
             $clave = $aula.'|'.$docente;
             if (! isset($agrupado[$clave])) {
-                $agrupado[$clave] = ['aula' => $aula, 'docente' => $docente ?: 'Sin registro', 'registrados' => 0, 'presentes' => 0, 'ausentes' => 0];
+                $agrupado[$clave] = ['aula' => $aula, 'docente' => $docente ?: 'Sin docente', 'registrados' => 0, 'presentes' => 0, 'ausentes' => 0];
             }
             $agrupado[$clave]['registrados']++;
             if (($e['estado_asistencia'] ?? '') === 'presente') {

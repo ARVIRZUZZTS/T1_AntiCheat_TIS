@@ -2,10 +2,20 @@
     @file    asistencia.blade.php
     @author  AI Assistant
     @created 2026-10-24
+    @updated 2026-10-26
 
     @description
     Pestaña "Reporte de asistencia" (HU-7). Parcial con su propio x-data
     que escucha el evento global de selección de materia/examen.
+
+    @changelog
+    - 2026-10-26  [OchoaCesar]  fix: `registrador` es un string en los datos
+      reales del endpoint (no un objeto), así que la tabla, los filtros y el
+      mock de prueba pasan a leerlo como texto: antes pintaban "undefined".
+    - 2026-10-26  [OchoaCesar]  fix: el resumen por aula agrupa y muestra el
+      `docente_cargo` real (configuración del estudiante) en vez del
+      registrador: con "Todos los docentes" la columna "Docente a cargo"
+      salía "Sin registro" para todo ingreso aún no confirmado.
 --}}
 <div
     x-data="{
@@ -39,10 +49,10 @@
             return {
                 examen: { tipo_examen: { nombre_tipo_examen: 'Examen Parcial' }, fecha: new Date().toISOString().slice(0,10), hora_inicio: '08:00' },
                 estudiantes: [
-                    { sis: '20180001', nombre: 'Juan Carlos', apellido: 'Pérez López de Mendoza', aula: 'Aula 101 - Edificio A', hora_ingreso: '08:05', estado_asistencia: 'presente', registrador: { nombre_usuario: 'Docente', apellido: 'Titular' } },
-                    { sis: '20180002', nombre: 'María Fernanda', apellido: 'González Rodríguez', aula: 'Aula 101 - Edificio A', hora_ingreso: null, estado_asistencia: 'pendiente', registrador: null },
-                    { sis: '20180003', nombre: 'Luis Alberto', apellido: 'Quispe Mamani', aula: 'Aula 102 - Edificio B', hora_ingreso: '08:12', estado_asistencia: 'presente', registrador: { nombre_usuario: 'Auxiliar', apellido: 'de Laboratorio' } },
-                    { sis: '99999999', nombre: 'Nombre Extremadamente Largo Para Probar', apellido: 'Apellido También Muy Largo Que Podría Romper El Diseño', aula: 'Aula con Nombre Extremadamente Largo Para Pruebas', hora_ingreso: null, estado_asistencia: 'pendiente', registrador: null },
+                    { sis: '20180001', nombre: 'Juan Carlos', apellido: 'Pérez López de Mendoza', aula: 'Aula 101 - Edificio A', hora_ingreso: '08:05', estado_asistencia: 'presente', registrador: 'Docente Titular', docente_cargo: 'Docente Titular' },
+                    { sis: '20180002', nombre: 'María Fernanda', apellido: 'González Rodríguez', aula: 'Aula 101 - Edificio A', hora_ingreso: null, estado_asistencia: 'pendiente', registrador: null, docente_cargo: 'Docente Titular' },
+                    { sis: '20180003', nombre: 'Luis Alberto', apellido: 'Quispe Mamani', aula: 'Aula 102 - Edificio B', hora_ingreso: '08:12', estado_asistencia: 'presente', registrador: 'Auxiliar de Laboratorio', docente_cargo: 'Docente Titular' },
+                    { sis: '99999999', nombre: 'Nombre Extremadamente Largo Para Probar', apellido: 'Apellido También Muy Largo Que Podría Romper El Diseño', aula: 'Aula con Nombre Extremadamente Largo Para Pruebas', hora_ingreso: null, estado_asistencia: 'pendiente', registrador: null, docente_cargo: 'Docente Titular' },
                 ]
             };
         },
@@ -60,7 +70,7 @@
             }
             if (this.filtroDocente) {
                 lista = lista.filter(e => {
-                    const reg = e.registrador ? (e.registrador.nombre_usuario + ' ' + e.registrador.apellido).toLowerCase() : '';
+                    const reg = (e.registrador || '').toLowerCase();
                     return reg.includes(this.filtroDocente.toLowerCase());
                 });
             }
@@ -91,7 +101,7 @@
             const set = new Set();
             f.estudiantes.forEach(e => {
                 if (e.registrador) {
-                    set.add((e.registrador.nombre_usuario + ' ' + e.registrador.apellido));
+                    set.add(e.registrador);
                 }
             });
             return [...set];
@@ -101,12 +111,14 @@
             const res = {};
             this.estudiantes.forEach(e => {
                 const aula = e.aula || 'Sin aula';
-                if (! res[aula]) {
-                    res[aula] = { aula, docente: e.registrador ? (e.registrador.nombre_usuario + ' ' + e.registrador.apellido) : 'Sin registro', registrados: 0, presentes: 0, ausentes: 0 };
+                const docente = e.docente_cargo || 'Sin docente';
+                const clave = aula + '|' + docente;
+                if (! res[clave]) {
+                    res[clave] = { aula, docente, registrados: 0, presentes: 0, ausentes: 0 };
                 }
-                res[aula].registrados++;
-                if (e.estado_asistencia === 'presente') res[aula].presentes++;
-                else res[aula].ausentes++;
+                res[clave].registrados++;
+                if (e.estado_asistencia === 'presente') res[clave].presentes++;
+                else res[clave].ausentes++;
             });
             return Object.values(res);
         },
@@ -298,7 +310,7 @@
                         <div class="overflow-x-auto">
                             <x-ui.table :headers="['Aula', 'Docente a cargo', 'Registrados', 'Presentes', 'Ausentes']" min-width="min-w-[640px]">
                                 <x-slot:body>
-                                    <template x-for="r in resumenPorAula" :key="r.aula">
+                                    <template x-for="r in resumenPorAula" :key="r.aula + '|' + r.docente">
                                         <tr class="border-b border-default bg-neutral-primary last:border-0">
                                             <td class="px-6 py-4" x-text="r.aula"></td>
                                             <td class="px-6 py-4" x-text="r.docente"></td>
