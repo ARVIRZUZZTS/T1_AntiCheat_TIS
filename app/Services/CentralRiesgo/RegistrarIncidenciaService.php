@@ -7,6 +7,8 @@
  *
  * @created 2026-10-25
  *
+ * @updated 2026-10-26
+ *
  * @description
  * Registro de una incidencia en la central de riesgos desde el monitor en vivo
  * (HU 5). Es el único camino de registro: lo usan el registro rápido del
@@ -14,8 +16,8 @@
  *
  * Reglas:
  *  - Tipo según el rol del registrador: un docente registra `tramposo`
- *    (confirmado) y un auxiliar `sospechoso` (en revisión). Solo se guarda
- *    `tipo_infraccion`; `estado_incidencia` se va a eliminar.
+ *    (confirmado) y un auxiliar `sospechoso` (en revisión); el tipo es
+ *    también el estado de la incidencia.
  *  - Motivo de la lista del origen (Motivo::paraIngreso() o paraMonitor()).
  *    La descripción admite hasta 300 caracteres y es obligatoria con "Otro".
  *  - Si el SIS no existe en la base, se da de alta al estudiante con los datos
@@ -29,6 +31,9 @@
  *
  * @changelog
  * - 2026-10-25  [Valery D. Ortuno P]  feat: creación inicial del servicio.
+ * - 2026-10-26  [Valery D. Ortuno P]  perf: el estudiante y su inscripción salen
+ *   de una sola consulta, y la incidencia llega a las notificaciones con el
+ *   estudiante ya cargado (no lo vuelven a consultar): dos viajes menos.
  *
  * @see  App\Support\DTO\RegistroIncidenciaDTO
  * @see  App\Livewire\Monitoreo\MonitorEnVivo
@@ -94,23 +99,21 @@ class RegistrarIncidenciaService
         $esAuxiliar = self::esAuxiliar($registrador);
 
         $registro = DB::transaction(function () use ($datos, $sis, $motivo, $detalle, $registrador, $idDocente, $esAuxiliar): CentralRiesgo {
-            $estudiante = Estudiante::query()->find($sis) ?? $this->altaNoVerificado($sis, $datos);
-
-            $inscripcion = EstudianteExamen::query()
-                ->where('sis_estudiante', $sis)
-                ->where('id_examen', $datos->idExamen)
-                ->delDocente($idDocente)
-                ->first();
+            $estudiante = $this->estudianteConInscripcion($sis, $datos->idExamen, $idDocente)
+                ?? $this->altaNoVerificado($sis, $datos);
+            $idInscripcion = $estudiante->getAttribute('inscripcion_id');
+            $idCursoInscripcion = $estudiante->getAttribute('inscripcion_curso');
 
             DB::statement('LOCK TABLE central_riesgo IN SHARE ROW EXCLUSIVE MODE');
 
-            return CentralRiesgo::create([
+            $incidencia = CentralRiesgo::create([
                 'id_registro' => (int) CentralRiesgo::query()->max('id_registro') + 1,
                 'sis_estudiante' => $estudiante->sis_estudiante,
                 'id_examen' => $datos->idExamen,
-                'id_curso' => $inscripcion?->id_curso
-                    ?? $this->cursoDelRegistrador($registrador, $datos->idExamen, $esAuxiliar),
-                'id_estudiante_examen' => $inscripcion?->id_estudiante_examen,
+                'id_curso' => $idCursoInscripcion !== null
+                    ? (int) $idCursoInscripcion
+                    : $this->cursoDelRegistrador($registrador, $datos->idExamen, $esAuxiliar),
+                'id_estudiante_examen' => $idInscripcion !== null ? (int) $idInscripcion : null,
                 'id_registrador' => $registrador->id_usuario,
                 'motivo' => $motivo->value,
                 'detalle_motivo' => $detalle,
@@ -119,6 +122,10 @@ class RegistrarIncidenciaService
                     ? TipoInfraccion::Sospechoso->value
                     : TipoInfraccion::Tramposo->value,
             ]);
+
+            // Las notificaciones leen el estudiante de la incidencia: ya lo
+            // tenemos, así que no hace falta otra consulta.
+            return $incidencia->setRelation('estudiante', $estudiante);
         });
 
         // El servicio de notificaciones decide qué aviso aplica: "Posible
@@ -185,6 +192,32 @@ class RegistrarIncidenciaService
         }
 
         return $detalle === '' ? null : $detalle;
+    }
+
+    /**
+     * El estudiante con su inscripción en el examen (la del docente cuya
+     * configuración se usa), en una sola consulta: la inscripción viaja como
+     * `inscripcion_id` e `inscripcion_curso`, null si no está inscrito.
+     *
+     * @return ?Estudiante  Null si el SIS no está en la base.
+     */
+    private function estudianteConInscripcion(string $sis, int $idExamen, int $idDocente): ?Estudiante
+    {
+        $inscripcion = fn (string $columna) => EstudianteExamen::query()
+            ->select($columna)
+            ->whereColumn('estudiante_examen.sis_estudiante', 'estudiante.sis_estudiante')
+            ->where('estudiante_examen.id_examen', $idExamen)
+            ->delDocente($idDocente)
+            ->limit(1);
+
+        return Estudiante::query()
+            ->select('estudiante.*')
+            ->addSelect([
+                'inscripcion_id' => $inscripcion('id_estudiante_examen'),
+                'inscripcion_curso' => $inscripcion('id_curso'),
+            ])
+            ->whereKey($sis)
+            ->first();
     }
 
     /**

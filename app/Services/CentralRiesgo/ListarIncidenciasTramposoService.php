@@ -11,6 +11,7 @@
  * @updated 2026-10-11
  * @updated 2026-10-24
  * @updated 2026-10-25
+ * @updated 2026-10-26
  *
  * @description
  * Servicio de dominio que lista las incidencias de la central de riesgos con
@@ -68,11 +69,13 @@
  *   cada registro trae `curso` (nombre completo) y `materia` (sin el grupo).
  * - 2026-10-25  [Valery D. Ortuno P]  feat: cada registro trae `verificado`
  *   (false si el estudiante se dio de alta desde una incidencia, HU 5).
+ * - 2026-10-26  [Valery D. Ortuno P]  refactor: el estado sale de
+ *   TipoInfraccion::estado(); `estado_incidencia` y el enum
+ *   EstadoIncidencia se eliminaron.
  */
 
 namespace App\Services\CentralRiesgo;
 
-use App\Enums\EstadoIncidencia;
 use App\Enums\TipoInfraccion;
 use App\Models\CentralRiesgo;
 use App\Services\Examen\BusquedaEstudianteService;
@@ -312,7 +315,7 @@ class ListarIncidenciasTramposoService
             'motivo' => $incidencia->motivo,
             'motivo_etiqueta' => $incidencia->motivo->etiqueta(),
             // La central solo lista tramposos, y tramposo equivale a confirmado.
-            'estado' => EstadoIncidencia::Confirmado->value,
+            'estado' => TipoInfraccion::Tramposo->estado(),
             'fecha' => $incidencia->fecha_registro->toDateTimeString(),
         ];
     }

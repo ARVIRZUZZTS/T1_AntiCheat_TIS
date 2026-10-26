@@ -36,7 +36,7 @@ class GenerarReporteIngresosIlegalesService
                 'aula' => $examen?->ambientes->first()?->nombre_ambiente,
                 'motivo' => $incidencia->motivo->etiqueta(),
                 'tipo' => $incidencia->tipo_infraccion->etiqueta(),
-                'estado' => $incidencia->estado_incidencia->etiqueta(),
+                'estado' => $incidencia->tipo_infraccion->estado(),
                 'fecha' => $incidencia->fecha_registro?->format('d/m/Y H:i'),
                 'detalle' => $incidencia->detalle_motivo,
                 'materia' => $incidencia->materia(),

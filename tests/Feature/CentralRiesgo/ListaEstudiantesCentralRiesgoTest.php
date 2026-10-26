@@ -10,6 +10,7 @@
  * @updated 2026-10-10
  * @updated 2026-10-24
  * @updated 2026-10-25
+ * @updated 2026-10-26
  *
  * @description
  * Pruebas de la lista de estudiantes de la central de riesgos (HU 10), sobre el
@@ -45,6 +46,9 @@
  * - 2026-10-25  [Valery D. Ortuno P]  test: etiqueta "No verificado" para los
  *   estudiantes dados de alta desde una incidencia; el esquema de prueba suma
  *   `estudiante.verificado` y las etiquetas de motivo van sin acentos (HU 5).
+ * - 2026-10-26  [Valery D. Ortuno P]  test: sin `estado_incidencia`,
+ *   eliminada de la base; se quita la prueba de tramposo con estado
+ *   Pendiente, que ya no puede darse.
  */
 
 namespace Tests\Feature\CentralRiesgo;
@@ -130,20 +134,11 @@ class ListaEstudiantesCentralRiesgoTest extends TestCase
         $this->assertNotContains(self::PEDRO_SOSPECHOSO, $this->sisListados($this->institucion()));
     }
 
-    /** Tramposo equivale a confirmado: `estado_incidencia` ya no decide. */
-    public function test_un_tramposo_se_muestra_aunque_estado_incidencia_diga_pendiente(): void
-    {
-        $this->crearEstudiante('900000040', 'Nadia', 'Cordero Vargas');
-        $this->crearIncidencia('900000040', self::EXAMEN_A, 'tramposo', '2026-10-05 09:00:00', self::DOCENTE_A, 'Pendiente');
-
-        $this->assertContains('900000040', $this->sisListados($this->institucion()));
-    }
-
     /** Sin curso registrado la incidencia se lista igual, sin materia. */
     public function test_una_incidencia_sin_curso_registrado_se_lista_sin_materia(): void
     {
         $this->crearEstudiante('900000041', 'Nadia', 'Cordero Vargas');
-        $this->crearIncidencia('900000041', self::EXAMEN_A, 'tramposo', '2026-10-05 09:00:00', self::DOCENTE_A, 'Confirmado', null);
+        $this->crearIncidencia('900000041', self::EXAMEN_A, 'tramposo', '2026-10-05 09:00:00', self::DOCENTE_A, null);
 
         $this->institucion()->assertSee('Sin materia');
     }
@@ -473,7 +468,6 @@ class ListaEstudiantesCentralRiesgoTest extends TestCase
             'detalle_motivo' => 'Prueba de invalidación de la caché',
             'fecha_registro' => '2026-10-06 08:00:00',
             'tipo_infraccion' => 'tramposo',
-            'estado_incidencia' => 'Confirmado',
         ]);
 
         $despues = $this->sisListados($componente->call('$refresh'));
@@ -543,7 +537,6 @@ class ListaEstudiantesCentralRiesgoTest extends TestCase
         string $tipo,
         string $fecha,
         int $registrador = self::DOCENTE_A,
-        string $estado = 'Confirmado',
         int|null|false $curso = false,
     ): void {
         $cursoPorExamen = [
@@ -562,7 +555,6 @@ class ListaEstudiantesCentralRiesgoTest extends TestCase
             'detalle_motivo' => 'Motivo de prueba '.$sis,
             'fecha_registro' => $fecha,
             'tipo_infraccion' => $tipo,
-            'estado_incidencia' => $estado,
         ]);
     }
 
@@ -616,7 +608,6 @@ class ListaEstudiantesCentralRiesgoTest extends TestCase
             $tabla->string('detalle_motivo')->nullable();
             $tabla->dateTime('fecha_registro');
             $tabla->string('tipo_infraccion');
-            $tabla->string('estado_incidencia')->default('Confirmado');
             $tabla->foreign('sis_estudiante')->references('sis_estudiante')->on('estudiante');
         });
     }

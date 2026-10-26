@@ -9,6 +9,7 @@
  *
  * @updated 2026-10-09
  * @updated 2026-10-24
+ * @updated 2026-10-26
  *
  * @description Pruebas HTTP y transaccionales con SQLite en memoria, sin usar Supabase.
  *
@@ -16,11 +17,16 @@
  * - 2026-10-09  [Diego Tejerina]  test: cubrir revisión, permisos y duplicados (#142).
  * - 2026-10-24  [Valery D. Ortuno P]  test: confirmar deja el caso como
  *   `tramposo` (antes seguía como sospechoso).
+ * - 2026-10-26  [Valery D. Ortuno P]  test: pendiente es sospechoso y
+ *   confirmar lo pasa a tramposo, sin `estado_incidencia` ni `id_confirmador`
+ *   (se prueba la migración que los elimina, también su reversión). El
+ *   esquema lleva `id_curso`, que es lo que mira la policy: sin él todas las
+ *   resoluciones daban 403.
  */
 
 namespace Tests\Feature\CentralRiesgo;
 
-use App\Enums\EstadoIncidencia;
+use App\Enums\TipoInfraccion;
 use App\Models\CentralRiesgo;
 use App\Models\Usuario;
 use App\Services\CentralRiesgo\ResolverIncidenciaService;
@@ -42,8 +48,10 @@ class ResolverIncidenciaTest extends TestCase
         $this->crearEsquema();
         $this->crearDatos();
 
-        $migracion = require database_path('migrations/2026_10_09_000001_agregar_revision_incidencia.php');
-        $migracion->up();
+        // Estado de Supabase antes del refactor: con `estado_incidencia` e
+        // `id_confirmador`, que la migración nueva elimina.
+        (require database_path('migrations/2026_10_09_000001_agregar_revision_incidencia.php'))->up();
+        $this->migracionUnificar()->up();
     }
 
     protected function tearDown(): void
@@ -54,30 +62,32 @@ class ResolverIncidenciaTest extends TestCase
     }
 
     /** @throws \Throwable Si se altera el reportante o se duplica la incidencia. */
-    public function test_confirma_y_registra_al_docente_autenticado_sin_duplicar(): void
+    public function test_confirma_pasando_a_tramposo_sin_duplicar_ni_cambiar_el_reportante(): void
     {
         $this->actingAs(Usuario::findOrFail(1), 'web')
-            ->postJson('/api/incidencias/1/confirmar', ['id_confirmador' => 3, 'id_registrador' => 3])
+            ->postJson('/api/incidencias/1/confirmar', ['id_registrador' => 3])
             ->assertOk()->assertExactJson([
-                'datos' => ['id_registro' => 1, 'estado_incidencia' => 'Confirmado', 'id_confirmador' => 1],
+                'datos' => ['id_registro' => 1, 'tipo_infraccion' => 'tramposo'],
                 'mensaje' => 'Incidencia confirmada correctamente.',
             ]);
 
         $this->assertDatabaseCount('central_riesgo', 2);
-        // Confirmar pasa el caso a tramposo: la central de riesgos lista por
-        // tipo de infracción (tramposo = confirmado).
+        // Confirmar pasa el caso a tramposo: el tipo es el estado
+        // (tramposo = confirmado).
         $this->assertDatabaseHas('central_riesgo', [
-            'id_registro' => 1, 'estado_incidencia' => 'Confirmado', 'id_confirmador' => 1,
-            'id_registrador' => 2, 'tipo_infraccion' => 'tramposo',
+            'id_registro' => 1, 'id_registrador' => 2, 'tipo_infraccion' => 'tramposo',
         ]);
-        $this->assertSame(EstadoIncidencia::Confirmado, CentralRiesgo::findOrFail(1)->estado_incidencia);
+        $this->assertSame('Confirmado', CentralRiesgo::findOrFail(1)->tipo_infraccion->estado());
     }
 
     /** @throws \Throwable Si el descarte afecta otros registros o deja un riesgo. */
     public function test_rechaza_y_elimina_solo_la_incidencia_y_sus_notificaciones(): void
     {
         $this->actingAs(Usuario::findOrFail(1), 'web')->postJson('/api/incidencias/1/rechazar')
-            ->assertOk()->assertJsonPath('datos.estado_incidencia', 'Rechazado');
+            ->assertOk()->assertExactJson([
+                'datos' => ['id_registro' => 1],
+                'mensaje' => 'Incidencia rechazada correctamente.',
+            ]);
 
         $this->assertDatabaseMissing('central_riesgo', ['id_registro' => 1]);
         $this->assertDatabaseMissing('notificacion_docente', ['id_central_riesgo' => 1]);
@@ -118,13 +128,18 @@ class ResolverIncidenciaTest extends TestCase
         $this->assertPendiente();
     }
 
-    /** @throws \Throwable Si el vínculo compartido no autoriza a su docente. */
-    public function test_autoriza_al_docente_de_un_curso_que_comparte_el_examen(): void
+    /** @throws \Throwable Si compartir el examen basta para resolver una incidencia de otro curso. */
+    public function test_solo_resuelve_el_docente_del_curso_de_la_incidencia(): void
     {
         DB::table('examen_curso')->insert(['id_examen' => 1, 'id_curso' => 2]);
 
         $this->actingAs(Usuario::findOrFail(3), 'web')->postJson('/api/incidencias/1/confirmar')
-            ->assertOk()->assertJsonPath('datos.id_confirmador', 3);
+            ->assertForbidden();
+        $this->assertPendiente();
+
+        DB::table('central_riesgo')->where('id_registro', 1)->update(['id_curso' => 2]);
+        $this->actingAs(Usuario::findOrFail(3), 'web')->postJson('/api/incidencias/1/confirmar')
+            ->assertOk()->assertJsonPath('datos.tipo_infraccion', 'tramposo');
     }
 
     /** @throws \Throwable Si se resuelve nuevamente una incidencia confirmada. */
@@ -134,7 +149,7 @@ class ResolverIncidenciaTest extends TestCase
             $this->actingAs(Usuario::findOrFail(1), 'web')->postJson('/api/incidencias/2/'.$accion)
                 ->assertUnprocessable()->assertJsonStructure(['mensaje']);
         }
-        $this->assertDatabaseHas('central_riesgo', ['id_registro' => 2, 'estado_incidencia' => 'Confirmado']);
+        $this->assertDatabaseHas('central_riesgo', ['id_registro' => 2, 'tipo_infraccion' => 'tramposo']);
         $this->assertDatabaseHas('notificacion_docente', ['id_central_riesgo' => 2]);
     }
 
@@ -146,7 +161,7 @@ class ResolverIncidenciaTest extends TestCase
         $this->postJson('/api/incidencias/1/confirmar')->assertUnprocessable();
         $this->postJson('/api/incidencias/1/rechazar')->assertUnprocessable();
         $this->assertDatabaseCount('central_riesgo', 2);
-        $this->assertDatabaseHas('central_riesgo', ['id_registro' => 1, 'id_confirmador' => 1]);
+        $this->assertDatabaseHas('central_riesgo', ['id_registro' => 1, 'tipo_infraccion' => 'tramposo']);
     }
 
     /** @throws \Throwable Si un segundo descarte afecta otras incidencias. */
@@ -199,25 +214,41 @@ class ResolverIncidenciaTest extends TestCase
         $this->assertPendiente();
     }
 
-    /** @throws \Throwable Si el backfill cambia registros existentes o se repite. */
-    public function test_migracion_clasifica_datos_existentes_y_conserva_el_reportante(): void
+    /** @throws \Throwable Si la migración pierde datos, no unifica o no es idempotente. */
+    public function test_migracion_unifica_el_estado_en_el_tipo_y_se_puede_revertir(): void
     {
-        $this->assertPendiente();
-        $this->assertDatabaseHas('central_riesgo', [
-            'id_registro' => 2, 'estado_incidencia' => 'Confirmado', 'id_confirmador' => null,
-        ]);
-        $migracion = require database_path('migrations/2026_10_09_000001_agregar_revision_incidencia.php');
-        $migracion->up();
+        $this->assertFalse(Schema::hasColumn('central_riesgo', 'estado_incidencia'));
+        $this->assertFalse(Schema::hasColumn('central_riesgo', 'id_confirmador'));
+
+        // Al revertir vuelven las columnas, con el estado calculado del tipo.
+        $this->migracionUnificar()->down();
+        $this->assertDatabaseHas('central_riesgo', ['id_registro' => 1, 'estado_incidencia' => 'Pendiente']);
+        $this->assertDatabaseHas('central_riesgo', ['id_registro' => 2, 'estado_incidencia' => 'Confirmado']);
+
+        // Un sospechoso que un docente ya confirmó pasa a tramposo; un
+        // tramposo que quedó Pendiente sigue tramposo (el tipo manda).
+        DB::table('central_riesgo')->where('id_registro', 1)->update(['estado_incidencia' => 'Confirmado']);
+        DB::table('central_riesgo')->where('id_registro', 2)->update(['estado_incidencia' => 'Pendiente']);
+        $this->migracionUnificar()->up();
+        $this->migracionUnificar()->up();
+
         $this->assertDatabaseCount('central_riesgo', 2);
-        $this->assertPendiente();
+        $this->assertDatabaseHas('central_riesgo', ['id_registro' => 1, 'tipo_infraccion' => 'tramposo', 'id_registrador' => 2]);
+        $this->assertDatabaseHas('central_riesgo', ['id_registro' => 2, 'tipo_infraccion' => 'tramposo']);
+        $this->assertFalse(Schema::hasColumn('central_riesgo', 'estado_incidencia'));
     }
 
+    /** Sigue sospechosa (pendiente) y con su reportante original. */
     private function assertPendiente(): void
     {
         $this->assertDatabaseHas('central_riesgo', [
-            'id_registro' => 1, 'estado_incidencia' => 'Pendiente',
-            'id_confirmador' => null, 'id_registrador' => 2,
+            'id_registro' => 1, 'tipo_infraccion' => TipoInfraccion::Sospechoso->value, 'id_registrador' => 2,
         ]);
+    }
+
+    private function migracionUnificar(): object
+    {
+        return require database_path('migrations/2026_10_26_000001_unificar_estado_incidencia_en_tipo_infraccion.php');
     }
 
     private function crearEsquema(): void
@@ -255,6 +286,7 @@ class ResolverIncidenciaTest extends TestCase
             $tabla->integer('id_registro')->primary();
             $tabla->integer('id_registrador');
             $tabla->integer('id_examen');
+            $tabla->integer('id_curso')->nullable();
             $tabla->string('tipo_infraccion');
             $tabla->foreign('id_registrador')->references('id_usuario')->on('usuario');
             $tabla->foreign('id_examen')->references('id_examen')->on('examen');
@@ -286,8 +318,8 @@ class ResolverIncidenciaTest extends TestCase
             ['id_examen' => 1, 'id_curso' => 1], ['id_examen' => 2, 'id_curso' => 2],
         ]);
         DB::table('central_riesgo')->insert([
-            ['id_registro' => 1, 'id_registrador' => 2, 'id_examen' => 1, 'tipo_infraccion' => 'sospechoso'],
-            ['id_registro' => 2, 'id_registrador' => 2, 'id_examen' => 1, 'tipo_infraccion' => 'tramposo'],
+            ['id_registro' => 1, 'id_registrador' => 2, 'id_examen' => 1, 'id_curso' => 1, 'tipo_infraccion' => 'sospechoso'],
+            ['id_registro' => 2, 'id_registrador' => 2, 'id_examen' => 1, 'id_curso' => 1, 'tipo_infraccion' => 'tramposo'],
         ]);
         DB::table('notificacion_docente')->insert([
             ['id_notificacion' => 1, 'id_central_riesgo' => 1],

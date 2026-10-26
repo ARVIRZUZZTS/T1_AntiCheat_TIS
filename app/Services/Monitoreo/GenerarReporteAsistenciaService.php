@@ -8,6 +8,7 @@
  * @created 2026-09-25
  *
  * @updated 2026-10-11
+ * @updated 2026-10-26
  *
  * @description
  * Servicio de dominio que genera el reporte de asistencia de un examen.
@@ -57,6 +58,9 @@
  *   (`EstadoIncidencia`) porque el modelo volvió a castear `estado_incidencia`;
  *   el `(string)` anterior sobre el enum lanzaba "Object of class could not be
  *   converted to string" en `incidenciasPorEstudiante()`.
+ * - 2026-10-26  [Valery D. Ortuno P]  refactor: el estado sale de
+ *   TipoInfraccion::estado(); `estado_incidencia` y el enum
+ *   EstadoIncidencia se eliminaron.
  *
  * @see  \App\Livewire\Monitoreo\MonitorEnVivo
  * @see  App\Services\Asistencia\RegistroIngresoService
@@ -69,7 +73,6 @@
 namespace App\Services\Monitoreo;
 
 use App\Enums\EstadoEstudianteExamen;
-use App\Enums\EstadoIncidencia;
 use App\Enums\Motivo;
 use App\Models\CentralRiesgo;
 use App\Models\ConfiguracionExamenDocente;
@@ -189,12 +192,8 @@ class GenerarReporteAsistenciaService
             ->map(fn (CentralRiesgo $riesgo): array => [
                 'tipo' => (string) $riesgo->tipo_infraccion?->value,
                 'fecha' => $riesgo->fecha_registro?->format('d/m/Y') ?? '',
-                // `estado_incidencia` llega casteado a EstadoIncidencia desde el
-                // modelo, pero se acepta también el texto plano por si el cast
-                // se retira.
-                'estado' => $riesgo->getAttribute('estado_incidencia') instanceof EstadoIncidencia
-                    ? $riesgo->getAttribute('estado_incidencia')->value
-                    : (string) $riesgo->getAttribute('estado_incidencia'),
+                // El estado de revisión sale del tipo (tramposo = Confirmado).
+                'estado' => (string) $riesgo->tipo_infraccion?->estado(),
                 // `motivo` llega casteado a Motivo desde el modelo, pero se
                 // acepta también el texto plano por si el cast se retira.
                 'motivo_etiqueta' => $riesgo->motivo instanceof Motivo

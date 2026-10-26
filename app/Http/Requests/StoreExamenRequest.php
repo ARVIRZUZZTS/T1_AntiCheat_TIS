@@ -9,6 +9,7 @@
  *
  * @updated 2026-10-10
  * @updated 2026-10-24
+ * @updated 2026-10-26
  *
  * @description
  * Validación del alta de examen del formulario de crear examen. Los nombres de campo
@@ -39,11 +40,15 @@
  *   del docente autenticado (CursoPolicy), ahora que existe el login.
  * - 2026-10-24  [Valery D. Ortuno P]  feat: no se crean exámenes en cursos
  *   finalizados (CursoPolicy::crearExamen) y los mensajes van sin acentos.
+ * - 2026-10-26  [Valery D. Ortuno P]  perf: ambientes, materiales y normas se
+ *   validan con `in` contra el catálogo cacheado (CatalogosExamenService)
+ *   en vez de `exists`, que hacía una consulta por cada opción marcada.
  */
 
 namespace App\Http\Requests;
 
 use App\Enums\TipoExamen;
+use App\Services\Examen\CatalogosExamenService;
 use App\Services\Examen\RegistrarExamenService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -93,7 +98,7 @@ class StoreExamenRequest extends FormRequest
     /**
      * @return array<string, mixed>
      */
-    public function rules(): array
+    public function rules(CatalogosExamenService $catalogos): array
     {
         return [
             // `in:` y no `Rule::enum()` por un motivo concreto: la regla enum
@@ -123,11 +128,13 @@ class StoreExamenRequest extends FormRequest
             // Sin ambiente el examen no se puede monitorear, así que se exige al
             // menos uno.
             'ambientes' => ['required', 'array', 'min:1'],
-            'ambientes.*' => ['integer', Rule::exists('ambiente', 'id_ambiente')],
+            // `in` contra el catálogo cacheado y no `exists`: `exists` hacía
+            // una consulta por cada opción marcada.
+            'ambientes.*' => ['integer', Rule::in($catalogos->ids('ambientes'))],
             'materiales' => ['sometimes', 'array'],
-            'materiales.*' => ['integer', Rule::exists('material', 'id_material')],
+            'materiales.*' => ['integer', Rule::in($catalogos->ids('materiales'))],
             'normas' => ['sometimes', 'array'],
-            'normas.*' => ['integer', Rule::exists('norma', 'id_norma')],
+            'normas.*' => ['integer', Rule::in($catalogos->ids('normas'))],
             'materiales_personalizados' => ['nullable', 'string', 'max:300'],
             'normas_personalizadas' => ['nullable', 'string', 'max:300'],
         ];
@@ -160,9 +167,9 @@ class StoreExamenRequest extends FormRequest
             'duracion.max' => 'La duracion no debe superar los 300 minutos.',
             'ambientes.required' => 'Seleccione al menos un ambiente.',
             'ambientes.min' => 'Seleccione al menos un ambiente.',
-            'ambientes.*.exists' => 'Uno de los ambientes seleccionados no existe.',
-            'materiales.*.exists' => 'Uno de los materiales seleccionados no existe.',
-            'normas.*.exists' => 'Una de las normas seleccionadas no existe.',
+            'ambientes.*.in' => 'Uno de los ambientes seleccionados no existe.',
+            'materiales.*.in' => 'Uno de los materiales seleccionados no existe.',
+            'normas.*.in' => 'Una de las normas seleccionadas no existe.',
             'materiales_personalizados.max' => 'El material personalizado no debe superar los 300 caracteres.',
             'normas_personalizadas.max' => 'La norma personalizada no debe superar los 300 caracteres.',
         ];

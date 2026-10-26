@@ -42,11 +42,12 @@
  * - 2026-10-12  [Diego Tejerina]  fix: aborta si la conexión activa no es
  *   local (127.0.0.1/localhost/el servicio de Docker), para que no se
  *   pueda correr sin querer contra Supabase u otra base compartida.
+ * - 2026-10-26  [Valery D. Ortuno P]  refactor: ya no escribe
+ *   `estado_incidencia`, eliminada de la base (el tipo es el estado).
  */
 
 namespace Database\Seeders;
 
-use App\Enums\EstadoIncidencia;
 use App\Models\CentralRiesgo;
 use App\Models\Curso;
 use App\Models\Estudiante;
@@ -176,7 +177,6 @@ class DevEstudiantesSeeder extends Seeder
                     'detalle_motivo' => 'Generado por DevEstudiantesSeeder para pruebas.',
                     'fecha_registro' => now(),
                     'tipo_infraccion' => $datos['infraccion'],
-                    'estado_incidencia' => EstadoIncidencia::Pendiente,
                     'id_curso' => self::ID_CURSO,
                     'sis_estudiante' => $sis,
                     'id_examen' => $idExamen,

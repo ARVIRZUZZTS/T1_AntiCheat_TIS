@@ -7,6 +7,8 @@
  *
  * @created 2026-10-24
  *
+ * @updated 2026-10-26
+ *
  * @description
  * Lista los cursos de un docente para las secciones Cursos y Exámenes.
  *
@@ -22,6 +24,8 @@
  * - 2026-10-24  [Valery D. Ortuno P]  feat: creación inicial del servicio.
  * - 2026-10-24  [Valery D. Ortuno P]  feat: cada curso de conMetricas() trae su
  *   gestión con año ("Segundo semestre 2026") para la lista de cursos.
+ * - 2026-10-26  [Valery D. Ortuno P]  perf: los cursos del docente y sus
+ *   gestiones salen de una sola consulta (antes eran dos).
  *
  * @see  App\Services\Curso\ListarMateriasConMetricasService
  * @see  App\Http\Controllers\CursoController
@@ -58,10 +62,8 @@ class ListarCursosDocenteService
      */
     public function conMetricas(int $idDocente): Collection
     {
-        $idsCursos = Curso::query()
-            ->where('sis_doc', $idDocente)
-            ->pluck('id_curso')
-            ->all();
+        $cursos = $this->cursosConGestion($idDocente);
+        $idsCursos = $cursos->keys()->all();
 
         // Sin cursos no hace falta consultar métricas. Ojo: pasarle null al
         // servicio de métricas listaría los cursos de toda la institución.
@@ -69,7 +71,7 @@ class ListarCursosDocenteService
             return collect();
         }
 
-        $gestiones = $this->gestionesPorCurso($idsCursos);
+        $gestiones = $cursos->filter();
 
         return $this->metricas->ejecutar($idsCursos)
             ->map(fn (array $fila): array => $fila + ['gestion' => $gestiones->get($fila['curso']->id_curso)])
@@ -78,20 +80,25 @@ class ListarCursosDocenteService
     }
 
     /**
-     * Gestión con año de cada curso, en una sola consulta.
+     * Cursos del docente con la gestión y el año de cada uno, en una sola
+     * consulta (cada viaje a la base remota pesa).
      *
-     * @param  array<int, int>  $idsCursos  Cursos del docente.
+     * @param  int  $idDocente  ID del docente (`curso.sis_doc`).
      *
-     * @return Collection<int, string>  id_curso => "Segundo semestre 2026".
+     * @return Collection<int, ?string>  id_curso => "Segundo semestre 2026", o
+     *         null si el curso no tiene gestión.
      */
-    private function gestionesPorCurso(array $idsCursos): Collection
+    private function cursosConGestion(int $idDocente): Collection
     {
-        return DB::table('curso_tipo_gestion as ctg')
-            ->join('tipo_gestion as tg', 'tg.id_tipo_gestion', '=', 'ctg.id_tg')
-            ->whereIn('ctg.id_curso', $idsCursos)
-            ->get(['ctg.id_curso', 'tg.nombre_tipo_gestion', 'ctg.anio'])
+        return DB::table('curso as c')
+            ->leftJoin('curso_tipo_gestion as ctg', 'ctg.id_curso', '=', 'c.id_curso')
+            ->leftJoin('tipo_gestion as tg', 'tg.id_tipo_gestion', '=', 'ctg.id_tg')
+            ->where('c.sis_doc', $idDocente)
+            ->get(['c.id_curso', 'tg.nombre_tipo_gestion', 'ctg.anio'])
             ->mapWithKeys(fn (object $fila): array => [
-                (int) $fila->id_curso => Str::ucfirst($fila->nombre_tipo_gestion).' '.$fila->anio,
+                (int) $fila->id_curso => $fila->nombre_tipo_gestion !== null
+                    ? Str::ucfirst($fila->nombre_tipo_gestion).' '.$fila->anio
+                    : null,
             ]);
     }
 

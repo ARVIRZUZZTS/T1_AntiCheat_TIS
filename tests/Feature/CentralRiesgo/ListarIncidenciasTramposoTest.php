@@ -9,6 +9,7 @@
  *
  * @updated 2026-10-09
  * @updated 2026-10-24
+ * @updated 2026-10-26
  *
  * @description
  * Pruebas de integración del endpoint /api/central-riesgo: listado completo
@@ -38,6 +39,9 @@
  *   (tramposo se lista aunque `estado_incidencia` diga Pendiente) y por el
  *   curso registrado (`id_curso`): materia sin el grupo, "Mis materias" por el
  *   docente de ese curso y sin curso la materia queda vacía.
+ * - 2026-10-26  [Valery D. Ortuno P]  test: sin `estado_incidencia`,
+ *   eliminada de la base; se quita la prueba de tramposo con estado
+ *   Pendiente, que ya no puede darse.
  */
 
 namespace Tests\Feature\CentralRiesgo;
@@ -194,7 +198,7 @@ class ListarIncidenciasTramposoTest extends TestCase
         }
     }
 
-    private function crearIncidencia(string $sis, int $idExamen, ?int $idCurso, string $tipo, string $fecha, string $estado = 'Confirmado'): void
+    private function crearIncidencia(string $sis, int $idExamen, ?int $idCurso, string $tipo, string $fecha): void
     {
         static $idRiesgo = 900000;
 
@@ -206,7 +210,6 @@ class ListarIncidenciasTramposoTest extends TestCase
             'detalle_motivo' => 'Motivo de prueba '.$sis,
             'fecha_registro' => $fecha,
             'tipo_infraccion' => $tipo,
-            'estado_incidencia' => $estado,
             'id_examen' => $idExamen,
             'id_curso' => $idCurso,
             'sis_estudiante' => $sis,
@@ -240,15 +243,6 @@ class ListarIncidenciasTramposoTest extends TestCase
     public function test_solo_devuelve_incidencias_tramposas(): void
     {
         $this->assertNotContains('900000004', $this->sisDeLaRespuesta());
-    }
-
-    /** Tramposo equivale a confirmado: `estado_incidencia` ya no decide. */
-    public function test_un_tramposo_se_lista_aunque_estado_incidencia_diga_pendiente(): void
-    {
-        $this->crearEstudiante('900000008', 'Nadia', 'Cordero Vargas', [self::CURSO_A]);
-        $this->crearIncidencia('900000008', self::EXAMEN_A, self::CURSO_A, 'tramposo', '2026-10-04 09:00:00', 'Pendiente');
-
-        $this->assertContains('900000008', $this->sisDeLaRespuesta());
     }
 
     /** Solo los cursos registrados del docente: Jaime (examen compartido) quedó en Fisica I. */

@@ -7,6 +7,8 @@
  *
  * @created 2026-10-11
  *
+ * @updated 2026-10-26
+ *
  * @description
  * Pruebas de integración de los endpoints de notificaciones: listado ordenado
  * de más reciente a más antiguo, lista vacía, auxiliar sin notificaciones,
@@ -30,6 +32,8 @@
  * - 2026-10-11  [Valery D. Ortuno P]  test: el aviso "posible_tramposo" expone
  *   `referencia` (id_registro) y `detalle_href`, que son los que usa la tarjeta
  *   para abrir el detalle.
+ * - 2026-10-26  [Valery D. Ortuno P]  test: sin `estado_incidencia` ni
+ *   `id_confirmador`, eliminadas de la base (el tipo es el estado).
  */
 
 namespace Tests\Feature\Notificaciones;
@@ -120,7 +124,7 @@ class NotificacionesApiTest extends TestCase
             ->assertOk();
 
         $this->assertDatabaseHas('notificacion_docente', ['id_notificacion' => 1, 'oculta' => true]);
-        $this->assertDatabaseHas('central_riesgo', ['id_registro' => 1, 'estado_incidencia' => 'Pendiente']);
+        $this->assertDatabaseHas('central_riesgo', ['id_registro' => 1, 'tipo_infraccion' => 'sospechoso']);
 
         $this->getJson('/api/notificaciones')->assertOk()->assertJsonCount(1)->assertJsonPath('0.id', 2);
     }
@@ -154,7 +158,7 @@ class NotificacionesApiTest extends TestCase
         DB::table('central_riesgo')->insert([
             'id_registro' => 7, 'sis_estudiante' => '900000001', 'id_examen' => 1, 'id_curso' => 1,
             'id_registrador' => self::DOCENTE_A, 'tipo_infraccion' => 'tramposo',
-            'estado_incidencia' => 'Pendiente', 'fecha_registro' => Carbon::now()->subMinutes(3)->toDateTimeString(),
+            'fecha_registro' => Carbon::now()->subMinutes(3)->toDateTimeString(),
         ]);
         DB::table('notificacion_docente')->insert([
             'id_notificacion' => 5,
@@ -204,7 +208,6 @@ class NotificacionesApiTest extends TestCase
         // El caso de la central de riesgos queda intacto.
         $this->assertDatabaseHas('central_riesgo', [
             'id_registro' => 1,
-            'estado_incidencia' => 'Pendiente',
             'tipo_infraccion' => 'sospechoso',
         ]);
 
@@ -218,8 +221,7 @@ class NotificacionesApiTest extends TestCase
     {
         DB::table('central_riesgo')->insert([
             'id_registro' => 5, 'sis_estudiante' => '900000001', 'id_examen' => 1, 'id_curso' => 1,
-            'id_registrador' => self::AUXILIAR, 'tipo_infraccion' => 'sospechoso',
-            'estado_incidencia' => 'Pendiente', 'fecha_registro' => now()->toDateTimeString(),
+            'id_registrador' => self::AUXILIAR, 'tipo_infraccion' => 'sospechoso', 'fecha_registro' => now()->toDateTimeString(),
         ]);
         $sospechoso = CentralRiesgo::query()->findOrFail(5);
 
@@ -232,7 +234,7 @@ class NotificacionesApiTest extends TestCase
         DB::table('central_riesgo')->insert([
             'id_registro' => 6, 'sis_estudiante' => '900000001', 'id_examen' => 1, 'id_curso' => 1,
             'id_registrador' => self::DOCENTE_A, 'tipo_infraccion' => 'tramposo',
-            'estado_incidencia' => 'Confirmado', 'fecha_registro' => now()->toDateTimeString(),
+            'fecha_registro' => now()->toDateTimeString(),
         ]);
 
         $this->assertNull(
@@ -302,12 +304,10 @@ class NotificacionesApiTest extends TestCase
             $tabla->integer('id_examen');
             $tabla->integer('id_curso')->nullable();
             $tabla->integer('id_registrador');
-            $tabla->integer('id_confirmador')->nullable();
             $tabla->string('motivo')->nullable();
             $tabla->string('detalle_motivo')->nullable();
             $tabla->dateTime('fecha_registro')->nullable();
             $tabla->string('tipo_infraccion');
-            $tabla->string('estado_incidencia')->default('Pendiente');
         });
         Schema::create('notificacion_docente', function (Blueprint $tabla): void {
             $tabla->integer('id_notificacion')->primary();
@@ -360,10 +360,10 @@ class NotificacionesApiTest extends TestCase
 
         $ahora = Carbon::now();
         DB::table('central_riesgo')->insert([
-            ['id_registro' => 1, 'sis_estudiante' => '900000001', 'id_examen' => 1, 'id_curso' => 1, 'id_registrador' => self::AUXILIAR, 'tipo_infraccion' => 'sospechoso', 'estado_incidencia' => 'Pendiente', 'fecha_registro' => $ahora->copy()->subMinutes(20)->toDateTimeString()],
-            ['id_registro' => 2, 'sis_estudiante' => '900000002', 'id_examen' => 1, 'id_curso' => 1, 'id_registrador' => self::AUXILIAR, 'tipo_infraccion' => 'sospechoso', 'estado_incidencia' => 'Pendiente', 'fecha_registro' => $ahora->copy()->subHours(2)->toDateTimeString()],
-            ['id_registro' => 3, 'sis_estudiante' => '900000003', 'id_examen' => 2, 'id_curso' => 2, 'id_registrador' => self::AUXILIAR, 'tipo_infraccion' => 'sospechoso', 'estado_incidencia' => 'Pendiente', 'fecha_registro' => $ahora->copy()->subHours(3)->toDateTimeString()],
-            ['id_registro' => 4, 'sis_estudiante' => '900000004', 'id_examen' => 1, 'id_curso' => 1, 'id_registrador' => self::AUXILIAR, 'tipo_infraccion' => 'sospechoso', 'estado_incidencia' => 'Pendiente', 'fecha_registro' => $ahora->copy()->subHours(4)->toDateTimeString()],
+            ['id_registro' => 1, 'sis_estudiante' => '900000001', 'id_examen' => 1, 'id_curso' => 1, 'id_registrador' => self::AUXILIAR, 'tipo_infraccion' => 'sospechoso', 'fecha_registro' => $ahora->copy()->subMinutes(20)->toDateTimeString()],
+            ['id_registro' => 2, 'sis_estudiante' => '900000002', 'id_examen' => 1, 'id_curso' => 1, 'id_registrador' => self::AUXILIAR, 'tipo_infraccion' => 'sospechoso', 'fecha_registro' => $ahora->copy()->subHours(2)->toDateTimeString()],
+            ['id_registro' => 3, 'sis_estudiante' => '900000003', 'id_examen' => 2, 'id_curso' => 2, 'id_registrador' => self::AUXILIAR, 'tipo_infraccion' => 'sospechoso', 'fecha_registro' => $ahora->copy()->subHours(3)->toDateTimeString()],
+            ['id_registro' => 4, 'sis_estudiante' => '900000004', 'id_examen' => 1, 'id_curso' => 1, 'id_registrador' => self::AUXILIAR, 'tipo_infraccion' => 'sospechoso', 'fecha_registro' => $ahora->copy()->subHours(4)->toDateTimeString()],
         ]);
 
         DB::table('notificacion_docente')->insert([

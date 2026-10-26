@@ -7,6 +7,8 @@
  *
  * @created 2026-10-11
  *
+ * @updated 2026-10-26
+ *
  * @description
  * Pruebas de la HU 6 · T1: cuando un estudiante queda registrado o confirmado
  * como "Tramposo" en la central de riesgos, se genera el aviso "Estudiante
@@ -29,6 +31,10 @@
  *
  * @changelog
  * - 2026-10-11  [David E. Chavez T.]  test: criterios de la HU 6 (T1).
+ * - 2026-10-26  [Valery D. Ortuno P]  test: sin `estado_incidencia` ni
+ *   `id_confirmador` (el tipo es el estado); las incidencias llevan
+ *   `id_curso`, que es lo que mira la policy al confirmar o rechazar (sin él
+ *   esas dos pruebas fallaban con 403).
  */
 
 namespace Tests\Feature\Notificaciones;
@@ -92,7 +98,7 @@ class NotificacionCentralRiesgoTest extends TestCase
 
     public function test_registrar_tramposo_avisa_a_los_docentes_de_las_materias_activas(): void
     {
-        $registro = $this->registroCentral(tipo: 'tramposo', estado: 'Pendiente');
+        $registro = $this->registroCentral(tipo: 'tramposo');
 
         $avisos = app(NotificacionService::class)->notificarCentralRiesgo($registro);
 
@@ -114,7 +120,7 @@ class NotificacionCentralRiesgoTest extends TestCase
 
     public function test_cada_docente_solo_ve_el_aviso_de_su_materia(): void
     {
-        $registro = $this->registroCentral(tipo: 'tramposo', estado: 'Pendiente');
+        $registro = $this->registroCentral(tipo: 'tramposo');
         app(NotificacionService::class)->notificarCentralRiesgo($registro);
 
         $delDocenteA = app(NotificacionService::class)->listarPara(Usuario::findOrFail(self::DOCENTE_A));
@@ -131,7 +137,7 @@ class NotificacionCentralRiesgoTest extends TestCase
 
     public function test_un_auxiliar_no_recibe_avisos_de_ingreso(): void
     {
-        $registro = $this->registroCentral(tipo: 'tramposo', estado: 'Pendiente');
+        $registro = $this->registroCentral(tipo: 'tramposo');
         app(NotificacionService::class)->notificarCentralRiesgo($registro);
 
         $this->assertSame([], app(NotificacionService::class)->listarPara(Usuario::findOrFail(self::AUXILIAR))->all());
@@ -139,7 +145,7 @@ class NotificacionCentralRiesgoTest extends TestCase
 
     public function test_confirmar_un_sospechoso_genera_el_aviso_de_ingreso(): void
     {
-        $registro = $this->registroCentral(id: 2, tipo: 'sospechoso', estado: 'Pendiente');
+        $registro = $this->registroCentral(id: 2, tipo: 'sospechoso');
 
         // Sin confirmar, el reporte del auxiliar todavía no está en la central.
         $this->assertSame([], app(NotificacionService::class)->notificarCentralRiesgo($registro));
@@ -153,12 +159,12 @@ class NotificacionCentralRiesgoTest extends TestCase
         $this->assertDatabaseHas('notificacion_docente', ['id_central_riesgo' => 2, 'id_curso' => self::CURSO_B, 'tipo' => 'central_riesgo']);
 
         // El caso queda confirmado y con su aviso vinculado.
-        $this->assertDatabaseHas('central_riesgo', ['id_registro' => 2, 'estado_incidencia' => 'Confirmado']);
+        $this->assertDatabaseHas('central_riesgo', ['id_registro' => 2, 'tipo_infraccion' => 'tramposo']);
     }
 
     public function test_rechazar_el_caso_no_deja_avisos(): void
     {
-        $registro = $this->registroCentral(id: 3, tipo: 'sospechoso', estado: 'Pendiente');
+        $registro = $this->registroCentral(id: 3, tipo: 'sospechoso');
         app(NotificacionService::class)->notificarCentralRiesgo($registro, porConfirmacion: true);
         $this->assertDatabaseCount('notificacion_docente', 2);
 
@@ -170,7 +176,7 @@ class NotificacionCentralRiesgoTest extends TestCase
 
     public function test_no_duplica_avisos_del_mismo_caso(): void
     {
-        $registro = $this->registroCentral(tipo: 'tramposo', estado: 'Pendiente');
+        $registro = $this->registroCentral(tipo: 'tramposo');
         $servicio = app(NotificacionService::class);
 
         $servicio->notificarCentralRiesgo($registro);
@@ -182,21 +188,21 @@ class NotificacionCentralRiesgoTest extends TestCase
 
     public function test_estudiante_sin_materias_activas_no_genera_avisos(): void
     {
-        $registro = $this->registroCentral(id: 4, sis: self::SIS_SIN_CURSOS, tipo: 'tramposo', estado: 'Pendiente');
+        $registro = $this->registroCentral(id: 4, sis: self::SIS_SIN_CURSOS, tipo: 'tramposo');
 
         $this->assertSame([], app(NotificacionService::class)->notificarCentralRiesgo($registro));
         $this->assertDatabaseCount('notificacion_docente', 0);
     }
 
-    private function registroCentral(int $id = 1, string $sis = self::SIS_ESTUDIANTE, string $tipo = 'tramposo', string $estado = 'Pendiente'): CentralRiesgo
+    private function registroCentral(int $id = 1, string $sis = self::SIS_ESTUDIANTE, string $tipo = 'tramposo'): CentralRiesgo
     {
         DB::table('central_riesgo')->insert([
             'id_registro' => $id,
             'sis_estudiante' => $sis,
             'id_examen' => 1,
+            'id_curso' => self::CURSO_A,
             'id_registrador' => self::AUXILIAR,
             'tipo_infraccion' => $tipo,
-            'estado_incidencia' => $estado,
             'fecha_registro' => Carbon::now()->toDateTimeString(),
         ]);
 
@@ -264,12 +270,10 @@ class NotificacionCentralRiesgoTest extends TestCase
             $tabla->integer('id_examen');
             $tabla->integer('id_curso')->nullable();
             $tabla->integer('id_registrador');
-            $tabla->integer('id_confirmador')->nullable();
             $tabla->string('motivo')->nullable();
             $tabla->string('detalle_motivo')->nullable();
             $tabla->dateTime('fecha_registro')->nullable();
             $tabla->string('tipo_infraccion');
-            $tabla->string('estado_incidencia')->default('Pendiente');
         });
         Schema::create('notificacion_docente', function (Blueprint $tabla): void {
             $tabla->integer('id_notificacion')->primary();

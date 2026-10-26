@@ -10,6 +10,7 @@
  * @updated 2026-10-11
  * @updated 2026-10-24
  * @updated 2026-10-25
+ * @updated 2026-10-26
  *
  * @description
  * Servicio de dominio que devuelve el detalle de una incidencia de la
@@ -20,7 +21,7 @@
  * relaciones directas; `central_riesgo` no tiene enlace a
  * `registro_asistencia` (no existe `id_ingreso`).
  *
- * Los enums casteados por el modelo (`motivo`, `estado_incidencia`) se
+ * Los enums casteados por el modelo (`motivo`, `tipo_infraccion`) se
  * normalizan a su valor/etiqueta antes de armar el JSON.
  *
  * @changelog
@@ -53,6 +54,9 @@
  *   `estado_incidencia`, que se dejará de usar.
  * - 2026-10-25  [Valery D. Ortuno P]  feat: el detalle trae
  *   `estudiante_verificado` (false si se dio de alta desde una incidencia, HU 5).
+ * - 2026-10-26  [Valery D. Ortuno P]  refactor: el estado sale de
+ *   TipoInfraccion::estado(); `estado_incidencia` y el enum
+ *   EstadoIncidencia se eliminaron.
  *
  * @see  App\Policies\CentralRiesgoPolicy
  * @see  App\Models\CentralRiesgo
@@ -61,7 +65,6 @@
 
 namespace App\Services\CentralRiesgo;
 
-use App\Enums\EstadoIncidencia;
 use App\Enums\Motivo;
 use App\Enums\TipoInfraccion;
 use App\Models\CentralRiesgo;
@@ -162,15 +165,12 @@ class ConsultarDetalleIncidenciaService
     /**
      * Estado de revisión de la incidencia, según su tipo de infracción:
      * `tramposo` es un caso confirmado y `sospechoso` uno pendiente.
-     * `estado_incidencia` ya no se lee porque se va a dejar de usar.
      *
      * @param  CentralRiesgo  $incidencia  Incidencia consultada.
      * @return string Valor del estado ('Confirmado' o 'Pendiente').
      */
     private function estado(CentralRiesgo $incidencia): string
     {
-        return $incidencia->tipo_infraccion === TipoInfraccion::Tramposo
-            ? EstadoIncidencia::Confirmado->value
-            : EstadoIncidencia::Pendiente->value;
+        return $incidencia->tipo_infraccion->estado();
     }
 }
