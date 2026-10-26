@@ -14,7 +14,8 @@
  * Servicio de dominio que genera el reporte de asistencia de un examen.
  * Dado el id de un examen, resuelve el estado de cada estudiante inscrito
  * (`presente` / `rechazado` / `riesgo` / `pendiente`), la incidencia vigente
- * de la central de riesgos y el registrador y hora de ingreso.
+ * de la central de riesgos, el aula, el docente a cargo, el registrador y
+ * hora de ingreso.
  *
  * El estado sale del dato persistido y no de un reloj, para que el monitor
  * muestre lo mismo sin importar cuándo se abra:
@@ -61,6 +62,14 @@
  * - 2026-10-26  [Valery D. Ortuno P]  refactor: el estado sale de
  *   TipoInfraccion::estado(); `estado_incidencia` y el enum
  *   EstadoIncidencia se eliminaron.
+ * - 2026-10-26  [OchoaCesar]  feat: se agrega `aula` al reporte, resuelta
+ *   desde `estudiante_examen_ambiente` con fallback a los ambientes del
+ *   examen: el reporte de asistencia (pantalla y Excel) mostraba "Sin aula"
+ *   porque el campo nunca existió en este servicio.
+ * - 2026-10-26  [OchoaCesar]  feat: se agrega `docente_cargo` al reporte, el
+ *   docente real de la configuración del estudiante (con el creador del
+ *   examen como respaldo). El resumen lo usaba desde el registrador y salía
+ *   "Sin registro" para todo ingreso aún no confirmado en el monitor.
  *
  * @see  \App\Livewire\Monitoreo\MonitorEnVivo
  * @see  App\Services\Asistencia\RegistroIngresoService
@@ -81,6 +90,7 @@ use App\Models\Examen;
 use App\Models\RegistroAsistencia;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 /**
  * @author  OchoaCesar <cesareduardonick@gmail.com>
@@ -134,12 +144,27 @@ class GenerarReporteAsistenciaService
 
         $incidencias = $this->incidenciasPorEstudiante($examen->id_examen, $idDocente);
 
+        // El aula asignada sale de la puente `estudiante_examen_ambiente` (una
+        // inscripción puede tener varias, que quedan unidas por coma). Sin
+        // asignación se cae a los ambientes del examen y, si el examen no
+        // tiene ninguno, a "Sin aula".
+        $aulasPorInscripcion = $this->aulasPorInscripcion($examen->id_examen);
+        $aulasDelExamen = $examen->ambientes->pluck('nombre_ambiente')->unique()->implode(', ');
+
+        // Docente real del estudiante: el de su configuración de examen. Si la
+        // inscripción no tiene (datos antiguos) se cae al creador del examen.
+        $docentesPorInscripcion = $this->docentesPorInscripcion($examen->id_examen);
+        $creador = DB::table('usuario')->where('id_usuario', $examen->creador)->first();
+        $creadorDelExamen = $creador !== null
+            ? trim($creador->nombre_usuario.' '.$creador->apellido)
+            : null;
+
         $estudiantes = EstudianteExamen::query()
             ->where('id_examen', $examen->id_examen)
             ->when($idDocente !== null, fn ($query) => $query->delDocente($idDocente))
             ->with('estudiante')
             ->get()
-            ->map(function (EstudianteExamen $inscripcion) use ($registros, $incidencias) {
+            ->map(function (EstudianteExamen $inscripcion) use ($registros, $incidencias, $aulasPorInscripcion, $aulasDelExamen, $docentesPorInscripcion, $creadorDelExamen) {
                 $estudiante = $inscripcion->estudiante;
                 $clave = $this->clave($inscripcion->id_estudiante_examen, $estudiante->sis_estudiante);
                 $registro = $registros->get($clave);
@@ -152,6 +177,10 @@ class GenerarReporteAsistenciaService
                     'id_inscripcion' => (int) $inscripcion->id_estudiante_examen,
                     'nombre' => $estudiante->nombre_estudiante,
                     'apellido' => $estudiante->apellido_estudiante,
+                    'aula' => $aulasPorInscripcion->get($inscripcion->id_estudiante_examen, $aulasDelExamen)
+                        ?: 'Sin aula',
+                    'docente_cargo' => $docentesPorInscripcion->get($inscripcion->id_estudiante_examen, $creadorDelExamen)
+                        ?? 'Sin docente',
                     'habilitado' => $habilitado,
                     'registrador' => $registro !== null && $registro->registrador !== null
                         ? trim($registro->registrador->nombre_usuario.' '.$registro->registrador->apellido)
@@ -166,6 +195,44 @@ class GenerarReporteAsistenciaService
             'examen' => $examen,
             'estudiantes' => $estudiantes,
         ];
+    }
+
+    /**
+     * Aula asignada a cada inscripción del examen, en una sola consulta.
+     *
+     * @param  int  $idExamen  ID del examen.
+     * @return Collection<int|string, string> id de inscripción => aulas unidas por coma.
+     */
+    private function aulasPorInscripcion(int $idExamen): Collection
+    {
+        return DB::table('estudiante_examen_ambiente as eea')
+            ->join('estudiante_examen as ee', 'ee.id_estudiante_examen', '=', 'eea.id_ee')
+            ->join('ambiente as a', 'a.id_ambiente', '=', 'eea.id_ambiente')
+            ->where('ee.id_examen', $idExamen)
+            ->get(['eea.id_ee', 'a.nombre_ambiente'])
+            ->groupBy('id_ee')
+            ->map(fn (Collection $filas): string => $filas->pluck('nombre_ambiente')->unique()->implode(', '));
+    }
+
+    /**
+     * Docente a cargo de cada inscripción, en una sola consulta.
+     *
+     * Sale de la configuración del estudiante (`configuracion_examen_docente`
+     * → `usuario`); una inscripción sin configuración no tiene entrada aquí y
+     * en `ejecutar()` se resuelve con el creador del examen.
+     *
+     * @param  int  $idExamen  ID del examen.
+     * @return Collection<int|string, string> id de inscripción => nombre del docente.
+     */
+    private function docentesPorInscripcion(int $idExamen): Collection
+    {
+        return DB::table('estudiante_examen as ee')
+            ->join('configuracion_examen_docente as c', 'c.id_configuracion_examen', '=', 'ee.id_configuracion_examen')
+            ->join('usuario as u', 'u.id_usuario', '=', 'c.id_docente')
+            ->where('ee.id_examen', $idExamen)
+            ->get(['ee.id_estudiante_examen', 'u.nombre_usuario', 'u.apellido'])
+            ->groupBy('id_estudiante_examen')
+            ->map(fn (Collection $filas): string => trim($filas->first()->nombre_usuario.' '.$filas->first()->apellido));
     }
 
     /**
