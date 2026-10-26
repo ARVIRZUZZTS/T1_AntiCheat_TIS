@@ -4,6 +4,7 @@
     @created 2026-10-05
     @updated 2026-10-10
     @updated 2026-10-24
+    @updated 2026-10-25
 
     @description
     Listado de exámenes de un curso (página examenes-curso): lista los exámenes
@@ -13,8 +14,12 @@
 
     Arriba van los botones "Invitar docente" y "Dividir examen". Actúan sobre
     un examen concreto: se activan recién cuando se toca una tarjeta para
-    seleccionarla. Por ahora no hacen
-    nada; su funcionalidad llega con sus HUs.
+    seleccionarla. "Invitar docente" todavía no tiene funcionalidad. "Dividir
+    examen" reemplaza el listado por el título del examen elegido y el criterio
+    de división (por carrera o por orden alfabetico) con los botones "Dividir"
+    (todavía sin acción) . Si el examen tiene una sola aula, en
+    lugar de los controles se muestra un texto simple avisando que no se puede
+    dividir.
 
     El listado no llega con la página: el parcial declara un x-data de Alpine
     que consulta GET /api/cursos/{idCurso}/examenes (CursoExamenController)
@@ -50,6 +55,10 @@
       "Invitar docente" y "Dividir examen", que se activan al seleccionar una
       tarjeta; un clic fuera de las tarjetas suelta la selección. Los textos
       visibles van sin acentos.
+    - 2026-10-25  [Alex Candia]  feat: "Dividir examen" reemplaza el listado por
+      el título del examen, el criterio de división y los botones "Dividir" y
+      . Con una sola aula muestra solo un texto simple. El botón
+      "Dividir" todavía no ejecuta la división.
 
     @see  App\Http\Controllers\Api\CursoExamenController
     @see  resources/views/pages/examenes-curso.blade.php
@@ -61,6 +70,12 @@
     $botonBase = 'inline-flex items-center justify-center box-border border focus:ring-4 shadow-xs font-medium leading-5 focus:outline-none rounded-base px-6 py-2.5 text-sm font-semibold shrink-0 whitespace-nowrap';
     $botonPorExamen = 'text-body bg-neutral-primary-soft border-default hover:bg-neutral-secondary-medium hover:text-heading focus:ring-neutral-tertiary-soft cursor-pointer';
     $botonInactivo = 'text-fg-disabled bg-disabled border-default-medium cursor-not-allowed';
+    $botonDivisionActivo = 'text-white bg-brand border-transparent hover:bg-brand-strong focus:ring-brand-medium cursor-pointer';
+
+    $opcionesDivision = [
+        'carrera' => 'Por carrera',
+        'apellido' => 'Por orden alfabetico',
+    ];
 @endphp
 
 <div class="flex flex-col gap-4"
@@ -69,8 +84,20 @@
          estado: 'cargando',
          // Examen elegido para Invitar docente / Dividir examen.
          seleccionado: null,
+         panelDivision: false,
+         criterioDivision: '',
+         get examenSeleccionado() {
+             return this.examenes.find((examen) => examen.id === this.seleccionado) || null;
+         },
+         get aulasDelExamen() {
+             return this.examenSeleccionado?.ambientes?.length ?? 0;
+         },
+         get puedeDividir() {
+             return this.aulasDelExamen > 1;
+         },
          async cargar() {
              this.estado = 'cargando';
+             this.limpiarSeleccion();
              try {
                  const respuesta = await fetch('{{ route('api.cursos.examenes.listar', ['idCurso' => $curso->id_curso]) }}');
                  if (!respuesta.ok) {
@@ -85,6 +112,26 @@
          },
          init() {
              this.cargar();
+         },
+         seleccionar(id) {
+             this.seleccionado = id;
+             this.criterioDivision = '';
+         },
+         alternarDivision() {
+             if (this.seleccionado === null) {
+                 return;
+             }
+             this.panelDivision = ! this.panelDivision;
+             this.criterioDivision = '';
+         },
+         salirDivision() {
+             this.panelDivision = false;
+             this.criterioDivision = '';
+         },
+         limpiarSeleccion() {
+             this.seleccionado = null;
+             this.panelDivision = false;
+             this.criterioDivision = '';
          },
          fechaDe(examen) {
              if (!examen.fecha) {
@@ -104,12 +151,12 @@
          // @click.outside.
          soltarSeleccion(evento) {
              if (! evento.target.closest('[data-seleccionable], [data-accion-seleccion]')) {
-                 this.seleccionado = null;
+                 this.limpiarSeleccion();
              }
          },
      }"
      @click="soltarSeleccion($event)"
-     @click.outside="seleccionado = null">
+     @click.outside="limpiarSeleccion()">
     {{-- Aviso de éxito del alta: el formulario de crear examen vuelve acá. --}}
     @if (session('mensaje'))
         <x-ui.modal-aviso :mensaje="session('mensaje')" />
@@ -125,8 +172,12 @@
                 Invitar docente
             </button>
             <button type="button" class="{{ $botonBase }}" data-accion-seleccion
-                    :class="seleccionado === null ? '{{ $botonInactivo }}' : '{{ $botonPorExamen }}'"
-                    :disabled="seleccionado === null">
+                    :class="seleccionado === null
+                        ? '{{ $botonInactivo }}'
+                        : (panelDivision ? '{{ $botonDivisionActivo }}' : '{{ $botonPorExamen }}')"
+                    :disabled="seleccionado === null"
+                    :aria-expanded="panelDivision ? 'true' : 'false'"
+                    @click="alternarDivision()">
                 Dividir examen
             </button>
         </div>
@@ -136,8 +187,46 @@
         </p>
     </header>
 
+    {{-- Vista de división: reemplaza el listado sin salir de la página. Con una
+         sola aula no hay controles: solo el aviso en texto simple. --}}
+    <section x-show="panelDivision" x-cloak data-accion-seleccion class="flex flex-col gap-4">
+        <template x-if="! puedeDividir">
+            <p class="text-sm text-body">
+                No se puede dividir el examen, solo se cuenta con un aula
+            </p>
+        </template>
+
+        <template x-if="puedeDividir">
+            <div class="flex flex-col gap-4">
+                <h2 class="text-2xl font-bold text-heading" x-text="examenSeleccionado?.tipo || 'Sin tipo'"></h2>
+
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-end">
+                    <div class="min-w-0 flex-1 sm:max-w-xs">
+                        <x-ui.select
+                            label="Dividir por"
+                            name="division_por"
+                            x-model="criterioDivision"
+                            :options="$opcionesDivision"
+                            placeholder="Selecciona un criterio"
+                        />
+                    </div>
+
+                    <div class="flex gap-2">
+                        <x-ui.button
+                            variant="default"
+                            x-bind:disabled="criterioDivision === ''"
+                            x-bind:class="criterioDivision === '' ? 'opacity-50 cursor-not-allowed' : ''"
+                        >
+                            Dividir
+                        </x-ui.button>
+                    </div>
+                </div>
+            </div>
+        </template>
+    </section>
+
     {{-- Cargando: placeholders con el mismo contorno que las tarjetas. --}}
-    <div class="flex flex-col gap-4" x-show="estado === 'cargando'">
+    <div class="flex flex-col gap-4" x-show="estado === 'cargando' && ! panelDivision">
         @foreach ([1, 2] as $placeholder)
             <div class="animate-pulse border border-default bg-neutral-primary-soft rounded-base shadow-xs px-5 py-6 sm:px-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:gap-6" aria-hidden="true">
                 <div class="flex items-center gap-4 lg:w-72">
@@ -158,7 +247,7 @@
     </div>
 
     {{-- Error de la consulta, con reintento. --}}
-    <div x-show="estado === 'error'" x-cloak>
+    <div x-show="estado === 'error' && ! panelDivision" x-cloak>
         <x-ui.alert type="danger" title="No se pudieron cargar los examenes">
             Ocurrio un problema al consultar el listado.
             <div class="mt-2">
@@ -168,15 +257,15 @@
     </div>
 
     {{-- Listado: las tarjetas salen del JSON del endpoint, no de Blade. --}}
-    <ul class="flex flex-col gap-4" x-show="estado === 'listo'" x-cloak>
+    <ul class="flex flex-col gap-4" x-show="estado === 'listo' && ! panelDivision" x-cloak>
         <template x-for="examen in examenes" :key="examen.id">
             <li class="flex cursor-pointer flex-col gap-4 border bg-neutral-primary-soft rounded-base shadow-xs px-5 py-6 sm:px-8 lg:flex-row lg:items-center lg:gap-6"
                 role="button" tabindex="0" data-seleccionable
                 :aria-pressed="seleccionado === examen.id ? 'true' : 'false'"
                 :class="seleccionado === examen.id ? 'border-brand ring-2 ring-brand' : 'border-default hover:border-brand-subtle'"
-                @click="seleccionado = examen.id"
-                @keydown.enter.prevent="seleccionado = examen.id"
-                @keydown.space.prevent="seleccionado = examen.id">
+                @click="seleccionar(examen.id)"
+                @keydown.enter.prevent="seleccionar(examen.id)"
+                @keydown.space.prevent="seleccionar(examen.id)">
                 {{-- Ícono, tipo y estado. --}}
                 <div class="flex items-center gap-4 lg:w-72">
                     <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-brand-softer text-fg-brand-strong">
