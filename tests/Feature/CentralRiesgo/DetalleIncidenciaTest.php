@@ -10,6 +10,7 @@
  * @updated 2026-10-11
  * @updated 2026-10-24
  * @updated 2026-10-25
+ * @updated 2026-10-26
  *
  * @description Pruebas HTTP con SQLite en memoria, sin usar Supabase, del
  * endpoint GET /api/incidencias/{idIncidencia}: datos completos del detalle
@@ -31,6 +32,8 @@
  * - 2026-10-25  [Valery D. Ortuno P]  test: el detalle trae
  *   `estudiante_verificado` y el esquema de prueba suma `estudiante.verificado`;
  *   las etiquetas de motivo van sin acentos (HU 5).
+ * - 2026-10-26  [Valery D. Ortuno P]  test: el esquema de prueba ya no
+ *   tiene `estado_incidencia` ni `id_confirmador`, eliminadas de la base.
  *
  * @see App\Http\Controllers\Api\DetalleIncidenciaController
  * @see App\Services\CentralRiesgo\ConsultarDetalleIncidenciaService
@@ -155,8 +158,6 @@ class DetalleIncidenciaTest extends TestCase
             $tabla->string('detalle_motivo')->nullable();
             $tabla->dateTime('fecha_registro');
             $tabla->string('tipo_infraccion');
-            $tabla->string('estado_incidencia')->default('Pendiente');
-            $tabla->integer('id_confirmador')->nullable();
             $tabla->foreign('id_examen')->references('id_examen')->on('examen');
             $tabla->foreign('sis_estudiante')->references('sis_estudiante')->on('estudiante');
             $tabla->foreign('id_registrador')->references('id_usuario')->on('usuario');
@@ -196,9 +197,6 @@ class DetalleIncidenciaTest extends TestCase
             'detalle_motivo' => 'Copia visible desde el celular en el momento del examen.',
             'fecha_registro' => '2026-10-05 10:30:00',
             'tipo_infraccion' => 'tramposo',
-            // El estado sale del tipo (tramposo = Confirmado), no de esta columna.
-            'estado_incidencia' => 'Pendiente',
-            'id_confirmador' => null,
         ]);
     }
 }

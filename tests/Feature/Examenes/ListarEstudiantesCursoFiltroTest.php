@@ -9,6 +9,7 @@
  *
  * @updated 2026-10-10
  * @updated 2026-10-24
+ * @updated 2026-10-26
  *
  * @description
  * Pruebas de integración del filtrado de estudiantes por estado (issue #29),
@@ -35,11 +36,12 @@
  *   cuenta a los estudiantes que están en la central de riesgos.
  * - 2026-10-24  [Valery D. Ortuno P]  test: la incidencia guarda `id_curso`,
  *   que es lo que ahora usa el filtro "tramposos" para ubicarla en el curso.
+ * - 2026-10-26  [Valery D. Ortuno P]  test: sin `estado_incidencia`,
+ *   eliminada de la base (el tipo es el estado).
  */
 
 namespace Tests\Feature\Examenes;
 
-use App\Enums\EstadoIncidencia;
 use App\Enums\Motivo;
 use App\Models\CentralRiesgo;
 use App\Models\Curso;
@@ -168,9 +170,6 @@ class ListarEstudiantesCursoFiltroTest extends TestCase
                 'detalle_motivo' => 'Motivo de prueba',
                 'fecha_registro' => now()->toDateString(),
                 'tipo_infraccion' => $infraccion,
-                'estado_incidencia' => $infraccion === 'tramposo'
-                    ? EstadoIncidencia::Confirmado
-                    : EstadoIncidencia::Pendiente,
             ]);
         }
     }
