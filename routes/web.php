@@ -72,6 +72,9 @@
  *   docentes (HU 10); antes un auxiliar podía abrirla por URL.
  * - 2026-10-25  [Valery D. Ortuno P]  refactor: se retira /registrar-incidencia;
  *   las incidencias se registran desde los modales del monitor en vivo (HU 5).
+ * - 2026-10-25  [Alex Candia]  feat: /examenes pasa a ser una sola página con
+ *   selector de materia; las rutas /examenes/curso/{curso} quedan por
+ *   compatibilidad.
  */
 
 use App\Http\Controllers\AuthController;
@@ -153,8 +156,8 @@ Route::middleware(['auth', 'docente'])->group(function (): void {
     Route::get('/cursos/{curso}/estudiantes/estado', EstudiantesCurso::class)
         ->name('cursos.estudiantes.estado');
 
-    // Sección Exámenes: se elige un curso activo y desde ahí se ven sus
-    // exámenes o se abre el formulario de alta.
+    // Sección Exámenes: una sola página con selector de materia y las cuatro
+    // pestañas. Las rutas por curso se mantienen por compatibilidad.
     Route::get('/examenes', [ExamenController::class, 'index'])->name('examenes');
     Route::get('/examenes/curso/{curso}', [ExamenController::class, 'curso'])
         ->whereNumber('curso')

@@ -5,12 +5,17 @@
     @updated 2026-10-10
     @updated 2026-10-12
     @updated 2026-10-24
+    @updated 2026-10-25
 
     @description
     Componente UI Blade reutilizable con el formulario de alta de un examen en
     un curso (tipo, fecha, hora de inicio, duración, ambientes, materiales y
     normas). Lo incrusta la página pages/examen-crear; ya no es un modal, así
     que no se abre ni se cierra: "Cancelar" vuelve a `cancelarUrl`.
+
+    También se incrusta en la pestaña Crear Examen de la página única Exámenes;
+    ahí la URL de envío y el curso se actualizan sin recargar cuando cambia el
+    selector de materia.
 
     La fecha se escribe dd/mm/aaaa con los separadores colocados a mano (así el
     formato no depende del navegador); las barras se ponen solas y el año en
@@ -62,6 +67,7 @@
         'normas' => [],
         'cursoId' => null,
         'cancelarUrl' => null,
+        'accionUrl' => null,
     ])
 
     @changelog
@@ -143,6 +149,10 @@
     - 2026-10-24  [Valery D. Ortuno P]  feat: "Materiales personalizados" pasa a
       textarea de 3 renglones, igual que "Normas personalizadas"; la duración
       corta a 3 digitos también al pegar, y los textos visibles van sin acentos.
+    - 2026-10-25  [Alex Candia]  feat: el formulario acepta una URL de acción con
+      el marcador __CURSO__ y escucha el evento curso-seleccionado, para que la
+      materia se pueda cambiar sin salir de la página. Manda el curso elegido en
+      un campo oculto para recuperarlo si falla la validación.
 
     @see  resources/views/pages/examen-crear.blade.php
     @see  App\Enums\TipoExamen
@@ -183,10 +193,18 @@
     $anioActual = (string) now()->year;
 
     $urlCancelar = $cancelarUrl ?? url()->previous();
+    $accionInicial = $accionUrl
+        ?? (($cursoId ?? null) !== null ? route('cursos.examenes.store', $cursoId) : '');
 @endphp
 
 <div
     x-data="{
+        cursoId: @js($cursoId ?? ''),
+        nombreCurso: @js($nombreCurso ?? ''),
+        accionUrl: @js($accionInicial),
+        get urlAccion() {
+            return this.accionUrl.replace('__CURSO__', this.cursoId);
+        },
         tipo: @js(old('tipo_examen', '')),
         fecha: @js(old('fecha', '')),
         horaInicio: @js(old('hora_inicio', '')),
@@ -434,23 +452,24 @@
             this.agregarAmbiente(ambiente.id);
         }
     }"
+    @curso-seleccionado.window="cursoId = $event.detail.id; nombreCurso = $event.detail.nombre"
     class="w-full"
 >
-    <form method="POST" action="{{ route('cursos.examenes.store', $cursoId) }}">
+    <form method="POST" x-bind:action="urlAccion">
         @csrf
+        <input type="hidden" name="curso_id" x-bind:value="cursoId">
 
     <div class="space-y-4 py-4">
-        @if ($nombreCurso)
-            <x-ui.input
-                label="Curso"
-                id="curso_examen"
-                name="nombre_curso"
-                :value="$nombreCurso"
-                readonly
-                required
-                class="cursor-default"
-            />
-        @endif
+        <x-ui.input
+            label="Curso"
+            id="curso_examen"
+            name="nombre_curso"
+            :value="$nombreCurso ?? ''"
+            x-bind:value="nombreCurso"
+            readonly
+            required
+            class="cursor-default"
+        />
 
         <x-ui.select
             label="Tipo de examen"

@@ -9,6 +9,7 @@
  *
  * @updated 2026-10-10
  * @updated 2026-10-24
+ * @updated 2026-10-25
  *
  * @description
  * Pruebas de integración del alta de examen del formulario de crear examen
@@ -36,6 +37,8 @@
  * - 2026-10-24  [Valery D. Ortuno P]  test: mensajes sin acentos, hora en
  *   punto válida y bloqueo de cursos
  *   finalizados.
+ * - 2026-10-25  [Alex Candia]  test: el alta vuelve a la página única de
+ *   Exámenes con la materia elegida.
  * - 2026-10-25  [Valery D. Ortuno P]  test: alta en un curso con varios
  *   estudiantes (cada inscripción con su propio id); antes ninguna prueba
  *   cubría un curso con estudiantes y el bug de los ids repetidos pasaba.
@@ -116,7 +119,7 @@ class RegistrarExamenTest extends TestCase
         $this->post(route('cursos.examenes.store', self::ID_CURSO), $this->datosValidos([
             'materiales_personalizados' => "Calculadora simple\nFormulario de fórmulas",
             'normas_personalizadas' => 'No usar celular',
-        ]))->assertRedirect(route('examenes.curso', self::ID_CURSO));
+        ]))->assertRedirect(route('examenes', ['curso' => self::ID_CURSO]));
 
         $examen = Examen::query()->where('creador', self::ID_DOCENTE)->firstOrFail();
 
@@ -170,7 +173,7 @@ class RegistrarExamenTest extends TestCase
         $this->post(route('cursos.examenes.store', self::ID_CURSO), $this->datosValidos([
             'hora_inicio' => '23:30',
             'duracion' => 90,
-        ]))->assertRedirect(route('examenes.curso', self::ID_CURSO));
+        ]))->assertRedirect(route('examenes', ['curso' => self::ID_CURSO]));
 
         $examen = Examen::query()->where('creador', self::ID_DOCENTE)->firstOrFail();
 
@@ -256,7 +259,7 @@ class RegistrarExamenTest extends TestCase
         }
 
         $this->post(route('cursos.examenes.store', self::ID_CURSO), $this->datosValidos())
-            ->assertRedirect(route('examenes.curso', self::ID_CURSO));
+            ->assertRedirect(route('examenes', ['curso' => self::ID_CURSO]));
 
         $examen = Examen::query()->where('creador', self::ID_DOCENTE)->firstOrFail();
         $ids = DB::table('estudiante_examen')->where('id_examen', $examen->id_examen)->pluck('id_estudiante_examen');

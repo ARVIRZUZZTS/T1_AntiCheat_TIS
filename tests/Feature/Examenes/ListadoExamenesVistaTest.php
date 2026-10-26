@@ -9,21 +9,23 @@
  *
  * @updated 2026-10-10
  * @updated 2026-10-24
+ * @updated 2026-10-25
  *
  * @description
  * Pruebas de la vista del listado de exámenes de un curso: verifican sobre
  * la fuente de las vistas y de las rutas que el parcial consulta con fetch el
- * endpoint /api/cursos/{idCurso}/examenes, que la página de exámenes del
- * curso lo incrusta, que la tarjeta sigue un diseño horizontal (ícono, badge
+ * endpoint /api/cursos/{idCurso}/examenes, que la página única de Exámenes lo
+ * incrusta, que la tarjeta sigue un diseño horizontal (ícono, badge
  * invertido, grid con labels en mayúsculas y valores mono, fecha en
  * dd/mm/yyyy) con los campos del criterio (tipo, estado, fecha, horario,
- * ambientes e ingresados) y que las rutas no resuelven los exámenes
- * server-side.
+ * ambientes e ingresados), que las acciones viven en cuatro pestañas y que
+ * las rutas no resuelven los exámenes server-side.
  *
  * Son aserciones de fuente, al estilo de BuscadorEstudiantesMateriaTest:
  * el comportamiento de la consulta en sí lo cubre ListarExamenesCursoTest.
  *
  * @see  resources/views/partials/examenes-curso.blade.php
+ * @see  resources/views/pages/examenes.blade.php
  * @see  resources/views/pages/examenes-curso.blade.php
  * @see  routes/web.php
  * @see  App\Http\Controllers\Api\CursoExamenController
@@ -38,6 +40,10 @@
  *   (ya no una pestaña x-if del detalle). El header ya no tiene "Crear
  *   examen" sino Invitar docente / Dividir examen, y los textos van sin
  *   acentos.
+ * - 2026-10-25  [Alex Candia]  test: las acciones pasan a cuatro pestañas y la
+ *   página pasa catálogos y permiso de alta al parcial.
+ * - 2026-10-25  [Alex Candia]  test: la página única de Exámenes monta el
+ *   parcial y el selector de materia oculta las pestañas sin selección.
  */
 
 namespace Tests\Feature\Examenes;
@@ -111,13 +117,13 @@ class ListadoExamenesVistaTest extends TestCase
     {
         $parcial = $this->fuenteParcial();
 
-        // Header: título grande y acciones sobre los exámenes. El alta es una
-        // página propia, así que el parcial ya no tiene "Crear examen".
+        // Header: título grande y las cuatro pestañas de gestión.
         $this->assertStringContainsString('text-2xl font-bold text-heading', $parcial);
         $this->assertStringNotContainsString('Ver examenes', $parcial);
-        $this->assertStringContainsString('Invitar docente', $parcial);
-        $this->assertStringContainsString('Dividir examen', $parcial);
-        $this->assertStringNotContainsString('Crear examen', $parcial);
+        $this->assertStringContainsString('Ver Lista de Examenes', $parcial);
+        $this->assertStringContainsString('Crear Examen', $parcial);
+        $this->assertStringContainsString('Invitar Docente a Examen', $parcial);
+        $this->assertStringContainsString('Dividir Examen', $parcial);
 
         // Tarjeta horizontal con ícono y badges invertidos respecto al diseño anterior.
         $this->assertStringContainsString('lg:w-72', $parcial);
@@ -145,15 +151,26 @@ class ListadoExamenesVistaTest extends TestCase
         $this->assertStringContainsString('no tiene examenes registrados', $parcial);
     }
 
-    public function test_la_pagina_de_examenes_del_curso_monta_el_parcial(): void
+    public function test_la_pagina_de_examenes_monta_el_parcial(): void
     {
-        $pagina = $this->fuente(resource_path('views/pages/examenes-curso.blade.php'));
+        $pagina = $this->fuente(resource_path('views/pages/examenes.blade.php'));
 
-        $this->assertStringContainsString(
-            "@include('partials.examenes-curso', ['curso' => \$curso])",
-            $pagina
-        );
+        $this->assertStringContainsString("@include('partials.examenes-curso', [", $pagina);
+        $this->assertStringContainsString("'cursos' => \$cursos", $pagina);
+        $this->assertStringContainsString("'cursoInicial' => \$cursoInicial", $pagina);
+        $this->assertStringNotContainsString('>Ver examenes<', $pagina);
+        $this->assertStringNotContainsString('>Crear examen<', $pagina);
         $this->assertStringNotContainsString("'examenes' => \$examenes", $pagina);
+    }
+
+    public function test_el_parcial_tiene_selector_de_materia_y_oculta_las_pestanas(): void
+    {
+        $parcial = $this->fuenteParcial();
+
+        $this->assertStringContainsString('label="Materia"', $parcial);
+        $this->assertStringContainsString('x-model="cursoSeleccionado"', $parcial);
+        $this->assertStringContainsString('x-show="hayCurso"', $parcial);
+        $this->assertStringContainsString('Selecciona una materia', $parcial);
     }
 
     public function test_el_detalle_del_curso_ya_no_tiene_pestana_examenes(): void
