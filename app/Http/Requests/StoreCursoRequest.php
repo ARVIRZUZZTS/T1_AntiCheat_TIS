@@ -8,6 +8,7 @@
  * @created 2026-10-24
  *
  * @updated 2026-10-24
+ * @updated 2026-10-26
  *
  * @description
  * Validación del alta de un curso desde el formulario "Crear curso". Se piden
@@ -27,10 +28,13 @@
  *
  * @changelog
  * - 2026-10-24  [Valery D. Ortuno P]  feat: creación inicial del request.
+ * - 2026-10-26  [Valery D. Ortuno P]  perf: la gestión se valida con `in`
+ *   contra el catálogo cacheado (ListarGestionesService) en vez de `exists`.
  */
 
 namespace App\Http\Requests;
 
+use App\Services\Curso\ListarGestionesService;
 use App\Support\DTO\GestionCursoDTO;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -75,12 +79,12 @@ class StoreCursoRequest extends FormRequest
     /**
      * @return array<string, mixed>
      */
-    public function rules(): array
+    public function rules(ListarGestionesService $gestiones): array
     {
         return [
             'materia' => ['required', 'string', 'max:80'],
             'grupo' => ['required', 'regex:/^[A-Z0-9]{1,3}$/'],
-            'gestion' => ['required', 'integer', Rule::exists('tipo_gestion', 'id_tipo_gestion')],
+            'gestion' => ['required', 'integer', Rule::in(array_keys($gestiones->ejecutar()))],
             // El año es libre (el formulario propone el actual), pero de cuatro
             // cifras y desde el 2000: un 1999 o un 202 son errores de tipeo.
             'anio' => ['required', 'integer', 'between:'.self::ANIO_MINIMO.','.self::ANIO_MAXIMO],
@@ -119,7 +123,7 @@ class StoreCursoRequest extends FormRequest
             'grupo.regex' => 'El grupo solo admite letras y numeros, hasta 3 caracteres.',
             'gestion.required' => 'Seleccione la gestion.',
             'gestion.integer' => 'Seleccione una gestion valida.',
-            'gestion.exists' => 'Seleccione una gestion valida.',
+            'gestion.in' => 'Seleccione una gestion valida.',
             'anio.required' => 'Ingrese el año.',
             'anio.integer' => 'Ingrese un año valido.',
             'anio.between' => 'El año debe estar entre '.self::ANIO_MINIMO.' y '.self::ANIO_MAXIMO.'.',
