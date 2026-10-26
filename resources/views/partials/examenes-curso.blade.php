@@ -4,6 +4,7 @@
     @created 2026-10-05
     @updated 2026-10-10
     @updated 2026-10-24
+    @updated 2026-10-25
 
     @description
     Exámenes de la materia elegida en la página única Exámenes. Arriba va el
@@ -149,6 +150,7 @@
              }
 
              this.estado = 'cargando';
+             this.limpiarSeleccion();
              try {
                  const url = this.urlExamenes.replace('__CURSO__', this.cursoSeleccionado);
                  const respuesta = await fetch(url);
@@ -173,6 +175,26 @@
          },
          etiquetaExamen(examen) {
              return [examen.tipo || 'Sin tipo', this.fechaDe(examen), this.horario(examen)].join(' - ');
+         },
+         seleccionar(id) {
+             this.seleccionado = id;
+             this.criterioDivision = '';
+         },
+         alternarDivision() {
+             if (this.seleccionado === null) {
+                 return;
+             }
+             this.panelDivision = ! this.panelDivision;
+             this.criterioDivision = '';
+         },
+         salirDivision() {
+             this.panelDivision = false;
+             this.criterioDivision = '';
+         },
+         limpiarSeleccion() {
+             this.seleccionado = null;
+             this.panelDivision = false;
+             this.criterioDivision = '';
          },
          fechaDe(examen) {
              if (!examen.fecha) {
