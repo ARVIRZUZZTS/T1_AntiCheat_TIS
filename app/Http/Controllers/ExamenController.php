@@ -9,6 +9,7 @@
  *
  * @updated 2026-10-10
  * @updated 2026-10-24
+ * @updated 2026-10-26
  *
  * @description
  * Controlador HTTP de la sección Exámenes del docente. Solo orquesta:
@@ -31,6 +32,9 @@
  * - 2026-10-24  [Valery D. Ortuno P]  feat: el formulario de alta exige que el
  *   curso siga en curso (CursoPolicy::crearExamen) y el aviso de éxito va sin
  *   acentos.
+ * - 2026-10-26  [Valery D. Ortuno P]  perf: los catálogos del formulario salen
+ *   de CatalogosExamenService (cacheados); antes eran tres consultas cada vez
+ *   que se abría el alta.
  *
  * @see  StoreExamenRequest
  * @see  App\Services\Examen\RegistrarExamenService
@@ -42,11 +46,9 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreExamenRequest;
 use App\Models\Curso;
-use App\Services\Ambiente\ListarAmbientesService;
 use App\Services\Curso\ListarCursosDocenteService;
+use App\Services\Examen\CatalogosExamenService;
 use App\Services\Examen\RegistrarExamenService;
-use App\Services\Material\ListarMaterialesService;
-use App\Services\Norma\ListarNormasService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -107,17 +109,17 @@ class ExamenController extends Controller
      * @author Valery D. Ortuno P <valerydariana98@gmail.com>
      * @since  2026-10-24
      */
-    public function crear(Curso $curso): View
+    public function crear(Curso $curso, CatalogosExamenService $catalogos): View
     {
         Gate::authorize('crearExamen', $curso);
 
         return view('pages.examen-crear', [
             'curso' => $curso,
-            // Catálogos del formulario. El buscador de ambientes los filtra en
-            // el navegador, así que se resuelven enteros y no por curso.
-            'ambientes' => app(ListarAmbientesService::class)->ejecutar(),
-            'materiales' => app(ListarMaterialesService::class)->ejecutar(),
-            'normas' => app(ListarNormasService::class)->ejecutar(),
+            // Catálogos del formulario, cacheados. El buscador de ambientes los
+            // filtra en el navegador, así que se resuelven enteros y no por curso.
+            'ambientes' => $catalogos->ambientes(),
+            'materiales' => $catalogos->materiales(),
+            'normas' => $catalogos->normas(),
             'backRoute' => route('examenes'),
         ]);
     }

@@ -11,6 +11,7 @@
  * @updated 2026-10-10
  * @updated 2026-10-24
  * @updated 2026-10-25
+ * @updated 2026-10-26
  *
  * @description
  * Servicio de la feature Examen que da de alta un examen con todo lo que se
@@ -46,6 +47,10 @@
  *   más estudiantes; ahora el id sale del índice y la tabla se bloquea.
  * - 2026-10-25  [Valery D. Ortuno P]  revert: se quita crearParaCurso(); Crear
  *   curso vuelve a pedir solo materia, grupo, gestión y año (sin exámenes).
+ * - 2026-10-26  [Valery D. Ortuno P]  perf: ambientes, normas y materiales se
+ *   agregan con attach() (el examen es nuevo, sync() consultaba antes lo que
+ *   ya tenía) y el id del tipo de examen se cachea; son cuatro viajes menos a
+ *   la base por alta.
  */
 
 namespace App\Services\Examen;
@@ -58,6 +63,7 @@ use App\Models\EstudianteExamen;
 use App\Models\Examen;
 use App\Models\TipoExamen as TipoExamenCatalogo;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use RuntimeException;
@@ -113,9 +119,12 @@ class RegistrarExamenService
             $examen->save();
 
             $examen->cursos()->attach($curso->id_curso);
-            $examen->ambientes()->sync($datos['ambientes']);
-            $examen->normas()->sync($datos['normas'] ?? []);
-            $examen->materialesPermitidos()->sync($datos['materiales'] ?? []);
+            // attach() y no sync(): el examen es nuevo, así que no hay nada que
+            // comparar y sync() solo sumaba una consulta por relación. Los ids
+            // se deduplican porque attach() no lo hace.
+            $examen->ambientes()->attach(array_unique($datos['ambientes']));
+            $examen->normas()->attach(array_unique($datos['normas'] ?? []));
+            $examen->materialesPermitidos()->attach(array_unique($datos['materiales'] ?? []));
 
             $this->guardarMaterialesPersonalizados($examen, $datos['materiales_personalizados'] ?? null);
             $this->guardarNormasPersonalizadas($examen, $datos['normas_personalizadas'] ?? null);
@@ -233,13 +242,21 @@ class RegistrarExamenService
      * válido lo controla el request; esto cubre el otro caso: que esté en el enum
      * pero no tenga fila en `tipo_examen`.
      *
+     * El id se cachea como los demás catálogos del alta
+     * (CatalogosExamenService::CACHE_MINUTOS): la aplicación no modifica
+     * `tipo_examen`. Un tipo que no existe no se cachea.
+     *
      * @throws InvalidArgumentException Si el catálogo no tiene ese tipo.
      */
     private function idTipoExamen(string $codigo): int
     {
-        $id = TipoExamenCatalogo::query()
-            ->where('nombre_tipo_examen', $codigo)
-            ->value('id_tipo_examen');
+        $id = Cache::remember(
+            CatalogosExamenService::CACHE_PREFIJO.'tipo.'.$codigo,
+            now()->addMinutes(CatalogosExamenService::CACHE_MINUTOS),
+            fn (): mixed => TipoExamenCatalogo::query()
+                ->where('nombre_tipo_examen', $codigo)
+                ->value('id_tipo_examen'),
+        );
 
         if ($id === null) {
             throw new InvalidArgumentException("El tipo de examen {$codigo} no está en el catálogo.");
