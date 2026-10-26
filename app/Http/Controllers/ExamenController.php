@@ -9,17 +9,19 @@
  *
  * @updated 2026-10-10
  * @updated 2026-10-24
+ * @updated 2026-10-25
  * @updated 2026-10-26
  *
  * @description
  * Controlador HTTP de la sección Exámenes del docente. Solo orquesta:
  *
- * - `index`: elegir uno de sus cursos activos para ver o crear exámenes.
- * - `curso`: los exámenes de un curso.
+ * - `index`: selector de materia y las cuatro pestañas de exámenes en una sola
+ *   página.
+ * - `curso`: página anterior de un curso (se mantiene por compatibilidad).
  * - `crear`: el formulario de alta de un examen, como página propia.
  * - `store`: valida (StoreExamenRequest), delega el alta en
- *   RegistrarExamenService y devuelve a la persona a los exámenes del curso
- *   con un mensaje de éxito.
+ *   RegistrarExamenService y vuelve a la página única con la materia elegida
+ *   y un mensaje de éxito.
  *
  * Si la validación falla no hace falta manejar nada: el request redirige de
  * vuelta al formulario con los errores y el input viejo.
@@ -32,11 +34,17 @@
  * - 2026-10-24  [Valery D. Ortuno P]  feat: el formulario de alta exige que el
  *   curso siga en curso (CursoPolicy::crearExamen) y el aviso de éxito va sin
  *   acentos.
+ * - 2026-10-25  [Alex Candia]  feat: la página del curso entrega la policy y
+ *   los catálogos para incrustar el formulario de alta en la pestaña Crear
+ *   Examen.
+ * - 2026-10-25  [Alex Candia]  feat: Exámenes pasa a una sola página con
+ *   selector de materia; el alta vuelve a esa página con la materia elegida.
  * - 2026-10-26  [Valery D. Ortuno P]  perf: los catálogos del formulario salen
  *   de CatalogosExamenService (cacheados); antes eran tres consultas cada vez
  *   que se abría el alta.
  *
  * @see  StoreExamenRequest
+ * @see  App\Services\Examen\CatalogosExamenService
  * @see  App\Services\Examen\RegistrarExamenService
  * @see  App\Services\Curso\ListarCursosDocenteService
  * @see  App\Policies\CursoPolicy
@@ -57,28 +65,69 @@ use Illuminate\Support\Facades\Gate;
 class ExamenController extends Controller
 {
     /**
-     * Sección Exámenes: cursos activos del docente para elegir uno.
+     * Sección Exámenes: selector de materia y, debajo, las cuatro pestañas de
+     * gestión del curso elegido. La página no navega: el selector y las
+     * pestañas viven en el mismo documento.
      *
      * @param  Request  $request  Request con el docente autenticado.
      * @param  ListarCursosDocenteService  $cursos  Servicio de cursos del docente.
+     * @param  CatalogosExamenService  $catalogos  Catálogos del formulario de alta.
      *
      * @return View  Vista pages.examenes.
      *
      * @author Valery D. Ortuno P <valerydariana98@gmail.com>
      * @since  2026-10-24
      */
-    public function index(Request $request, ListarCursosDocenteService $cursos): View
-    {
+    public function index(
+        Request $request,
+        ListarCursosDocenteService $cursos,
+        CatalogosExamenService $catalogos,
+    ): View {
+        $cursos = $cursos->activos((int) $request->user()->id_usuario);
+
+        // El curso puede venir de la URL (recarga o enlace directo) o quedar en
+        // el input viejo cuando falló el alta. Solo se acepta si es del docente.
+        $cursoId = (int) $request->old('curso_id', 0);
+        if ($cursoId === 0) {
+            $cursoId = $request->integer('curso');
+        }
+
+        $cursoInicial = $cursoId > 0
+            ? $cursos->firstWhere('id_curso', $cursoId)
+            : null;
+
+        // Si el alta falló, se vuelve a abrir la pestaña del formulario.
+        $hayErrores = (bool) $request->session()->get('errors')?->any();
+        $vieneDelAlta = $request->old('curso_id') !== null;
+        $tabInicial = $hayErrores && $vieneDelAlta && $cursoInicial !== null
+            ? 'crear'
+            : 'lista';
+
+        $catalogo = $cursos->isNotEmpty()
+            ? [
+                'ambientes' => $catalogos->ambientes(),
+                'materiales' => $catalogos->materiales(),
+                'normas' => $catalogos->normas(),
+            ]
+            : ['ambientes' => [], 'materiales' => [], 'normas' => []];
+
         return view('pages.examenes', [
-            'cursos' => $cursos->activos((int) $request->user()->id_usuario),
+            'cursos' => $cursos,
+            'cursoInicial' => $cursoInicial,
+            'tabInicial' => $tabInicial,
+            'ambientes' => $catalogo['ambientes'],
+            'materiales' => $catalogo['materiales'],
+            'normas' => $catalogo['normas'],
         ]);
     }
 
     /**
      * Exámenes de un curso. El listado lo consulta la vista con fetch al
-     * endpoint GET /api/cursos/{idCurso}/examenes.
+     * endpoint GET /api/cursos/{idCurso}/examenes; los catálogos se pasan para
+     * poder incrustar el formulario de alta en su pestaña.
      *
      * @param  Curso  $curso  Curso de la URL.
+     * @param  CatalogosExamenService  $catalogos  Catálogos del formulario.
      *
      * @return View  Vista pages.examenes-curso.
      *
@@ -87,12 +136,20 @@ class ExamenController extends Controller
      * @author Valery D. Ortuno P <valerydariana98@gmail.com>
      * @since  2026-10-24
      */
-    public function curso(Curso $curso): View
+    public function curso(Curso $curso, CatalogosExamenService $catalogos): View
     {
         Gate::authorize('gestionar', $curso);
 
+        // El formulario solo se muestra si el curso sigue habilitado para crear
+        // exámenes; así no se consultan catálogos que no se van a usar.
+        $puedeCrearExamen = Gate::allows('crearExamen', $curso);
+
         return view('pages.examenes-curso', [
             'curso' => $curso,
+            'ambientes' => $puedeCrearExamen ? $catalogos->ambientes() : [],
+            'materiales' => $puedeCrearExamen ? $catalogos->materiales() : [],
+            'normas' => $puedeCrearExamen ? $catalogos->normas() : [],
+            'puedeCrearExamen' => $puedeCrearExamen,
             'backRoute' => route('examenes'),
         ]);
     }
@@ -129,7 +186,7 @@ class ExamenController extends Controller
         $servicio->ejecutar($curso, $request->validated());
 
         return redirect()
-            ->route('examenes.curso', $curso->id_curso)
+            ->route('examenes', ['curso' => $curso->id_curso])
             ->with('mensaje', 'Examen creado con exito');
     }
 }
