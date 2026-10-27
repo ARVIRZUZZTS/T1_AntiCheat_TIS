@@ -135,10 +135,10 @@ Route::middleware(['web', 'auth:web'])->group(function (): void {
         ->middleware('docente')
         ->name('api.examenes.dividir.confirmar');
 
-});
-Route::get('/cursos/{idCurso}/examenes', [CursoExamenController::class, 'index'])
-    ->whereNumber('idCurso')
-    ->name('api.cursos.examenes.listar');
+    Route::get('/cursos/{idCurso}/examenes', [CursoExamenController::class, 'index'])
+        ->whereNumber('idCurso')
+        ->name('api.cursos.examenes.listar');
 
-Route::get('/central-riesgo', [CentralRiesgoController::class, 'index'])
-    ->name('api.central-riesgo.listar');
+    Route::get('/central-riesgo', [CentralRiesgoController::class, 'index'])
+        ->name('api.central-riesgo.listar');
+});
