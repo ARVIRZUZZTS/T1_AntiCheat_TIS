@@ -21,7 +21,7 @@ class BuscarDocentesInvitablesService
     public const PATRON_CORREO_PARCIAL = '/^[A-Za-z0-9._%+@-]+$/';
 
     /**
-     * @return Collection<int, array{id: int, nombre: string, correo: ?string}>
+     * @return Collection<int, array{id: int, sis: string, nombre: string, correo: ?string}>
      */
     public function ejecutar(Usuario $solicitante, Examen $examen, string $busqueda, int $limite = 10): Collection
     {
@@ -35,7 +35,7 @@ class BuscarDocentesInvitablesService
         $estadosActivos = [InvitacionEstado::Pendiente->value, InvitacionEstado::Aceptada->value];
 
         return Usuario::query()
-            ->select(['usuario.id_usuario', 'usuario.nombre_usuario', 'usuario.apellido', 'usuario.correo'])
+            ->select(['usuario.id_usuario', 'usuario.cod_sis', 'usuario.nombre_usuario', 'usuario.apellido', 'usuario.correo'])
             ->where('usuario.id_usuario', '!=', $solicitante->id_usuario)
             ->whereHas('roles', fn ($consulta) => $consulta->where('nombre_rol', Rol::NOMBRE_DOCENTE))
             ->whereDoesntHave('invitacionesRecibidas', function ($consulta) use ($examen, $estadosActivos): void {
@@ -45,6 +45,7 @@ class BuscarDocentesInvitablesService
             ->where(function ($consulta) use ($operador, $patron): void {
                 $consulta->where('usuario.nombre_usuario', $operador, $patron)
                     ->orWhere('usuario.apellido', $operador, $patron)
+                    ->orWhere('usuario.cod_sis', $operador, $patron)
                     ->orWhereRaw(
                         "usuario.nombre_usuario || ' ' || usuario.apellido {$operador} ?",
                         [$patron]
@@ -57,6 +58,7 @@ class BuscarDocentesInvitablesService
             ->get()
             ->map(fn (Usuario $docente): array => [
                 'id' => (int) $docente->id_usuario,
+                'sis' => $docente->cod_sis,
                 'nombre' => trim($docente->nombre_usuario.' '.$docente->apellido),
                 'correo' => $docente->correo,
             ]);

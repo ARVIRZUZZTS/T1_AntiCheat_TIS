@@ -98,8 +98,8 @@ class ListarMateriasConMetricasService
             return [
                 'curso' => $curso,
                 'inscritos' => (int) $curso->getAttribute('inscritos'),
-                'habilitados' => (int) ($estados->get('habilitado')?->total ?? 0),
-                'deshabilitados' => (int) ($estados->get('deshabilitado')?->total ?? 0),
+                'habilitados' => (int) ($estados->get('habilitado')->total ?? 0),
+                'deshabilitados' => (int) ($estados->get('deshabilitado')->total ?? 0),
                 'incidencias' => (int) ($incidenciasPorCurso->get($curso->id_curso) ?? 0),
                 'examen_activo' => $examenActual !== null && $this->examenEnCurso($examenActual, $ahora),
             ];

@@ -59,6 +59,11 @@ Route::middleware(['web', 'auth:web'])->group(function (): void {
         ->whereNumber('idNotificacion')
         ->name('api.notificaciones.ocultar');
 
+    Route::get('/examenes/{examen}/invitaciones', [InvitacionExamenController::class, 'index'])
+        ->whereNumber('examen')
+        ->middleware('docente')
+        ->name('api.examenes.invitaciones.index');
+
     Route::get('/examenes/{examen}/docentes-invitables', [InvitacionExamenController::class, 'docentesInvitables'])
         ->whereNumber('examen')
         ->middleware('docente')

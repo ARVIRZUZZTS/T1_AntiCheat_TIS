@@ -5,7 +5,7 @@
 - **BD oficial unica:** Supabase (PostgreSQL)
 - **Motor:** PostgreSQL (Supabase)
 - **Tablas totales:** 71
-- **Tablas del dominio (`public`):** 28
+- **Tablas del dominio (`public`):** 31
 - **Tablas de Supabase:** `auth.*` (27), `storage.*` (8)
 - **Tablas de Laravel:** 9 (`users`, `sessions`, `cache`, `cache_locks`, `jobs`, `job_batches`, `failed_jobs`, `password_reset_tokens`, `migrations`)
 - **Desarrollo local:** ya no se usa BD local SQLite. Toda la configuracion apunta a Supabase.
@@ -22,8 +22,8 @@
 | `estado_notificacion` | `visto`, `recibido` |
 | `estado_usuario` | `Activo`, `Baja` |
 | `estudiante_examen_estado` | `habilitado`, `deshabilitado` |
-| `invitacion_estado` | `aceptado`, `rechazado`, `pendiente` |
-| `motivo` | `intento de ingreso no autorizado`, `uso de dispositivos electronicos`, `copia o intercambio de respuestas`, `uso de material no autorizado`, `suplantacion de identidad`, `otro` |
+| `invitacion_estado` | `aceptado`, `rechazado`, `pendiente`, `cancelado` |
+| `motivo` | `intento de ingreso no autorizado`, `uso de dispositivos electronicos`, `copia o intercambio de respuestas`, `uso de material no autorizado`, `suplantacion de identidad`, `otro`, `intento de ingreso duplicado`, `aula equivocada`, `intento de ingreso de material no autorizado`, `en examen sin registro de ingreso` |
 | `nombre_tipo_gestion` | `primer semestre`, `invierno`, `segundo semestre`, `verano` |
 | `registrador_tipo` | `docente`, `auxiliar` |
 | `roles` | `docente`, `auxiliar` |
@@ -42,6 +42,7 @@
 | password | varchar | NO | NULL |
 | nombre_usuario | varchar | NO | NULL |
 | apellido | varchar | NO | NULL |
+| correo | varchar | YES | NULL |
 
 **Datos:**
 | id_usuario | cod_sis | nombre | apellido |
@@ -389,13 +390,17 @@
 
 ---
 
-### notificacion_docente (5 filas)
+### notificacion_docente (11 filas)
 | Columna | Tipo | Nullable | Default |
 |---|---|---|---|
 | id_notificacion | integer | NO | NULL |
-| id_central_riesgo | integer | NO | NULL |
-| id_curso | integer | NO | NULL |
+| id_central_riesgo | integer | YES | NULL |
+| id_curso | integer | YES | NULL |
 | estado | enum `estado_notificacion` | NO | NULL |
+| oculta | boolean | NO | false |
+| tipo | varchar | NO | NULL |
+| id_docente_destinatario | integer | YES | NULL |
+| id_invitacion | integer | YES | NULL |
 
 **Datos:**
 | id_notificacion | id_central_riesgo | id_curso | estado |
@@ -434,6 +439,9 @@
 | id_docente_invitado | integer | NO | NULL |
 | id_examen | integer | NO | NULL |
 | estado | enum `invitacion_estado` | NO | NULL |
+| id_docente_invitador | integer | NO | NULL |
+| created_at | timestamp | NO | NULL |
+| updated_at | timestamp | NO | NULL |
 
 **Datos:**
 | id_invitacion | id_docente_invitado | id_examen | estado |
@@ -446,8 +454,46 @@
 
 ---
 
-## Relaciones (Foreign Keys)
+### configuracion_examen_docente (31 filas)
+| Columna | Tipo | Nullable | Default |
+|---|---|---|---|
+| id_configuracion_examen | integer | NO | NULL |
+| id_examen | integer | NO | NULL |
+| id_docente | integer | NO | NULL |
+| created_at | timestamp | YES | NULL |
+| updated_at | timestamp | YES | NULL |
 
+### configuracion_examen_material
+| Columna | Tipo | Nullable | Default |
+|---|---|---|---|
+| id_configuracion_examen | integer | NO | NULL |
+| id_material | integer | NO | NULL |
+
+### configuracion_examen_norma
+| Columna | Tipo | Nullable | Default |
+|---|---|---|---|
+| id_configuracion_examen | integer | NO | NULL |
+| id_norma | integer | NO | NULL |
+
+### configuracion_material_personalizado
+| Columna | Tipo | Nullable | Default |
+|---|---|---|---|
+| id_configuracion_material | integer | NO | NULL |
+| id_configuracion_examen | integer | NO | NULL |
+| numero_material | integer | NO | NULL |
+| descripcion_material | text | NO | NULL |
+
+### configuracion_norma_personalizada
+| Columna | Tipo | Nullable | Default |
+|---|---|---|---|
+| id_configuracion_norma | integer | NO | NULL |
+| id_configuracion_examen | integer | NO | NULL |
+| numero_norma | integer | NO | NULL |
+| descripcion_norma | text | NO | NULL |
+
+---
+
+## Relaciones (Foreign Keys)
 | Origen | Destino |
 |---|---|
 | curso.sis_doc | usuario.id_usuario |
@@ -489,6 +535,15 @@
 | notificacion_auxiliar.id_ambiente | ambiente.id_ambiente |
 | invitacion_examen_compartido.id_docente_invitado | usuario.id_usuario |
 | invitacion_examen_compartido.id_examen | examen.id_examen |
+| invitacion_examen_compartido.id_docente_invitador | usuario.id_usuario |
+| notificacion_docente.id_docente_destinatario | usuario.id_usuario |
+| notificacion_docente.id_invitacion | invitacion_examen_compartido.id_invitacion |
+| configuracion_examen_docente.id_examen | examen.id_examen |
+| configuracion_examen_docente.id_docente | usuario.id_usuario |
+| configuracion_examen_material.id_configuracion_examen | configuracion_examen_docente.id_configuracion_examen |
+| configuracion_examen_norma.id_configuracion_examen | configuracion_examen_docente.id_configuracion_examen |
+| configuracion_material_personalizado.id_configuracion_examen | configuracion_examen_docente.id_configuracion_examen |
+| configuracion_norma_personalizada.id_configuracion_examen | configuracion_examen_docente.id_configuracion_examen |
 
 ---
 

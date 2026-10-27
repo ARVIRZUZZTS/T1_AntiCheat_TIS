@@ -96,6 +96,42 @@
             />
         </template>
 
+        <template id="notificacion-template-invitacion">
+            <div class="js-notificacion relative flex items-start gap-3 sm:gap-4 rounded-2xl border border-light bg-neutral-primary-soft p-4 sm:p-5 shadow-xs">
+                <span class="shrink-0 inline-flex items-center justify-center w-11 h-11 bg-brand-softer rounded-xl">
+                    <svg class="w-6 h-6 text-fg-brand-strong" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4" stroke="currentColor" stroke-width="2"/></svg>
+                </span>
+                <div class="flex-1 min-w-0 pe-8">
+                    <h3 class="js-titulo text-sm font-bold leading-snug text-heading break-words"></h3>
+                    <p class="js-descripcion mt-1 text-sm text-body break-words"></p>
+                    <span class="js-hace mt-3 block text-xs text-muted"></span>
+                    <div class="mt-3 flex gap-2">
+                        <button type="button" class="js-aceptar-invitacion inline-flex items-center justify-center px-4 py-2 text-sm font-semibold text-white bg-brand rounded-base hover:bg-brand-strong">Aceptar</button>
+                        <button type="button" class="js-rechazar-invitacion inline-flex items-center justify-center px-4 py-2 text-sm font-semibold text-heading bg-neutral-secondary-medium rounded-base hover:bg-neutral-tertiary">Rechazar</button>
+                    </div>
+                </div>
+                <button type="button" aria-label="Cerrar notificacion" title="Cerrar" class="js-cerrar-notificacion absolute end-2 top-2 inline-flex items-center justify-center w-8 h-8 bg-transparent rounded-base text-neutral-tertiary-medium hover:bg-neutral-tertiary-soft hover:text-heading focus:outline-none">
+                    <svg class="w-4 h-4" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6 18 17.94 6M18 18 6.06 6"/></svg>
+                </button>
+            </div>
+        </template>
+
+        <template id="notificacion-template-respuesta">
+            <div class="js-notificacion relative flex items-start gap-3 sm:gap-4 rounded-2xl border border-light bg-neutral-primary-soft p-4 sm:p-5 shadow-xs">
+                <span class="shrink-0 inline-flex items-center justify-center w-11 h-11 bg-success-soft rounded-xl">
+                    <svg class="w-6 h-6 text-fg-success-strong" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 6 9 17l-5-5"/></svg>
+                </span>
+                <div class="flex-1 min-w-0 pe-8">
+                    <h3 class="js-titulo text-sm font-bold leading-snug text-heading break-words"></h3>
+                    <p class="js-descripcion mt-1 text-sm text-body break-words"></p>
+                    <span class="js-hace mt-3 block text-xs text-muted"></span>
+                </div>
+                <button type="button" aria-label="Cerrar notificacion" title="Cerrar" class="js-cerrar-notificacion absolute end-2 top-2 inline-flex items-center justify-center w-8 h-8 bg-transparent rounded-base text-neutral-tertiary-medium hover:bg-neutral-tertiary-soft hover:text-heading focus:outline-none">
+                    <svg class="w-4 h-4" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6 18 17.94 6M18 18 6.06 6"/></svg>
+                </button>
+            </div>
+        </template>
+
         <div id="notificaciones-lista"
              class="mt-6 flex flex-col gap-4"
              data-endpoint="{{ route('api.notificaciones.index') }}"
@@ -131,12 +167,16 @@
 
             var plantillas = {
                 posible_tramposo: document.getElementById('notificacion-template-tramposo'),
-                central_riesgo: document.getElementById('notificacion-template-central')
+                central_riesgo: document.getElementById('notificacion-template-central'),
+                invitacion_examen: document.getElementById('notificacion-template-invitacion'),
+                respuesta_invitacion: document.getElementById('notificacion-template-respuesta')
             };
 
             var titulos = {
                 posible_tramposo: 'Posible Tramposo',
-                central_riesgo: 'Estudiante ingresado a central de riesgo'
+                central_riesgo: 'Estudiante ingresado a central de riesgo',
+                invitacion_examen: 'Invitacion para compartir un examen',
+                respuesta_invitacion: 'Respuesta a tu invitacion de examen'
             };
 
             var temporizadorError;
@@ -178,23 +218,31 @@
                 var plantilla = plantillas[tipo] || plantillas.posible_tramposo;
                 var nodo = plantilla.content.firstElementChild.cloneNode(true);
                 nodo.dataset.id = notificacion.id;
+                nodo.dataset.tipo = tipo;
 
-                var titulo = nodo.querySelector('h3');
+                var titulo = nodo.querySelector('.js-titulo') || nodo.querySelector('h3');
                 var descripcion = nodo.querySelector('.js-descripcion');
                 var hace = nodo.querySelector('.js-hace');
-                var detalle = nodo.querySelector('a');
                 var cerrar = nodo.querySelector('.js-cerrar-notificacion');
 
-                if (titulo) { titulo.textContent = notificacion.titulo || titulos[tipo] || ''; }
-                if (descripcion) { descripcion.textContent = descripcionDe(notificacion, tipo); }
-                if (hace) { hace.textContent = notificacion.hace || ''; }
-                if (detalle) {
-                    detalle.setAttribute('href', notificacion.detalle_href || '#');
-                    // El modal de detalle se abre con el id de la incidencia,
-                    // que el aviso trae en `referencia` (el `id` es el de la
-                    // notificación y sirve para el ocultar de más abajo).
-                    detalle.dataset.incidencia = notificacion.referencia != null ? notificacion.referencia : '';
+                var textoTitulo = notificacion.titulo || titulos[tipo] || '';
+                var textoDescripcion = notificacion.descripcion || descripcionDe(notificacion, tipo);
+
+                if (tipo === 'invitacion_examen') {
+                    var datos = notificacion.datos || {};
+                    textoDescripcion = (notificacion.descripcion || '') + (datos.invitador ? ' Invita: ' + datos.invitador + '.' : '');
+                    nodo.dataset.invitacion = notificacion.referencia != null ? notificacion.referencia : '';
                 }
+
+                if (tipo === 'respuesta_invitacion') {
+                    var datosRespuesta = notificacion.datos || {};
+                    textoDescripcion = notificacion.descripcion || '';
+                    nodo.dataset.invitacion = notificacion.referencia != null ? notificacion.referencia : '';
+                }
+
+                if (titulo) { titulo.textContent = textoTitulo; }
+                if (descripcion) { descripcion.textContent = textoDescripcion; }
+                if (hace) { hace.textContent = notificacion.hace || ''; }
                 if (cerrar) { cerrar.dataset.id = notificacion.id; }
 
                 return nodo;
@@ -236,7 +284,51 @@
                     .catch(actualizarVacio);
             }
 
+            function responderInvitacion(tarjeta, accion) {
+                var idInvitacion = tarjeta.dataset.invitacion;
+                if (!idInvitacion) {
+                    return;
+                }
+
+                fetch('/api/invitaciones/' + idInvitacion + '/' + accion, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': token,
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                })
+                    .then(function (respuesta) {
+                        if (!respuesta.ok) {
+                            throw new Error('HTTP ' + respuesta.status);
+                        }
+                        quitarTarjeta(tarjeta);
+                    })
+                    .catch(function () {
+                        mostrarError();
+                    });
+            }
+
             lista.addEventListener('click', function (evento) {
+                var aceptar = evento.target.closest('.js-aceptar-invitacion');
+                if (aceptar) {
+                    var tarjetaAceptar = aceptar.closest('.js-notificacion');
+                    if (tarjetaAceptar) {
+                        responderInvitacion(tarjetaAceptar, 'aceptar');
+                    }
+                    return;
+                }
+
+                var rechazar = evento.target.closest('.js-rechazar-invitacion');
+                if (rechazar) {
+                    var tarjetaRechazar = rechazar.closest('.js-notificacion');
+                    if (tarjetaRechazar) {
+                        responderInvitacion(tarjetaRechazar, 'rechazar');
+                    }
+                    return;
+                }
+
                 var boton = evento.target.closest('.js-cerrar-notificacion');
 
                 if (!boton) {

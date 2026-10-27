@@ -10,6 +10,7 @@ use App\Models\InvitacionExamenCompartido;
 use App\Models\Usuario;
 use App\Services\Invitacion\BuscarDocentesInvitablesService;
 use App\Services\Invitacion\CancelarInvitacionExamenService;
+use App\Services\Invitacion\ListarInvitacionesExamenService;
 use App\Services\Invitacion\EnviarInvitacionExamenService;
 use App\Services\Invitacion\ResponderInvitacionExamenService;
 use Illuminate\Http\JsonResponse;
@@ -17,6 +18,19 @@ use Illuminate\Http\Request;
 
 class InvitacionExamenController extends Controller
 {
+    public function index(
+        Request $request,
+        Examen $examen,
+        ListarInvitacionesExamenService $servicio,
+    ): JsonResponse {
+        /** @var Usuario $usuario */
+        $usuario = $request->user('web');
+
+        return response()->json([
+            'data' => $servicio->ejecutar($usuario, $examen)->values(),
+        ]);
+    }
+
     public function docentesInvitables(
         BuscarDocentesInvitablesRequest $request,
         Examen $examen,

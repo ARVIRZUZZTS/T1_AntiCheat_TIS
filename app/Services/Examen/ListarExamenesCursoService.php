@@ -133,6 +133,7 @@ class ListarExamenesCursoService
 
         return [
             'id' => $examen->id_examen,
+            'es_propio' => (int) $examen->creador === (int) (auth()->id() ?? 0),
             'nombre' => $nombre,
             // Compatibilidad con las pantallas actuales, que todavia leen
             // `tipo`: para los examenes de HU-16 se muestra su nombre.
