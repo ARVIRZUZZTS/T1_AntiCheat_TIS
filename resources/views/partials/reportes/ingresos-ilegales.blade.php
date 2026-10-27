@@ -3,6 +3,7 @@
     @author  Alex Candia <alex.leonar.candia@gmail.com>
     @created 2026-10-23
     @updated 2026-10-23
+    @updated 2026-10-26
 
     @description
     Pestaña "Reporte de intentos no autorizados". Parcial con su propio x-data
@@ -10,12 +11,20 @@
     con el reporte de horario usando el mismo componente de tabla y scroll
     horizontal. Se mantienen los resúmenes.
 
+    @changelog
+    - 2026-10-26  [Alex Candia]  feat: el título y el subtítulo usan la materia,
+      el tipo y la fecha enviados por la selección, igual que horarios de
+      ingreso.
+
     @see  resources/views/pages/reportes.blade.php
 --}}
 <div
     x-data="{
         idCurso: null,
         idExamen: null,
+        materiaSeleccionada: '',
+        tipoSeleccionado: '',
+        fechaSeleccionada: '',
         endpoint: @js(route('reportes.ingresos-ilegales')),
         endpointExportar: @js(route('reportes.ingresos-ilegales.exportar', ['examen' => '__EXAMEN__'])),
 
@@ -25,7 +34,6 @@
         cache: {},
         abortController: null,
         mostrarPrueba: @js(config('app.debug') || request()->has('pruebas_reporte')),
-        examenInfo: null,
 
         get hayDatos() {
             if (this.mostrarPrueba && typeof localStorage !== 'undefined' && localStorage.getItem('reportes_pruebas') !== 'off') {
@@ -55,6 +63,27 @@
             return this.ingresos;
         },
 
+        get nombreMateria() {
+            if (this.materiaSeleccionada) {
+                return this.materiaSeleccionada;
+            }
+
+            const primero = this.fuente[0];
+            return primero && primero.materia ? primero.materia : 'Materia';
+        },
+
+        get nombreExamen() {
+            return this.tipoSeleccionado;
+        },
+
+        get fechaExamen() {
+            return this.fechaSeleccionada;
+        },
+
+        get subtitulo() {
+            return [this.nombreExamen, this.fechaExamen].filter(Boolean).join(' · ');
+        },
+
         get totalIntentos() {
             return this.fuente.length;
         },
@@ -67,6 +96,9 @@
             const detalle = evento && evento.detail ? evento.detail : {};
             this.idCurso = detalle.idCurso ?? null;
             this.idExamen = detalle.idExamen ?? null;
+            this.materiaSeleccionada = detalle.nombreMateria ?? '';
+            this.tipoSeleccionado = detalle.tipoExamen ?? '';
+            this.fechaSeleccionada = detalle.fechaExamen ?? '';
             this.errorReporte = '';
 
             if (! this.idCurso || ! this.idExamen) {
@@ -176,8 +208,8 @@
 
             <div class="flex flex-wrap items-start justify-between gap-3">
                 <div class="min-w-0">
-                    <h2 class="text-lg font-semibold text-heading" x-text="'Intentos de ingreso no autorizados - Materia'"></h2>
-                    <p class="mt-1 text-sm text-body">Examen · Fecha - Estudiantes que intentaron ingresar sin estar inscritos.</p>
+                    <h2 class="text-lg font-semibold text-heading" x-text="'Intentos de ingreso no autorizados - ' + nombreMateria"></h2>
+                    <p class="mt-1 text-sm text-body" x-text="subtitulo"></p>
                 </div>
 
                 <x-ui.button

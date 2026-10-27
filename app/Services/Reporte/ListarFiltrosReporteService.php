@@ -6,6 +6,7 @@
  * @author  Alex Candia <alex.leonar.candia@gmail.com>
  *
  * @created 2026-10-21
+ * @updated 2026-10-26
  *
  * @description
  * Arma los datos de los dos selectores de la pantalla de reportes: la lista de
@@ -36,6 +37,8 @@
  *   autenticado (cursos del docente y cursos asignados al auxiliar).
  * - 2026-10-23  [Alex Candia]  fix: compatibilidad con llamada por id_docente
  *   y asegurar retorno array.
+ * - 2026-10-26  [Alex Candia]  feat: cada examen incluye tipo y fecha formateada
+ *   para que los tres reportes compartan el mismo titulo/subtitulo.
  */
 
 namespace App\Services\Reporte;
@@ -60,7 +63,13 @@ class ListarFiltrosReporteService
      *
      * @return array{
      *     opcionesMaterias: array<int, string>,
-     *     examenesPorCurso: array<int, list<array{id: int, etiqueta: string}>>
+     *     examenesPorCurso: array<int, list<array{
+     *         id: int,
+     *         etiqueta: string,
+     *         tipo: string,
+     *         fecha: ?string,
+     *         fecha_formateada: ?string
+     *     }>>
      * }
      */
     public function ejecutar(Usuario|int|null $usuario = null): array
@@ -138,8 +147,14 @@ class ListarFiltrosReporteService
     /**
      * Examenes de los cursos del usuario en una sola consulta, agrupados por curso.
      *
-     * @param Collection<int, int> $idsCursos
-     * @return array<int, list<array{id: int, etiqueta: string}>>
+     * @param  Collection<int, int>  $idsCursos
+     * @return array<int, list<array{
+     *     id: int,
+     *     etiqueta: string,
+     *     tipo: string,
+     *     fecha: ?string,
+     *     fecha_formateada: ?string
+     * }>>
      */
     private function examenesPorCurso(Collection $idsCursos, ?Usuario $docente): array
     {
@@ -176,6 +191,9 @@ class ListarFiltrosReporteService
                 ->map(fn (object $examen): array => [
                     'id' => (int) $examen->id_examen,
                     'etiqueta' => $this->etiquetaExamen($examen),
+                    'tipo' => $this->tipoExamen($examen),
+                    'fecha' => $examen->fecha,
+                    'fecha_formateada' => $this->fechaFormateada($examen),
                 ])
                 ->values()
                 ->all())
@@ -185,15 +203,32 @@ class ListarFiltrosReporteService
     /**
      * Etiqueta legible del examen.
      *
-     * @param object{nombre_tipo_examen: ?string, fecha: ?string} $examen
+     * @param  object{nombre_tipo_examen: ?string, fecha: ?string}  $examen
      */
     private function etiquetaExamen(object $examen): string
     {
-        $tipo = TipoExamen::etiquetaDe($examen->nombre_tipo_examen) ?? 'Sin tipo';
-        $fecha = $examen->fecha === null
-            ? 'Sin fecha'
-            : Carbon::parse($examen->fecha)->format('d/m/Y');
+        return $this->tipoExamen($examen).' — '.($this->fechaFormateada($examen) ?? 'Sin fecha');
+    }
 
-        return $tipo.' — '.$fecha;
+    /**
+     * Tipo de examen legible para el subtítulo de los reportes.
+     *
+     * @param  object{nombre_tipo_examen: ?string}  $examen
+     */
+    private function tipoExamen(object $examen): string
+    {
+        return TipoExamen::etiquetaDe($examen->nombre_tipo_examen) ?? 'Sin tipo';
+    }
+
+    /**
+     * Fecha del examen en dd/mm/aaaa, o null si no tiene fecha.
+     *
+     * @param  object{fecha: ?string}  $examen
+     */
+    private function fechaFormateada(object $examen): ?string
+    {
+        return $examen->fecha === null
+            ? null
+            : Carbon::parse($examen->fecha)->format('d/m/Y');
     }
 }
