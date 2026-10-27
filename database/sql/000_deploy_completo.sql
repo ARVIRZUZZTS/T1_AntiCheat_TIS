@@ -117,7 +117,7 @@ CREATE TABLE public.central_riesgo (
 );
 
 CREATE TABLE public.configuracion_examen_docente (
-    id_configuracion_examen integer NOT NULL DEFAULT nextval('configuracion_examen_docente_id_configuracion_examen_seq'::regclass),
+    id_configuracion_examen integer NOT NULL,
     id_examen integer NOT NULL,
     id_docente integer NOT NULL,
     created_at timestamp,
@@ -138,7 +138,7 @@ CREATE TABLE public.configuracion_examen_norma (
 );
 
 CREATE TABLE public.configuracion_material_personalizado (
-    id_configuracion_material integer NOT NULL DEFAULT nextval('configuracion_material_personaliz_id_configuracion_material_seq'::regclass),
+    id_configuracion_material integer NOT NULL,
     id_configuracion_examen integer NOT NULL,
     numero_material integer NOT NULL,
     descripcion_material text NOT NULL,
@@ -146,7 +146,7 @@ CREATE TABLE public.configuracion_material_personalizado (
 );
 
 CREATE TABLE public.configuracion_norma_personalizada (
-    id_configuracion_norma integer NOT NULL DEFAULT nextval('configuracion_norma_personalizada_id_configuracion_norma_seq'::regclass),
+    id_configuracion_norma integer NOT NULL,
     id_configuracion_examen integer NOT NULL,
     numero_norma integer NOT NULL,
     descripcion_norma text NOT NULL,
@@ -240,7 +240,7 @@ CREATE TABLE public.examen_norma (
 );
 
 CREATE TABLE public.failed_jobs (
-    id bigint NOT NULL DEFAULT nextval('failed_jobs_id_seq'::regclass),
+    id bigint NOT NULL,
     uuid varchar(255) NOT NULL,
     connection text NOT NULL,
     queue text NOT NULL,
@@ -276,7 +276,7 @@ CREATE TABLE public.job_batches (
 );
 
 CREATE TABLE public.jobs (
-    id bigint NOT NULL DEFAULT nextval('jobs_id_seq'::regclass),
+    id bigint NOT NULL,
     queue varchar(255) NOT NULL,
     payload text NOT NULL,
     attempts smallint NOT NULL,
@@ -299,7 +299,7 @@ CREATE TABLE public.material_personalizado (
 );
 
 CREATE TABLE public.migrations (
-    id integer NOT NULL DEFAULT nextval('migrations_id_seq'::regclass),
+    id integer NOT NULL,
     migration varchar(255) NOT NULL,
     batch integer NOT NULL,
     PRIMARY KEY ("id")
@@ -389,7 +389,7 @@ CREATE TABLE public.tipo_gestion (
 );
 
 CREATE TABLE public.users (
-    id bigint NOT NULL DEFAULT nextval('users_id_seq'::regclass),
+    id bigint NOT NULL,
     name varchar(255) NOT NULL,
     email varchar(255) NOT NULL,
     email_verified_at timestamp,
