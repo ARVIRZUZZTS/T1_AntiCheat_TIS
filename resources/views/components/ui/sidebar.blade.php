@@ -71,10 +71,10 @@
     $defaultItems = [
         ['label' => 'Cursos', 'route' => 'cursos'],
         ['label' => 'Examenes', 'route' => 'examenes'],
-        ['label' => 'Reportes', 'route' => 'reportes'],
-        ['label' => 'Docentes', 'route' => 'docentes', 'count' => 3],
-        ['label' => 'Auxiliares', 'route' => 'auxiliares'],
         ['label' => 'Monitor en vivo', 'route' => 'monitoreo'],
+        ['label' => 'Reportes', 'route' => 'reportes'],
+        ['label' => 'Auxiliares', 'route' => 'auxiliares'],
+        ['label' => 'Docentes', 'route' => 'docentes', 'count' => 3],
         ['label' => 'Central de riesgos', 'route' => 'central-riesgo'],
     ];
 
