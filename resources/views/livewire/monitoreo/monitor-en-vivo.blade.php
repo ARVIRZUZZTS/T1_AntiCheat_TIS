@@ -177,12 +177,10 @@
 
         // Estado visual y botón que abre el modal según lo que la fila tenga:
         // ingresó -> M2, rechazado -> M3, tramposo -> M4, resto -> M1.
-        $estadoVisual = match ($estudiante['estado_asistencia']) {
-            'presente' => 'Ingresó',
-            'rechazado' => 'Rechazado',
-            'riesgo' => ($incidencia['tipo'] ?? null) === \App\Enums\TipoInfraccion::Tramposo->value
-                ? 'C. de Riesgos'
-                : 'Sospechoso',
+        $estadoVisual = match (true) {
+            $incidencia !== null => 'C. de Riesgos',
+            $estudiante['estado_asistencia'] === 'presente' => 'IngresA3',
+            $estudiante['estado_asistencia'] === 'rechazado' => 'Rechazado',
             default => 'Pendiente',
         };
 

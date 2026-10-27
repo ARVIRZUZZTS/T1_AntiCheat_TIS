@@ -761,6 +761,17 @@ class MonitorEnVivo extends Component
                 $this->registrador(),
                 $this->idDocenteConfiguracion,
             );
+
+            try {
+                $this->servicioIngreso->rechazar(
+                    $datos->sis,
+                    $this->idExamen,
+                    $this->registradorId(),
+                    idDocente: $this->idDocenteConfiguracion,
+                );
+            } catch (InvalidArgumentException $e) {
+                // Estudiante no inscrito: no hay fila que deshabilitar.
+            }
         } catch (InvalidArgumentException $e) {
             $this->mensajeError = $e->getMessage();
 
