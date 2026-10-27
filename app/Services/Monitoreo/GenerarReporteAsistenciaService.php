@@ -88,6 +88,7 @@ use App\Models\ConfiguracionExamenDocente;
 use App\Models\EstudianteExamen;
 use App\Models\Examen;
 use App\Models\RegistroAsistencia;
+use App\Services\Asistencia\RegistroIngresoService;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -168,7 +169,7 @@ class GenerarReporteAsistenciaService
                 $estudiante = $inscripcion->estudiante;
                 $clave = $this->clave($inscripcion->id_estudiante_examen, $estudiante->sis_estudiante);
                 $registro = $registros->get($clave);
-                $incidencia = $incidencias->get($clave);
+                $incidencia = $incidencias->get($estudiante->sis_estudiante);
 
                 $habilitado = $inscripcion->estado === EstadoEstudianteExamen::Habilitado;
 
@@ -187,7 +188,7 @@ class GenerarReporteAsistenciaService
                         : null,
                     'hora_ingreso' => $registro?->hora_ingreso,
                     'incidencia' => $incidencia,
-                    'estado_asistencia' => $this->resolverEstado($habilitado, $incidencia, $registro),
+                    'estado_asistencia' => $this->resolverEstado($habilitado, $incidencia, $registro, $inscripcion->motivo),
                 ];
             });
 
@@ -249,15 +250,15 @@ class GenerarReporteAsistenciaService
     {
         return CentralRiesgo::query()
             ->where('id_examen', $idExamen)
-            ->when($idDocente !== null, fn ($query) => $query->delDocente($idDocente))
             ->orderBy('id_registro')
             ->get()
-            ->keyBy(fn (CentralRiesgo $riesgo): string => $this->clave(
-                $riesgo->id_estudiante_examen,
-                $riesgo->sis_estudiante,
-            ))
+            ->keyBy(fn (CentralRiesgo $riesgo): string => $riesgo->sis_estudiante)
             ->map(fn (CentralRiesgo $riesgo): array => [
                 'tipo' => (string) $riesgo->tipo_infraccion?->value,
+                'examen_id' => (int) $riesgo->id_examen,
+                'motivo' => $riesgo->motivo instanceof Motivo
+                    ? $riesgo->motivo->value
+                    : (string) $riesgo->motivo,
                 'fecha' => $riesgo->fecha_registro?->format('d/m/Y') ?? '',
                 // El estado de revisión sale del tipo (tramposo = Confirmado).
                 'estado' => (string) $riesgo->tipo_infraccion?->estado(),
@@ -299,18 +300,14 @@ class GenerarReporteAsistenciaService
      * @param  RegistroAsistencia|null  $registro  Fila de asistencia, si entró.
      * @return string presente | rechazado | riesgo | pendiente
      */
-    private function resolverEstado(bool $habilitado, ?array $incidencia, ?RegistroAsistencia $registro): string
+    private function resolverEstado(bool $habilitado, ?array $incidencia, ?RegistroAsistencia $registro, ?string $motivo = null): string
     {
-        if (! $habilitado) {
-            return 'rechazado';
-        }
-
-        if ($incidencia !== null) {
-            return 'riesgo';
-        }
-
         if ($registro !== null) {
             return 'presente';
+        }
+
+        if (! $habilitado && $motivo === RegistroIngresoService::MOTIVO_RECHAZO) {
+            return 'rechazado';
         }
 
         return 'pendiente';

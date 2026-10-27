@@ -123,19 +123,11 @@
         $estadoAsistencia = $estudiante['estado_asistencia'] ?? 'pendiente';
 
         if ($estadoAsistencia === 'presente') {
-            return $badgeGenerico('ingreso', 'Ingresó');
+                        return $badgeGenerico('ingreso', 'Ingresó');
         }
 
         if ($estadoAsistencia === 'rechazado') {
             return $badgeGenerico('status-no-habilitado', 'Rechazado');
-        }
-
-        if (($incidencia['tipo'] ?? null) === \App\Enums\TipoInfraccion::Tramposo->value) {
-            return $badgeGenerico('status-central-riesgos', 'C. de Riesgos');
-        }
-
-        if ($incidencia !== null) {
-            return $badgeGenerico('status-en-revision', 'Incidencia');
         }
 
         if ($estadoAsistencia === 'riesgo') {
@@ -143,6 +135,34 @@
         }
 
         return $badgeGenerico('status-pendiente', 'Pendiente');
+    };
+
+    $badgeIncidencia = function (?array $incidencia) use ($badgeGenerico, $examen): string {
+        if ($incidencia === null) {
+            return '';
+        }
+
+        $motivosIngreso = array_map(
+            fn ($m) => $m->value,
+            \App\Enums\Motivo::paraIngreso()
+        );
+
+        // Incidencia preexistente de otro examen -> C. de Riesgos (rojo).
+        if (($incidencia['examen_id'] ?? null) !== (int) $examen->id_examen) {
+            return $badgeGenerico('status-central-riesgos', 'C. de Riesgos');
+        }
+
+        // Incidencia registrada durante el ingreso -> Incidencia (amarillo).
+        if (in_array($incidencia['motivo'] ?? '', $motivosIngreso, true)) {
+            return $badgeGenerico('status-en-revision', 'Incidencia');
+        }
+
+        // Incidencia registrada durante el monitor -> C. de Riesgos (rojo) si tramposo.
+        if (($incidencia['tipo'] ?? null) === \App\Enums\TipoInfraccion::Tramposo->value) {
+            return $badgeGenerico('status-central-riesgos', 'C. de Riesgos');
+        }
+
+        return $badgeGenerico('status-en-revision', 'Incidencia');
     };
 
     // Botón de la fila: es el `x-ui.button` del sistema (mismo juego de clases)
@@ -173,19 +193,17 @@
 
         // Estado visual y botón que abre el modal según lo que la fila tenga:
         // ingresó -> M2, rechazado -> M3, tramposo -> M4, resto -> M1.
-        $estadoVisual = match ($estudiante['estado_asistencia']) {
-            'presente' => 'Ingresó',
-            'rechazado' => 'Rechazado',
-            'riesgo' => ($incidencia['tipo'] ?? null) === \App\Enums\TipoInfraccion::Tramposo->value
-                ? 'C. de Riesgos'
-                : 'Sospechoso',
-            default => 'Pendiente',
+        $estadoVisual = match (true) {
+            $incidencia !== null => 'central',
+            $estudiante['estado_asistencia'] === 'presente' => 'ingreso',
+            $estudiante['estado_asistencia'] === 'rechazado' => 'rechazado',
+            default => 'pendiente',
         };
 
         [$evento, $etiqueta] = match ($estadoVisual) {
-            'Ingresó' => ['abrir-modal-ingresado', 'Reportar'],
-            'Rechazado' => ['abrir-modal-no-habilitado', 'Ingreso'],
-            'C. de Riesgos' => ['abrir-modal-central-riesgos', 'Reportar'],
+                        'ingreso' => ['abrir-modal-ingresado', 'Reporte'],
+            'rechazado' => ['abrir-modal-no-habilitado', 'Ingreso'],
+            'central' => ['abrir-modal-central-riesgos', 'Reporte'],
             default => ['abrir-modal-ingreso', 'Ingreso'],
         };
 
@@ -201,7 +219,7 @@
             'materia' => $materia,
             'aula' => $aula,
             'aulaActual' => $aula,
-            'habilitacion' => $estadoVisual === 'Rechazado' ? 'No habilitado' : 'Habilitada',
+            'habilitacion' => $estadoVisual === 'rechazado' ? 'No habilitado' : 'Habilitada',
             'horaRegistro' => $horaModal,
             'materialPermitido' => $materialPermitido,
             'registrador' => $estudiante['registrador'] ?? '—',
@@ -212,7 +230,8 @@
         ];
 
         $badgesHtml = $badgeHabilitacion((bool) ($estudiante['habilitado'] ?? true))
-            .' '.$badgeIngreso($estudiante, $incidencia);
+            .' '.$badgeIngreso($estudiante, $incidencia)
+            .($incidencia !== null ? ' '.$badgeIncidencia($incidencia) : '');
 
         $fila = [
             ['heading' => true, 'value' => $nombreCompleto],
@@ -227,7 +246,7 @@
         $fila[] = ['html' => $badgesHtml];
         $fila[] = ['html' => $boton($datos, $evento, $etiqueta)];
 
-        if ($estadoVisual === 'Ingresó') {
+                if ($estadoVisual === 'ingreso') {
             $filasIngresados[] = $fila;
             $tarjetasIngresados[] = [
                 'nombre' => $nombreCompleto,
@@ -266,7 +285,7 @@
      componente compartido, y por eso se quedó sin la hamburguesa cuando se
      agregó ahí (el `@hasSection('header')` del layout hacía que esta vista
      nunca pasara por x-ui.page-header). --}}
-@section('subtitle', $subtituloExamen)
+@section('subtitle', $this->textoProximosExamenes())
 
 <div class="flex flex-col gap-6 px-[2vh] mt-[2vh]">
     {{-- Los dos avisos se autodescartan a los 4s: antes se quedaban en
@@ -289,7 +308,7 @@
 
     {{-- Tarjetas de conteo: mismo componente y mismo grid (2 columnas en
          mobile, 6 en desktop) que las 5 de /materias/{curso} — antes el
-         mobile tenía su propia card compacta distinta a la de desktop. --}}
+         mobile tenA-a su propia card compacta distinta a la de desktop. --}}
     <div class="grid grid-cols-2 gap-4 lg:grid-cols-6">
         {{-- Sin ícono a propósito: "08:00 – 09:30" + el recuadro del ícono
              no entran juntos en el ancho de la card con 6 (o 2) columnas. --}}
@@ -326,16 +345,18 @@
         </x-ui.stat-card>
     </div>
 
-    <div class="flex gap-2">
-        <x-ui.button :variant="$modoVista === 'ingreso' ? 'default' : 'secondary'" wire:click="cambiarVista('ingreso')">Ingreso</x-ui.button>
-        <x-ui.button :variant="$modoVista === 'monitor' ? 'default' : 'secondary'" wire:click="cambiarVista('monitor')">Monitor</x-ui.button>
-    </div>
+    <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div class="flex gap-2">
+            <x-ui.button :variant="$modoVista === 'ingreso' ? 'default' : 'secondary'" wire:click="cambiarVista('ingreso')">Ingreso</x-ui.button>
+            <x-ui.button :variant="$modoVista === 'monitor' ? 'default' : 'secondary'" wire:click="cambiarVista('monitor')">Monitor</x-ui.button>
+        </div>
 
-    <div class="flex gap-2 text-xs">
-        <x-ui.button variant="secondary" wire:click="ajustarExamenPrueba(30)">Iniciar en 30 min (mock)</x-ui.button>
-        <x-ui.button variant="secondary" wire:click="ajustarExamenPrueba(15)">Iniciar en 15 min (mock)</x-ui.button>
-        <x-ui.button variant="secondary" wire:click="ajustarExamenPrueba(5)">Iniciar en 5 min (mock)</x-ui.button>
-        <x-ui.button variant="secondary" wire:click="ajustarExamenPrueba(0)">Iniciar ahora (mock)</x-ui.button>
+        <div class="flex flex-wrap gap-2 text-xs">
+            <x-ui.button variant="secondary" wire:click="ajustarExamenPrueba(30)">Iniciar en 30 min (mock)</x-ui.button>
+            <x-ui.button variant="secondary" wire:click="ajustarExamenPrueba(15)">Iniciar en 15 min (mock)</x-ui.button>
+            <x-ui.button variant="secondary" wire:click="ajustarExamenPrueba(5)">Iniciar en 5 min (mock)</x-ui.button>
+            <x-ui.button variant="secondary" wire:click="ajustarExamenPrueba(0)">Iniciar ahora (mock)</x-ui.button>
+        </div>
     </div>
 
     @if (in_array($this->estadoAcceso(), ['registro_abierto', 'en_curso']))
@@ -375,7 +396,6 @@
                     <x-ui.button :variant="$filtro === 'deshabilitados' ? 'default' : 'secondary'" wire:click="filtrar('deshabilitados')">Deshabilitados</x-ui.button>
                 @else
                     <x-ui.button :variant="$filtro === 'central-riesgos' ? 'default' : 'secondary'" wire:click="filtrar('central-riesgos')">Central de riesgos</x-ui.button>
-                    <x-ui.button :variant="$filtro === 'pendientes' ? 'default' : 'secondary'" wire:click="filtrar('pendientes')">Pendientes</x-ui.button>
                 @endif
             </div>
         </div>
@@ -462,13 +482,40 @@
     </div>
 
     @else
-        <div class="bg-neutral-primary-soft border border-default rounded-base shadow-xs p-6">
-            <h2 class="text-lg font-semibold text-heading mb-2">Acceso al monitor</h2>
-            <p class="text-sm text-body mb-2">Estado: {{ $this->estadoAcceso() }}</p>
-            <p class="text-sm text-body mb-4">Comienza en {{ $this->minutosParaInicio() }} minutos.</p>
-            <div>
-                <a href="{{ route('auxiliares') }}" class="px-3 py-1.5 text-xs text-white bg-brand rounded">Gestionar auxiliares</a>
-            </div>
+        <div class="flex flex-col gap-3">
+            <h2 class="text-lg font-semibold text-heading">Próximos exámenes</h2>
+            <ul class="flex flex-col gap-4">
+                @foreach ($this->proximosExamenes() as $examenProximo)
+                    <li class="flex cursor-pointer flex-col gap-4 border bg-neutral-primary-soft rounded-base shadow-xs px-5 py-6 sm:px-8
+                        {{ $examenProximo['id'] === $this->idExamen ? 'border-brand ring-2 ring-brand' : 'border-default hover:border-brand-subtle' }}"
+                        role="button" tabindex="0"
+                        wire:click="seleccionarExamen({{ $examenProximo['id'] }})">
+                        <div style="display:flex; justify-content:space-between; width:100%; gap:1rem; flex-wrap:wrap; align-items:center;">
+                        <div class="flex items-center gap-4 lg:w-72">
+                            <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-brand-softer text-fg-brand-strong">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-6 w-6" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>
+                            </div>
+                            <div class="flex min-w-0 flex-col items-start gap-1">
+                                <h3 class="text-xl font-bold text-heading">{{ $examenProximo['tipo'] }}</h3>
+                                <span class="inline-flex items-center px-1.5 py-0.5 text-xs font-medium rounded-full border bg-neutral-secondary-medium border-default-medium text-heading">
+                                    {{ $examenProximo['estado'] }}
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="font-bold text-heading">
+                            Faltan: {{ $examenProximo['tiempo_restante'] }}
+                        </div>
+
+                        <div class="flex flex-col gap-1 text-sm text-body">
+                            <span>Fecha: {{ \Carbon\Carbon::parse($examenProximo['fecha'])->format('d-m-Y') }}</span>
+                            <span>Horario: {{ $examenProximo['hora_inicio'] }}{{ $examenProximo['hora_fin'] ? ' - ' . $examenProximo['hora_fin'] : '' }}</span>
+                            <span>Ambientes: {{ $examenProximo['ambientes'] ?: '-' }}</span>
+                        </div>
+                        </div>
+                    </li>
+                @endforeach
+            </ul>
         </div>
     @endif
 

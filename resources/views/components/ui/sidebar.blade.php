@@ -71,10 +71,10 @@
     $defaultItems = [
         ['label' => 'Cursos', 'route' => 'cursos'],
         ['label' => 'Examenes', 'route' => 'examenes'],
-        ['label' => 'Reportes', 'route' => 'reportes'],
-        ['label' => 'Docentes', 'route' => 'docentes', 'count' => 3],
-        ['label' => 'Auxiliares', 'route' => 'auxiliares'],
         ['label' => 'Monitor en vivo', 'route' => 'monitoreo'],
+        ['label' => 'Reportes', 'route' => 'reportes'],
+        ['label' => 'Auxiliares', 'route' => 'auxiliares'],
+        ['label' => 'Docentes', 'route' => 'docentes', 'count' => 3],
         ['label' => 'Central de riesgos', 'route' => 'central-riesgo'],
     ];
 
@@ -164,6 +164,7 @@
                 'text-neutral-primary hover:bg-brand-active hover:text-neutral-primary' => ! $notificacionesActivas,
             ])>
                 <span class="ms-3 flex-1 whitespace-nowrap">Notificaciones</span>
+                <span id="notificaciones-badge" class="hidden inline-flex items-center justify-center min-w-5 h-5 px-1.5 ms-2 text-xs font-medium bg-danger-soft text-fg-danger-strong rounded-full">0</span>
             </a>
 
             {{-- Bloque del usuario autenticado: avatar + nombre + rol. Sale
@@ -188,3 +189,47 @@
         </div>
     </div>
 </aside>
+
+@if ($rolUsuario === 'docente')
+<script>
+(function () {
+    'use strict';
+    var badge = document.getElementById('notificaciones-badge');
+    if (!badge) {
+        return;
+    }
+
+    var endpoint = '{{ route('api.notificaciones.index') }}';
+
+    function actualizar() {
+        fetch(endpoint, { headers: { 'Accept': 'application/json' }, credentials: 'same-origin' })
+            .then(function (respuesta) {
+                if (!respuesta.ok) {
+                    throw new Error('HTTP ' + respuesta.status);
+                }
+                return respuesta.json();
+            })
+            .then(function (notificaciones) {
+                var total = Array.isArray(notificaciones) ? notificaciones.length : 0;
+                if (total > 0) {
+                    badge.textContent = total > 99 ? '99+' : total;
+                    badge.classList.remove('hidden');
+                } else {
+                    badge.classList.add('hidden');
+                }
+            })
+            .catch(function () {
+                // silencioso
+            });
+    }
+
+    actualizar();
+    setInterval(actualizar, 60000);
+    document.addEventListener('visibilitychange', function () {
+        if (document.visibilityState === 'visible') {
+            actualizar();
+        }
+    });
+})();
+</script>
+@endif

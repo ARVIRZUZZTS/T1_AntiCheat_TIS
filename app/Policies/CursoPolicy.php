@@ -26,6 +26,7 @@ namespace App\Policies;
 use App\Enums\CursoEstado;
 use App\Models\Curso;
 use App\Models\Usuario;
+use Illuminate\Support\Facades\DB;
 
 class CursoPolicy
 {
@@ -46,7 +47,15 @@ class CursoPolicy
      */
     public function gestionar(Usuario $usuario, Curso $curso): bool
     {
-        return (int) $curso->sis_doc === (int) $usuario->id_usuario;
+        if ((int) $curso->sis_doc === (int) $usuario->id_usuario) {
+            return true;
+        }
+
+        return DB::table('configuracion_examen_docente as ced')
+            ->join('examen_curso as ec', 'ec.id_examen', '=', 'ced.id_examen')
+            ->where('ced.id_docente', $usuario->id_usuario)
+            ->where('ec.id_curso', $curso->id_curso)
+            ->exists();
     }
 
     /**

@@ -65,16 +65,20 @@ class ListarCursosDocenteService
         $cursos = $this->cursosConGestion($idDocente);
         $idsCursos = $cursos->keys()->all();
 
-        // Sin cursos no hace falta consultar métricas. Ojo: pasarle null al
-        // servicio de métricas listaría los cursos de toda la institución.
+        // Sin cursos no hace falta consultar mActricas. Ojo: pasarle null al
+        // servicio de mActricas listarA-a los cursos de toda la instituciA3n.
         if ($idsCursos === []) {
             return collect();
         }
 
         $gestiones = $cursos->filter();
+        $idsAnfitrion = $this->idsCursosAnfitrion($idDocente);
 
         return $this->metricas->ejecutar($idsCursos)
-            ->map(fn (array $fila): array => $fila + ['gestion' => $gestiones->get($fila['curso']->id_curso)])
+            ->map(fn (array $fila): array => $fila + [
+                'gestion' => $gestiones->get($fila['curso']->id_curso),
+                'es_anfitrion' => in_array($fila['curso']->id_curso, $idsAnfitrion, true),
+            ])
             ->sortBy(fn (array $fila): array => $this->claveDeOrden($fila['curso']))
             ->values();
     }
@@ -85,16 +89,30 @@ class ListarCursosDocenteService
      *
      * @param  int  $idDocente  ID del docente (`curso.sis_doc`).
      *
-     * @return Collection<int, ?string>  id_curso => "Segundo semestre 2026", o
+     * @return Collection<int, non-falsy-string|null>  id_curso => "Segundo semestre 2026", o
      *         null si el curso no tiene gestión.
      */
     private function cursosConGestion(int $idDocente): Collection
     {
-        return DB::table('curso as c')
+        $propios = DB::table('curso as c')
             ->leftJoin('curso_tipo_gestion as ctg', 'ctg.id_curso', '=', 'c.id_curso')
             ->leftJoin('tipo_gestion as tg', 'tg.id_tipo_gestion', '=', 'ctg.id_tg')
             ->where('c.sis_doc', $idDocente)
-            ->get(['c.id_curso', 'tg.nombre_tipo_gestion', 'ctg.anio'])
+            ->get(['c.id_curso', 'tg.nombre_tipo_gestion', 'ctg.anio']);
+
+        $idsCompartidos = $this->idsCursosCompartidos($idDocente);
+
+        $compartidos = $idsCompartidos === []
+            ? collect()
+            : DB::table('curso as c')
+                ->leftJoin('curso_tipo_gestion as ctg', 'ctg.id_curso', '=', 'c.id_curso')
+                ->leftJoin('tipo_gestion as tg', 'tg.id_tipo_gestion', '=', 'ctg.id_tg')
+                ->whereIn('c.id_curso', $idsCompartidos)
+                ->get(['c.id_curso', 'tg.nombre_tipo_gestion', 'ctg.anio']);
+
+        return $propios
+            ->concat($compartidos)
+            ->unique('id_curso')
             ->mapWithKeys(fn (object $fila): array => [
                 (int) $fila->id_curso => $fila->nombre_tipo_gestion !== null
                     ? Str::ucfirst($fila->nombre_tipo_gestion).' '.$fila->anio
@@ -115,13 +133,68 @@ class ListarCursosDocenteService
      */
     public function activos(int $idDocente): EloquentCollection
     {
-        return Curso::query()
+        $ids = Curso::query()
             ->where('sis_doc', $idDocente)
+            ->where('estado', CursoEstado::EnCurso->value)
+            ->pluck('id_curso')
+            ->merge($this->idsCursosCompartidos($idDocente))
+            ->unique()
+            ->values();
+
+        if ($ids->isEmpty()) {
+            return new EloquentCollection();
+        }
+
+        $idsAnfitrion = $this->idsCursosAnfitrion($idDocente);
+
+        $cursos = Curso::query()
+            ->whereIn('id_curso', $ids)
             ->where('estado', CursoEstado::EnCurso->value)
             ->withCount(['estudiantes', 'examenes'])
             ->orderByRaw('fecha_creacion desc nulls last')
             ->orderByDesc('id_curso')
             ->get();
+
+        foreach ($cursos as $curso) {
+            $curso->setAttribute('es_anfitrion', in_array($curso->id_curso, $idsAnfitrion, true));
+        }
+
+        return $cursos;
+    }
+
+    /**
+     * Cursos en los que el docente tiene configuración de examen pero no es
+     * el docente responsable (cursos compartidos por invitación).
+     *
+     * @return array<int, int>
+     */
+    private function idsCursosCompartidos(int $idDocente): array
+    {
+        return DB::table('configuracion_examen_docente as ced')
+            ->join('examen_curso as ec', 'ec.id_examen', '=', 'ced.id_examen')
+            ->join('curso as c', 'c.id_curso', '=', 'ec.id_curso')
+            ->where('ced.id_docente', $idDocente)
+            ->where('c.sis_doc', '!=', $idDocente)
+            ->pluck('ec.id_curso')
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Cursos en los que el docente ha enviado invitaciones a otros docentes.
+     *
+     * @return array<int, int>
+     */
+    private function idsCursosAnfitrion(int $idDocente): array
+    {
+        return DB::table('invitacion_examen_compartido as iec')
+            ->join('examen_curso as ec', 'ec.id_examen', '=', 'iec.id_examen')
+            ->where('iec.id_docente_invitador', $idDocente)
+            ->pluck('ec.id_curso')
+            ->unique()
+            ->values()
+            ->all();
     }
 
     /**

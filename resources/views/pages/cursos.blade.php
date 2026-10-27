@@ -203,16 +203,22 @@
                     ])
                 >
                     {{-- Ícono + nombre + badge de estado. --}}
-                    <div class="flex items-center gap-3 sm:w-64 sm:shrink-0 min-w-0">
+                    <div class="flex items-center gap-3 sm:w-80 sm:shrink-0 min-w-0">
                         <span class="shrink-0 flex items-center justify-center w-10 h-10 rounded-base bg-brand-softer text-fg-brand">
                             <svg class="w-5 h-5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25"/></svg>
                         </span>
                         <div class="min-w-0">
                             <div class="flex flex-wrap items-center gap-2">
-                                <p class="font-semibold text-heading truncate">{{ $curso->nombre_curso }}</p>
+                                <p class="font-semibold text-heading break-words">{{ $curso->nombre_curso }}</p>
                                 <x-ui.badge :type="$esActivo ? 'status-habilitado' : 'gray'">
                                     {{ $esActivo ? 'Activo' : 'Finalizado' }}
                                 </x-ui.badge>
+                                @if ((int) $curso->sis_doc !== (int) auth()->id())
+                                    <x-ui.badge type="success">Invitado</x-ui.badge>
+                                @endif
+                                @if (!empty($fila['es_anfitrion']))
+                                    <x-ui.badge type="brand">Anfitrion</x-ui.badge>
+                                @endif
                             </div>
                             @if ($fila['gestion'])
                                 <p class="text-xs text-body">{{ $fila['gestion'] }}</p>

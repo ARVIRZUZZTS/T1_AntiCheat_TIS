@@ -59,6 +59,11 @@ Route::middleware(['web', 'auth:web'])->group(function (): void {
         ->whereNumber('idNotificacion')
         ->name('api.notificaciones.ocultar');
 
+    Route::get('/examenes/{examen}/invitaciones', [InvitacionExamenController::class, 'index'])
+        ->whereNumber('examen')
+        ->middleware('docente')
+        ->name('api.examenes.invitaciones.index');
+
     Route::get('/examenes/{examen}/docentes-invitables', [InvitacionExamenController::class, 'docentesInvitables'])
         ->whereNumber('examen')
         ->middleware('docente')
@@ -130,10 +135,10 @@ Route::middleware(['web', 'auth:web'])->group(function (): void {
         ->middleware('docente')
         ->name('api.examenes.dividir.confirmar');
 
-});
-Route::get('/cursos/{idCurso}/examenes', [CursoExamenController::class, 'index'])
-    ->whereNumber('idCurso')
-    ->name('api.cursos.examenes.listar');
+    Route::get('/cursos/{idCurso}/examenes', [CursoExamenController::class, 'index'])
+        ->whereNumber('idCurso')
+        ->name('api.cursos.examenes.listar');
 
-Route::get('/central-riesgo', [CentralRiesgoController::class, 'index'])
-    ->name('api.central-riesgo.listar');
+    Route::get('/central-riesgo', [CentralRiesgoController::class, 'index'])
+        ->name('api.central-riesgo.listar');
+});

@@ -290,7 +290,9 @@ class MonitorEnVivo extends Component
         $todos = $this->informe['estudiantes'];
 
         if ($this->modoVista === 'ingreso') {
-            $todos = $todos->whereIn('estado_asistencia', ['pendiente', 'presente'])->values();
+            $todos = $todos->whereIn('estado_asistencia', ['pendiente', 'presente', 'rechazado'])->values();
+        } else {
+            $todos = $todos->where('estado_asistencia', 'presente')->values();
         }
 
         $filtrados = match ($this->filtro) {
@@ -392,6 +394,104 @@ class MonitorEnVivo extends Component
         $examen->save();
 
         Cache::forget($this->claveCacheInforme());
+    }
+
+    public function totalProximosExamenes(): int
+    {
+        return $this->consultaExamenesAccesibles()
+            ->where('fecha', '>=', now()->toDateString())
+            ->count();
+    }
+
+    public function textoProximosExamenes(): string
+    {
+        $total = $this->totalProximosExamenes();
+
+        if ($total > 5) {
+            return 'Próximos 5+ exámenes';
+        }
+
+        return 'Próximos ' . $total . ' ' . ($total === 1 ? 'examen' : 'exámenes');
+    }
+
+    public function seleccionarExamen(int $idExamen): void
+    {
+        $examen = $this->consultaExamenesAccesibles()
+            ->where('id_examen', $idExamen)
+            ->first();
+
+        if ($examen === null) {
+            return;
+        }
+
+        $this->idExamen = (int) $examen->id_examen;
+        $this->idDocenteConfiguracion = $this->resolverDocenteConfiguracion($examen);
+        Cache::forget($this->claveCacheInforme());
+        $this->pagina = 1;
+        $this->busqueda = '';
+        $this->filtro = 'todos';
+    }
+
+    public function proximosExamenes(): array
+    {
+        $examenes = $this->consultaExamenesAccesibles()
+            ->with(['cursos', 'ambientes', 'tipoExamen'])
+            ->where('fecha', '>=', now()->toDateString())
+            ->orderBy('fecha')
+            ->orderBy('hora_inicio')
+            ->limit(5)
+            ->get();
+
+        return $examenes->map(function (Examen $examen): array {
+            $cursoIds = $examen->cursos->pluck('id_curso');
+
+            $auxiliares = 0;
+            if ($cursoIds->isNotEmpty()) {
+                $auxiliares = DB::table('auxiliar_curso')
+                    ->whereIn('id_curso', $cursoIds)
+                    ->distinct()
+                    ->count('id_auxiliar');
+            }
+
+            $ingresos = (int) DB::table('registro_asistencia')
+                ->where('id_examen', $examen->id_examen)
+                ->distinct('id_estudiante')
+                ->count('id_estudiante');
+
+            $inicio = Carbon::parse($examen->fecha . ' ' . $examen->hora_inicio);
+            $minutosParaInicio = (int) now()->diffInMinutes($inicio, false);
+
+            if ($minutosParaInicio <= 0) {
+                $tiempoRestante = 'En curso';
+            } elseif ($minutosParaInicio < 60) {
+                $tiempoRestante = 'En ' . $minutosParaInicio . ' min';
+            } elseif ($minutosParaInicio < 1440) {
+                $horas = intdiv($minutosParaInicio, 60);
+                $minutos = $minutosParaInicio % 60;
+                $tiempoRestante = 'En ' . $horas . ' h ' . $minutos . ' min';
+            } elseif ($minutosParaInicio < 10080) {
+                $dias = intdiv($minutosParaInicio, 1440);
+                $horas = intdiv($minutosParaInicio % 1440, 60);
+                $tiempoRestante = 'En ' . $dias . ' días ' . $horas . ' h';
+            } else {
+                $tiempoRestante = '+7 días';
+            }
+
+            return [
+                'id' => $examen->id_examen,
+                'materias' => $examen->cursos->pluck('nombre_curso')->implode(', '),
+                'tipo' => $examen->tipoExamen?->nombre_tipo_examen ?? 'Sin tipo',
+                'fecha' => $examen->fecha,
+                'hora_inicio' => substr((string) $examen->hora_inicio, 0, 5),
+                'hora_fin' => $examen->hora_fin ? substr((string) $examen->hora_fin, 0, 5) : null,
+                'ambientes' => $examen->ambientes->pluck('nombre_ambiente')->implode(', '),
+                'ingresos' => $ingresos,
+                'auxiliares' => $auxiliares,
+                'estado' => 'Programado',
+                'minutos_para_inicio' => $minutosParaInicio,
+                'tiempo_restante' => $tiempoRestante,
+            ];
+        })->all();
     }
 
     public function cambiarVista(string $vista): void
@@ -661,6 +761,17 @@ class MonitorEnVivo extends Component
                 $this->registrador(),
                 $this->idDocenteConfiguracion,
             );
+
+            try {
+                $this->servicioIngreso->rechazar(
+                    $datos->sis,
+                    $this->idExamen,
+                    $this->registradorId(),
+                    idDocente: $this->idDocenteConfiguracion,
+                );
+            } catch (InvalidArgumentException $e) {
+                // Estudiante no inscrito: no hay fila que deshabilitar.
+            }
         } catch (InvalidArgumentException $e) {
             $this->mensajeError = $e->getMessage();
 

@@ -83,7 +83,15 @@
         'apellido' => 'Por orden alfabetico',
     ];
 
-    $opcionesCursos = $cursos->pluck('nombre_curso', 'id_curso')->all();
+    $opcionesCursos = $cursos->mapWithKeys(function ($curso) {
+        $etiqueta = $curso->nombre_curso;
+
+        if (!empty($curso->es_anfitrion)) {
+            $etiqueta .= ' (Anfitrion)';
+        }
+
+        return [$curso->id_curso => $etiqueta];
+    })->all();
 
     // Si el alta falló, se vuelve a abrir la pestaña del formulario.
     $tabInicial = $tabInicial ?? (($errors->any() && $cursoInicial !== null && $puedeCrearExamen) ? 'crear' : 'lista');
@@ -104,6 +112,23 @@
          criterioDivision: '',
          errorDivision: '',
          urlPreviewDivision: @js(route('api.examenes.dividir.preview', ['examen' => '__ID__'])),
+         csrfToken: document.querySelector('meta[name=csrf-token]')?.getAttribute('content') || '',
+         // Modal de invitacion a docente.
+         modalInvitar: false,
+         examenInvitarId: '',
+         busquedaDocente: '',
+         buscandoDocentes: false,
+         docentes: [],
+         docenteSeleccionado: null,
+         errorBusqueda: '',
+         enviandoInvitacion: false,
+         errorInvitacion: '',
+         temporizadorBusqueda: null,
+         modalExitoInvitacion: false,
+         resumenInvitacion: null,
+         modalInvitaciones: false,
+         invitaciones: [],
+         cargandoInvitaciones: false,
          get hayCurso() {
              return this.cursoSeleccionado !== '';
          },
@@ -170,6 +195,10 @@
                  }
                  this.examenes = cuerpo.datos ?? [];
                  this.estado = 'listo';
+
+                 if (this.examenes.length > 0 && (this.seleccionado === '' || this.seleccionado === null)) {
+                     this.seleccionado = String(this.examenes[0].id);
+                 }
              } catch (error) {
                  if (peticion === this.peticion) {
                      this.estado = 'error';
@@ -244,6 +273,148 @@
              this.panelDivision = false;
              this.criterioDivision = '';
              this.errorDivision = '';
+         },
+         abrirModalInvitar() {
+             if (this.seleccionado === '' || this.seleccionado === null) {
+                 return;
+             }
+             this.examenInvitarId = String(this.seleccionado);
+             this.busquedaDocente = '';
+             this.docentes = [];
+             this.docenteSeleccionado = null;
+             this.errorBusqueda = '';
+             this.errorInvitacion = '';
+             this.enviandoInvitacion = false;
+             this.modalInvitar = true;
+         },
+         cerrarModalInvitar() {
+             this.modalInvitar = false;
+             if (this.temporizadorBusqueda) {
+                 clearTimeout(this.temporizadorBusqueda);
+                 this.temporizadorBusqueda = null;
+             }
+         },
+         programarBusqueda() {
+             if (this.temporizadorBusqueda) {
+                 clearTimeout(this.temporizadorBusqueda);
+             }
+             this.temporizadorBusqueda = setTimeout(() => this.buscarDocentes(), 1000);
+         },
+         buscarDocentesAhora() {
+             if (this.temporizadorBusqueda) {
+                 clearTimeout(this.temporizadorBusqueda);
+                 this.temporizadorBusqueda = null;
+             }
+             this.buscarDocentes();
+         },
+         async buscarDocentes() {
+             const termino = this.busquedaDocente.trim();
+             if (termino.length < 2) {
+                 this.docentes = [];
+                 this.errorBusqueda = termino.length === 0 ? '' : 'La busqueda debe tener al menos 2 caracteres.';
+                 return;
+             }
+             this.buscandoDocentes = true;
+             this.errorBusqueda = '';
+             try {
+                 const url = '/api/examenes/' + this.examenInvitarId + '/docentes-invitables?busqueda=' + encodeURIComponent(termino);
+                 const respuesta = await fetch(url, { headers: { 'Accept': 'application/json' }, credentials: 'same-origin' });
+                 const cuerpo = await respuesta.json();
+                 if (!respuesta.ok) {
+                     throw new Error(cuerpo?.errors?.busqueda?.[0] || cuerpo?.message || 'No se pudo buscar docentes.');
+                 }
+                 this.docentes = cuerpo.data || [];
+                 if (this.docentes.length === 0) {
+                     this.errorBusqueda = 'No se encontraron docentes.';
+                 }
+             } catch (error) {
+                 this.docentes = [];
+                 this.errorBusqueda = error.message || 'No se pudo buscar docentes.';
+             } finally {
+                 this.buscandoDocentes = false;
+             }
+         },
+         seleccionarDocente(docente) {
+             this.docenteSeleccionado = docente;
+             this.errorInvitacion = '';
+         },
+         async enviarInvitacion() {
+             if (!this.docenteSeleccionado) {
+                 this.errorInvitacion = 'Debe seleccionar un docente.';
+                 return;
+             }
+             this.enviandoInvitacion = true;
+             this.errorInvitacion = '';
+             try {
+                 const respuesta = await fetch('/api/examenes/' + this.examenInvitarId + '/invitaciones', {
+                     method: 'POST',
+                     credentials: 'same-origin',
+                     headers: {
+                         'Accept': 'application/json',
+                         'Content-Type': 'application/json',
+                         'X-CSRF-TOKEN': this.csrfToken,
+                         'X-Requested-With': 'XMLHttpRequest',
+                     },
+                     body: JSON.stringify({ docente_invitado_id: this.docenteSeleccionado.id }),
+                 });
+                 const cuerpo = await respuesta.json();
+                 if (!respuesta.ok) {
+                     const errores = cuerpo?.errors || {};
+                     this.errorInvitacion = errores.docente_invitado_id?.[0] || cuerpo?.message || 'No se pudo enviar la invitacion.';
+                     return;
+                 }
+                 this.resumenInvitacion = cuerpo.data;
+                 this.modalInvitar = false;
+                 this.modalExitoInvitacion = true;
+             } catch (error) {
+                 this.errorInvitacion = error.message || 'No se pudo enviar la invitacion.';
+             } finally {
+                 this.enviandoInvitacion = false;
+             }
+         },
+         abrirModalInvitaciones() {
+             if (this.seleccionado === '' || this.seleccionado === null) {
+                 return;
+             }
+             this.examenInvitarId = String(this.seleccionado);
+             this.modalInvitaciones = true;
+             this.cargarInvitaciones();
+         },
+         cerrarModalInvitaciones() {
+             this.modalInvitaciones = false;
+         },
+         async cargarInvitaciones() {
+             this.cargandoInvitaciones = true;
+             try {
+                 const respuesta = await fetch('/api/examenes/' + this.examenInvitarId + '/invitaciones', { headers: { 'Accept': 'application/json' }, credentials: 'same-origin' });
+                 const cuerpo = await respuesta.json();
+                 if (!respuesta.ok) {
+                     throw new Error(cuerpo?.message || 'No se pudieron cargar las invitaciones.');
+                 }
+                 this.invitaciones = cuerpo.data || [];
+             } catch (error) {
+                 this.invitaciones = [];
+             } finally {
+                 this.cargandoInvitaciones = false;
+             }
+         },
+         async cancelarInvitacion(idInvitacion) {
+             try {
+                 const respuesta = await fetch('/api/invitaciones/' + idInvitacion + '/cancelar', {
+                     method: 'POST',
+                     credentials: 'same-origin',
+                     headers: {
+                         'Accept': 'application/json',
+                         'X-CSRF-TOKEN': this.csrfToken,
+                         'X-Requested-With': 'XMLHttpRequest',
+                     }
+                 });
+                 if (!respuesta.ok) {
+                     throw new Error('No se pudo cancelar.');
+                 }
+                 await this.cargarInvitaciones();
+             } catch (error) {
+             }
          },
          fechaDe(examen) {
              if (!examen.fecha) {
@@ -356,16 +527,20 @@
                         <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-brand-softer text-fg-brand-strong">
                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-6 w-6" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>
                         </div>
-                        <div class="flex min-w-0 flex-col items-start">
+                        <div class="flex min-w-0 flex-col items-start gap-1">
                             <h3 class="text-xl font-bold text-heading" x-text="examen.tipo || 'Sin tipo'"></h3>
-
-                            <x-ui.badge type="gray" class="mt-1" x-show="examen.estado === 'Programado'">
-                                <span x-text="examen.estado"></span>
-                            </x-ui.badge>
-                            <x-ui.badge type="brand" class="mt-1 gap-1" x-show="examen.estado === 'Finalizado'">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-3 w-3 shrink-0" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
-                                <span x-text="examen.estado"></span>
-                            </x-ui.badge>
+                            <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+                            <span x-show="examen.es_propio" class="inline-flex items-center px-1.5 py-0.5 text-xs font-medium rounded-full border bg-brand-softer border-brand-subtle text-fg-brand-strong">Propio</span>
+                            <span x-show="examen.es_anfitrion" class="inline-flex items-center px-1.5 py-0.5 text-xs font-medium rounded-full border bg-warning-soft border-warning-subtle text-fg-warning">Anfitrion</span>
+                            <span x-show="!examen.es_propio" class="inline-flex items-center px-1.5 py-0.5 text-xs font-medium rounded-full border bg-success-soft border-success-subtle text-fg-success-strong">Invitado</span>
+                                <x-ui.badge type="gray" class="mt-1" x-show="examen.estado === 'Programado'">
+                                    <span x-text="examen.estado"></span>
+                                </x-ui.badge>
+                                <x-ui.badge type="brand" class="mt-1 gap-1" x-show="examen.estado === 'Finalizado'">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-3 w-3 shrink-0" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+                                    <span x-text="examen.estado"></span>
+                                </x-ui.badge>
+                            </div>
                         </div>
                     </div>
 
@@ -452,8 +627,15 @@
 
             <x-ui.button variant="default"
                          x-bind:disabled="seleccionado === ''"
-                         x-bind:class="seleccionado === '' ? 'opacity-50 cursor-not-allowed' : ''">
+                         x-bind:class="seleccionado === '' ? 'opacity-50 cursor-not-allowed' : ''"
+                         @click.prevent="abrirModalInvitar()">
                 Invitar docente
+            </x-ui.button>
+            <x-ui.button variant="secondary"
+                         x-bind:disabled="seleccionado === ''"
+                         x-bind:class="seleccionado === '' ? 'opacity-50 cursor-not-allowed' : ''"
+                         @click="abrirModalInvitaciones()">
+                Invitaciones
             </x-ui.button>
         </div>
     </section>
@@ -531,7 +713,99 @@
         </div>
     </section>
     </div>
+
+    {{-- Modal: invitar docente a compartir el examen seleccionado. --}}
+    <div x-show="modalInvitar" x-cloak class="overflow-y-auto overflow-x-hidden fixed top-0 right-0 left-0 z-50 flex justify-center items-center w-full md:inset-0 h-full max-h-full bg-overlay-modal/50" @click.self="cerrarModalInvitar()" @keydown.escape.window="cerrarModalInvitar()">
+        <div class="relative p-4 w-full max-w-2xl max-h-full">
+            <div class="relative bg-neutral-primary-soft border border-default rounded-base shadow-sm p-4 md:p-6">
+                <div class="flex items-start justify-between gap-3 border-b border-default pb-4">
+                    <div>
+                        <h3 class="text-lg font-medium text-heading">Invitar docente</h3>
+                        <p class="text-sm text-muted">Busca por SIS, nombre o correo y selecciona un docente.</p>
+                    </div>
+                    <button type="button" @click="cerrarModalInvitar()" class="text-body bg-transparent hover:bg-neutral-tertiary hover:text-heading rounded-base text-sm w-9 h-9 ms-auto inline-flex justify-center items-center cursor-pointer">
+                        <svg class="w-5 h-5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18 17.94 6M18 18 6.06 6"/></svg>
+                    </button>
+                </div>
+
+                <div class="py-4 space-y-4">
+                    <div class="flex gap-2">
+                        <input type="text" x-model="busquedaDocente" @input="programarBusqueda()" @keydown.enter.prevent="buscarDocentesAhora()" placeholder="SIS, nombre o correo" class="w-full rounded-base border border-default bg-neutral-primary-soft px-3 py-2 text-sm text-heading" />
+                        <button type="button" @click="buscarDocentesAhora()" class="inline-flex items-center justify-center rounded-base border border-default px-4 py-2 text-sm font-medium text-heading hover:bg-neutral-secondary-medium">Buscar</button>
+                    </div>
+
+                    <p x-show="buscandoDocentes" class="text-sm text-body">Buscando docentes...</p>
+                    <p x-show="errorBusqueda" x-text="errorBusqueda" class="text-sm text-fg-danger-strong"></p>
+                    <p x-show="errorInvitacion" x-text="errorInvitacion" class="text-sm text-fg-danger-strong"></p>
+
+                    <div class="max-h-72 overflow-y-auto space-y-2">
+                        <template x-for="docente in docentes" :key="docente.id">
+                            <button type="button"
+                                    @click="seleccionarDocente(docente)"
+                                    :class="docenteSeleccionado && docenteSeleccionado.id === docente.id ? 'border-brand ring-2 ring-brand' : 'border-default hover:border-brand-subtle'"
+                                    class="w-full text-left rounded-base border bg-neutral-primary-soft px-4 py-3 shadow-xs">
+                                <p class="font-medium text-heading" x-text="docente.nombre"></p>
+                                <p class="text-sm text-body" x-text="docente.correo || ''"></p>
+                                <p class="text-xs font-mono text-muted" x-text="'SIS: ' + (docente.sis || docente.id)"></p>
+                            </button>
+                        </template>
+                    </div>
+                </div>
+
+                <div class="border-t border-default pt-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
+                    <button type="button" @click="cerrarModalInvitar()" class="inline-flex items-center justify-center rounded-base border border-default px-4 py-2 text-sm font-medium text-heading hover:bg-neutral-secondary-medium">Cancelar</button>
+                    <button type="button" @click="enviarInvitacion()" :disabled="!docenteSeleccionado || enviandoInvitacion" class="inline-flex items-center justify-center rounded-base border border-transparent bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-strong disabled:cursor-not-allowed disabled:opacity-50">
+                        <span x-text="enviandoInvitacion ? 'Enviando...' : 'Invitar'"></span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- Modal: invitaciones enviadas del examen. --}}
+    <div x-show="modalInvitaciones" x-cloak class="overflow-y-auto overflow-x-hidden fixed top-0 right-0 left-0 z-50 flex justify-center items-center w-full md:inset-0 h-full max-h-full bg-overlay-modal/50" @click.self="cerrarModalInvitaciones()" @keydown.escape.window="cerrarModalInvitaciones()">
+        <div class="relative p-4 w-full max-w-2xl max-h-full">
+            <div class="relative bg-neutral-primary-soft border border-default rounded-base shadow-sm p-4 md:p-6">
+                <div class="flex items-start justify-between gap-3 border-b border-default pb-4">
+                    <div>
+                        <h3 class="text-lg font-medium text-heading">Invitaciones enviadas</h3>
+                        <p class="text-sm text-muted">Cancela las que sigan pendientes.</p>
+                    </div>
+                    <button type="button" @click="cerrarModalInvitaciones()" class="text-body bg-transparent hover:bg-neutral-tertiary hover:text-heading rounded-base text-sm w-9 h-9 ms-auto inline-flex justify-center items-center cursor-pointer">
+                        <svg class="w-5 h-5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18 17.94 6M18 18 6.06 6"/></svg>
+                    </button>
+                </div>
+                <div class="py-4 space-y-2 max-h-72 overflow-y-auto">
+                    <p x-show="cargandoInvitaciones" class="text-sm text-body">Cargando invitaciones...</p>
+                    <template x-for="invitacion in invitaciones" :key="invitacion.id">
+                        <div class="rounded-base border border-default bg-neutral-primary-soft px-4 py-3 shadow-xs flex items-center justify-between gap-3">
+                            <div>
+                                <p class="font-medium text-heading" x-text="invitacion.invitado?.nombre || ''"></p>
+                                <p class="text-xs text-muted" x-text="invitacion.estado"></p>
+                            </div>
+                            <button type="button" x-show="invitacion.estado === 'pendiente'" @click="cancelarInvitacion(invitacion.id)" class="inline-flex items-center justify-center rounded-base border border-default px-3 py-1.5 text-xs font-medium text-heading hover:bg-neutral-secondary-medium">Cancelar</button>
+                        </div>
+                    </template>
+                    <p x-show="!cargandoInvitaciones && invitaciones.length === 0" class="text-sm text-body">No hay invitaciones enviadas.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- Modal de exito de invitacion. --}}
+    <div x-show="modalExitoInvitacion" x-cloak class="overflow-y-auto overflow-x-hidden fixed top-0 right-0 left-0 z-50 flex justify-center items-center w-full md:inset-0 h-full max-h-full bg-overlay-modal/50" @click.self="modalExitoInvitacion = false" @keydown.escape.window="modalExitoInvitacion = false">
+        <div class="relative p-4 w-full max-w-md max-h-full">
+            <div class="relative bg-neutral-primary-soft border border-default rounded-base shadow-sm p-4 md:p-6 text-center">
+                <h3 class="text-lg font-medium text-heading">Invitacion enviada con exito</h3>
+                <p class="mt-2 text-sm text-body" x-text="resumenInvitacion ? (resumenInvitacion.invitado?.nombre || '') : ''"></p>
+                <p class="mt-1 text-xs text-muted" x-text="resumenInvitacion ? ((resumenInvitacion.examen?.tipo || 'Examen') + ' - ' + (resumenInvitacion.examen?.materias || []).join(', ')) : ''"></p>
+                <div class="mt-4">
+                    <button type="button" @click="modalExitoInvitacion = false" class="inline-flex items-center justify-center rounded-base border border-transparent bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-strong">Aceptar</button>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
-    {{-- Modales de división de examen --}}
+    {{-- Modales de division de examen --}}
     <x-ui.modal-dividir-examen />
     <x-ui.modal-division-exitosa />
