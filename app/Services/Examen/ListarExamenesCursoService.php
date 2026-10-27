@@ -96,6 +96,11 @@ class ListarExamenesCursoService
         $curso = Curso::findOrFail($idCurso);
         $ahora ??= Carbon::now();
 
+        $examenesInvitados = DB::table('invitacion_examen_compartido')
+            ->where('id_docente_invitador', (int) (auth()->id() ?? 0))
+            ->pluck('id_examen')
+            ->all();
+
         return $curso->examenes()
             ->with(['tipoExamen', 'ambientes'])
             ->withCount([
@@ -106,7 +111,7 @@ class ListarExamenesCursoService
                 },
             ])
             ->get()
-            ->map(fn (Examen $examen): array => $this->mapearExamen($examen, $ahora))
+            ->map(fn (Examen $examen): array => $this->mapearExamen($examen, $ahora, $examenesInvitados))
             ->sortBy([
                 fn (array $primero, array $segundo): int => ($primero['estado'] === self::ESTADO_FINALIZADO)
                     <=> ($segundo['estado'] === self::ESTADO_FINALIZADO),
@@ -126,7 +131,10 @@ class ListarExamenesCursoService
      * @param  Carbon  $ahora  Momento de referencia para el estado.
      * @return array<string, mixed>
      */
-    private function mapearExamen(Examen $examen, Carbon $ahora): array
+    /**
+     * @param  list<int>  $examenesInvitados
+     */
+    private function mapearExamen(Examen $examen, Carbon $ahora, array $examenesInvitados = []): array
     {
         $tipo = TipoExamen::etiquetaDe($examen->tipoExamen?->nombre_tipo_examen);
         $nombre = $examen->nombre_examen ?? $tipo ?? 'Examen #'.$examen->id_examen;
@@ -134,6 +142,7 @@ class ListarExamenesCursoService
         return [
             'id' => $examen->id_examen,
             'es_propio' => (int) $examen->creador === (int) (auth()->id() ?? 0),
+            'es_anfitrion' => in_array((int) $examen->id_examen, $examenesInvitados, true),
             'nombre' => $nombre,
             // Compatibilidad con las pantallas actuales, que todavia leen
             // `tipo`: para los examenes de HU-16 se muestra su nombre.

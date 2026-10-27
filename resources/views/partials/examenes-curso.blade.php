@@ -286,7 +286,7 @@
              if (this.temporizadorBusqueda) {
                  clearTimeout(this.temporizadorBusqueda);
              }
-             this.temporizadorBusqueda = setTimeout(() => this.buscarDocentes(), 2000);
+             this.temporizadorBusqueda = setTimeout(() => this.buscarDocentes(), 1000);
          },
          buscarDocentesAhora() {
              if (this.temporizadorBusqueda) {
@@ -520,8 +520,9 @@
                         <div class="flex min-w-0 flex-col items-start gap-1">
                             <h3 class="text-xl font-bold text-heading" x-text="examen.tipo || 'Sin tipo'"></h3>
                             <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
-                                <span x-show="examen.es_propio" class="inline-flex items-center px-1.5 py-0.5 text-xs font-medium rounded-full border bg-brand-softer border-brand-subtle text-fg-brand-strong">Propio</span>
-                                <span x-show="!examen.es_propio" class="inline-flex items-center px-1.5 py-0.5 text-xs font-medium rounded-full border bg-success-soft border-success-subtle text-fg-success-strong">Invitado</span>
+                            <span x-show="examen.es_propio" class="inline-flex items-center px-1.5 py-0.5 text-xs font-medium rounded-full border bg-brand-softer border-brand-subtle text-fg-brand-strong">Propio</span>
+                            <span x-show="examen.es_anfitrion" class="inline-flex items-center px-1.5 py-0.5 text-xs font-medium rounded-full border bg-warning-soft border-warning-subtle text-fg-warning">Anfitrion</span>
+                            <span x-show="!examen.es_propio" class="inline-flex items-center px-1.5 py-0.5 text-xs font-medium rounded-full border bg-success-soft border-success-subtle text-fg-success-strong">Invitado</span>
                                 <x-ui.badge type="gray" class="mt-1" x-show="examen.estado === 'Programado'">
                                     <span x-text="examen.estado"></span>
                                 </x-ui.badge>
@@ -617,7 +618,7 @@
             <x-ui.button variant="default"
                          x-bind:disabled="seleccionado === ''"
                          x-bind:class="seleccionado === '' ? 'opacity-50 cursor-not-allowed' : ''"
-                         @click="abrirModalInvitar()">
+                         @click.prevent="abrirModalInvitar()">
                 Invitar docente
             </x-ui.button>
             <x-ui.button variant="secondary"
