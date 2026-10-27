@@ -586,10 +586,9 @@
                     <li class="flex items-center justify-between gap-2 px-3 py-2 rounded-base border border-default bg-neutral-secondary-soft">
                         <span class="truncate text-sm text-heading" x-text="ambiente.nombre"></span>
                         <button type="button" @click="quitarAmbiente(ambiente.id)"
-                                class="shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-base text-body hover:text-fg-danger hover:bg-neutral-secondary-medium focus:outline-none focus:ring-2 focus:ring-danger-medium"
-                                :aria-label="'Quitar ' + ambiente.nombre">
-                            <svg class="w-4 h-4" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0 1 16.138 21H7.862a2 2 0 0 1-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 0 0-1-1H10a1 1 0 0 0-1 1v3M4 7h16"/></svg>
-                            <span class="sr-only" x-text="'Quitar ' + ambiente.nombre"></span>
+                                class="shrink-0 inline-flex items-center justify-center h-9 px-3 rounded-base text-body hover:text-fg-danger hover:bg-neutral-secondary-medium focus:outline-none focus:ring-2 focus:ring-danger-medium"
+                                :aria-label="'Descartar ' + ambiente.nombre">
+                            Descartar
                         </button>
                     </li>
                 </template>
