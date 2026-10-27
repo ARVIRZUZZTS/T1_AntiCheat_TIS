@@ -83,7 +83,15 @@
         'apellido' => 'Por orden alfabetico',
     ];
 
-    $opcionesCursos = $cursos->pluck('nombre_curso', 'id_curso')->all();
+    $opcionesCursos = $cursos->mapWithKeys(function ($curso) {
+        $etiqueta = $curso->nombre_curso;
+
+        if (!empty($curso->es_anfitrion)) {
+            $etiqueta .= ' (Anfitrion)';
+        }
+
+        return [$curso->id_curso => $etiqueta];
+    })->all();
 
     // Si el alta falló, se vuelve a abrir la pestaña del formulario.
     $tabInicial = $tabInicial ?? (($errors->any() && $cursoInicial !== null && $puedeCrearExamen) ? 'crear' : 'lista');

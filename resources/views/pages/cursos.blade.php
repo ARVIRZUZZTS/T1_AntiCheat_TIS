@@ -216,6 +216,9 @@
                                 @if ((int) $curso->sis_doc !== (int) auth()->id())
                                     <x-ui.badge type="success">Invitado</x-ui.badge>
                                 @endif
+                                @if (!empty($fila['es_anfitrion']))
+                                    <x-ui.badge type="brand">Anfitrion</x-ui.badge>
+                                @endif
                             </div>
                             @if ($fila['gestion'])
                                 <p class="text-xs text-body">{{ $fila['gestion'] }}</p>
