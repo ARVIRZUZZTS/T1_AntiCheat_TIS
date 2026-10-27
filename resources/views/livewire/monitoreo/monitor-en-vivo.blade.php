@@ -137,17 +137,17 @@
         return $badgeGenerico('status-pendiente', 'Pendiente');
     };
 
-    $badgeIncidencia = function (?array $incidencia) use ($badgeGenerico, $examen): string {
+    $badgeIncidencia = function (?array $incidencia) use ($badgeGenerico): string {
         if ($incidencia === null) {
             return '';
         }
 
-        // Incidencia registrada durante este examen -> Incidencia (amarillo).
-        if (($incidencia['examen_id'] ?? null) === (int) $examen->id_examen) {
+        // Incidencia registrada durante el ingreso (sospechoso) -> Incidencia (amarillo).
+        if (($incidencia['tipo'] ?? null) === \App\Enums\TipoInfraccion::Sospechoso->value) {
             return $badgeGenerico('status-en-revision', 'Incidencia');
         }
 
-        // Incidencia preexistente de otro examen -> C. de Riesgos (rojo).
+        // Tramposo (monitor o preexistente) -> C. de Riesgos (rojo).
         return $badgeGenerico('status-central-riesgos', 'C. de Riesgos');
     };
 
@@ -187,7 +187,7 @@
         };
 
         [$evento, $etiqueta] = match ($estadoVisual) {
-            'Ingresó' => ['abrir-modal-ingresado', 'Reportar'],
+            'Ingresó' => ['abrir-modal-ingresado', 'Reporte'],
             'Rechazado' => ['abrir-modal-no-habilitado', 'Ingreso'],
             'C. de Riesgos' => ['abrir-modal-central-riesgos', 'Reporte'],
             default => ['abrir-modal-ingreso', 'Ingreso'],
