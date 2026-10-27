@@ -287,9 +287,26 @@
         </div>
     @endif
 
+    {{-- Tarjetas de los exA�menes mA�s prA3ximos: hasta 5, seleccionables. --}}
+    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        @foreach ($this->proximosExamenes() as $examenProximo)
+            <button type="button"
+                    wire:click="seleccionarExamen({{ $examenProximo['id'] }})"
+                    @class([
+                        'text-left rounded-base border bg-neutral-primary-soft shadow-xs p-4 transition',
+                        'border-brand ring-2 ring-brand' => $examenProximo['id'] === $this->idExamen,
+                        'border-default hover:border-brand-subtle' => $examenProximo['id'] !== $this->idExamen,
+                    ])>
+                <p class="font-semibold text-heading truncate">{{ $examenProximo['materias'] }}</p>
+                <p class="text-xs text-body mt-1">{{ $examenProximo['fecha'] }} · {{ $examenProximo['hora'] }}</p>
+                <p class="text-xs text-muted mt-1">Auxiliares: {{ $examenProximo['auxiliares'] }}</p>
+            </button>
+        @endforeach
+    </div>
+
     {{-- Tarjetas de conteo: mismo componente y mismo grid (2 columnas en
          mobile, 6 en desktop) que las 5 de /materias/{curso} — antes el
-         mobile tenía su propia card compacta distinta a la de desktop. --}}
+         mobile tenA-a su propia card compacta distinta a la de desktop. --}}
     <div class="grid grid-cols-2 gap-4 lg:grid-cols-6">
         {{-- Sin ícono a propósito: "08:00 – 09:30" + el recuadro del ícono
              no entran juntos en el ancho de la card con 6 (o 2) columnas. --}}
@@ -326,16 +343,18 @@
         </x-ui.stat-card>
     </div>
 
-    <div class="flex gap-2">
-        <x-ui.button :variant="$modoVista === 'ingreso' ? 'default' : 'secondary'" wire:click="cambiarVista('ingreso')">Ingreso</x-ui.button>
-        <x-ui.button :variant="$modoVista === 'monitor' ? 'default' : 'secondary'" wire:click="cambiarVista('monitor')">Monitor</x-ui.button>
-    </div>
+    <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div class="flex gap-2">
+            <x-ui.button :variant="$modoVista === 'ingreso' ? 'default' : 'secondary'" wire:click="cambiarVista('ingreso')">Ingreso</x-ui.button>
+            <x-ui.button :variant="$modoVista === 'monitor' ? 'default' : 'secondary'" wire:click="cambiarVista('monitor')">Monitor</x-ui.button>
+        </div>
 
-    <div class="flex gap-2 text-xs">
-        <x-ui.button variant="secondary" wire:click="ajustarExamenPrueba(30)">Iniciar en 30 min (mock)</x-ui.button>
-        <x-ui.button variant="secondary" wire:click="ajustarExamenPrueba(15)">Iniciar en 15 min (mock)</x-ui.button>
-        <x-ui.button variant="secondary" wire:click="ajustarExamenPrueba(5)">Iniciar en 5 min (mock)</x-ui.button>
-        <x-ui.button variant="secondary" wire:click="ajustarExamenPrueba(0)">Iniciar ahora (mock)</x-ui.button>
+        <div class="flex flex-wrap gap-2 text-xs">
+            <x-ui.button variant="secondary" wire:click="ajustarExamenPrueba(30)">Iniciar en 30 min (mock)</x-ui.button>
+            <x-ui.button variant="secondary" wire:click="ajustarExamenPrueba(15)">Iniciar en 15 min (mock)</x-ui.button>
+            <x-ui.button variant="secondary" wire:click="ajustarExamenPrueba(5)">Iniciar en 5 min (mock)</x-ui.button>
+            <x-ui.button variant="secondary" wire:click="ajustarExamenPrueba(0)">Iniciar ahora (mock)</x-ui.button>
+        </div>
     </div>
 
     @if (in_array($this->estadoAcceso(), ['registro_abierto', 'en_curso']))

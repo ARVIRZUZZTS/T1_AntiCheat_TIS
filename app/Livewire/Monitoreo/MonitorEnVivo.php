@@ -394,6 +394,55 @@ class MonitorEnVivo extends Component
         Cache::forget($this->claveCacheInforme());
     }
 
+    public function seleccionarExamen(int $idExamen): void
+    {
+        $examen = $this->consultaExamenesAccesibles()
+            ->where('id_examen', $idExamen)
+            ->first();
+
+        if ($examen === null) {
+            return;
+        }
+
+        $this->idExamen = (int) $examen->id_examen;
+        $this->idDocenteConfiguracion = $this->resolverDocenteConfiguracion($examen);
+        Cache::forget($this->claveCacheInforme());
+        $this->pagina = 1;
+        $this->busqueda = '';
+        $this->filtro = 'todos';
+    }
+
+    public function proximosExamenes(): array
+    {
+        $examenes = $this->consultaExamenesAccesibles()
+            ->with('cursos')
+            ->where('fecha', '>=', now()->toDateString())
+            ->orderBy('fecha')
+            ->orderBy('hora_inicio')
+            ->limit(5)
+            ->get();
+
+        return $examenes->map(function (Examen $examen): array {
+            $cursoIds = $examen->cursos->pluck('id_curso');
+
+            $auxiliares = 0;
+            if ($cursoIds->isNotEmpty()) {
+                $auxiliares = DB::table('auxiliar_curso')
+                    ->whereIn('id_curso', $cursoIds)
+                    ->distinct()
+                    ->count('id_auxiliar');
+            }
+
+            return [
+                'id' => $examen->id_examen,
+                'materias' => $examen->cursos->pluck('nombre_curso')->implode(', '),
+                'fecha' => $examen->fecha,
+                'hora' => substr((string) $examen->hora_inicio, 0, 5),
+                'auxiliares' => $auxiliares,
+            ];
+        })->all();
+    }
+
     public function cambiarVista(string $vista): void
     {
         if (! in_array($vista, ['ingreso', 'monitor'], true)) {
