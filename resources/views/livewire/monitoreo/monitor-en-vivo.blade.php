@@ -466,9 +466,6 @@
             <h2 class="text-lg font-semibold text-heading mb-2">Acceso al monitor</h2>
             <p class="text-sm text-body mb-2">Estado: {{ $this->estadoAcceso() }}</p>
             <p class="text-sm text-body mb-4">Comienza en {{ $this->minutosParaInicio() }} minutos.</p>
-            <div>
-                <a href="{{ route('auxiliares') }}" class="px-3 py-1.5 text-xs text-white bg-brand rounded">Gestionar auxiliares</a>
-            </div>
         </div>
     @endif
 
