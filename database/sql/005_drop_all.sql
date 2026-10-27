@@ -1,8 +1,11 @@
 -- ============================================================================
---  TECH ONE / T1 - LIMPIEZA INDIVIDUAL DE TABLAS Y ENUMS (public)
---  Borra tablas y enums uno por uno (no elimina el esquema public).
---  Ejecutar ANTES de 000_deploy_completo.sql en una base existente.
+--  TECH ONE / T1 - LIMPIEZA INDIVIDUAL DE OBJETOS (public)
+--  Borra tablas, vistas, secuencias, enums y funciones uno por uno.
+--  No elimina el esquema public. Ejecutar ANTES de 000_deploy_completo.sql.
 -- ============================================================================
+
+
+-- Vistas
 
 
 -- Tablas
@@ -49,6 +52,16 @@ DROP TABLE IF EXISTS public."tipo_gestion" CASCADE;
 DROP TABLE IF EXISTS public."users" CASCADE;
 DROP TABLE IF EXISTS public."usuario" CASCADE;
 
+-- Secuencias
+
+DROP SEQUENCE IF EXISTS public."configuracion_examen_docente_id_configuracion_examen_seq" CASCADE;
+DROP SEQUENCE IF EXISTS public."configuracion_material_personaliz_id_configuracion_material_seq" CASCADE;
+DROP SEQUENCE IF EXISTS public."configuracion_norma_personalizada_id_configuracion_norma_seq" CASCADE;
+DROP SEQUENCE IF EXISTS public."failed_jobs_id_seq" CASCADE;
+DROP SEQUENCE IF EXISTS public."jobs_id_seq" CASCADE;
+DROP SEQUENCE IF EXISTS public."migrations_id_seq" CASCADE;
+DROP SEQUENCE IF EXISTS public."users_id_seq" CASCADE;
+
 -- Enums (tipos)
 
 DROP TYPE IF EXISTS public."curso_estado" CASCADE;
@@ -63,5 +76,8 @@ DROP TYPE IF EXISTS public."registrador_tipo" CASCADE;
 DROP TYPE IF EXISTS public."roles" CASCADE;
 DROP TYPE IF EXISTS public."tipo_examen_nombre" CASCADE;
 DROP TYPE IF EXISTS public."tipo_infraccion" CASCADE;
+
+-- Funciones
+
 
 -- Fin
