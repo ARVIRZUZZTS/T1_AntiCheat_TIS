@@ -371,6 +371,7 @@
             </div>
 
             <div class="flex flex-wrap gap-2 sm:shrink-0">
+                <x-ui.button variant="secondary" wire:click="refrescar">Refrescar</x-ui.button>
                 @if ($modoVista === 'ingreso')
                     <x-ui.button :variant="$filtro === 'todos' ? 'default' : 'secondary'" wire:click="filtrar('todos')">Todos</x-ui.button>
                     <x-ui.button :variant="$filtro === 'habilitados' ? 'default' : 'secondary'" wire:click="filtrar('habilitados')">Habilitados</x-ui.button>
