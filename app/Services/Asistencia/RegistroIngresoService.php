@@ -76,8 +76,9 @@ class RegistroIngresoService
         return DB::transaction(function () use ($sisEstudiante, $idExamen, $idRegistrador, $idDocente) {
             $inscripcion = $this->obtenerInscripcion($sisEstudiante, $idExamen, $idDocente);
 
-            if ($inscripcion->estado !== EstadoEstudianteExamen::Habilitado) {
-                throw new InvalidArgumentException('El estudiante no está habilitado para este examen.');
+            if ($inscripcion->estado === EstadoEstudianteExamen::Deshabilitado
+                && $inscripcion->motivo === self::MOTIVO_RECHAZO) {
+                throw new InvalidArgumentException('El estudiante fue rechazado en el control de ingreso.');
             }
 
             $existe = RegistroAsistencia::query()
