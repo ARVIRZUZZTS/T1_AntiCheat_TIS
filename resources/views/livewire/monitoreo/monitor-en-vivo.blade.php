@@ -231,7 +231,8 @@
 
         $badgesHtml = $badgeHabilitacion((bool) ($estudiante['habilitado'] ?? true))
             .' '.$badgeIngreso($estudiante, $incidencia)
-            .($incidencia !== null ? ' '.$badgeIncidencia($incidencia) : '');
+            .($incidencia !== null ? ' '.$badgeIncidencia($incidencia) : '')
+            .' [dbg: '.$estadoVisual.'/'.$estudiante['estado_asistencia'].']';
 
         $fila = [
             ['heading' => true, 'value' => $nombreCompleto],
