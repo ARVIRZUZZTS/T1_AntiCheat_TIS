@@ -123,7 +123,7 @@
         $estadoAsistencia = $estudiante['estado_asistencia'] ?? 'pendiente';
 
         if ($estadoAsistencia === 'presente') {
-            return $badgeGenerico('ingreso', 'IngresA3');
+            return $badgeGenerico('ingreso', 'Ingresó');
         }
 
         if ($estadoAsistencia === 'rechazado') {
