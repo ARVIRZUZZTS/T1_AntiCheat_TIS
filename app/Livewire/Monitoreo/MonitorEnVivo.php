@@ -394,6 +394,24 @@ class MonitorEnVivo extends Component
         Cache::forget($this->claveCacheInforme());
     }
 
+    public function totalProximosExamenes(): int
+    {
+        return $this->consultaExamenesAccesibles()
+            ->where('fecha', '>=', now()->toDateString())
+            ->count();
+    }
+
+    public function textoProximosExamenes(): string
+    {
+        $total = $this->totalProximosExamenes();
+
+        if ($total > 5) {
+            return 'Próximos 5+ exámenes';
+        }
+
+        return 'Próximos ' . $total . ' ' . ($total === 1 ? 'examen' : 'exámenes');
+    }
+
     public function seleccionarExamen(int $idExamen): void
     {
         $examen = $this->consultaExamenesAccesibles()

@@ -266,7 +266,7 @@
      componente compartido, y por eso se quedó sin la hamburguesa cuando se
      agregó ahí (el `@hasSection('header')` del layout hacía que esta vista
      nunca pasara por x-ui.page-header). --}}
-@section('subtitle', $subtituloExamen)
+@section('subtitle', $this->textoProximosExamenes() . ' · ' . $subtituloExamen)
 
 <div class="flex flex-col gap-6 px-[2vh] mt-[2vh]">
     {{-- Los dos avisos se autodescartan a los 4s: antes se quedaban en
@@ -465,13 +465,12 @@
 
     @else
         <div class="bg-neutral-primary-soft border border-default rounded-base shadow-xs p-6">
-            <h2 class="text-lg font-semibold text-heading mb-2">Acceso al monitor</h2>
-            <p class="text-sm text-body mb-2">Estado: {{ $this->estadoAcceso() }}</p>
-            <p class="text-sm text-body mb-4">Comienza en {{ $this->minutosParaInicio() }} minutos.</p>
+            <h2 class="text-lg font-semibold text-heading mb-2">Próximo examen en</h2>
+            <p class="text-2xl font-bold text-heading">{{ $this->minutosParaInicio() }} min</p>
         </div>
 
         <div class="flex flex-col gap-3">
-            <h2 class="text-lg font-semibold text-heading">Proximos examenes</h2>
+            <h2 class="text-lg font-semibold text-heading">Próximos exámenes</h2>
             <ul class="flex flex-col gap-4">
                 @foreach ($this->proximosExamenes() as $examenProximo)
                     <li class="flex cursor-pointer flex-col gap-4 border bg-neutral-primary-soft rounded-base shadow-xs px-5 py-6 sm:px-8 lg:flex-row lg:items-center lg:gap-6
