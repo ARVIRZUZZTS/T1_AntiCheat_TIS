@@ -137,18 +137,32 @@
         return $badgeGenerico('status-pendiente', 'Pendiente');
     };
 
-    $badgeIncidencia = function (?array $incidencia) use ($badgeGenerico): string {
+    $badgeIncidencia = function (?array $incidencia) use ($badgeGenerico, $examen): string {
         if ($incidencia === null) {
             return '';
         }
 
-        // Incidencia registrada durante el ingreso (sospechoso) -> Incidencia (amarillo).
-        if (($incidencia['tipo'] ?? null) === \App\Enums\TipoInfraccion::Sospechoso->value) {
+        $motivosIngreso = array_map(
+            fn ($m) => $m->value,
+            \App\Enums\Motivo::paraIngreso()
+        );
+
+        // Incidencia preexistente de otro examen -> C. de Riesgos (rojo).
+        if (($incidencia['examen_id'] ?? null) !== (int) $examen->id_examen) {
+            return $badgeGenerico('status-central-riesgos', 'C. de Riesgos');
+        }
+
+        // Incidencia registrada durante el ingreso -> Incidencia (amarillo).
+        if (in_array($incidencia['motivo'] ?? '', $motivosIngreso, true)) {
             return $badgeGenerico('status-en-revision', 'Incidencia');
         }
 
-        // Tramposo (monitor o preexistente) -> C. de Riesgos (rojo).
-        return $badgeGenerico('status-central-riesgos', 'C. de Riesgos');
+        // Incidencia registrada durante el monitor -> C. de Riesgos (rojo) si tramposo.
+        if (($incidencia['tipo'] ?? null) === \App\Enums\TipoInfraccion::Tramposo->value) {
+            return $badgeGenerico('status-central-riesgos', 'C. de Riesgos');
+        }
+
+        return $badgeGenerico('status-en-revision', 'Incidencia');
     };
 
     // Botón de la fila: es el `x-ui.button` del sistema (mismo juego de clases)
