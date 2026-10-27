@@ -266,7 +266,7 @@
      componente compartido, y por eso se quedó sin la hamburguesa cuando se
      agregó ahí (el `@hasSection('header')` del layout hacía que esta vista
      nunca pasara por x-ui.page-header). --}}
-@section('subtitle', $this->textoProximosExamenes() . ' · ' . $subtituloExamen)
+@section('subtitle', $this->textoProximosExamenes())
 
 <div class="flex flex-col gap-6 px-[2vh] mt-[2vh]">
     {{-- Los dos avisos se autodescartan a los 4s: antes se quedaban en
