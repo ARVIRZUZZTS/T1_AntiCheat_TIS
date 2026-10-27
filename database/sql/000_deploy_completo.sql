@@ -3585,8 +3585,8 @@ SELECT pg_catalog.setval('public.configuracion_norma_personalizada_id_configurac
 
 SELECT pg_catalog.setval('public.migrations_id_seq', 21, true);
 
-SELECT pg_catalog.setval('public.users_id_seq', , false);
+SELECT pg_catalog.setval('public.users_id_seq', 1, false);
 
-SELECT pg_catalog.setval('public.jobs_id_seq', , false);
+SELECT pg_catalog.setval('public.jobs_id_seq', 1, false);
 
-SELECT pg_catalog.setval('public.failed_jobs_id_seq', , false);
+SELECT pg_catalog.setval('public.failed_jobs_id_seq', 1, false);
