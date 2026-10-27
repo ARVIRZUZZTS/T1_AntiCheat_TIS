@@ -195,6 +195,10 @@
                  }
                  this.examenes = cuerpo.datos ?? [];
                  this.estado = 'listo';
+
+                 if (this.examenes.length > 0 && (this.seleccionado === '' || this.seleccionado === null)) {
+                     this.seleccionado = String(this.examenes[0].id);
+                 }
              } catch (error) {
                  if (peticion === this.peticion) {
                      this.estado = 'error';
