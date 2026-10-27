@@ -123,7 +123,7 @@
         $estadoAsistencia = $estudiante['estado_asistencia'] ?? 'pendiente';
 
         if ($estadoAsistencia === 'presente') {
-            return $badgeGenerico('ingreso', 'Ingresó');
+                        return $badgeGenerico('ingreso', 'Ingresó');
         }
 
         if ($estadoAsistencia === 'rechazado') {
@@ -194,16 +194,16 @@
         // Estado visual y botón que abre el modal según lo que la fila tenga:
         // ingresó -> M2, rechazado -> M3, tramposo -> M4, resto -> M1.
         $estadoVisual = match (true) {
-            $incidencia !== null => 'C. de Riesgos',
-            $estudiante['estado_asistencia'] === 'presente' => 'IngresA3',
-            $estudiante['estado_asistencia'] === 'rechazado' => 'Rechazado',
-            default => 'Pendiente',
+            $incidencia !== null => 'central',
+            $estudiante['estado_asistencia'] === 'presente' => 'ingreso',
+            $estudiante['estado_asistencia'] === 'rechazado' => 'rechazado',
+            default => 'pendiente',
         };
 
         [$evento, $etiqueta] = match ($estadoVisual) {
-            'Ingresó' => ['abrir-modal-ingresado', 'Reporte'],
-            'Rechazado' => ['abrir-modal-no-habilitado', 'Ingreso'],
-            'C. de Riesgos' => ['abrir-modal-central-riesgos', 'Reporte'],
+                        'ingreso' => ['abrir-modal-ingresado', 'Reporte'],
+            'rechazado' => ['abrir-modal-no-habilitado', 'Ingreso'],
+            'central' => ['abrir-modal-central-riesgos', 'Reporte'],
             default => ['abrir-modal-ingreso', 'Ingreso'],
         };
 
@@ -219,7 +219,7 @@
             'materia' => $materia,
             'aula' => $aula,
             'aulaActual' => $aula,
-            'habilitacion' => $estadoVisual === 'Rechazado' ? 'No habilitado' : 'Habilitada',
+            'habilitacion' => $estadoVisual === 'rechazado' ? 'No habilitado' : 'Habilitada',
             'horaRegistro' => $horaModal,
             'materialPermitido' => $materialPermitido,
             'registrador' => $estudiante['registrador'] ?? '—',
@@ -247,7 +247,7 @@
         $fila[] = ['html' => $badgesHtml];
         $fila[] = ['html' => $boton($datos, $evento, $etiqueta)];
 
-        if ($estadoVisual === 'Ingresó') {
+                if ($estadoVisual === 'ingreso') {
             $filasIngresados[] = $fila;
             $tarjetasIngresados[] = [
                 'nombre' => $nombreCompleto,
