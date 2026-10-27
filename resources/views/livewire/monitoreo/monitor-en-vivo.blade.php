@@ -498,7 +498,7 @@
 
                             <div class="flex flex-col items-center gap-1.5 text-center">
                                 <span class="text-xs font-semibold uppercase text-muted">Horario:</span>
-                                <span class="text-sm font-mono text-body">{{ $examenProximo['hora'] }}</span>
+                                <span class="text-sm font-mono text-body">{{ $examenProximo['hora_inicio'] }}{{ $examenProximo['hora_fin'] ? ' - ' . $examenProximo['hora_fin'] : '' }}</span>
                             </div>
 
                             <div class="flex flex-col items-center gap-1.5 text-center">
