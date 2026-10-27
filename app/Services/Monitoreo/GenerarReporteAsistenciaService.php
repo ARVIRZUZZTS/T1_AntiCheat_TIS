@@ -256,6 +256,7 @@ class GenerarReporteAsistenciaService
             ->map(fn (CentralRiesgo $riesgo): array => [
                 'tipo' => (string) $riesgo->tipo_infraccion?->value,
                 'examen_id' => (int) $riesgo->id_examen,
+                'motivo' => (string) $riesgo->motivo,
                 'fecha' => $riesgo->fecha_registro?->format('d/m/Y') ?? '',
                 // El estado de revisión sale del tipo (tramposo = Confirmado).
                 'estado' => (string) $riesgo->tipo_infraccion?->estado(),

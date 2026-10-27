@@ -143,16 +143,12 @@
         }
 
         // Incidencia registrada durante este examen -> Incidencia (amarillo).
-        // Incidencia preexistente de otro examen -> C. de Riesgos (rojo).
         if (($incidencia['examen_id'] ?? null) === (int) $examen->id_examen) {
             return $badgeGenerico('status-en-revision', 'Incidencia');
         }
 
-        if (($incidencia['tipo'] ?? null) === \App\Enums\TipoInfraccion::Tramposo->value) {
-            return $badgeGenerico('status-central-riesgos', 'C. de Riesgos');
-        }
-
-        return $badgeGenerico('status-en-revision', 'Incidencia');
+        // Incidencia preexistente de otro examen -> C. de Riesgos (rojo).
+        return $badgeGenerico('status-central-riesgos', 'C. de Riesgos');
     };
 
     // Botón de la fila: es el `x-ui.button` del sistema (mismo juego de clases)

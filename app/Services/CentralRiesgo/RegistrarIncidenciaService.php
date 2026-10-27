@@ -118,9 +118,11 @@ class RegistrarIncidenciaService
                 'motivo' => $motivo->value,
                 'detalle_motivo' => $detalle,
                 'fecha_registro' => now(),
-                'tipo_infraccion' => $esAuxiliar
+                'tipo_infraccion' => $datos->origen === RegistroIncidenciaDTO::ORIGEN_INGRESO
                     ? TipoInfraccion::Sospechoso->value
-                    : TipoInfraccion::Tramposo->value,
+                    : ($esAuxiliar
+                        ? TipoInfraccion::Sospechoso->value
+                        : TipoInfraccion::Tramposo->value),
             ]);
 
             // Las notificaciones leen el estudiante de la incidencia: ya lo
