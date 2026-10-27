@@ -16,11 +16,17 @@
       `docente_cargo` real (configuración del estudiante) en vez del
       registrador: con "Todos los docentes" la columna "Docente a cargo"
       salía "Sin registro" para todo ingreso aún no confirmado.
+    - 2026-10-26  [Alex Candia]  feat: el título y el subtítulo usan la materia,
+      el tipo y la fecha enviados por la selección, igual que horarios de
+      ingreso.
 --}}
 <div
     x-data="{
         idCurso: null,
         idExamen: null,
+        materiaSeleccionada: '',
+        tipoSeleccionado: '',
+        fechaSeleccionada: '',
         endpoint: @js(route('api.examenes.monitoreo.asistencia', ['idExamen' => '__EXAMEN__'])),
         endpointExportar: @js(route('reportes.asistencia.exportar', ['examen' => '__EXAMEN__'])),
         datos: null,
@@ -132,26 +138,44 @@
         },
 
         get nombreMateria() {
+            if (this.materiaSeleccionada) {
+                return this.materiaSeleccionada;
+            }
+
             const f = this.fuente;
             return f && f.examen && f.examen.curso ? f.examen.curso.nombre_curso : (f && f.materia ? f.materia.nombre : 'Materia');
         },
 
         get nombreExamen() {
+            if (this.tipoSeleccionado) {
+                return this.tipoSeleccionado;
+            }
+
             const f = this.fuente;
             if (! f || ! f.examen) return '';
-            const tipo = f.examen.tipo_examen ? f.examen.tipo_examen.nombre_tipo_examen : (f.examen.tipo || '');
-            return tipo;
+            return f.examen.tipo_examen ? f.examen.tipo_examen.nombre_tipo_examen : (f.examen.tipo || '');
         },
 
         get fechaExamen() {
+            if (this.fechaSeleccionada) {
+                return this.fechaSeleccionada;
+            }
+
             const f = this.fuente;
             return f && f.examen ? (f.examen.fecha || '') : '';
+        },
+
+        get subtitulo() {
+            return [this.nombreExamen, this.fechaExamen].filter(Boolean).join(' · ');
         },
 
         actualizarSeleccion(evento) {
             const detalle = evento && evento.detail ? evento.detail : {};
             this.idCurso = detalle.idCurso ?? null;
             this.idExamen = detalle.idExamen ?? null;
+            this.materiaSeleccionada = detalle.nombreMateria ?? '';
+            this.tipoSeleccionado = detalle.tipoExamen ?? '';
+            this.fechaSeleccionada = detalle.fechaExamen ?? '';
             this.errorReporte = '';
             this.filtroAula = '';
             this.filtroDocente = '';
@@ -264,7 +288,7 @@
             <div class="flex flex-wrap items-start justify-between gap-3">
                 <div class="min-w-0">
                     <h2 class="text-lg font-semibold text-heading" x-text="'Asistencia - ' + nombreMateria"></h2>
-                    <p class="mt-1 text-sm text-body"><span x-text="nombreExamen"></span> · <span x-text="fechaExamen"></span></p>
+                    <p class="mt-1 text-sm text-body" x-text="subtitulo"></p>
                 </div>
 
                 <x-ui.button

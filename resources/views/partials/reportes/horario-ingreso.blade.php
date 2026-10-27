@@ -3,17 +3,26 @@
     @author  Alex Candia <alex.leonar.candia@gmail.com>
     @created 2026-10-23
     @updated 2026-10-25
+    @updated 2026-10-26
 
     @description
     Pestaña "Reporte de horarios de ingreso". Solo muestra tabla con
     nombres, apellidos, código SIS, aula, hora de ingreso y hora de salida.
-    Orden por hora de ingreso del más temprano al más tardío.
+    Orden por hora de ingreso del más temprano al más tardío. El título y el
+    subtítulo salen de la misma selección que usan los otros reportes.
+
+    @changelog
+    - 2026-10-26  [Alex Candia]  refactor: el encabezado usa la materia, el tipo
+      y la fecha del evento de selección, con respaldo en la respuesta del API.
 --}}
 
 <div
     x-data="{
         idCurso: null,
         idExamen: null,
+        materiaSeleccionada: '',
+        tipoSeleccionado: '',
+        fechaSeleccionada: '',
         endpoint: @js(route('api.reportes.horarios-ingreso')),
         endpointExportar: @js(route('api.reportes.horarios-ingreso.exportar')),
 
@@ -27,10 +36,29 @@
             return this.horario !== null && this.horario && ! this.horario.sin_datos && Array.isArray(this.horario.estudiantes) && this.horario.estudiantes.length > 0;
         },
 
+        get nombreMateria() {
+            return this.materiaSeleccionada || (this.horario && this.horario.materia ? this.horario.materia.nombre : '');
+        },
+
+        get nombreExamen() {
+            return this.tipoSeleccionado || (this.horario && this.horario.examen ? this.horario.examen.tipo : '');
+        },
+
+        get fechaExamen() {
+            return this.fechaSeleccionada || (this.horario && this.horario.examen ? this.horario.examen.fecha_formateada : '');
+        },
+
+        get subtitulo() {
+            return [this.nombreExamen, this.fechaExamen].filter(Boolean).join(' · ');
+        },
+
         actualizarSeleccion(evento) {
             const detalle = evento && evento.detail ? evento.detail : {};
             this.idCurso = detalle.idCurso ?? null;
             this.idExamen = detalle.idExamen ?? null;
+            this.materiaSeleccionada = detalle.nombreMateria ?? '';
+            this.tipoSeleccionado = detalle.tipoExamen ?? '';
+            this.fechaSeleccionada = detalle.fechaExamen ?? '';
             this.errorReporte = '';
 
             if (this.idCurso === undefined || this.idCurso === '' || this.idExamen === undefined || this.idExamen === '') {
@@ -144,8 +172,8 @@
 
                 <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
                     <div class="min-w-0">
-                        <h2 class="text-lg font-semibold text-heading" x-text="'Horarios de ingreso - ' + (horario.materia ? horario.materia.nombre : '')"></h2>
-                        <p class="mt-1 text-sm text-body" x-text="(horario.examen ? horario.examen.tipo : '') + (horario.examen && horario.examen.fecha_formateada ? ' · ' + horario.examen.fecha_formateada : '')"></p>
+                        <h2 class="text-lg font-semibold text-heading" x-text="'Horarios de ingreso - ' + nombreMateria"></h2>
+                        <p class="mt-1 text-sm text-body" x-text="subtitulo"></p>
                     </div>
 
                     <x-ui.button

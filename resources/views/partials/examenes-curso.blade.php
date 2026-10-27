@@ -430,7 +430,6 @@
              return (examen.ambientes || []).map((ambiente) => ambiente.nombre).join(', ') || '—';
          },
      }">
-    {{-- Aviso de éxito del alta: el formulario de crear examen vuelve acá. --}}
     @if (session('mensaje'))
         <x-ui.modal-aviso :mensaje="session('mensaje')" />
     @endif
@@ -454,7 +453,6 @@
     {{-- Las cuatro pestañas y su contenido solo aparecen con materia elegida. --}}
     <div x-show="hayCurso" x-cloak class="flex flex-col gap-4">
     <header class="flex flex-col gap-3">
-        <h2 class="px-3 text-2xl font-bold text-heading">Examenes</h2>
 
         <nav class="flex min-w-0 gap-2 overflow-x-auto px-3" aria-label="Opciones de examenes">
             <button type="button" class="{{ $tabClases }}"

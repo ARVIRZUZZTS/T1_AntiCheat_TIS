@@ -4,6 +4,7 @@
     @created 2026-09-29
     @updated 2026-10-23
     @updated 2026-10-24
+    @updated 2026-10-26
 
     @description
     Pantalla de reportes por materia y examen. Dos selectores dinámicos
@@ -35,6 +36,9 @@
     - 2026-10-24  [Valery D. Ortuno P]  style: la fila de pestañas pierde la
       línea inferior que la separaba del contenido, igual que en la vista del
       curso, para que las pestañas tengan el mismo formato en todo el sistema.
+    - 2026-10-26  [Alex Candia]  feat: el evento de selección incluye materia,
+      tipo de examen y fecha formateada para que los tres reportes usen el
+      mismo título y subtítulo.
 
     @see  resources/views/partials/reportes/horario-ingreso.blade.php
 --}}
@@ -52,6 +56,7 @@
             materiaId: '',
             examenId: '',
             tab: 'asistencia',
+            materias: @js($opcionesMaterias),
             examenesPorCurso: @js($examenesPorCurso),
 
             // Exámenes de la materia elegida. Si no hay materia o no hay
@@ -60,10 +65,31 @@
                 return this.examenesPorCurso[this.materiaId] || [];
             },
 
+            get materiaSeleccionada() {
+                return this.materias[this.materiaId] || '';
+            },
+
+            get examenSeleccionado() {
+                const id = String(this.examenId);
+
+                return this.examenesVisibles.find(examen => String(examen.id) === id) || null;
+            },
+
+            get tipoExamenSeleccionado() {
+                return this.examenSeleccionado ? this.examenSeleccionado.tipo : '';
+            },
+
+            get fechaExamenSeleccionada() {
+                return this.examenSeleccionado ? this.examenSeleccionado.fecha_formateada : '';
+            },
+
             actualizarReportes() {
                 this.$dispatch('reporte-seleccion-actualizada', {
                     idCurso: this.materiaId,
-                    idExamen: this.examenId
+                    idExamen: this.examenId,
+                    nombreMateria: this.materiaSeleccionada,
+                    tipoExamen: this.tipoExamenSeleccionado,
+                    fechaExamen: this.fechaExamenSeleccionada
                 });
             },
 
