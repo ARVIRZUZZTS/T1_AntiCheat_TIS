@@ -287,23 +287,6 @@
         </div>
     @endif
 
-    {{-- Tarjetas de los exA�menes mA�s prA3ximos: hasta 5, seleccionables. --}}
-    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        @foreach ($this->proximosExamenes() as $examenProximo)
-            <button type="button"
-                    wire:click="seleccionarExamen({{ $examenProximo['id'] }})"
-                    @class([
-                        'text-left rounded-base border bg-neutral-primary-soft shadow-xs p-4 transition',
-                        'border-brand ring-2 ring-brand' => $examenProximo['id'] === $this->idExamen,
-                        'border-default hover:border-brand-subtle' => $examenProximo['id'] !== $this->idExamen,
-                    ])>
-                <p class="font-semibold text-heading truncate">{{ $examenProximo['materias'] }}</p>
-                <p class="text-xs text-body mt-1">{{ $examenProximo['fecha'] }} · {{ $examenProximo['hora'] }}</p>
-                <p class="text-xs text-muted mt-1">Auxiliares: {{ $examenProximo['auxiliares'] }}</p>
-            </button>
-        @endforeach
-    </div>
-
     {{-- Tarjetas de conteo: mismo componente y mismo grid (2 columnas en
          mobile, 6 en desktop) que las 5 de /materias/{curso} — antes el
          mobile tenA-a su propia card compacta distinta a la de desktop. --}}
@@ -485,6 +468,52 @@
             <h2 class="text-lg font-semibold text-heading mb-2">Acceso al monitor</h2>
             <p class="text-sm text-body mb-2">Estado: {{ $this->estadoAcceso() }}</p>
             <p class="text-sm text-body mb-4">Comienza en {{ $this->minutosParaInicio() }} minutos.</p>
+        </div>
+
+        <div class="flex flex-col gap-3">
+            <h2 class="text-lg font-semibold text-heading">Proximos examenes</h2>
+            <ul class="flex flex-col gap-4">
+                @foreach ($this->proximosExamenes() as $examenProximo)
+                    <li class="flex cursor-pointer flex-col gap-4 border bg-neutral-primary-soft rounded-base shadow-xs px-5 py-6 sm:px-8 lg:flex-row lg:items-center lg:gap-6
+                        {{ $examenProximo['id'] === $this->idExamen ? 'border-brand ring-2 ring-brand' : 'border-default hover:border-brand-subtle' }}"
+                        role="button" tabindex="0"
+                        wire:click="seleccionarExamen({{ $examenProximo['id'] }})">
+                        <div class="flex items-center gap-4 lg:w-72">
+                            <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-brand-softer text-fg-brand-strong">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-6 w-6" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>
+                            </div>
+                            <div class="flex min-w-0 flex-col items-start gap-1">
+                                <h3 class="text-xl font-bold text-heading">{{ $examenProximo['tipo'] }}</h3>
+                                <span class="inline-flex items-center px-1.5 py-0.5 text-xs font-medium rounded-full border bg-neutral-secondary-medium border-default-medium text-heading">
+                                    {{ $examenProximo['estado'] }}
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="grid flex-1 grid-cols-2 gap-4 sm:grid-cols-4">
+                            <div class="flex flex-col items-center gap-1.5 text-center">
+                                <span class="text-xs font-semibold uppercase text-muted">Fecha:</span>
+                                <time class="text-sm font-mono text-body">{{ \Carbon\Carbon::parse($examenProximo['fecha'])->format('d-m-Y') }}</time>
+                            </div>
+
+                            <div class="flex flex-col items-center gap-1.5 text-center">
+                                <span class="text-xs font-semibold uppercase text-muted">Horario:</span>
+                                <span class="text-sm font-mono text-body">{{ $examenProximo['hora'] }}</span>
+                            </div>
+
+                            <div class="flex flex-col items-center gap-1.5 text-center">
+                                <span class="text-xs font-semibold uppercase text-muted">Ambientes:</span>
+                                <span class="text-sm font-mono text-body">{{ $examenProximo['ambientes'] ?: '-' }}</span>
+                            </div>
+
+                            <div class="flex flex-col items-center gap-1.5 text-center">
+                                <span class="text-xs font-semibold uppercase text-muted">Ingresos:</span>
+                                <span class="text-sm font-bold text-heading">{{ $examenProximo['ingresos'] }}</span>
+                            </div>
+                        </div>
+                    </li>
+                @endforeach
+            </ul>
         </div>
     @endif
 

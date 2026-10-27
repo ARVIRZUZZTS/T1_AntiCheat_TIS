@@ -415,7 +415,7 @@ class MonitorEnVivo extends Component
     public function proximosExamenes(): array
     {
         $examenes = $this->consultaExamenesAccesibles()
-            ->with('cursos')
+            ->with(['cursos', 'ambientes', 'tipoExamen'])
             ->where('fecha', '>=', now()->toDateString())
             ->orderBy('fecha')
             ->orderBy('hora_inicio')
@@ -433,12 +433,22 @@ class MonitorEnVivo extends Component
                     ->count('id_auxiliar');
             }
 
+            $ingresos = (int) DB::table('registro_asistencia')
+                ->where('id_examen', $examen->id_examen)
+                ->distinct('id_estudiante')
+                ->count('id_estudiante');
+
             return [
                 'id' => $examen->id_examen,
                 'materias' => $examen->cursos->pluck('nombre_curso')->implode(', '),
+                'tipo' => $examen->tipoExamen?->nombre_tipo_examen ?? 'Sin tipo',
                 'fecha' => $examen->fecha,
-                'hora' => substr((string) $examen->hora_inicio, 0, 5),
+                'hora_inicio' => substr((string) $examen->hora_inicio, 0, 5),
+                'hora_fin' => $examen->hora_fin ? substr((string) $examen->hora_fin, 0, 5) : null,
+                'ambientes' => $examen->ambientes->pluck('nombre_ambiente')->implode(', '),
+                'ingresos' => $ingresos,
                 'auxiliares' => $auxiliares,
+                'estado' => 'Programado',
             ];
         })->all();
     }
