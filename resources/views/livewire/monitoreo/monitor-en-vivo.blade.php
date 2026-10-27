@@ -137,9 +137,15 @@
         return $badgeGenerico('status-pendiente', 'Pendiente');
     };
 
-    $badgeIncidencia = function (?array $incidencia) use ($badgeGenerico): string {
+    $badgeIncidencia = function (?array $incidencia) use ($badgeGenerico, $examen): string {
         if ($incidencia === null) {
             return '';
+        }
+
+        // Incidencia registrada durante este examen -> Incidencia (amarillo).
+        // Incidencia preexistente de otro examen -> C. de Riesgos (rojo).
+        if (($incidencia['examen_id'] ?? null) === (int) $examen->id_examen) {
+            return $badgeGenerico('status-en-revision', 'Incidencia');
         }
 
         if (($incidencia['tipo'] ?? null) === \App\Enums\TipoInfraccion::Tramposo->value) {
