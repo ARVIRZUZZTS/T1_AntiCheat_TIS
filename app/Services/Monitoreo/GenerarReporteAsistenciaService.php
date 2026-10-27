@@ -88,6 +88,7 @@ use App\Models\ConfiguracionExamenDocente;
 use App\Models\EstudianteExamen;
 use App\Models\Examen;
 use App\Models\RegistroAsistencia;
+use App\Services\Asistencia\RegistroIngresoService;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -187,7 +188,7 @@ class GenerarReporteAsistenciaService
                         : null,
                     'hora_ingreso' => $registro?->hora_ingreso,
                     'incidencia' => $incidencia,
-                    'estado_asistencia' => $this->resolverEstado($habilitado, $incidencia, $registro),
+                    'estado_asistencia' => $this->resolverEstado($habilitado, $incidencia, $registro, $inscripcion->motivo),
                 ];
             });
 
@@ -299,18 +300,14 @@ class GenerarReporteAsistenciaService
      * @param  RegistroAsistencia|null  $registro  Fila de asistencia, si entró.
      * @return string presente | rechazado | riesgo | pendiente
      */
-    private function resolverEstado(bool $habilitado, ?array $incidencia, ?RegistroAsistencia $registro): string
+    private function resolverEstado(bool $habilitado, ?array $incidencia, ?RegistroAsistencia $registro, ?string $motivo = null): string
     {
-        if (! $habilitado) {
-            return 'rechazado';
-        }
-
-        if ($incidencia !== null) {
-            return 'riesgo';
-        }
-
         if ($registro !== null) {
             return 'presente';
+        }
+
+        if (! $habilitado && $motivo === RegistroIngresoService::MOTIVO_RECHAZO) {
+            return 'rechazado';
         }
 
         return 'pendiente';

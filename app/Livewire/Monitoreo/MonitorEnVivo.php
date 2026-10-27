@@ -290,7 +290,7 @@ class MonitorEnVivo extends Component
         $todos = $this->informe['estudiantes'];
 
         if ($this->modoVista === 'ingreso') {
-            $todos = $todos->whereIn('estado_asistencia', ['pendiente', 'presente', 'rechazado', 'riesgo'])->values();
+            $todos = $todos->whereIn('estado_asistencia', ['pendiente', 'presente', 'rechazado'])->values();
         }
 
         $filtrados = match ($this->filtro) {
