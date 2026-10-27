@@ -377,7 +377,6 @@
                     <x-ui.button :variant="$filtro === 'deshabilitados' ? 'default' : 'secondary'" wire:click="filtrar('deshabilitados')">Deshabilitados</x-ui.button>
                 @else
                     <x-ui.button :variant="$filtro === 'central-riesgos' ? 'default' : 'secondary'" wire:click="filtrar('central-riesgos')">Central de riesgos</x-ui.button>
-                    <x-ui.button :variant="$filtro === 'pendientes' ? 'default' : 'secondary'" wire:click="filtrar('pendientes')">Pendientes</x-ui.button>
                 @endif
             </div>
         </div>

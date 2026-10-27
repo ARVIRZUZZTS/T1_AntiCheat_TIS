@@ -250,7 +250,6 @@ class GenerarReporteAsistenciaService
     {
         return CentralRiesgo::query()
             ->where('id_examen', $idExamen)
-            ->when($idDocente !== null, fn ($query) => $query->delDocente($idDocente))
             ->orderBy('id_registro')
             ->get()
             ->keyBy(fn (CentralRiesgo $riesgo): string => $this->clave(
