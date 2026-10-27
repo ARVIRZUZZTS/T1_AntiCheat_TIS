@@ -168,7 +168,7 @@ class MonitorEnVivo extends Component
     /**
      * Minutos que se cachea el informe antes de volver a consultar la base.
      */
-    private const CACHE_INFORME_MINUTOS = 0;
+    private const CACHE_INFORME_MINUTOS = 1;
 
     /**
      * Resuelve los servicios en cada ciclo del componente.

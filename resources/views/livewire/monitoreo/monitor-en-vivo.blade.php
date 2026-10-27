@@ -123,19 +123,11 @@
         $estadoAsistencia = $estudiante['estado_asistencia'] ?? 'pendiente';
 
         if ($estadoAsistencia === 'presente') {
-            return $badgeGenerico('ingreso', 'Ingresó');
+            return $badgeGenerico('ingreso', 'IngresA3');
         }
 
         if ($estadoAsistencia === 'rechazado') {
             return $badgeGenerico('status-no-habilitado', 'Rechazado');
-        }
-
-        if (($incidencia['tipo'] ?? null) === \App\Enums\TipoInfraccion::Tramposo->value) {
-            return $badgeGenerico('status-central-riesgos', 'C. de Riesgos');
-        }
-
-        if ($incidencia !== null) {
-            return $badgeGenerico('status-en-revision', 'Incidencia');
         }
 
         if ($estadoAsistencia === 'riesgo') {
@@ -143,6 +135,18 @@
         }
 
         return $badgeGenerico('status-pendiente', 'Pendiente');
+    };
+
+    $badgeIncidencia = function (?array $incidencia) use ($badgeGenerico): string {
+        if ($incidencia === null) {
+            return '';
+        }
+
+        if (($incidencia['tipo'] ?? null) === \App\Enums\TipoInfraccion::Tramposo->value) {
+            return $badgeGenerico('status-central-riesgos', 'C. de Riesgos');
+        }
+
+        return $badgeGenerico('status-en-revision', 'Incidencia');
     };
 
     // Botón de la fila: es el `x-ui.button` del sistema (mismo juego de clases)
@@ -213,7 +217,7 @@
 
         $badgesHtml = $badgeHabilitacion((bool) ($estudiante['habilitado'] ?? true))
             .' '.$badgeIngreso($estudiante, $incidencia)
-            .' [dbg:'.($estudiante['incidencia']['tipo'] ?? 'null').']';
+            .($incidencia !== null ? ' '.$badgeIncidencia($incidencia) : '');
 
         $fila = [
             ['heading' => true, 'value' => $nombreCompleto],
