@@ -494,14 +494,6 @@ class MonitorEnVivo extends Component
         })->all();
     }
 
-    public function refrescar(): void
-    {
-        Cache::forget($this->claveCacheInforme());
-        $this->pagina = 1;
-        $this->busqueda = '';
-        $this->filtro = 'todos';
-    }
-
     public function cambiarVista(string $vista): void
     {
         if (! in_array($vista, ['ingreso', 'monitor'], true)) {
