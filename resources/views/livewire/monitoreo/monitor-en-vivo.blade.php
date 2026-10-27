@@ -189,7 +189,7 @@
         [$evento, $etiqueta] = match ($estadoVisual) {
             'Ingresó' => ['abrir-modal-ingresado', 'Reportar'],
             'Rechazado' => ['abrir-modal-no-habilitado', 'Ingreso'],
-            'C. de Riesgos' => ['abrir-modal-central-riesgos', 'Reportar'],
+            'C. de Riesgos' => ['abrir-modal-central-riesgos', 'Reporte'],
             default => ['abrir-modal-ingreso', 'Ingreso'],
         };
 
