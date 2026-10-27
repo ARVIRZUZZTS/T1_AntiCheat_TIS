@@ -468,10 +468,11 @@
             <h2 class="text-lg font-semibold text-heading">Próximos exámenes</h2>
             <ul class="flex flex-col gap-4">
                 @foreach ($this->proximosExamenes() as $examenProximo)
-                    <li class="flex cursor-pointer flex-col gap-4 border bg-neutral-primary-soft rounded-base shadow-xs px-5 py-6 sm:px-8 lg:flex-row lg:items-center lg:justify-between
+                    <li class="flex cursor-pointer flex-col gap-4 border bg-neutral-primary-soft rounded-base shadow-xs px-5 py-6 sm:px-8
                         {{ $examenProximo['id'] === $this->idExamen ? 'border-brand ring-2 ring-brand' : 'border-default hover:border-brand-subtle' }}"
                         role="button" tabindex="0"
                         wire:click="seleccionarExamen({{ $examenProximo['id'] }})">
+                        <div style="display:flex; justify-content:space-between; width:100%; gap:1rem; flex-wrap:wrap; align-items:center;">
                         <div class="flex items-center gap-4 lg:w-72">
                             <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-brand-softer text-fg-brand-strong">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-6 w-6" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>
@@ -492,6 +493,7 @@
                             <span>Fecha: {{ \Carbon\Carbon::parse($examenProximo['fecha'])->format('d-m-Y') }}</span>
                             <span>Horario: {{ $examenProximo['hora_inicio'] }}{{ $examenProximo['hora_fin'] ? ' - ' . $examenProximo['hora_fin'] : '' }}</span>
                             <span>Ambientes: {{ $examenProximo['ambientes'] ?: '-' }}</span>
+                        </div>
                         </div>
                     </li>
                 @endforeach
