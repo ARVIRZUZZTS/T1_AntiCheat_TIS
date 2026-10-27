@@ -169,7 +169,7 @@ class GenerarReporteAsistenciaService
                 $estudiante = $inscripcion->estudiante;
                 $clave = $this->clave($inscripcion->id_estudiante_examen, $estudiante->sis_estudiante);
                 $registro = $registros->get($clave);
-                $incidencia = $incidencias->get($clave);
+                $incidencia = $incidencias->get($estudiante->sis_estudiante);
 
                 $habilitado = $inscripcion->estado === EstadoEstudianteExamen::Habilitado;
 
@@ -252,10 +252,7 @@ class GenerarReporteAsistenciaService
             ->where('id_examen', $idExamen)
             ->orderBy('id_registro')
             ->get()
-            ->keyBy(fn (CentralRiesgo $riesgo): string => $this->clave(
-                $riesgo->id_estudiante_examen,
-                $riesgo->sis_estudiante,
-            ))
+            ->keyBy(fn (CentralRiesgo $riesgo): string => $riesgo->sis_estudiante)
             ->map(fn (CentralRiesgo $riesgo): array => [
                 'tipo' => (string) $riesgo->tipo_infraccion?->value,
                 'fecha' => $riesgo->fecha_registro?->format('d/m/Y') ?? '',
