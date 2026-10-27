@@ -484,31 +484,11 @@
                             </div>
                         </div>
 
-                        <div class="grid flex-1 grid-cols-2 gap-4 sm:grid-cols-4">
-                            <div class="flex flex-col items-center gap-1.5 text-center">
-                                <span class="text-xs font-semibold uppercase text-muted">Fecha:</span>
-                                <time class="text-sm font-mono text-body">{{ \Carbon\Carbon::parse($examenProximo['fecha'])->format('d-m-Y') }}</time>
-                            </div>
-
-                            <div class="flex flex-col items-center gap-1.5 text-center">
-                                <span class="text-xs font-semibold uppercase text-muted">Horario:</span>
-                                <span class="text-sm font-mono text-body">{{ $examenProximo['hora_inicio'] }}{{ $examenProximo['hora_fin'] ? ' - ' . $examenProximo['hora_fin'] : '' }}</span>
-                            </div>
-
-                            <div class="flex flex-col items-center gap-1.5 text-center">
-                                <span class="text-xs font-semibold uppercase text-muted">Ambientes:</span>
-                                <span class="text-sm font-mono text-body">{{ $examenProximo['ambientes'] ?: '-' }}</span>
-                            </div>
-
-                            <div class="flex flex-col items-center gap-1.5 text-center">
-                                <span class="text-xs font-semibold uppercase text-muted">Ingresos:</span>
-                                <span class="text-sm font-bold text-heading">{{ $examenProximo['ingresos'] }}</span>
-                            </div>
-
-                            <div class="flex flex-col items-center gap-1.5 text-center">
-                                <span class="text-xs font-semibold uppercase text-muted">Faltan:</span>
-                                <span class="text-sm font-bold text-heading">{{ $examenProximo['tiempo_restante'] }}</span>
-                            </div>
+                        <div class="flex flex-col gap-1 text-sm text-body">
+                            <span class="font-bold text-heading">Faltan: {{ $examenProximo['tiempo_restante'] }}</span>
+                            <span>Fecha: {{ \Carbon\Carbon::parse($examenProximo['fecha'])->format('d-m-Y') }}</span>
+                            <span>Horario: {{ $examenProximo['hora_inicio'] }}{{ $examenProximo['hora_fin'] ? ' - ' . $examenProximo['hora_fin'] : '' }}</span>
+                            <span>Ambientes: {{ $examenProximo['ambientes'] ?: '-' }}</span>
                         </div>
                     </li>
                 @endforeach
