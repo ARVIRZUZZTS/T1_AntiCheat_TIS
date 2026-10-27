@@ -468,7 +468,7 @@
             <h2 class="text-lg font-semibold text-heading">Próximos exámenes</h2>
             <ul class="flex flex-col gap-4">
                 @foreach ($this->proximosExamenes() as $examenProximo)
-                    <li class="flex cursor-pointer flex-col gap-4 border bg-neutral-primary-soft rounded-base shadow-xs px-5 py-6 sm:px-8 lg:flex-row lg:items-center lg:gap-6
+                    <li class="flex cursor-pointer flex-col gap-4 border bg-neutral-primary-soft rounded-base shadow-xs px-5 py-6 sm:px-8 lg:flex-row lg:items-center lg:justify-between
                         {{ $examenProximo['id'] === $this->idExamen ? 'border-brand ring-2 ring-brand' : 'border-default hover:border-brand-subtle' }}"
                         role="button" tabindex="0"
                         wire:click="seleccionarExamen({{ $examenProximo['id'] }})">
@@ -484,8 +484,11 @@
                             </div>
                         </div>
 
+                        <div class="font-bold text-heading">
+                            Faltan: {{ $examenProximo['tiempo_restante'] }}
+                        </div>
+
                         <div class="flex flex-col gap-1 text-sm text-body">
-                            <span class="font-bold text-heading">Faltan: {{ $examenProximo['tiempo_restante'] }}</span>
                             <span>Fecha: {{ \Carbon\Carbon::parse($examenProximo['fecha'])->format('d-m-Y') }}</span>
                             <span>Horario: {{ $examenProximo['hora_inicio'] }}{{ $examenProximo['hora_fin'] ? ' - ' . $examenProximo['hora_fin'] : '' }}</span>
                             <span>Ambientes: {{ $examenProximo['ambientes'] ?: '-' }}</span>
