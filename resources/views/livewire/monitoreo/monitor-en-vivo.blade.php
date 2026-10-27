@@ -464,11 +464,6 @@
     </div>
 
     @else
-        <div class="bg-neutral-primary-soft border border-default rounded-base shadow-xs p-6">
-            <h2 class="text-lg font-semibold text-heading mb-2">Próximo examen en</h2>
-            <p class="text-2xl font-bold text-heading">{{ $this->minutosParaInicio() }} min</p>
-        </div>
-
         <div class="flex flex-col gap-3">
             <h2 class="text-lg font-semibold text-heading">Próximos exámenes</h2>
             <ul class="flex flex-col gap-4">
@@ -508,6 +503,11 @@
                             <div class="flex flex-col items-center gap-1.5 text-center">
                                 <span class="text-xs font-semibold uppercase text-muted">Ingresos:</span>
                                 <span class="text-sm font-bold text-heading">{{ $examenProximo['ingresos'] }}</span>
+                            </div>
+
+                            <div class="flex flex-col items-center gap-1.5 text-center">
+                                <span class="text-xs font-semibold uppercase text-muted">Faltan:</span>
+                                <span class="text-sm font-bold text-heading">{{ $examenProximo['tiempo_restante'] }}</span>
                             </div>
                         </div>
                     </li>

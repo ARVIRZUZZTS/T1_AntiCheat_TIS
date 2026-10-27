@@ -456,6 +456,25 @@ class MonitorEnVivo extends Component
                 ->distinct('id_estudiante')
                 ->count('id_estudiante');
 
+            $inicio = Carbon::parse($examen->fecha . ' ' . $examen->hora_inicio);
+            $minutosParaInicio = (int) now()->diffInMinutes($inicio, false);
+
+            if ($minutosParaInicio <= 0) {
+                $tiempoRestante = 'En curso';
+            } elseif ($minutosParaInicio < 60) {
+                $tiempoRestante = 'En ' . $minutosParaInicio . ' min';
+            } elseif ($minutosParaInicio < 1440) {
+                $horas = intdiv($minutosParaInicio, 60);
+                $minutos = $minutosParaInicio % 60;
+                $tiempoRestante = 'En ' . $horas . ' h ' . $minutos . ' min';
+            } elseif ($minutosParaInicio < 10080) {
+                $dias = intdiv($minutosParaInicio, 1440);
+                $horas = intdiv($minutosParaInicio % 1440, 60);
+                $tiempoRestante = 'En ' . $dias . ' días ' . $horas . ' h';
+            } else {
+                $tiempoRestante = '+7 días';
+            }
+
             return [
                 'id' => $examen->id_examen,
                 'materias' => $examen->cursos->pluck('nombre_curso')->implode(', '),
@@ -467,6 +486,8 @@ class MonitorEnVivo extends Component
                 'ingresos' => $ingresos,
                 'auxiliares' => $auxiliares,
                 'estado' => 'Programado',
+                'minutos_para_inicio' => $minutosParaInicio,
+                'tiempo_restante' => $tiempoRestante,
             ];
         })->all();
     }
