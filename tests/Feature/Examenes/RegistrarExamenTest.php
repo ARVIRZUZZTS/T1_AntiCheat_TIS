@@ -10,6 +10,7 @@
  * @updated 2026-10-10
  * @updated 2026-10-24
  * @updated 2026-10-25
+ * @updated 2026-11-04
  *
  * @description
  * Pruebas de integración del alta de examen del formulario de crear examen
@@ -42,6 +43,11 @@
  * - 2026-10-25  [Valery D. Ortuno P]  test: alta en un curso con varios
  *   estudiantes (cada inscripción con su propio id); antes ninguna prueba
  *   cubría un curso con estudiantes y el bug de los ids repetidos pasaba.
+ * - 2026-11-04  [Valery D. Ortuno P]  test: no se aceptan fechas ni horas
+ *   pasadas (con la hora congelada en Bolivia) y la ventana horaria es
+ *   06:00-22:00. La fecha de los datos válidos es relativa a hoy (la fija
+ *   15/12/2026 iba a quedar en el pasado) y el cruce de medianoche empieza
+ *   21:30, dentro de la ventana (23:30 ya estaba fuera).
  */
 
 namespace Tests\Feature\Examenes;
@@ -49,6 +55,7 @@ namespace Tests\Feature\Examenes;
 use App\Models\Examen;
 use App\Models\Rol;
 use App\Models\Usuario;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -171,13 +178,13 @@ class RegistrarExamenTest extends TestCase
     public function test_la_hora_de_fin_cruza_la_medianoche(): void
     {
         $this->post(route('cursos.examenes.store', self::ID_CURSO), $this->datosValidos([
-            'hora_inicio' => '23:30',
-            'duracion' => 90,
+            'hora_inicio' => '21:30',
+            'duracion' => 180,
         ]))->assertRedirect(route('examenes', ['curso' => self::ID_CURSO]));
 
         $examen = Examen::query()->where('creador', self::ID_DOCENTE)->firstOrFail();
 
-        $this->assertSame('01:00:00', $examen->hora_fin);
+        $this->assertSame('00:30:00', $examen->hora_fin);
     }
 
     /** Al menos un ambiente es obligatorio para poder monitorear el examen. */
@@ -229,6 +236,58 @@ class RegistrarExamenTest extends TestCase
     }
 
 
+    /** Una fecha anterior a hoy (en Bolivia) no es válida. */
+    public function test_rechaza_una_fecha_pasada(): void
+    {
+        $this->travelTo(Carbon::parse('2026-11-04 10:00', 'America/La_Paz'));
+
+        $this->post(route('cursos.examenes.store', self::ID_CURSO), $this->datosValidos([
+            'fecha' => '03/11/2026',
+        ]))->assertSessionHasErrors(['fecha' => 'Ingrese una fecha valida.']);
+    }
+
+    /** Hoy, una hora que ya pasó (o la actual) no es válida. */
+    public function test_rechaza_una_hora_pasada_de_hoy(): void
+    {
+        $this->travelTo(Carbon::parse('2026-11-04 10:00', 'America/La_Paz'));
+
+        foreach (['09:59', '10:00'] as $hora) {
+            $this->post(route('cursos.examenes.store', self::ID_CURSO), $this->datosValidos([
+                'fecha' => '04/11/2026',
+                'hora_inicio' => $hora,
+            ]))->assertSessionHasErrors(['hora_inicio' => 'Ingrese una hora valida.']);
+        }
+    }
+
+    /** Hoy, una hora que todavía no llegó es válida. */
+    public function test_acepta_hoy_con_una_hora_futura(): void
+    {
+        $this->travelTo(Carbon::parse('2026-11-04 10:00', 'America/La_Paz'));
+
+        $this->post(route('cursos.examenes.store', self::ID_CURSO), $this->datosValidos([
+            'fecha' => '04/11/2026',
+            'hora_inicio' => '10:01',
+        ]))->assertSessionHasNoErrors();
+    }
+
+    /** La ventana horaria es 06:00-22:00, con los dos extremos incluidos. */
+    public function test_la_hora_de_inicio_va_de_las_6_a_las_22(): void
+    {
+        foreach (['06:00', '22:00'] as $hora) {
+            $this->post(route('cursos.examenes.store', self::ID_CURSO), $this->datosValidos([
+                'hora_inicio' => $hora,
+            ]))->assertSessionHasNoErrors();
+        }
+
+        $this->post(route('cursos.examenes.store', self::ID_CURSO), $this->datosValidos([
+            'hora_inicio' => '05:59',
+        ]))->assertSessionHasErrors(['hora_inicio' => 'La hora de inicio no puede ser anterior a las 06:00.']);
+
+        $this->post(route('cursos.examenes.store', self::ID_CURSO), $this->datosValidos([
+            'hora_inicio' => '22:01',
+        ]))->assertSessionHasErrors(['hora_inicio' => 'La hora de inicio no puede ser posterior a las 22:00.']);
+    }
+
     /** En un curso finalizado no se crean exámenes, ni el formulario se abre. */
     public function test_no_crea_examenes_en_un_curso_finalizado(): void
     {
@@ -276,7 +335,8 @@ class RegistrarExamenTest extends TestCase
     {
         return array_merge([
             'tipo_examen' => 'examen parcial',
-            'fecha' => '15/12/2026',
+            // Siempre en el futuro, para que la prueba no venza con el tiempo.
+            'fecha' => now()->addMonth()->format('d/m/Y'),
             'hora_inicio' => '08:30',
             'duracion' => 90,
             'ambientes' => [self::ID_AMBIENTE],

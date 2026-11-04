@@ -12,6 +12,7 @@
  * @updated 2026-10-24
  * @updated 2026-10-25
  * @updated 2026-10-26
+ * @updated 2026-11-04
  *
  * @description
  * Servicio de la feature Examen que da de alta un examen con todo lo que se
@@ -51,6 +52,8 @@
  *   agregan con attach() (el examen es nuevo, sync() consultaba antes lo que
  *   ya tenía) y el id del tipo de examen se cachea; son cuatro viajes menos a
  *   la base por alta.
+ * - 2026-11-04  [Valery D. Ortuno P]  fix: la hora de inicio va de 06:00 a
+ *   22:00 (antes 06:45 a 20:15).
  */
 
 namespace App\Services\Examen;
@@ -78,16 +81,16 @@ class RegistrarExamenService
 
     /**
      * Ventana horaria para empezar un examen, en formato 24 horas. Es la misma que
-     * usa el modal para acotar lo que se escribe, así el campo y la validación no
-     * pueden quedar con rangos distintos.
+     * usa el formulario para acotar lo que se escribe, así el campo y la
+     * validación no pueden quedar con rangos distintos.
      */
-    public const HORA_INICIO_MINIMA = '06:45';
+    public const HORA_INICIO_MINIMA = '06:00';
 
     /**
-     * Última hora de inicio admitida (20:15): con la hora en 20, los minutos
-     * tampoco pasan de 15.
+     * Última hora de inicio admitida (22:00): con la hora en 22, los minutos
+     * quedan en 00.
      */
-    public const HORA_INICIO_MAXIMA = '20:15';
+    public const HORA_INICIO_MAXIMA = '22:00';
 
     public function __construct(
         private readonly DividirExamenService $dividirExamenService,

@@ -10,6 +10,7 @@
  * @updated 2026-10-10
  * @updated 2026-10-24
  * @updated 2026-10-26
+ * @updated 2026-11-04
  *
  * @description
  * Validación del alta de examen del formulario de crear examen. Los nombres de campo
@@ -43,6 +44,10 @@
  * - 2026-10-26  [Valery D. Ortuno P]  perf: ambientes, materiales y normas se
  *   validan con `in` contra el catálogo cacheado (CatalogosExamenService)
  *   en vez de `exists`, que hacía una consulta por cada opción marcada.
+ * - 2026-11-04  [Valery D. Ortuno P]  fix: no se aceptan fechas ni horas
+ *   pasadas (hora de Bolivia, la zona de la aplicación): la fecha anterior a
+ *   hoy da "Ingrese una fecha valida." y, si es hoy, la hora que ya pasó da
+ *   "Ingrese una hora valida.". La ventana horaria pasa a 06:00-22:00.
  */
 
 namespace App\Http\Requests;
@@ -50,6 +55,7 @@ namespace App\Http\Requests;
 use App\Enums\TipoExamen;
 use App\Services\Examen\CatalogosExamenService;
 use App\Services\Examen\RegistrarExamenService;
+use Carbon\Carbon;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -72,27 +78,74 @@ class StoreExamenRequest extends FormRequest
     }
 
     /**
-     * Valida aparte el año de la fecha.
+     * Valida aparte el año de la fecha y que el examen no quede en el pasado.
      *
-     * La regla de formato solo mira que sean cuatro dígitos; acá se exige que el
-     * año empiece con 19 o 20, para poder dar un mensaje propio ("Ingrese un año
-     * válido") en vez del genérico de formato.
+     * - La regla de formato solo mira que sean cuatro dígitos; acá se exige que
+     *   el año empiece con 19 o 20, para poder dar un mensaje propio ("Ingrese
+     *   un año válido") en vez del genérico de formato.
+     * - Una fecha anterior a hoy no es válida y, si es hoy, tampoco una hora que
+     *   ya pasó (o es la actual). "Hoy" y "ahora" son de Bolivia: es la zona de
+     *   la aplicación (`app.timezone`, America/La_Paz), así que no dependen de
+     *   la hora del navegador.
+     *
+     * Solo se revisa lo que ya pasó el formato: una fecha u hora mal escrita ya
+     * tiene su error y no se le suma otro.
      */
     public function withValidator(Validator $validator): void
     {
         $validator->after(function (Validator $validator): void {
-            $fecha = (string) $this->input('fecha');
+            $fecha = $this->fechaEscrita();
 
-            if (! preg_match('/^\d{2}\/\d{2}\/(\d{4})$/', $fecha, $coincidencias)) {
+            if ($fecha === null) {
                 return;
             }
 
-            $anio = (int) $coincidencias[1];
-
-            if ($anio < 1900 || $anio > 2099) {
+            if ($fecha->year < 1900 || $fecha->year > 2099) {
                 $validator->errors()->add('fecha', 'Ingrese un año valido.');
+
+                return;
+            }
+
+            $ahora = now();
+
+            if ($fecha->lt($ahora->copy()->startOfDay())) {
+                $validator->errors()->add('fecha', 'Ingrese una fecha valida.');
+
+                return;
+            }
+
+            $hora = (string) $this->input('hora_inicio');
+
+            if (! $fecha->isSameDay($ahora)
+                || $validator->errors()->has('hora_inicio')
+                || preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $hora) !== 1) {
+                return;
+            }
+
+            // Mismo formato H:i en las dos, así que se comparan como texto.
+            if ($hora <= $ahora->format('H:i')) {
+                $validator->errors()->add('hora_inicio', 'Ingrese una hora valida.');
             }
         });
+    }
+
+    /**
+     * La fecha del formulario si es una fecha real en dd/mm/aaaa, o null si no
+     * (de eso ya avisan las reglas de formato).
+     */
+    private function fechaEscrita(): ?Carbon
+    {
+        $texto = (string) $this->input('fecha');
+
+        if (preg_match('/^\d{2}\/\d{2}\/\d{4}$/', $texto) !== 1) {
+            return null;
+        }
+
+        $fecha = Carbon::createFromFormat('!d/m/Y', $texto);
+
+        // El round-trip descarta fechas como 31/02, que createFromFormat corre
+        // a marzo.
+        return $fecha !== false && $fecha->format('d/m/Y') === $texto ? $fecha : null;
     }
 
     /**
@@ -114,9 +167,10 @@ class StoreExamenRequest extends FormRequest
             // escribir una hora inválida, pero el mensaje propio cubre igual un
             // envío que no venga del navegador. El `after_or_equal`/
             // `before_or_equal` es lo que acota a la ventana del centro de
-            // exámenes (06:45 a 20:15). Es `after_or_equal` y no `after` porque
-            // el piso es una hora válida: con `after`, las 06:45 exactas quedaban
-            // rechazadas por el propio límite.
+            // exámenes (06:00 a 22:00). Es `after_or_equal` y no `after` porque
+            // el piso es una hora válida: con `after`, las 06:00 exactas quedaban
+            // rechazadas por el propio límite. Que no sea una hora pasada lo
+            // revisa withValidator().
             'hora_inicio' => [
                 'required',
                 'date_format:H:i',
