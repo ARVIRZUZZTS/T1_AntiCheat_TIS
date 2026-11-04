@@ -6,6 +6,7 @@
     @updated 2026-10-12
     @updated 2026-10-24
     @updated 2026-10-25
+    @updated 2026-11-04
 
     @description
     Componente UI Blade reutilizable con el formulario de alta de un examen en
@@ -153,6 +154,10 @@
       el marcador __CURSO__ y escucha el evento curso-seleccionado, para que la
       materia se pueda cambiar sin salir de la página. Manda el curso elegido en
       un campo oculto para recuperarlo si falla la validación.
+    - 2026-11-04  [Valery D. Ortuno P]  fix: al corregir un campo se borran su
+      rojo y su mensaje (quedaban del último envío y parecía que lo nuevo seguía
+      mal); cambiar la fecha borra también el error de la hora. La hora se acota
+      entre 06:00 y 22:00 (antes 06:45 y 20:15).
 
     @see  resources/views/pages/examen-crear.blade.php
     @see  App\Enums\TipoExamen
@@ -230,6 +235,36 @@
             const ambientes = document.getElementById('indice-ambientes-examen');
 
             this.indiceAmbientes = ambientes ? JSON.parse(ambientes.textContent) : [];
+
+            // Al corregir un campo se apaga su error: el rojo y el mensaje son
+            // del ultimo envio y, si quedaban, parecia que lo nuevo seguia mal.
+            // Lo vuelve a revisar el servidor al guardar. La fecha apaga tambien
+            // el de la hora, porque 'hora pasada' depende del dia elegido.
+            const camposConError = {
+                tipo: ['tipo_examen'],
+                fecha: ['fecha', 'hora_inicio'],
+                horaInicio: ['hora_inicio'],
+                duracion: ['duracion'],
+                ambientesElegidos: ['ambientes'],
+                materialesElegidos: ['materiales'],
+                materialesPersonalizados: ['materiales_personalizados'],
+                normasElegidas: ['normas'],
+                normasPersonalizadas: ['normas_personalizadas'],
+            };
+
+            Object.entries(camposConError).forEach(([propiedad, campos]) => {
+                this.$watch(propiedad, () => this.limpiarErrores(campos));
+            });
+        },
+
+        // Quita los errores de esos campos, tambien los de sus items
+        // (`materiales.0` es de `materiales`).
+        limpiarErrores(campos) {
+            this.errores = Object.fromEntries(
+                Object.entries(this.errores).filter(([clave]) =>
+                    ! campos.some((campo) => clave === campo || clave.startsWith(campo + '.'))
+                )
+            );
         },
 
         // Mensaje de error de un campo, o cadena vacia si no hay. Se mira tambien
