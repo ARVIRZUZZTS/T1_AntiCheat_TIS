@@ -7,6 +7,8 @@
  *
  * @created 2026-10-24
  *
+ * @updated 2026-11-04
+ *
  * @description
  * Pruebas de integración del alta de curso (POST /cursos) contra el esquema
  * real de desarrollo. Como el resto de pruebas sobre tablas del dominio, usa
@@ -14,8 +16,10 @@
  * revierte al terminar.
  *
  * Cubre que el curso se guarde activo, a nombre del docente, con el nombre
- * "{materia} - Grupo {grupo}" y su gestión con año, y las validaciones de
- * cada campo.
+ * "{materia} - Grupo {grupo}" y su gestión con año, las validaciones de
+ * cada campo y que no se cree dos veces el mismo curso. La materia de prueba
+ * es propia ("Prueba Alta Curso") para no chocar con cursos reales: el
+ * repetido se busca entre todos los cursos.
  *
  * @see  App\Http\Controllers\CursoController
  * @see  App\Http\Requests\StoreCursoRequest
@@ -23,6 +27,9 @@
  *
  * @changelog
  * - 2026-10-24  [Valery D. Ortuno P]  test: creación inicial.
+ * - 2026-11-04  [Valery D. Ortuno P]  test: el año va desde el actual (sin
+ *   tope) y no se repite un curso en la misma gestión y año; sí en otra
+ *   gestión o en otro año.
  */
 
 namespace Tests\Feature\Cursos;
@@ -75,7 +82,7 @@ class CrearCursoTest extends TestCase
         $curso = DB::table('curso')->where('sis_doc', self::ID_DOCENTE)->first();
 
         $this->assertNotNull($curso);
-        $this->assertSame('Calculo I - Grupo 21A', $curso->nombre_curso);
+        $this->assertSame('Prueba Alta Curso - Grupo 21A', $curso->nombre_curso);
         $this->assertSame('EnCurso', $curso->estado);
         $this->assertSame(now()->toDateString(), $curso->fecha_creacion);
         $this->assertDatabaseHas('curso_tipo_gestion', [
@@ -85,31 +92,56 @@ class CrearCursoTest extends TestCase
         ]);
     }
 
-    /** El año es libre entre 2000 y 2099: sirve para cursos futuros. */
-    public function test_el_anio_es_libre_entre_2000_y_2099(): void
+    /** El año va desde el actual, sin tope: no se crean cursos de años pasados. */
+    public function test_el_anio_va_desde_el_actual(): void
     {
-        $mensaje = 'El año debe estar entre 2000 y 2099.';
+        $actual = now()->year;
 
-        $this->post(route('cursos.store'), $this->datosValidos(['anio' => 2035]))
+        $this->post(route('cursos.store'), $this->datosValidos(['anio' => $actual + 80]))
             ->assertSessionHasNoErrors();
-        $this->assertDatabaseHas('curso_tipo_gestion', ['anio' => 2035]);
+        $this->assertDatabaseHas('curso_tipo_gestion', ['anio' => $actual + 80]);
 
-        $this->post(route('cursos.store'), $this->datosValidos(['anio' => 1999]))
-            ->assertSessionHasErrors(['anio' => $mensaje]);
-        $this->post(route('cursos.store'), $this->datosValidos(['anio' => 2100]))
-            ->assertSessionHasErrors(['anio' => $mensaje]);
+        $this->post(route('cursos.store'), $this->datosValidos(['anio' => $actual - 1]))
+            ->assertSessionHasErrors(['anio' => 'El año debe ser '.$actual.' o posterior.']);
+        $this->post(route('cursos.store'), $this->datosValidos(['anio' => 12026]))
+            ->assertSessionHasErrors(['anio' => 'Ingrese un año valido.']);
+    }
+
+    /** El mismo curso (materia, grupo, gestión y año) no se crea dos veces. */
+    public function test_no_crea_un_curso_que_ya_existe(): void
+    {
+        $this->post(route('cursos.store'), $this->datosValidos())->assertSessionHasNoErrors();
+
+        // Mismo curso, aunque cambien las mayúsculas de la materia.
+        $this->post(route('cursos.store'), $this->datosValidos(['materia' => 'PRUEBA alta curso']))
+            ->assertSessionHasErrors(['curso' => 'Este curso ya existe en la gestion y el año elegidos.']);
+
+        $this->assertSame(1, DB::table('curso')->where('sis_doc', self::ID_DOCENTE)->count());
+    }
+
+    /** El mismo nombre sí puede repetirse en otra gestión o en otro año. */
+    public function test_el_mismo_nombre_se_puede_en_otra_gestion_u_otro_anio(): void
+    {
+        $this->post(route('cursos.store'), $this->datosValidos())->assertSessionHasNoErrors();
+
+        $this->post(route('cursos.store'), $this->datosValidos(['gestion' => $this->idGestion('invierno')]))
+            ->assertSessionHasNoErrors();
+        $this->post(route('cursos.store'), $this->datosValidos(['anio' => now()->year + 1]))
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame(3, DB::table('curso')->where('sis_doc', self::ID_DOCENTE)->count());
     }
 
     public function test_limpia_espacios_y_pasa_el_grupo_a_mayusculas(): void
     {
         $this->post(route('cursos.store'), $this->datosValidos([
-            'materia' => '  Calculo    I ',
+            'materia' => '  Prueba    Alta Curso ',
             'grupo' => '21a',
         ]))->assertSessionHasNoErrors();
 
         $this->assertDatabaseHas('curso', [
             'sis_doc' => self::ID_DOCENTE,
-            'nombre_curso' => 'Calculo I - Grupo 21A',
+            'nombre_curso' => 'Prueba Alta Curso - Grupo 21A',
         ]);
     }
 
@@ -163,7 +195,7 @@ class CrearCursoTest extends TestCase
     private function datosValidos(array $sobrescribir = []): array
     {
         return array_merge([
-            'materia' => 'Calculo I',
+            'materia' => 'Prueba Alta Curso',
             'grupo' => '21A',
             'gestion' => $this->idGestion('segundo semestre'),
             'anio' => now()->year,

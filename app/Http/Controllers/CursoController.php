@@ -7,6 +7,8 @@
  *
  * @created 2026-10-24
  *
+ * @updated 2026-11-04
+ *
  * @description
  * Controlador HTTP de la sección Cursos del docente: la lista de sus cursos,
  * el formulario de alta ("Crear curso"), el alta del curso y la vista de un
@@ -20,6 +22,8 @@
  * - 2026-10-24  [Valery D. Ortuno P]  feat: creación inicial del controlador.
  * - 2026-10-24  [Valery D. Ortuno P]  feat: alta de curso con materia y grupo
  *   concatenados y su gestión con año; al guardar vuelve a la lista de cursos.
+ * - 2026-11-04  [Valery D. Ortuno P]  fix: si el curso ya existe vuelve al
+ *   formulario con el aviso (`curso`) y lo escrito.
  *
  * @see  App\Services\Curso\ListarCursosDocenteService
  * @see  App\Services\Curso\ListarGestionesService
@@ -41,6 +45,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use InvalidArgumentException;
 
 class CursoController extends Controller
 {
@@ -94,11 +99,17 @@ class CursoController extends Controller
      */
     public function store(StoreCursoRequest $request, RegistrarCursoService $servicio): RedirectResponse
     {
-        $servicio->ejecutar(
-            $request->nombreCurso(),
-            (int) $request->user()->id_usuario,
-            $request->gestion(),
-        );
+        try {
+            $servicio->ejecutar(
+                $request->nombreCurso(),
+                (int) $request->user()->id_usuario,
+                $request->gestion(),
+            );
+        } catch (InvalidArgumentException $error) {
+            // Curso repetido: el aviso va arriba del formulario y se conserva
+            // lo escrito, como con cualquier error de validación.
+            return back()->withErrors(['curso' => $error->getMessage()])->withInput();
+        }
 
         return redirect()
             ->route('cursos')

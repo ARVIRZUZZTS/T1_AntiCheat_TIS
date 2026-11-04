@@ -9,14 +9,16 @@
  *
  * @updated 2026-10-24
  * @updated 2026-10-26
+ * @updated 2026-11-04
  *
  * @description
  * Validación del alta de un curso desde el formulario "Crear curso". Se piden
  * la materia, el grupo, la gestión y el año; la materia y el grupo se guardan
  * juntos como "{materia} - Grupo {grupo}" (separados por " - " para poder
  * dividirlos después si hace falta) y la gestión con su año va a
- * `curso_tipo_gestion`. El año es libre entre 2000 y 2099 (el formulario
- * propone el actual).
+ * `curso_tipo_gestion`. El año es el actual o uno posterior (hora de Bolivia,
+ * la zona de la aplicación), de cuatro cifras; el formulario propone el
+ * actual. Que el curso no exista ya lo revisa RegistrarCursoService.
  *
  * El grupo es alfanumérico de hasta 3 caracteres (2, 10, 21A) y se guarda en
  * mayúsculas. Con 80 caracteres de materia, el nombre completo no pasa de los
@@ -30,6 +32,8 @@
  * - 2026-10-24  [Valery D. Ortuno P]  feat: creación inicial del request.
  * - 2026-10-26  [Valery D. Ortuno P]  perf: la gestión se valida con `in`
  *   contra el catálogo cacheado (ListarGestionesService) en vez de `exists`.
+ * - 2026-11-04  [Valery D. Ortuno P]  fix: no se aceptan años pasados: el año
+ *   va desde el actual, sin tope (antes 2000 a 2099).
  */
 
 namespace App\Http\Requests;
@@ -41,12 +45,6 @@ use Illuminate\Validation\Rule;
 
 class StoreCursoRequest extends FormRequest
 {
-    /** Primer año que se acepta para la gestión del curso. */
-    public const ANIO_MINIMO = 2000;
-
-    /** Último año que se acepta: cuatro cifras, sin años sin sentido. */
-    public const ANIO_MAXIMO = 2099;
-
     /**
      * El rol docente ya lo exige el middleware `docente` de la ruta; el curso
      * se crea a nombre del usuario autenticado.
@@ -85,10 +83,23 @@ class StoreCursoRequest extends FormRequest
             'materia' => ['required', 'string', 'max:80'],
             'grupo' => ['required', 'regex:/^[A-Z0-9]{1,3}$/'],
             'gestion' => ['required', 'integer', Rule::in(array_keys($gestiones->ejecutar()))],
-            // El año es libre (el formulario propone el actual), pero de cuatro
-            // cifras y desde el 2000: un 1999 o un 202 son errores de tipeo.
-            'anio' => ['required', 'integer', 'between:'.self::ANIO_MINIMO.','.self::ANIO_MAXIMO],
+            // Cuatro cifras y desde el año actual: no se crean cursos de
+            // gestiones pasadas. Hacia adelante no hay tope.
+            'anio' => ['required', 'integer', 'digits:4', 'min:'.$this->anioMinimo()],
         ];
+    }
+
+    /**
+     * Primer año aceptado: el actual, en hora de Bolivia (`app.timezone`).
+     *
+     * @return int  Año en curso.
+     *
+     * @author Valery D. Ortuno P <valerydariana98@gmail.com>
+     * @since  2026-11-04
+     */
+    public function anioMinimo(): int
+    {
+        return now()->year;
     }
 
     /**
@@ -126,7 +137,8 @@ class StoreCursoRequest extends FormRequest
             'gestion.in' => 'Seleccione una gestion valida.',
             'anio.required' => 'Ingrese el año.',
             'anio.integer' => 'Ingrese un año valido.',
-            'anio.between' => 'El año debe estar entre '.self::ANIO_MINIMO.' y '.self::ANIO_MAXIMO.'.',
+            'anio.digits' => 'Ingrese un año valido.',
+            'anio.min' => 'El año debe ser '.$this->anioMinimo().' o posterior.',
         ];
     }
 
