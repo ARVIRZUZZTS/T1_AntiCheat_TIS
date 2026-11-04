@@ -211,6 +211,40 @@ class RegistrarExamenTest extends TestCase
         ]))->assertSessionHasErrors(['fecha' => 'Ingrese un año valido.']);
     }
 
+    /** Solo puede existir un examen final por curso. */
+    public function test_solo_permite_un_examen_final_por_curso(): void
+    {
+        $this->travelTo(now()->setTime(10, 0));
+
+        $datos = $this->datosValidos([
+            'tipo_examen' => 'examen final',
+            'fecha' => now()->addWeek()->format('d/m/Y'),
+        ]);
+
+        $this->post(route('cursos.examenes.store', self::ID_CURSO), $datos)
+            ->assertSessionHasNoErrors();
+
+        $this->post(route('cursos.examenes.store', self::ID_CURSO), $datos)
+            ->assertSessionHasErrors(['tipo_examen' => 'Ya existe un examen final para este curso.']);
+    }
+
+    /** Solo puede existir una segunda instancia por curso. */
+    public function test_solo_permite_una_segunda_instancia_por_curso(): void
+    {
+        $this->travelTo(now()->setTime(10, 0));
+
+        $datos = $this->datosValidos([
+            'tipo_examen' => 'segunda instancia',
+            'fecha' => now()->addWeek()->format('d/m/Y'),
+        ]);
+
+        $this->post(route('cursos.examenes.store', self::ID_CURSO), $datos)
+            ->assertSessionHasNoErrors();
+
+        $this->post(route('cursos.examenes.store', self::ID_CURSO), $datos)
+            ->assertSessionHasErrors(['tipo_examen' => 'Ya existe una segunda instancia para este curso.']);
+    }
+
     /** Una hora fuera de 00:00-23:59 da el mensaje de hora inválida. */
     public function test_rechaza_una_hora_invalida(): void
     {

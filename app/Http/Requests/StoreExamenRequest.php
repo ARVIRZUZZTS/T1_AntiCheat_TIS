@@ -53,10 +53,12 @@
 namespace App\Http\Requests;
 
 use App\Enums\TipoExamen;
+use App\Models\Curso;
 use App\Services\Examen\CatalogosExamenService;
 use App\Services\Examen\RegistrarExamenService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
@@ -112,6 +114,29 @@ class StoreExamenRequest extends FormRequest
                 $validator->errors()->add('fecha', 'Ingrese una fecha valida.');
 
                 return;
+            }
+
+            $tipo = (string) $this->input('tipo_examen');
+
+            if (in_array($tipo, [TipoExamen::ExamenFinal->value, TipoExamen::SegundaInstancia->value], true)) {
+                $curso = $this->route('curso');
+                $idCurso = $curso instanceof Curso ? $curso->id_curso : (int) $curso;
+
+                $existe = DB::table('examen')
+                    ->join('examen_curso', 'examen_curso.id_examen', '=', 'examen.id_examen')
+                    ->join('tipo_examen', 'tipo_examen.id_tipo_examen', '=', 'examen.tipo_examen')
+                    ->where('examen_curso.id_curso', $idCurso)
+                    ->where('tipo_examen.nombre_tipo_examen', $tipo)
+                    ->exists();
+
+                if ($existe) {
+                    $validator->errors()->add(
+                        'tipo_examen',
+                        $tipo === TipoExamen::ExamenFinal->value
+                            ? 'Ya existe un examen final para este curso.'
+                            : 'Ya existe una segunda instancia para este curso.'
+                    );
+                }
             }
 
             $hora = (string) $this->input('hora_inicio');
