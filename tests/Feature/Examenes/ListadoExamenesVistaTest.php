@@ -10,6 +10,7 @@
  * @updated 2026-10-10
  * @updated 2026-10-24
  * @updated 2026-10-25
+ * @updated 2026-11-04
  *
  * @description
  * Pruebas de la vista del listado de exámenes de un curso: verifican sobre
@@ -44,6 +45,8 @@
  *   página pasa catálogos y permiso de alta al parcial.
  * - 2026-10-25  [Alex Candia]  test: la página única de Exámenes monta el
  *   parcial y el selector de materia oculta las pestañas sin selección.
+ * - 2026-11-04  [Alex Candia]  test: los selectores de Invitar y Dividir solo
+ *   listan exámenes con fecha y hora futuras, sin filtrar el listado completo.
  */
 
 namespace Tests\Feature\Examenes;
@@ -149,6 +152,19 @@ class ListadoExamenesVistaTest extends TestCase
         $this->assertStringContainsString("estado === 'listo'", $parcial);
         $this->assertStringContainsString('Reintentar', $parcial);
         $this->assertStringContainsString('no tiene examenes registrados', $parcial);
+    }
+
+    public function test_los_selectores_solo_listan_examenes_con_fecha_y_hora_futuras(): void
+    {
+        $parcial = $this->fuenteParcial();
+
+        $this->assertStringContainsString("ahora: @js(now()->format('Y-m-d H:i'))", $parcial);
+        $this->assertStringContainsString('get examenesDisponibles()', $parcial);
+        $this->assertStringContainsString("const inicio = examen.fecha + ' ' + (examen.hora_inicio || '00:00');", $parcial);
+        $this->assertStringContainsString('return inicio > this.ahora;', $parcial);
+        $this->assertStringContainsString('x-for="examen in examenesDisponibles"', $parcial);
+        $this->assertStringContainsString('No hay examenes disponibles con fecha y hora futuras.', $parcial);
+        $this->assertStringContainsString('<template x-for="examen in examenes" :key="examen.id">', $parcial);
     }
 
     public function test_la_pagina_de_examenes_monta_el_parcial(): void

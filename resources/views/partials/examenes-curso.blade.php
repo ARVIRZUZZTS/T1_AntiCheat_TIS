@@ -6,6 +6,7 @@
     @updated 2026-10-24
     @updated 2026-10-25
     @updated 2026-10-26
+    @updated 2026-11-04
 
     @description
     Exámenes de la materia elegida en la página única Exámenes. Arriba va el
@@ -57,6 +58,9 @@
       actualizan sin salir de la página.
     - 2026-10-26  [Alisson D. Alvarado]  feat: conecta el botón "Dividir" con la
       vista previa y los modales de división de examen.
+    - 2026-11-04  [Alex Candia]  fix: los selectores de Invitar y Dividir ya no
+      ofrecen exámenes con fecha u hora anteriores al momento actual. El listado
+      completo se conserva en "Ver Lista de Examenes".
 
     @see  App\Http\Controllers\Api\CursoExamenController
     @see  App\Http\Controllers\ExamenController
@@ -104,6 +108,7 @@
          cursoNombre: @js($cursoInicial?->nombre_curso ?? ''),
          urlExamenes: @js(route('api.cursos.examenes.listar', ['idCurso' => '__CURSO__'])),
          examenes: [],
+         ahora: @js(now()->format('Y-m-d H:i')),
          estado: 'listo',
          peticion: 0,
          tab: @js($tabInicial),
@@ -134,6 +139,9 @@
          },
          get examenSeleccionado() {
              return this.examenes.find((examen) => String(examen.id) === String(this.seleccionado)) || null;
+         },
+         get examenesDisponibles() {
+             return this.examenes.filter((examen) => this.examenDisponible(examen));
          },
          get aulasDelExamen() {
              return this.examenSeleccionado?.ambientes?.length ?? 0;
@@ -196,8 +204,8 @@
                  this.examenes = cuerpo.datos ?? [];
                  this.estado = 'listo';
 
-                 if (this.examenes.length > 0 && (this.seleccionado === '' || this.seleccionado === null)) {
-                     this.seleccionado = String(this.examenes[0].id);
+                 if (this.examenesDisponibles.length > 0 && (this.seleccionado === '' || this.seleccionado === null)) {
+                     this.seleccionado = String(this.examenesDisponibles[0].id);
                  }
              } catch (error) {
                  if (peticion === this.peticion) {
@@ -208,6 +216,15 @@
          init() {
              this.cargar();
              this.$nextTick(() => this.avisarFormulario());
+         },
+         examenDisponible(examen) {
+             if (! examen.fecha) {
+                 return false;
+             }
+
+             const inicio = examen.fecha + ' ' + (examen.hora_inicio || '00:00');
+
+             return inicio > this.ahora;
          },
          etiquetaExamen(examen) {
              return [examen.tipo || 'Sin tipo', this.fechaDe(examen), this.horario(examen)].join(' - ');
@@ -612,14 +629,18 @@
             Este curso aun no tiene examenes registrados.
         </p>
 
-        <div x-show="estado === 'listo' && examenes.length > 0"
+        <p class="px-3 text-sm text-body" x-show="estado === 'listo' && examenes.length > 0 && examenesDisponibles.length === 0">
+            No hay examenes disponibles con fecha y hora futuras.
+        </p>
+
+        <div x-show="estado === 'listo' && examenesDisponibles.length > 0"
              class="flex flex-col gap-3 sm:flex-row sm:items-end">
             <div class="min-w-0 flex-1 sm:max-w-md">
                 <label for="examen-invitar" class="block mb-2.5 text-sm font-medium text-heading">Examen</label>
                 <select id="examen-invitar" x-model="seleccionado" @change="criterioDivision = ''"
                         class="block w-full px-3 py-2.5 border text-sm rounded-base shadow-xs bg-neutral-secondary-medium border-default-medium text-heading focus:ring-brand focus:border-brand">
                     <option value="" disabled>Selecciona un examen</option>
-                    <template x-for="examen in examenes" :key="'invitar-' + examen.id">
+                    <template x-for="examen in examenesDisponibles" :key="'invitar-' + examen.id">
                         <option :value="examen.id" x-text="etiquetaExamen(examen)"></option>
                     </template>
                 </select>
@@ -658,14 +679,18 @@
             Este curso aun no tiene examenes registrados.
         </p>
 
-        <div x-show="estado === 'listo' && examenes.length > 0" class="flex flex-col gap-4">
+        <p class="px-3 text-sm text-body" x-show="estado === 'listo' && examenes.length > 0 && examenesDisponibles.length === 0">
+            No hay examenes disponibles con fecha y hora futuras.
+        </p>
+
+        <div x-show="estado === 'listo' && examenesDisponibles.length > 0" class="flex flex-col gap-4">
             <div class="min-w-0 max-w-md">
                 <label for="examen-dividir" class="block mb-2.5 text-sm font-medium text-heading">Examen</label>
                 <select id="examen-dividir" x-model="seleccionado"
                         @change="criterioDivision = ''; errorDivision = ''"
                         class="block w-full px-3 py-2.5 border text-sm rounded-base shadow-xs bg-neutral-secondary-medium border-default-medium text-heading focus:ring-brand focus:border-brand">
                     <option value="" disabled>Selecciona un examen</option>
-                    <template x-for="examen in examenes" :key="'dividir-' + examen.id">
+                    <template x-for="examen in examenesDisponibles" :key="'dividir-' + examen.id">
                         <option :value="examen.id" x-text="etiquetaExamen(examen)"></option>
                     </template>
                 </select>
