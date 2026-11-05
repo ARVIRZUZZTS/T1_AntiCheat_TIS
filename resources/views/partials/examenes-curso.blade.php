@@ -13,9 +13,9 @@
     selector de materia; mientras no haya una seleccionada no se muestran las
     cuatro pestañas.
 
-    El parcial muestra cuatro pestañas: "Ver Lista de Examenes", "Crear Examen",
-    "Invitar Docente a Examen" y "Dividir Examen". Al cambiar de pestaña solo
-    cambia el contenido de abajo; no se navega a otra página.
+    El parcial muestra cinco pestañas: "Ver Lista de Examenes", "Crear Examen",
+    "Editar Examen", "Invitar Docente a Examen" y "Dividir Examen". Al cambiar
+    de pestaña solo cambia el contenido de abajo; no se navega a otra página.
 
     La pestaña de lista es de solo lectura: las tarjetas se consultan con fetch
     al endpoint GET /api/cursos/{idCurso}/examenes (CursoExamenController) y no
@@ -61,6 +61,8 @@
     - 2026-11-04  [Alex Candia]  fix: los selectores de Invitar y Dividir ya no
       ofrecen exámenes con fecha u hora anteriores al momento actual. El listado
       completo se conserva en "Ver Lista de Examenes".
+    - 2026-11-04  [Alex Candia]  feat: nueva pestaña "Editar Examen" a la derecha
+      de "Crear Examen", por ahora solo con el selector de exámenes disponibles.
 
     @see  App\Http\Controllers\Api\CursoExamenController
     @see  App\Http\Controllers\ExamenController
@@ -467,7 +469,7 @@
         Selecciona una materia para ver sus examenes.
     </p>
 
-    {{-- Las cuatro pestañas y su contenido solo aparecen con materia elegida. --}}
+    {{-- Las pestañas y su contenido solo aparecen con materia elegida. --}}
     <div x-show="hayCurso" x-cloak class="flex flex-col gap-4">
     <header class="flex flex-col gap-3">
 
@@ -490,6 +492,12 @@
                     Crear Examen
                 </button>
             @endif
+
+            <button type="button" class="{{ $tabClases }}"
+                    :class="tab === 'editar' ? '{{ $tabActivo }}' : '{{ $tabInactivo }}'"
+                    @click="tab = 'editar'">
+                Editar Examen
+            </button>
 
             <button type="button" class="{{ $tabClases }}"
                     :class="tab === 'invitar' ? '{{ $tabActivo }}' : '{{ $tabInactivo }}'"
@@ -610,6 +618,39 @@
             </div>
         </section>
     @endif
+
+    {{-- Editar Examen: por ahora solo se elige el examen. --}}
+    <section x-show="tab === 'editar'" x-cloak class="flex flex-col gap-4">
+        <p class="px-3 text-sm text-body" x-show="estado === 'cargando'">Cargando examenes...</p>
+
+        <div x-show="estado === 'error'" x-cloak>
+            <x-ui.alert type="danger" title="No se pudieron cargar los examenes">
+                Ocurrio un problema al consultar el listado.
+                <div class="mt-2">
+                    <x-ui.button variant="secondary" @click="cargar()">Reintentar</x-ui.button>
+                </div>
+            </x-ui.alert>
+        </div>
+
+        <p class="px-3 text-sm text-body" x-show="estado === 'listo' && examenes.length === 0">
+            Este curso aun no tiene examenes registrados.
+        </p>
+
+        <p class="px-3 text-sm text-body" x-show="estado === 'listo' && examenes.length > 0 && examenesDisponibles.length === 0">
+            No hay examenes disponibles con fecha y hora futuras.
+        </p>
+
+        <div x-show="estado === 'listo' && examenesDisponibles.length > 0" class="min-w-0 max-w-md">
+            <label for="examen-editar" class="block mb-2.5 text-sm font-medium text-heading">Examen</label>
+            <select id="examen-editar" x-model="seleccionado" @change="criterioDivision = ''; errorDivision = ''"
+                    class="block w-full px-3 py-2.5 border text-sm rounded-base shadow-xs bg-neutral-secondary-medium border-default-medium text-heading focus:ring-brand focus:border-brand">
+                <option value="" disabled>Selecciona un examen</option>
+                <template x-for="examen in examenesDisponibles" :key="'editar-' + examen.id">
+                    <option :value="examen.id" x-text="etiquetaExamen(examen)"></option>
+                </template>
+            </select>
+        </div>
+    </section>
 
     {{-- Invitar Docente a Examen: se elige el examen; la invitación todavía no
          tiene flujo de guardado. --}}

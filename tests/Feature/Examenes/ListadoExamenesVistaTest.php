@@ -125,6 +125,7 @@ class ListadoExamenesVistaTest extends TestCase
         $this->assertStringNotContainsString('Ver examenes', $parcial);
         $this->assertStringContainsString('Ver Lista de Examenes', $parcial);
         $this->assertStringContainsString('Crear Examen', $parcial);
+        $this->assertStringContainsString('Editar Examen', $parcial);
         $this->assertStringContainsString('Invitar Docente a Examen', $parcial);
         $this->assertStringContainsString('Dividir Examen', $parcial);
 
@@ -165,6 +166,8 @@ class ListadoExamenesVistaTest extends TestCase
         $this->assertStringContainsString('x-for="examen in examenesDisponibles"', $parcial);
         $this->assertStringContainsString('No hay examenes disponibles con fecha y hora futuras.', $parcial);
         $this->assertStringContainsString('<template x-for="examen in examenes" :key="examen.id">', $parcial);
+        $this->assertStringContainsString("tab === 'editar'", $parcial);
+        $this->assertStringContainsString('id="examen-editar"', $parcial);
     }
 
     public function test_la_pagina_de_examenes_monta_el_parcial(): void
