@@ -35,6 +35,7 @@
 namespace App\Services\Curso;
 
 use App\Enums\CursoEstado;
+use App\Enums\InvitacionEstado;
 use App\Models\Curso;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
@@ -45,19 +46,18 @@ class ListarCursosDocenteService
 {
     public function __construct(
         private readonly ListarMateriasConMetricasService $metricas,
-    ) {
-    }
+    ) {}
 
     /**
      * Cursos del docente con sus métricas: activos primero, luego finalizados,
      * y dentro de cada grupo del más reciente al más antiguo.
      *
      * @param  int  $idDocente  ID del docente (`curso.sis_doc`).
-     *
-     * @return Collection<int, array<string, mixed>>  Filas de ListarMateriasConMetricasService
-     *         ordenadas, cada una con `gestion` ("Segundo semestre 2026" o null).
+     * @return Collection<int, array<string, mixed>> Filas de ListarMateriasConMetricasService
+     *                                               ordenadas, cada una con `gestion` ("Segundo semestre 2026" o null).
      *
      * @author Valery D. Ortuno P <valerydariana98@gmail.com>
+     *
      * @since  2026-10-24
      */
     public function conMetricas(int $idDocente): Collection
@@ -74,9 +74,10 @@ class ListarCursosDocenteService
         $gestiones = $cursos->filter();
         $idsAnfitrion = $this->idsCursosAnfitrion($idDocente);
 
-        return $this->metricas->ejecutar($idsCursos)
+        return $this->metricas->ejecutar($idsCursos, true)
             ->map(fn (array $fila): array => $fila + [
                 'gestion' => $gestiones->get($fila['curso']->id_curso),
+                'invitado' => (int) $fila['curso']->sis_doc !== $idDocente,
                 'es_anfitrion' => in_array($fila['curso']->id_curso, $idsAnfitrion, true),
             ])
             ->sortBy(fn (array $fila): array => $this->claveDeOrden($fila['curso']))
@@ -88,9 +89,8 @@ class ListarCursosDocenteService
      * consulta (cada viaje a la base remota pesa).
      *
      * @param  int  $idDocente  ID del docente (`curso.sis_doc`).
-     *
-     * @return Collection<int, non-falsy-string|null>  id_curso => "Segundo semestre 2026", o
-     *         null si el curso no tiene gestión.
+     * @return Collection<int, non-falsy-string|null> id_curso => "Segundo semestre 2026", o
+     *                                                null si el curso no tiene gestión.
      */
     private function cursosConGestion(int $idDocente): Collection
     {
@@ -100,7 +100,7 @@ class ListarCursosDocenteService
             ->where('c.sis_doc', $idDocente)
             ->get(['c.id_curso', 'tg.nombre_tipo_gestion', 'ctg.anio']);
 
-        $idsCompartidos = $this->idsCursosCompartidos($idDocente);
+        $idsCompartidos = $this->idsCursosInvitados($idDocente);
 
         $compartidos = $idsCompartidos === []
             ? collect()
@@ -125,10 +125,10 @@ class ListarCursosDocenteService
      * cantidad de estudiantes y de exámenes de cada uno.
      *
      * @param  int  $idDocente  ID del docente (`curso.sis_doc`).
-     *
-     * @return EloquentCollection<int, Curso>  Cursos con `estudiantes_count` y `examenes_count`.
+     * @return EloquentCollection<int, Curso> Cursos con `estudiantes_count` y `examenes_count`.
      *
      * @author Valery D. Ortuno P <valerydariana98@gmail.com>
+     *
      * @since  2026-10-24
      */
     public function activos(int $idDocente): EloquentCollection
@@ -137,12 +137,12 @@ class ListarCursosDocenteService
             ->where('sis_doc', $idDocente)
             ->where('estado', CursoEstado::EnCurso->value)
             ->pluck('id_curso')
-            ->merge($this->idsCursosCompartidos($idDocente))
+            ->merge($this->idsCursosInvitados($idDocente))
             ->unique()
             ->values();
 
         if ($ids->isEmpty()) {
-            return new EloquentCollection();
+            return new EloquentCollection;
         }
 
         $idsAnfitrion = $this->idsCursosAnfitrion($idDocente);
@@ -163,17 +163,17 @@ class ListarCursosDocenteService
     }
 
     /**
-     * Cursos en los que el docente tiene configuración de examen pero no es
-     * el docente responsable (cursos compartidos por invitación).
+     * Cursos ajenos vinculados a exámenes con invitación aceptada.
      *
      * @return array<int, int>
      */
-    private function idsCursosCompartidos(int $idDocente): array
+    private function idsCursosInvitados(int $idDocente): array
     {
-        return DB::table('configuracion_examen_docente as ced')
-            ->join('examen_curso as ec', 'ec.id_examen', '=', 'ced.id_examen')
+        return DB::table('invitacion_examen_compartido as iec')
+            ->join('examen_curso as ec', 'ec.id_examen', '=', 'iec.id_examen')
             ->join('curso as c', 'c.id_curso', '=', 'ec.id_curso')
-            ->where('ced.id_docente', $idDocente)
+            ->where('iec.id_docente_invitado', $idDocente)
+            ->where('iec.estado', InvitacionEstado::Aceptada->value)
             ->where('c.sis_doc', '!=', $idDocente)
             ->pluck('ec.id_curso')
             ->unique()
@@ -202,8 +202,7 @@ class ListarCursosDocenteService
      * fecha de creación más reciente primero (el id desempata).
      *
      * @param  Curso  $curso  Curso a ubicar.
-     *
-     * @return array<int, int|string>  Clave comparable por sortBy.
+     * @return array<int, int|string> Clave comparable por sortBy.
      */
     private function claveDeOrden(Curso $curso): array
     {

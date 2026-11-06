@@ -24,6 +24,7 @@
 namespace App\Policies;
 
 use App\Enums\CursoEstado;
+use App\Enums\InvitacionEstado;
 use App\Models\Curso;
 use App\Models\Usuario;
 use Illuminate\Support\Facades\DB;
@@ -39,10 +40,10 @@ class CursoPolicy
      *
      * @param  Usuario  $usuario  Usuario autenticado.
      * @param  Curso  $curso  Curso que se quiere gestionar.
-     *
      * @return bool Si el curso pertenece al usuario.
      *
      * @author Valery D. Ortuno P <valerydariana98@gmail.com>
+     *
      * @since  2026-10-24
      */
     public function gestionar(Usuario $usuario, Curso $curso): bool
@@ -51,9 +52,10 @@ class CursoPolicy
             return true;
         }
 
-        return DB::table('configuracion_examen_docente as ced')
-            ->join('examen_curso as ec', 'ec.id_examen', '=', 'ced.id_examen')
-            ->where('ced.id_docente', $usuario->id_usuario)
+        return DB::table('invitacion_examen_compartido as iec')
+            ->join('examen_curso as ec', 'ec.id_examen', '=', 'iec.id_examen')
+            ->where('iec.id_docente_invitado', $usuario->id_usuario)
+            ->where('iec.estado', InvitacionEstado::Aceptada->value)
             ->where('ec.id_curso', $curso->id_curso)
             ->exists();
     }
@@ -66,10 +68,10 @@ class CursoPolicy
      *
      * @param  Usuario  $usuario  Usuario autenticado.
      * @param  Curso  $curso  Curso en el que se quiere crear el examen.
-     *
      * @return bool Si puede crear exámenes en el curso.
      *
      * @author Valery D. Ortuno P <valerydariana98@gmail.com>
+     *
      * @since  2026-10-24
      */
     public function crearExamen(Usuario $usuario, Curso $curso): bool
