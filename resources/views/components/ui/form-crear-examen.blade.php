@@ -69,6 +69,8 @@
         'cursoId' => null,
         'cancelarUrl' => null,
         'accionUrl' => null,
+        'modo' => 'crear',
+        'idPrefijo' => 'crear',
     ])
 
     @changelog
@@ -158,6 +160,9 @@
       rojo y su mensaje (quedaban del último envío y parecía que lo nuevo seguía
       mal); cambiar la fecha borra también el error de la hora. La hora se acota
       entre 06:00 y 22:00 (antes 06:45 y 20:15).
+    - 2026-11-05  [Alex Candia]  feat: el formulario se reutiliza en la pestaña
+      Editar con `modo` e `idPrefijo`, escucha `editar-examen-datos` y precarga
+      los campos sin enviar: el submit queda anulado y el botón solo se muestra.
 
     @see  resources/views/pages/examen-crear.blade.php
     @see  App\Enums\TipoExamen
@@ -170,7 +175,11 @@
     use App\Enums\TipoExamen;
     use App\Services\Examen\RegistrarExamenService;
 
+    $modo = $modo ?? 'crear';
+    $idPrefijo = $idPrefijo ?? 'crear';
     $opciones = $tipos ?? TipoExamen::opciones();
+    $esEdicion = $modo === 'editar';
+    $idIndiceAmbientes = 'indice-ambientes-examen-'.$idPrefijo;
 
     $catalogoAmbientes = collect($ambientes)->keyBy('id');
 
@@ -199,13 +208,15 @@
 
     $urlCancelar = $cancelarUrl ?? url()->previous();
     $accionInicial = $accionUrl
-        ?? (($cursoId ?? null) !== null ? route('cursos.examenes.store', $cursoId) : '');
+        ?? (! $esEdicion && ($cursoId ?? null) !== null ? route('cursos.examenes.store', $cursoId) : '');
 @endphp
 
 <div
     x-data="{
         cursoId: @js($cursoId ?? ''),
         nombreCurso: @js($nombreCurso ?? ''),
+        modo: @js($modo),
+        idPrefijo: @js($idPrefijo),
         accionUrl: @js($accionInicial),
         get urlAccion() {
             return this.accionUrl.replace('__CURSO__', this.cursoId);
@@ -232,9 +243,7 @@
         // El catalogo de ambientes llega en el bloque de script de abajo. `termino` ya
         // viene en minusculas desde el servicio, asi que aca no se normaliza nada.
         init() {
-            const ambientes = document.getElementById('indice-ambientes-examen');
-
-            this.indiceAmbientes = ambientes ? JSON.parse(ambientes.textContent) : [];
+            this.cargarIndiceAmbientes();
 
             // Al corregir un campo se apaga su error: el rojo y el mensaje son
             // del ultimo envio y, si quedaban, parecia que lo nuevo seguia mal.
@@ -255,6 +264,40 @@
             Object.entries(camposConError).forEach(([propiedad, campos]) => {
                 this.$watch(propiedad, () => this.limpiarErrores(campos));
             });
+        },
+
+        cargarIndiceAmbientes() {
+            const ambientes = document.getElementById('{{ $idIndiceAmbientes }}');
+
+            this.indiceAmbientes = ambientes ? JSON.parse(ambientes.textContent) : [];
+        },
+
+        // Precarga el formulario con lo que devuelve el endpoint de edicion.
+        // Los ids se convierten a numero porque los valores de los checkbox y
+        // del catalogo viajan como texto en el HTML.
+        cargarEdicion(datos) {
+            if (! this.indiceAmbientes.length) {
+                this.cargarIndiceAmbientes();
+            }
+
+            this.tipo = datos.tipo_examen ?? '';
+            this.fecha = datos.fecha ?? '';
+            this.horaInicio = datos.hora_inicio ?? '';
+            this.duracion = datos.duracion === null || datos.duracion === undefined
+                ? ''
+                : String(datos.duracion);
+
+            this.ambientesElegidos = (datos.ambientes ?? [])
+                .map((id) => this.indiceAmbientes.find((ambiente) => Number(ambiente.id) === Number(id)))
+                .filter(Boolean);
+
+            this.materialesElegidos = (datos.materiales ?? []).map(Number);
+            this.normasElegidas = (datos.normas ?? []).map(Number);
+            this.materialesPersonalizados = datos.materiales_personalizados ?? '';
+            this.normasPersonalizadas = datos.normas_personalizadas ?? '';
+
+            this.errores = {};
+            this.mostrarErrores = false;
         },
 
         // Quita los errores de esos campos, tambien los de sus items
@@ -488,16 +531,19 @@
         }
     }"
     @curso-seleccionado.window="cursoId = $event.detail.id; nombreCurso = $event.detail.nombre"
+    @if ($esEdicion)
+        x-on:editar-examen-datos.window="cargarEdicion($event.detail)"
+    @endif
     class="w-full"
 >
-    <form method="POST" x-bind:action="urlAccion">
+    <form method="POST" x-bind:action="urlAccion" @if ($esEdicion) x-on:submit.prevent @endif>
         @csrf
         <input type="hidden" name="curso_id" x-bind:value="cursoId">
 
     <div class="space-y-4 py-4">
         <x-ui.input
             label="Curso"
-            id="curso_examen"
+            id="{{ $idPrefijo }}_curso_examen"
             name="nombre_curso"
             :value="$nombreCurso ?? ''"
             x-bind:value="nombreCurso"
@@ -508,7 +554,7 @@
 
         <x-ui.select
             label="Tipo de examen"
-            id="tipo_examen"
+            id="{{ $idPrefijo }}_tipo_examen"
             name="tipo_examen"
             x-model="tipo"
             :options="$opciones"
@@ -522,7 +568,7 @@
 
         <x-ui.input
             label="Fecha"
-            id="fecha_examen"
+            id="{{ $idPrefijo }}_fecha_examen"
             name="fecha"
             type="text"
             placeholder="dd/mm/aaaa"
@@ -539,7 +585,7 @@
 
         <x-ui.input
             label="Hora de inicio"
-            id="hora_inicio_examen"
+            id="{{ $idPrefijo }}_hora_inicio_examen"
             name="hora_inicio"
             type="text"
             inputmode="numeric"
@@ -556,7 +602,7 @@
 
         <x-ui.input
             label="Duracion (minutos)"
-            id="duracion_examen"
+            id="{{ $idPrefijo }}_duracion_examen"
             name="duracion"
             type="text"
             inputmode="numeric"
@@ -572,14 +618,14 @@
         <p x-show="errorDe('duracion')" x-text="errorDe('duracion')"
            class="mt-1 text-sm text-fg-danger-strong"></p>
         <div @click.outside="listaAbierta = false">
-            <label for="busqueda_ambiente" class="block mb-2.5 text-sm font-medium text-heading">
+            <label for="{{ $idPrefijo }}_busqueda_ambiente" class="block mb-2.5 text-sm font-medium text-heading">
                 Ambientes <span class="text-fg-danger-strong" aria-hidden="true">*</span>
             </label>
 
-            <input type="text" id="busqueda_ambiente"
+            <input type="text" id="{{ $idPrefijo }}_busqueda_ambiente"
                    role="combobox"
                    aria-autocomplete="list"
-                   aria-controls="lista-ambientes"
+                   aria-controls="{{ $idPrefijo }}_lista-ambientes"
                    :aria-expanded="listaAbierta"
                    autocomplete="off"
                    x-model="busquedaAmbiente"
@@ -594,7 +640,7 @@
                    x-bind:aria-invalid="errorDe('ambientes') ? 'true' : null"
                    class="block w-full p-3 border border-default-medium bg-neutral-secondary-medium text-heading text-sm rounded-base focus:ring-brand focus:border-brand shadow-xs placeholder:text-body" />
 
-            <ul id="lista-ambientes" role="listbox" aria-label="Ambientes disponibles"
+            <ul id="{{ $idPrefijo }}_lista-ambientes" role="listbox" aria-label="Ambientes disponibles"
                 x-show="listaAbierta" x-cloak
                 class="mt-2 max-h-40 overflow-y-auto rounded-base border border-default divide-y divide-default">
                 <template x-for="(ambiente, posicion) in ambientesVisibles()" :key="ambiente.id">
@@ -640,16 +686,16 @@
         </div>
 
         <div>
-            <p class="block mb-2.5 text-sm font-medium text-heading" id="materiales_examen">
+            <p class="block mb-2.5 text-sm font-medium text-heading" id="{{ $idPrefijo }}_materiales_examen">
                 Material permitido
             </p>
 
             <ul class="flex flex-col gap-3"
-                aria-labelledby="materiales_examen">
+                aria-labelledby="{{ $idPrefijo }}_materiales_examen">
                 @forelse ($materiales as $material)
                     <li>
                         <x-ui.checkbox
-                            id="material_{{ $material['id'] }}"
+                            id="{{ $idPrefijo }}_material_{{ $material['id'] }}"
                             name="materiales[]"
                             label="{{ $material['descripcion'] }}"
                             value="{{ $material['id'] }}"
@@ -671,7 +717,7 @@
              textarea es lo que corta a 300. --}}
         <x-ui.textarea
             label="Materiales personalizados"
-            id="materiales_personalizados_examen"
+            id="{{ $idPrefijo }}_materiales_personalizados_examen"
             name="materiales_personalizados"
             rows="3"
             maxlength="300"
@@ -685,16 +731,16 @@
 
      
         <div>
-            <p class="block mb-2.5 text-sm font-medium text-heading" id="normas_examen">
+            <p class="block mb-2.5 text-sm font-medium text-heading" id="{{ $idPrefijo }}_normas_examen">
                 Normas
             </p>
 
             <ul class="flex flex-col gap-3"
-                aria-labelledby="normas_examen">
+                aria-labelledby="{{ $idPrefijo }}_normas_examen">
                 @forelse ($normas as $norma)
                     <li>
                         <x-ui.checkbox
-                            id="norma_{{ $norma['id'] }}"
+                            id="{{ $idPrefijo }}_norma_{{ $norma['id'] }}"
                             name="normas[]"
                             label="{{ $norma['detalle'] }}"
                             value="{{ $norma['id'] }}"
@@ -715,7 +761,7 @@
              que corta a 300. --}}
         <x-ui.textarea
             label="Normas personalizadas"
-            id="normas_personalizadas_examen"
+            id="{{ $idPrefijo }}_normas_personalizadas_examen"
             name="normas_personalizadas"
             rows="3"
             maxlength="300"
@@ -732,9 +778,11 @@
              Blade las directivas no se compilan y llegaban tal cual al
              navegador, así que el clic fallaba y no volvía. --}}
         <x-ui.button-cancelar class="flex-1" @click="window.location.href = {{ \Illuminate\Support\Js::from($urlCancelar) }}">Cancelar</x-ui.button-cancelar>
-        <x-ui.button type="submit" variant="default" class="flex-1">Guardar examen</x-ui.button>
+        <x-ui.button type="{{ $esEdicion ? 'button' : 'submit' }}" variant="default" class="flex-1">
+            {{ $esEdicion ? 'Guardar cambios' : 'Guardar examen' }}
+        </x-ui.button>
     </div>
     </form>
 
-    <script type="application/json" id="indice-ambientes-examen">@json($ambientes)</script>
+    <script type="application/json" id="{{ $idIndiceAmbientes }}">@json($ambientes)</script>
 </div>

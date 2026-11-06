@@ -9,6 +9,7 @@
  *
  * @updated 2026-10-09
  * @updated 2026-10-25
+ * @updated 2026-11-05
  *
  * @description Rutas JSON del backend.
  *
@@ -18,6 +19,7 @@
  * - 2026-10-09  [Alisson D. Alvarado]  feat: detalle de incidencia de la central
  *   de riesgos, con error controlado 404 si no existe.
  * - 2026-10-25  [Alisson D. Alvarado]  feat: rutas para previsualizar y confirmar división de examen por ambientes.
+ * - 2026-11-05  [Alex Candia]  feat: detalle de examen para precargar la pestaña Editar Examen.
  */
 
 use App\Http\Controllers\Api\CentralRiesgoController;
@@ -27,6 +29,7 @@ use App\Http\Controllers\Api\CursoExamenController;
 use App\Http\Controllers\Api\DetalleIncidenciaController;
 use App\Http\Controllers\Api\DividirExamenController;
 use App\Http\Controllers\Api\EstudianteExamenController;
+use App\Http\Controllers\Api\ExamenEdicionController;
 use App\Http\Controllers\Api\ExamenMonitoreoController;
 use App\Http\Controllers\Api\InvitacionExamenController;
 use App\Http\Controllers\Api\NotificacionController;
@@ -94,6 +97,11 @@ Route::middleware(['web', 'auth:web'])->group(function (): void {
 
     Route::get('/reportes/horarios-ingreso/exportar', [ReporteHorarioIngresoController::class, 'exportar'])
         ->name('api.reportes.horarios-ingreso.exportar');
+
+    Route::get('/examenes/{examen}/edicion', [ExamenEdicionController::class, 'mostrar'])
+        ->whereNumber('examen')
+        ->middleware('docente')
+        ->name('api.examenes.edicion.mostrar');
 
     Route::get('/examenes/{examen}/configuracion', [ConfiguracionExamenDocenteController::class, 'mostrar'])
         ->whereNumber('examen')

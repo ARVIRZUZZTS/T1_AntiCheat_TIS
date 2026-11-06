@@ -11,6 +11,7 @@
  * @updated 2026-10-24
  * @updated 2026-10-25
  * @updated 2026-11-04
+ * @updated 2026-11-05
  *
  * @description
  * Pruebas de la vista del listado de exámenes de un curso: verifican sobre
@@ -47,6 +48,8 @@
  *   parcial y el selector de materia oculta las pestañas sin selección.
  * - 2026-11-04  [Alex Candia]  test: los selectores de Invitar y Dividir solo
  *   listan exámenes con fecha y hora futuras, sin filtrar el listado completo.
+ * - 2026-11-05  [Alex Candia]  test: Editar Examen solo ofrece exámenes propios,
+ *   consulta su detalle y precarga el formulario sin enviar cambios.
  */
 
 namespace Tests\Feature\Examenes;
@@ -168,6 +171,23 @@ class ListadoExamenesVistaTest extends TestCase
         $this->assertStringContainsString('<template x-for="examen in examenes" :key="examen.id">', $parcial);
         $this->assertStringContainsString("tab === 'editar'", $parcial);
         $this->assertStringContainsString('id="examen-editar"', $parcial);
+    }
+
+    public function test_editar_carga_el_formulario_sin_enviar_cambios(): void
+    {
+        $parcial = $this->fuenteParcial();
+        $formulario = $this->fuente(resource_path('views/components/ui/form-crear-examen.blade.php'));
+
+        $this->assertStringContainsString('get examenesEditables()', $parcial);
+        $this->assertStringContainsString('examenesDisponibles.filter((examen) => Boolean(examen.es_propio))', $parcial);
+        $this->assertStringContainsString('api.examenes.edicion.mostrar', $parcial);
+        $this->assertStringContainsString('modo="editar"', $parcial);
+        $this->assertStringContainsString('x-for="examen in examenesEditables"', $parcial);
+
+        $this->assertStringContainsString('x-on:editar-examen-datos.window="cargarEdicion($event.detail)"', $formulario);
+        $this->assertStringContainsString('x-on:submit.prevent', $formulario);
+        $this->assertStringContainsString("type=\"{{ \$esEdicion ? 'button' : 'submit' }}\"", $formulario);
+        $this->assertStringNotContainsString('examenes.update', $parcial);
     }
 
     public function test_la_pagina_de_examenes_monta_el_parcial(): void
