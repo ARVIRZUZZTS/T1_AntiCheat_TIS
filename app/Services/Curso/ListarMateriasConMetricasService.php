@@ -49,7 +49,9 @@ class ListarMateriasConMetricasService
 {
     /**
      * @param  array<int, int>|null  $idsCursos  Si se pasa, solo se listan
-     *         esos cursos; `null` lista todos (comportamiento de /materias).
+     *                                           esos cursos; `null` lista todos (comportamiento de /materias).
+     * @param  bool  $proximoExamen  Para Cursos, usa el examen futuro más próximo
+     *                               y cuenta solamente sus estudiantes inscritos.
      * @return Collection<int, array{
      *     curso: Curso,
      *     inscritos: int,
@@ -59,11 +61,14 @@ class ListarMateriasConMetricasService
      *     examen_activo: bool,
      * }>
      */
-    public function ejecutar(?array $idsCursos = null): Collection
+    public function ejecutar(?array $idsCursos = null, bool $proximoExamen = false): Collection
     {
         $consulta = Curso::query()
-            ->withCount(['estudiantes as inscritos'])
             ->orderBy('id_curso');
+
+        if (! $proximoExamen) {
+            $consulta->withCount(['estudiantes as inscritos']);
+        }
 
         if ($idsCursos !== null) {
             $consulta->whereIn('id_curso', $idsCursos);
@@ -77,11 +82,12 @@ class ListarMateriasConMetricasService
 
         $idsCurso = $cursos->pluck('id_curso');
 
-        $examenActualPorCurso = $this->examenActualPorCurso($idsCurso);
+        $ahora = Carbon::now();
+        $examenActualPorCurso = $this->examenActualPorCurso($idsCurso, $proximoExamen, $ahora);
 
         $idsExamenActual = $examenActualPorCurso->pluck('id_examen')->filter()->unique()->values();
 
-        $conteosEstadoPorCurso = $this->conteosEstadoPorCurso($idsCurso, $idsExamenActual, $examenActualPorCurso);
+        $conteosEstadoPorCurso = $this->conteosEstadoPorCurso($idsCurso, $idsExamenActual, $examenActualPorCurso, $proximoExamen);
 
         $incidenciasPorCurso = DB::table('central_riesgo')
             ->whereIn('id_curso', $idsCurso)
@@ -89,40 +95,50 @@ class ListarMateriasConMetricasService
             ->groupBy('id_curso')
             ->pluck('total', 'id_curso');
 
-        $ahora = Carbon::now();
-
-        return $cursos->map(function (Curso $curso) use ($examenActualPorCurso, $conteosEstadoPorCurso, $incidenciasPorCurso, $ahora): array {
+        return $cursos->map(function (Curso $curso) use ($examenActualPorCurso, $conteosEstadoPorCurso, $incidenciasPorCurso, $ahora, $proximoExamen): array {
             $examenActual = $examenActualPorCurso->get($curso->id_curso);
             $estados = $conteosEstadoPorCurso->get($curso->id_curso, collect());
 
             return [
                 'curso' => $curso,
-                'inscritos' => (int) $curso->getAttribute('inscritos'),
+                'inscritos' => $proximoExamen ? (int) $estados->sum('total') : (int) $curso->getAttribute('inscritos'),
                 'habilitados' => (int) ($estados->get('habilitado')->total ?? 0),
                 'deshabilitados' => (int) ($estados->get('deshabilitado')->total ?? 0),
                 'incidencias' => (int) ($incidenciasPorCurso->get($curso->id_curso) ?? 0),
                 'examen_activo' => $examenActual !== null && $this->examenEnCurso($examenActual, $ahora),
+                'proximo_examen' => $proximoExamen ? $examenActual : null,
             ];
         })->values();
     }
 
     /**
-     * El examen más reciente de cada curso, en una sola consulta (join +
-     * agrupación en PHP), en vez de `Curso::examenActual()` por curso.
+     * El examen más reciente o el futuro más próximo de cada curso, en una
+     * sola consulta (join + agrupación en PHP).
      *
      * @param  Collection<int, int>  $idsCurso
      * @return Collection<int, object{id_curso: int, id_examen: int, fecha: ?string, hora_inicio: ?string, duracion: ?int}>
-     *         Indexada por id_curso.
+     *                                                                                                                      Indexada por id_curso.
      */
-    private function examenActualPorCurso(Collection $idsCurso): Collection
+    private function examenActualPorCurso(Collection $idsCurso, bool $proximoExamen, Carbon $ahora): Collection
     {
         return DB::table('examen_curso as ec')
             ->join('examen as e', 'e.id_examen', '=', 'ec.id_examen')
             ->whereIn('ec.id_curso', $idsCurso)
             ->select('ec.id_curso', 'e.id_examen', 'e.fecha', 'e.hora_inicio', 'e.duracion')
             ->get()
+            ->when($proximoExamen, fn (Collection $filas): Collection => $filas->filter(
+                fn (object $fila): bool => $fila->fecha !== null
+                    && $fila->hora_inicio !== null
+                    && Carbon::parse($fila->fecha.' '.$fila->hora_inicio)->gt($ahora)
+            ))
             ->groupBy('id_curso')
-            ->map(function (Collection $examenesDelCurso) {
+            ->map(function (Collection $examenesDelCurso) use ($proximoExamen) {
+                if ($proximoExamen) {
+                    return $examenesDelCurso
+                        ->sortBy(fn (object $fila): string => $fila->fecha.' '.$fila->hora_inicio.' '.str_pad((string) $fila->id_examen, 10, '0', STR_PAD_LEFT))
+                        ->first();
+                }
+
                 // Mismo criterio que Curso::examenActual(): fecha más
                 // reciente y, en empate, el id_examen más alto.
                 return $examenesDelCurso
@@ -134,7 +150,7 @@ class ListarMateriasConMetricasService
     /**
      * Cuenta estudiante_examen por estado (habilitado/deshabilitado), SOLO
      * de estudiantes inscritos en cada curso (`estudiante_curso`) y SOLO
-     * contra el examen "actual" de ESE curso puntual.
+     * contra el examen elegido para ESE curso puntual.
      *
      * Un examen se puede compartir entre varios cursos (#70): agrupar
      * directo por id_examen contaría, para cada curso, también a los
@@ -148,9 +164,9 @@ class ListarMateriasConMetricasService
      * @param  Collection<int, int>  $idsExamen
      * @param  Collection<int, object{id_curso:int,id_examen:int}>  $examenActualPorCurso  Indexada por id_curso.
      * @return Collection<int, Collection<string, object{estado: string, total: int}>>
-     *         Indexada por id_curso, y dentro por estado.
+     *                                                                                 Indexada por id_curso, y dentro por estado.
      */
-    private function conteosEstadoPorCurso(Collection $idsCurso, Collection $idsExamen, Collection $examenActualPorCurso): Collection
+    private function conteosEstadoPorCurso(Collection $idsCurso, Collection $idsExamen, Collection $examenActualPorCurso, bool $proximoExamen): Collection
     {
         if ($idsExamen->isEmpty()) {
             return collect();
@@ -160,11 +176,17 @@ class ListarMateriasConMetricasService
             ->join('estudiante_examen as ee', 'ee.sis_estudiante', '=', 'ecurso.sis_estudiante')
             ->whereIn('ecurso.id_curso', $idsCurso)
             ->whereIn('ee.id_examen', $idsExamen)
-            ->select('ecurso.id_curso', 'ee.id_examen', 'ee.estado')
+            ->when($proximoExamen, fn ($consulta) => $consulta->where(fn ($filtro) => $filtro
+                ->whereColumn('ee.id_curso', 'ecurso.id_curso')
+                ->orWhereNull('ee.id_curso')))
+            ->select('ecurso.id_curso', 'ee.id_examen', 'ee.sis_estudiante', 'ee.estado')
             ->get()
             // El examen puede estar compartido con otro curso: se descarta
             // la fila si no es el examen "actual" de ESE id_curso puntual.
             ->filter(fn ($fila) => $examenActualPorCurso->get($fila->id_curso)?->id_examen === $fila->id_examen)
+            ->when($proximoExamen, fn (Collection $filas): Collection => $filas->unique(
+                fn (object $fila): string => $fila->id_curso.'-'.$fila->sis_estudiante
+            ))
             ->groupBy('id_curso')
             ->map(function (Collection $filas) {
                 return $filas
