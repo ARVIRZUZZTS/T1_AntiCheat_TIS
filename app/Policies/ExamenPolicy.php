@@ -8,9 +8,11 @@
  * @created 2026-10-23
  *
  * @description Autoriza el reporte de horarios de ingreso de un examen a su
- * docente responsable o a un docente invitado que acepto la invitacion.
+ * docente responsable o a un docente invitado que acepto la invitacion, y la
+ * edicion de los datos base del examen solo a su creador.
  *
  * @see  App\Services\Reporte\ConsultarReporteHorarioIngresoService
+ * @see  App\Http\Controllers\Api\ExamenEdicionController
  */
 
 namespace App\Policies;
@@ -50,6 +52,19 @@ class ExamenPolicy
             ->where('auxiliar_curso.id_auxiliar', $usuario->id_usuario)
             ->where('examen_curso.id_examen', $examen->id_examen)
             ->exists();
+    }
+
+    /**
+     * Editar los datos base del examen (tipo, fecha, hora, duracion,
+     * ambientes, materiales y normas) es solo para quien lo creo.
+     */
+    public function editar(Usuario $usuario, Examen $examen): bool
+    {
+        if (! $usuario->roles()->where('nombre_rol', Rol::NOMBRE_DOCENTE)->exists()) {
+            return false;
+        }
+
+        return (int) $examen->creador === (int) $usuario->id_usuario;
     }
 
     public function invitarDocente(Usuario $usuario, Examen $examen): bool

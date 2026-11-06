@@ -7,6 +7,7 @@
     @updated 2026-10-25
     @updated 2026-10-26
     @updated 2026-11-04
+    @updated 2026-11-05
 
     @description
     Exámenes de la materia elegida en la página única Exámenes. Arriba va el
@@ -23,6 +24,10 @@
     Examen incrusta el mismo formulario de pages/examen-crear; si la validación
     falla, la página vuelve a abrir esa pestaña porque StoreExamenRequest
     redirige con errores y el formulario manda el curso elegido.
+
+    Editar Examen lista solo los exámenes propios con fecha futura y precarga el
+    mismo formulario con GET /api/examenes/{examen}/edicion. Por ahora el
+    formulario es de solo lectura: el botón "Guardar cambios" no envía nada.
 
     La división usa los ambientes que ya devuelve el endpoint. Si el examen
     tiene una sola aula, en lugar de los controles se muestra un texto simple
@@ -63,8 +68,12 @@
       completo se conserva en "Ver Lista de Examenes".
     - 2026-11-04  [Alex Candia]  feat: nueva pestaña "Editar Examen" a la derecha
       de "Crear Examen", por ahora solo con el selector de exámenes disponibles.
+    - 2026-11-05  [Alex Candia]  feat: Editar Examen carga el detalle del examen
+      propio elegido y precarga el formulario de alta. No guarda cambios: el
+      submit está anulado y el botón queda inerte hasta implementar el guardado.
 
     @see  App\Http\Controllers\Api\CursoExamenController
+    @see  App\Http\Controllers\Api\ExamenEdicionController
     @see  App\Http\Controllers\ExamenController
     @see  resources/views/pages/examenes-curso.blade.php
     @see  resources/views/components/ui/form-crear-examen.blade.php
@@ -114,8 +123,13 @@
          estado: 'listo',
          peticion: 0,
          tab: @js($tabInicial),
-         // Examen elegido en las pestañas Invitar y Dividir.
+         // Examen elegido en Editar, Invitar y Dividir.
          seleccionado: '',
+         examenEdicionCargadoId: '',
+         cargandoEdicion: false,
+         errorEdicion: '',
+         peticionEdicion: 0,
+         urlDetalleExamen: @js(route('api.examenes.edicion.mostrar', ['examen' => '__ID__'])),
          criterioDivision: '',
          errorDivision: '',
          urlPreviewDivision: @js(route('api.examenes.dividir.preview', ['examen' => '__ID__'])),
@@ -145,6 +159,9 @@
          get examenesDisponibles() {
              return this.examenes.filter((examen) => this.examenDisponible(examen));
          },
+         get examenesEditables() {
+             return this.examenesDisponibles.filter((examen) => Boolean(examen.es_propio));
+         },
          get aulasDelExamen() {
              return this.examenSeleccionado?.ambientes?.length ?? 0;
          },
@@ -155,6 +172,9 @@
              this.tab = 'lista';
              this.cursoNombre = this.cursos[this.cursoSeleccionado] ?? '';
              this.seleccionado = '';
+             this.examenEdicionCargadoId = '';
+             this.cargandoEdicion = false;
+             this.errorEdicion = '';
              this.criterioDivision = '';
              this.errorDivision = '';
              this.actualizarUrl();
@@ -180,9 +200,10 @@
          async cargar() {
              const peticion = ++this.peticion;
 
-             this.seleccionado = '';
-             this.criterioDivision = '';
-             this.errorDivision = '';
+             this.examenEdicionCargadoId = '';
+             this.cargandoEdicion = false;
+             this.errorEdicion = '';
+             this.limpiarSeleccion();
 
              if (! this.hayCurso) {
                  this.examenes = [];
@@ -192,7 +213,6 @@
              }
 
              this.estado = 'cargando';
-             this.limpiarSeleccion();
              try {
                  const url = this.urlExamenes.replace('__CURSO__', this.cursoSeleccionado);
                  const respuesta = await fetch(url);
@@ -206,8 +226,16 @@
                  this.examenes = cuerpo.datos ?? [];
                  this.estado = 'listo';
 
-                 if (this.examenesDisponibles.length > 0 && (this.seleccionado === '' || this.seleccionado === null)) {
-                     this.seleccionado = String(this.examenesDisponibles[0].id);
+                 const disponibles = this.tab === 'editar'
+                     ? this.examenesEditables
+                     : this.examenesDisponibles;
+
+                 if (disponibles.length > 0) {
+                     this.seleccionado = String(disponibles[0].id);
+                 }
+
+                 if (this.tab === 'editar') {
+                     this.cargarExamenEdicion(false);
                  }
              } catch (error) {
                  if (peticion === this.peticion) {
@@ -235,6 +263,79 @@
              this.seleccionado = id;
              this.criterioDivision = '';
              this.errorDivision = '';
+         },
+         abrirEditar() {
+             this.tab = 'editar';
+
+             // Si la seleccion venia de Invitar/Dividir y no es un examen
+             // propio, se elige el primero editable para no mostrar un 403.
+             const actual = this.examenesEditables.find(
+                 (examen) => String(examen.id) === String(this.seleccionado)
+             );
+
+             if (! actual) {
+                 this.seleccionado = this.examenesEditables.length > 0
+                     ? String(this.examenesEditables[0].id)
+                     : '';
+                 this.examenEdicionCargadoId = '';
+             }
+
+             this.cargarExamenEdicion(false);
+         },
+         seleccionarEdicion() {
+             this.criterioDivision = '';
+             this.errorDivision = '';
+             this.cargarExamenEdicion(true);
+         },
+         async cargarExamenEdicion(forzar = true) {
+             const id = String(this.seleccionado ?? '');
+
+             if (id === '') {
+                 return;
+             }
+
+             if (! forzar && id === this.examenEdicionCargadoId) {
+                 return;
+             }
+
+             const peticion = ++this.peticionEdicion;
+
+             this.cargandoEdicion = true;
+             this.errorEdicion = '';
+
+             try {
+                 const url = this.urlDetalleExamen.replace('__ID__', id);
+                 const respuesta = await fetch(url, {
+                     headers: { 'Accept': 'application/json' },
+                     credentials: 'same-origin',
+                 });
+                 const cuerpo = await respuesta.json().catch(() => ({}));
+
+                 if (peticion !== this.peticionEdicion) {
+                     return;
+                 }
+
+                 if (! respuesta.ok) {
+                     this.examenEdicionCargadoId = '';
+                     this.errorEdicion = cuerpo?.message || 'No se pudieron cargar los datos del examen.';
+
+                     return;
+                 }
+
+                 window.dispatchEvent(new CustomEvent('editar-examen-datos', {
+                     detail: cuerpo.datos ?? {},
+                 }));
+                 this.examenEdicionCargadoId = id;
+             } catch (error) {
+                 if (peticion === this.peticionEdicion) {
+                     this.examenEdicionCargadoId = '';
+                     this.errorEdicion = 'No se pudo conectar con el servidor.';
+                 }
+             } finally {
+                 if (peticion === this.peticionEdicion) {
+                     this.cargandoEdicion = false;
+                 }
+             }
          },
          async abrirModalDivision() {
              if (this.seleccionado === '' || this.criterioDivision === '' || ! this.puedeDividir) {
@@ -495,7 +596,7 @@
 
             <button type="button" class="{{ $tabClases }}"
                     :class="tab === 'editar' ? '{{ $tabActivo }}' : '{{ $tabInactivo }}'"
-                    @click="tab = 'editar'">
+                    @click="abrirEditar()">
                 Editar Examen
             </button>
 
@@ -619,7 +720,8 @@
         </section>
     @endif
 
-    {{-- Editar Examen: por ahora solo se elige el examen. --}}
+    {{-- Editar Examen: se elige uno propio y se precarga el mismo formulario
+         del alta. Al cambiar la seleccion se consulta el detalle del examen. --}}
     <section x-show="tab === 'editar'" x-cloak class="flex flex-col gap-4">
         <p class="px-3 text-sm text-body" x-show="estado === 'cargando'">Cargando examenes...</p>
 
@@ -640,18 +742,46 @@
             No hay examenes disponibles con fecha y hora futuras.
         </p>
 
-        <div x-show="estado === 'listo' && examenesDisponibles.length > 0" class="min-w-0 max-w-md">
+        <p class="px-3 text-sm text-body" x-show="estado === 'listo' && examenesDisponibles.length > 0 && examenesEditables.length === 0">
+            No hay examenes propios disponibles para editar.
+        </p>
+
+        <div x-show="estado === 'listo' && examenesEditables.length > 0" class="min-w-0 max-w-md px-3">
             <label for="examen-editar" class="block mb-2.5 text-sm font-medium text-heading">Examen</label>
-            <select id="examen-editar" x-model="seleccionado" @change="criterioDivision = ''; errorDivision = ''"
+            <select id="examen-editar" x-model="seleccionado" @change="seleccionarEdicion()"
                     class="block w-full px-3 py-2.5 border text-sm rounded-base shadow-xs bg-neutral-secondary-medium border-default-medium text-heading focus:ring-brand focus:border-brand">
                 <option value="" disabled>Selecciona un examen</option>
-                <template x-for="examen in examenesDisponibles" :key="'editar-' + examen.id">
-                    <option :value="examen.id" x-text="etiquetaExamen(examen)"></option>
+                <template x-for="examen in examenesEditables" :key="'editar-' + examen.id">
+                    <option :value="String(examen.id)" x-text="etiquetaExamen(examen)"></option>
                 </template>
             </select>
         </div>
-    </section>
 
+        <p class="px-3 text-sm text-body" x-show="cargandoEdicion">Cargando datos del examen...</p>
+
+        <div x-show="! cargandoEdicion && errorEdicion !== ''" x-cloak>
+            <x-ui.alert type="danger" title="No se pudieron cargar los datos del examen">
+                <span x-text="errorEdicion"></span>
+                <div class="mt-2">
+                    <x-ui.button variant="secondary" @click="cargarExamenEdicion(true)">Reintentar</x-ui.button>
+                </div>
+            </x-ui.alert>
+        </div>
+
+        <div x-show="seleccionado !== '' && ! cargandoEdicion && errorEdicion === ''"
+             class="mx-auto w-full max-w-2xl rounded-base border border-default bg-neutral-primary-soft p-4 shadow-sm md:p-6">
+            <x-ui.form-crear-examen
+                :nombre-curso="$cursoInicial?->nombre_curso ?? ''"
+                :ambientes="$ambientes"
+                :materiales="$materiales"
+                :normas="$normas"
+                :curso-id="$cursoInicial?->id_curso"
+                modo="editar"
+                id-prefijo="editar"
+                :cancelar-url="route('examenes')"
+            />
+        </div>
+    </section>
     {{-- Invitar Docente a Examen: se elige el examen; la invitación todavía no
          tiene flujo de guardado. --}}
     <section x-show="tab === 'invitar'" x-cloak class="flex flex-col gap-4">

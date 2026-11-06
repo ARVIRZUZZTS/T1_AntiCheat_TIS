@@ -11,6 +11,7 @@
  * @updated 2026-10-24
  * @updated 2026-10-25
  * @updated 2026-10-26
+ * @updated 2026-11-05
  *
  * @description
  * Controlador HTTP de la sección Exámenes del docente. Solo orquesta:
@@ -42,6 +43,9 @@
  * - 2026-10-26  [Valery D. Ortuno P]  perf: los catálogos del formulario salen
  *   de CatalogosExamenService (cacheados); antes eran tres consultas cada vez
  *   que se abría el alta.
+ * - 2026-11-05  [Alex Candia]  feat: la página del curso entrega los catálogos
+ *   también cuando ya no se pueden crear exámenes, porque Editar Examen los
+ *   necesita para precargar el formulario.
  *
  * @see  StoreExamenRequest
  * @see  App\Services\Examen\CatalogosExamenService
@@ -140,15 +144,15 @@ class ExamenController extends Controller
     {
         Gate::authorize('gestionar', $curso);
 
-        // El formulario solo se muestra si el curso sigue habilitado para crear
-        // exámenes; así no se consultan catálogos que no se van a usar.
+        // La edicion tambien usa los catalogos, aunque el curso ya no permita
+        // crear examenes nuevos.
         $puedeCrearExamen = Gate::allows('crearExamen', $curso);
 
         return view('pages.examenes-curso', [
             'curso' => $curso,
-            'ambientes' => $puedeCrearExamen ? $catalogos->ambientes() : [],
-            'materiales' => $puedeCrearExamen ? $catalogos->materiales() : [],
-            'normas' => $puedeCrearExamen ? $catalogos->normas() : [],
+            'ambientes' => $catalogos->ambientes(),
+            'materiales' => $catalogos->materiales(),
+            'normas' => $catalogos->normas(),
             'puedeCrearExamen' => $puedeCrearExamen,
             'backRoute' => route('examenes'),
         ]);
