@@ -48,6 +48,11 @@
  *   pasadas (hora de Bolivia, la zona de la aplicación): la fecha anterior a
  *   hoy da "Ingrese una fecha valida." y, si es hoy, la hora que ya pasó da
  *   "Ingrese una hora valida.". La ventana horaria pasa a 06:00-22:00.
+ * - 2026-11-07  [Diego Tejerina]  refactor: la regla de "un solo final /
+ *   segunda instancia por curso" sale a dos metodos protegidos
+ *   (cursosParaUnicoPorTipo/examenExcluidoDeUnicoPorTipo) para que
+ *   UpdateExamenRequest la reutilice excluyendo el examen que edita (Task #261).
+ *   Sin cambios de comportamiento en el alta.
  */
 
 namespace App\Http\Requests;
@@ -69,9 +74,10 @@ class StoreExamenRequest extends FormRequest
      * mientras el curso siga en curso: el rol lo exige el middleware `docente`
      * y la pertenencia y el estado los decide CursoPolicy::crearExamen().
      *
-     * @return bool  Si el usuario autenticado puede crear exámenes en el curso de la URL.
+     * @return bool Si el usuario autenticado puede crear exámenes en el curso de la URL.
      *
      * @author Valery D. Ortuno P <valerydariana98@gmail.com>
+     *
      * @since  2026-10-24
      */
     public function authorize(): bool
@@ -119,17 +125,21 @@ class StoreExamenRequest extends FormRequest
             $tipo = (string) $this->input('tipo_examen');
 
             if (in_array($tipo, [TipoExamen::ExamenFinal->value, TipoExamen::SegundaInstancia->value], true)) {
-                $curso = $this->route('curso');
-                $idCurso = $curso instanceof Curso ? $curso->id_curso : (int) $curso;
-
-                $existe = DB::table('examen')
+                $consulta = DB::table('examen')
                     ->join('examen_curso', 'examen_curso.id_examen', '=', 'examen.id_examen')
                     ->join('tipo_examen', 'tipo_examen.id_tipo_examen', '=', 'examen.tipo_examen')
-                    ->where('examen_curso.id_curso', $idCurso)
-                    ->where('tipo_examen.nombre_tipo_examen', $tipo)
-                    ->exists();
+                    ->whereIn('examen_curso.id_curso', $this->cursosParaUnicoPorTipo())
+                    ->where('tipo_examen.nombre_tipo_examen', $tipo);
 
-                if ($existe) {
+                // Al editar, el propio examen no cuenta como "ya existe": si no se
+                // excluye, un final que se guarda sin cambiar el tipo chocaria
+                // consigo mismo. En el alta no hay nada que excluir.
+                $excluido = $this->examenExcluidoDeUnicoPorTipo();
+                if ($excluido !== null) {
+                    $consulta->where('examen.id_examen', '!=', $excluido);
+                }
+
+                if ($consulta->exists()) {
                     $validator->errors()->add(
                         'tipo_examen',
                         $tipo === TipoExamen::ExamenFinal->value
@@ -171,6 +181,29 @@ class StoreExamenRequest extends FormRequest
         // El round-trip descarta fechas como 31/02, que createFromFormat corre
         // a marzo.
         return $fecha !== false && $fecha->format('d/m/Y') === $texto ? $fecha : null;
+    }
+
+    /**
+     * Cursos sobre los que rige la regla "un solo examen final y una sola
+     * segunda instancia por curso". En el alta es el curso de la URL; la
+     * edicion lo sobrescribe con los cursos del examen que se edita.
+     *
+     * @return list<int>
+     */
+    protected function cursosParaUnicoPorTipo(): array
+    {
+        $curso = $this->route('curso');
+
+        return [$curso instanceof Curso ? (int) $curso->id_curso : (int) $curso];
+    }
+
+    /**
+     * Id del examen que NO cuenta en esa regla (el que se esta editando). En el
+     * alta no hay ninguno que excluir.
+     */
+    protected function examenExcluidoDeUnicoPorTipo(): ?int
+    {
+        return null;
     }
 
     /**
