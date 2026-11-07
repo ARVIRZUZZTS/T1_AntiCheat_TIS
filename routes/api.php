@@ -20,6 +20,7 @@
  *   de riesgos, con error controlado 404 si no existe.
  * - 2026-10-25  [Alisson D. Alvarado]  feat: rutas para previsualizar y confirmar división de examen por ambientes.
  * - 2026-11-05  [Alex Candia]  feat: detalle de examen para precargar la pestaña Editar Examen.
+ * - 2026-11-07  [Diego Tejerina]  feat: PUT de guardado del examen editado (#261).
  */
 
 use App\Http\Controllers\Api\CentralRiesgoController;
@@ -102,6 +103,13 @@ Route::middleware(['web', 'auth:web'])->group(function (): void {
         ->whereNumber('examen')
         ->middleware('docente')
         ->name('api.examenes.edicion.mostrar');
+
+    // Guardado de un examen editado (Task #261). La autorizacion (solo el
+    // creador) y la validacion viven en UpdateExamenRequest.
+    Route::put('/examenes/{examen}/edicion', [ExamenEdicionController::class, 'actualizar'])
+        ->whereNumber('examen')
+        ->middleware('docente')
+        ->name('api.examenes.edicion.actualizar');
 
     Route::get('/examenes/{examen}/configuracion', [ConfiguracionExamenDocenteController::class, 'mostrar'])
         ->whereNumber('examen')
