@@ -2,13 +2,14 @@
     @file    modal-registrar-no-inscrito.blade.php
     @author  Valery D. Ortuno P <valerydariana98@gmail.com>
     @created 2026-10-25
+    @updated 2026-11-07
 
     @description
     Componente UI Blade para registrar la incidencia de un estudiante que no
     está en la lista del examen (HU 5), con la misma estética que el registro
     rápido (modal-registrar-tramposo) y los mismos campos de incidencia.
 
-    Se escribe el SIS (solo dígitos, 8 o 9) y, mientras se escribe, se pregunta
+    Se escribe el SIS (solo dígitos, 9 sí o sí) y, al completarlo, se pregunta
     con el evento 'consultar-no-inscrito' si el estudiante existe; la respuesta
     llega por 'estudiante-no-inscrito-consultado':
      - si existe, se precargan sus datos en la ficha, como en el registro
@@ -26,6 +27,10 @@
 
     @changelog
     - 2026-10-25  [Valery D. Ortuno P]  feat: creación inicial del componente.
+    - 2026-11-07  [Valery D. Ortuno P]  feat: varios motivos por incidencia:
+      `motivo` pasa a `motivos` (arreglo) y el evento manda la lista.
+    - 2026-11-07  [Valery D. Ortuno P]  fix: el SIS tiene 9 dígitos (antes 8 o
+      9); con 8 no se consulta ni se puede registrar.
 
     @see  resources/views/partials/modales/campos-incidencia.blade.php
     @see  App\Livewire\Monitoreo\MonitorEnVivo::registrarNoInscrito()
@@ -47,7 +52,7 @@
         nombre: '',
         apellido: '',
         sugerido: { nombre: '', apellido: '' },
-        motivo: '',
+        motivos: [],
         detalle: '',
         ahora: '',
         temporizador: null,
@@ -57,7 +62,7 @@
             this.existe = false;
             this.nombre = '';
             this.apellido = '';
-            this.motivo = '';
+            this.motivos = [];
             this.detalle = '';
             this.ahora = new Date().toLocaleString('es-BO', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
             this.recibir(estudiante);
@@ -89,7 +94,7 @@
             }
             this.existe = false;
         },
-        // Solo dígitos, hasta 9; con 8 o 9 se pregunta si existe.
+        // Solo dígitos, hasta 9; con los 9 se pregunta si existe.
         escribirSis(valor) {
             this.sis = valor.replace(/\D/g, '').slice(0, 9);
             this.consultado = false;
@@ -100,16 +105,16 @@
             }
         },
         get sisValido() {
-            return /^\d{8,9}$/.test(this.sis);
+            return /^\d{9}$/.test(this.sis);
         },
         get completo() {
             const estudianteListo = this.consultado && (this.existe || (this.nombre.trim() !== '' && this.apellido.trim() !== ''));
-            return estudianteListo && this.motivo !== '' && (this.motivo !== 'otro' || this.detalle.trim() !== '');
+            return estudianteListo && this.motivos.length > 0 && (! this.motivos.includes('otro') || this.detalle.trim() !== '');
         },
         registrar() {
             this.$dispatch('registrar-no-inscrito', {
                 sis: this.sis,
-                motivo: this.motivo,
+                motivos: this.motivos,
                 detalle: this.detalle,
                 nombre: this.existe ? null : this.nombre,
                 apellido: this.existe ? null : this.apellido,
@@ -163,7 +168,7 @@
                         @input="escribirSis($event.target.value); $event.target.value = sis"
                         class="block w-full rounded-base border border-default-medium bg-neutral-secondary-medium p-3 text-sm text-heading shadow-xs placeholder:text-body focus:border-brand focus:ring-brand"
                     >
-                    <p x-show="sis !== '' && ! sisValido" class="mt-1 text-xs text-muted">El codigo SIS tiene 8 o 9 digitos.</p>
+                    <p x-show="sis !== '' && ! sisValido" class="mt-1 text-xs text-muted">El codigo SIS tiene 9 digitos.</p>
                 </div>
 
                 {{-- Existe en la base: sus datos precargados, como en el registro rápido. --}}

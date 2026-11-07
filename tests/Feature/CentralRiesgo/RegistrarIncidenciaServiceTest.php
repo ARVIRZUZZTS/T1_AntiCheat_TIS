@@ -7,6 +7,8 @@
  *
  * @created 2026-10-25
  *
+ * @updated 2026-11-07
+ *
  * @description
  * Pruebas de integración del registro de incidencias (HU 5) contra el esquema
  * real de desarrollo, con DatabaseTransactions e IDs dedicados (rango
@@ -18,6 +20,9 @@
  *
  * @changelog
  * - 2026-10-25  [Valery D. Ortuno P]  test: creación inicial.
+ * - 2026-11-07  [Valery D. Ortuno P]  test: varios motivos por incidencia
+ *   (se guardan todos, sin repetir; al menos uno; "Otro" combinado también
+ *   exige descripción). El SIS de un estudiante nuevo tiene 9 dígitos.
  *
  * @see  App\Services\CentralRiesgo\RegistrarIncidenciaService
  */
@@ -154,23 +159,57 @@ class RegistrarIncidenciaServiceTest extends TestCase
         $this->assertDatabaseMissing('estudiante', ['sis_estudiante' => self::SIS_NUEVO]);
     }
 
-    public function test_el_motivo_debe_ser_de_la_lista_del_origen(): void
+    public function test_los_motivos_deben_ser_de_la_lista_del_origen(): void
     {
-        $this->assertRechaza('Seleccione un motivo de la lista.',
-            $this->datos(self::SIS_INSCRITO, origen: RegistroIncidenciaDTO::ORIGEN_INGRESO, motivo: Motivo::CopiaOIntercambioDeRespuestas));
+        $this->assertRechaza('Seleccione motivos de la lista.',
+            $this->datos(self::SIS_INSCRITO, origen: RegistroIncidenciaDTO::ORIGEN_INGRESO, motivos: [Motivo::AulaEquivocada, Motivo::CopiaOIntercambioDeRespuestas]));
+    }
+
+    public function test_exige_al_menos_un_motivo(): void
+    {
+        $this->assertRechaza('Seleccione al menos un motivo.', $this->datos(self::SIS_INSCRITO, motivos: []));
+    }
+
+    /** Se guardan todos los motivos elegidos, sin repetir. */
+    public function test_guarda_varios_motivos(): void
+    {
+        $registro = $this->registrar(self::DOCENTE, $this->datos(self::SIS_INSCRITO, motivos: [
+            Motivo::CopiaOIntercambioDeRespuestas,
+            Motivo::UsoDeDispositivosElectronicos,
+            Motivo::CopiaOIntercambioDeRespuestas,
+        ]));
+
+        $guardados = DB::table('central_riesgo_motivo')
+            ->where('id_registro', $registro->id_registro)
+            ->orderBy('motivo')
+            ->pluck('motivo')
+            ->all();
+
+        $this->assertEqualsCanonicalizing(
+            [Motivo::UsoDeDispositivosElectronicos->value, Motivo::CopiaOIntercambioDeRespuestas->value],
+            $guardados,
+        );
     }
 
     public function test_otro_exige_descripcion_y_la_descripcion_tiene_tope(): void
     {
         $this->assertRechaza('Describa el hecho cuando el motivo es Otro.',
-            $this->datos(self::SIS_INSCRITO, motivo: Motivo::Otro));
+            $this->datos(self::SIS_INSCRITO, motivos: [Motivo::Otro]));
+        // Combinado con otros motivos también la exige.
+        $this->assertRechaza('Describa el hecho cuando el motivo es Otro.',
+            $this->datos(self::SIS_INSCRITO, motivos: [Motivo::CopiaOIntercambioDeRespuestas, Motivo::Otro]));
         $this->assertRechaza('La descripcion no debe superar los 300 caracteres.',
             $this->datos(self::SIS_INSCRITO, detalle: str_repeat('a', 301)));
     }
 
-    public function test_el_sis_debe_tener_8_o_9_digitos(): void
+    /** Un estudiante que se da de alta desde el registro tiene SIS de 9 dígitos. */
+    public function test_el_sis_de_un_estudiante_nuevo_tiene_9_digitos(): void
     {
-        $this->assertRechaza('Ingrese un codigo SIS valido (8 o 9 digitos).', $this->datos('12345'));
+        $mensaje = 'Ingrese un codigo SIS valido (9 digitos).';
+
+        $this->assertRechaza($mensaje, $this->datos('12345'));
+        $this->assertRechaza($mensaje, $this->datos('90050009', nombre: 'Maria', apellido: 'Lopez'));
+        $this->assertDatabaseMissing('estudiante', ['sis_estudiante' => '90050009']);
     }
 
     private function registrar(int $idUsuario, RegistroIncidenciaDTO $datos): \App\Models\CentralRiesgo
@@ -192,12 +231,20 @@ class RegistrarIncidenciaServiceTest extends TestCase
     private function datos(
         string $sis,
         string $origen = RegistroIncidenciaDTO::ORIGEN_MONITOR,
-        Motivo $motivo = Motivo::CopiaOIntercambioDeRespuestas,
+        array $motivos = [Motivo::CopiaOIntercambioDeRespuestas],
         ?string $detalle = null,
         ?string $nombre = null,
         ?string $apellido = null,
     ): RegistroIncidenciaDTO {
-        return new RegistroIncidenciaDTO($sis, self::EXAMEN, $origen, $motivo->value, $detalle, $nombre, $apellido);
+        return new RegistroIncidenciaDTO(
+            $sis,
+            self::EXAMEN,
+            $origen,
+            array_map(fn (Motivo $motivo): string => $motivo->value, $motivos),
+            $detalle,
+            $nombre,
+            $apellido,
+        );
     }
 
     private function idRol(string $nombre): int

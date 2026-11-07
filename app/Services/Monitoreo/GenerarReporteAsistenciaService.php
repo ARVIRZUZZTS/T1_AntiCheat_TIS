@@ -9,6 +9,7 @@
  *
  * @updated 2026-10-11
  * @updated 2026-10-26
+ * @updated 2026-11-07
  *
  * @description
  * Servicio de dominio que genera el reporte de asistencia de un examen.
@@ -70,6 +71,9 @@
  *   docente real de la configuración del estudiante (con el creador del
  *   examen como respaldo). El resumen lo usaba desde el registrador y salía
  *   "Sin registro" para todo ingreso aún no confirmado en el monitor.
+ * - 2026-11-07  [Valery D. Ortuno P]  feat: una incidencia puede tener varios
+ *   motivos (`central_riesgo_motivo`): cada incidencia trae `motivos` (lista)
+ *   y `motivo_etiqueta` con todos ("Motivo 1 · Motivo 2").
  *
  * @see  \App\Livewire\Monitoreo\MonitorEnVivo
  * @see  App\Services\Asistencia\RegistroIngresoService
@@ -89,6 +93,7 @@ use App\Models\EstudianteExamen;
 use App\Models\Examen;
 use App\Models\RegistroAsistencia;
 use App\Services\Asistencia\RegistroIngresoService;
+use App\Services\CentralRiesgo\MotivosIncidencia;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -244,11 +249,14 @@ class GenerarReporteAsistenciaService
      * caso la clave no existe.
      *
      * @param  int  $idExamen  ID del examen.
-     * @return Collection<string, array{tipo: string, fecha: string, estado: string, motivo_etiqueta: string}>
+     * @return Collection<string, array{tipo: string, fecha: string, estado: string, motivos: list<string>, motivo_etiqueta: string}>
      */
     private function incidenciasPorEstudiante(int $idExamen, ?int $idDocente): Collection
     {
+        // Los motivos (pueden ser varios) entran en la misma consulta.
         return CentralRiesgo::query()
+            ->select('central_riesgo.*')
+            ->tap(fn ($consulta) => MotivosIncidencia::seleccionar($consulta, 'motivos_texto'))
             ->where('id_examen', $idExamen)
             ->orderBy('id_registro')
             ->get()
@@ -256,17 +264,15 @@ class GenerarReporteAsistenciaService
             ->map(fn (CentralRiesgo $riesgo): array => [
                 'tipo' => (string) $riesgo->tipo_infraccion?->value,
                 'examen_id' => (int) $riesgo->id_examen,
-                'motivo' => $riesgo->motivo instanceof Motivo
-                    ? $riesgo->motivo->value
-                    : (string) $riesgo->motivo,
+                'motivos' => array_map(
+                    fn (Motivo $motivo): string => $motivo->value,
+                    Motivo::lista($riesgo->getAttribute('motivos_texto')),
+                ),
                 'fecha' => $riesgo->fecha_registro?->format('d/m/Y') ?? '',
                 // El estado de revisión sale del tipo (tramposo = Confirmado).
                 'estado' => (string) $riesgo->tipo_infraccion?->estado(),
-                // `motivo` llega casteado a Motivo desde el modelo, pero se
-                // acepta también el texto plano por si el cast se retira.
-                'motivo_etiqueta' => $riesgo->motivo instanceof Motivo
-                    ? $riesgo->motivo->etiqueta()
-                    : (Motivo::tryFrom((string) $riesgo->motivo)?->etiqueta() ?? (string) $riesgo->motivo),
+                // Todos los motivos en una línea: "Motivo 1 · Motivo 2".
+                'motivo_etiqueta' => Motivo::etiquetas($riesgo->getAttribute('motivos_texto')),
             ]);
     }
 

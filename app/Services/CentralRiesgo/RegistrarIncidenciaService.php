@@ -8,6 +8,7 @@
  * @created 2026-10-25
  *
  * @updated 2026-10-26
+ * @updated 2026-11-07
  *
  * @description
  * Registro de una incidencia en la central de riesgos desde el monitor en vivo
@@ -18,10 +19,14 @@
  *  - Tipo según el rol del registrador: un docente registra `tramposo`
  *    (confirmado) y un auxiliar `sospechoso` (en revisión); el tipo es
  *    también el estado de la incidencia.
- *  - Motivo de la lista del origen (Motivo::paraIngreso() o paraMonitor()).
- *    La descripción admite hasta 300 caracteres y es obligatoria con "Otro".
+ *  - Uno o varios motivos, todos de la lista del origen
+ *    (Motivo::paraIngreso() o paraMonitor()); se guardan en
+ *    `central_riesgo_motivo`. La descripción admite hasta 300 caracteres y es
+ *    obligatoria si "Otro" está entre los elegidos.
  *  - Si el SIS no existe en la base, se da de alta al estudiante con los datos
- *    que dio (SIS, nombres y apellidos, obligatorios) como no verificado.
+ *    que dio (SIS, nombres y apellidos, obligatorios) como no verificado. El
+ *    SIS de un estudiante nuevo tiene 9 dígitos, sí o sí; uno que ya está en
+ *    la base se acepta como está (hay datos de prueba con 8).
  *  - Curso: si el estudiante está inscrito en el examen, el de su inscripción;
  *    si no, el primer curso del registrador en ese examen (para un auxiliar,
  *    el primero que tiene asignado).
@@ -34,6 +39,10 @@
  * - 2026-10-26  [Valery D. Ortuno P]  perf: el estudiante y su inscripción salen
  *   de una sola consulta, y la incidencia llega a las notificaciones con el
  *   estudiante ya cargado (no lo vuelven a consultar): dos viajes menos.
+ * - 2026-11-07  [Valery D. Ortuno P]  feat: varios motivos por incidencia
+ *   (`central_riesgo_motivo`, vía MotivosIncidencia).
+ * - 2026-11-07  [Valery D. Ortuno P]  fix: el SIS de un estudiante que se da
+ *   de alta desde el registro tiene 9 dígitos (antes se aceptaban 8 o 9).
  *
  * @see  App\Support\DTO\RegistroIncidenciaDTO
  * @see  App\Livewire\Monitoreo\MonitorEnVivo
@@ -62,8 +71,14 @@ class RegistrarIncidenciaService
     /** Tope de caracteres de nombres y de apellidos (columnas de `estudiante`). */
     public const NOMBRE_MAXIMO = 50;
 
-    /** SIS: solo dígitos, 8 o 9 (los que ya tiene la base). */
-    private const PATRON_SIS = '/^\d{8,9}$/';
+    /** SIS escrito: solo dígitos, como mucho 9. */
+    private const PATRON_SIS = '/^\d{1,9}$/';
+
+    /** SIS de un estudiante que se da de alta: 9 dígitos, sí o sí. */
+    private const PATRON_SIS_NUEVO = '/^\d{9}$/';
+
+    /** Mensaje de SIS inválido, igual para los dos casos. */
+    public const MENSAJE_SIS = 'Ingrese un codigo SIS valido (9 digitos).';
 
     /** Nombres y apellidos: letras (con tildes y ñ) y espacios. */
     private const PATRON_NOMBRE = '/^[\p{L} ]+$/u';
@@ -89,16 +104,16 @@ class RegistrarIncidenciaService
     public function ejecutar(RegistroIncidenciaDTO $datos, Usuario $registrador, int $idDocente): CentralRiesgo
     {
         $sis = trim($datos->sis);
-        $motivo = $this->validarMotivo($datos);
-        $detalle = $this->validarDetalle($motivo, $datos->detalle);
+        $motivos = $this->validarMotivos($datos);
+        $detalle = $this->validarDetalle($motivos, $datos->detalle);
 
         if (preg_match(self::PATRON_SIS, $sis) !== 1) {
-            throw new InvalidArgumentException('Ingrese un codigo SIS valido (8 o 9 digitos).');
+            throw new InvalidArgumentException(self::MENSAJE_SIS);
         }
 
         $esAuxiliar = self::esAuxiliar($registrador);
 
-        $registro = DB::transaction(function () use ($datos, $sis, $motivo, $detalle, $registrador, $idDocente, $esAuxiliar): CentralRiesgo {
+        $registro = DB::transaction(function () use ($datos, $sis, $motivos, $detalle, $registrador, $idDocente, $esAuxiliar): CentralRiesgo {
             $estudiante = $this->estudianteConInscripcion($sis, $datos->idExamen, $idDocente)
                 ?? $this->altaNoVerificado($sis, $datos);
             $idInscripcion = $estudiante->getAttribute('inscripcion_id');
@@ -115,7 +130,6 @@ class RegistrarIncidenciaService
                     : $this->cursoDelRegistrador($registrador, $datos->idExamen, $esAuxiliar),
                 'id_estudiante_examen' => $idInscripcion !== null ? (int) $idInscripcion : null,
                 'id_registrador' => $registrador->id_usuario,
-                'motivo' => $motivo->value,
                 'detalle_motivo' => $detalle,
                 'fecha_registro' => now(),
                 'tipo_infraccion' => $datos->origen === RegistroIncidenciaDTO::ORIGEN_INGRESO
@@ -124,6 +138,8 @@ class RegistrarIncidenciaService
                         ? TipoInfraccion::Sospechoso->value
                         : TipoInfraccion::Tramposo->value),
             ]);
+
+            MotivosIncidencia::guardar($incidencia->id_registro, $motivos);
 
             // Las notificaciones leen el estudiante de la incidencia: ya lo
             // tenemos, así que no hace falta otra consulta.
@@ -157,9 +173,13 @@ class RegistrarIncidenciaService
     }
 
     /**
-     * @throws InvalidArgumentException  Si el motivo no es de la lista del origen.
+     * Al menos un motivo y todos de la lista del origen.
+     *
+     * @return list<Motivo>  Los motivos elegidos, sin repetir y en el orden del enum.
+     *
+     * @throws InvalidArgumentException  Si no hay motivos o alguno no es de la lista del origen.
      */
-    private function validarMotivo(RegistroIncidenciaDTO $datos): Motivo
+    private function validarMotivos(RegistroIncidenciaDTO $datos): array
     {
         $permitidos = match ($datos->origen) {
             RegistroIncidenciaDTO::ORIGEN_INGRESO => Motivo::paraIngreso(),
@@ -167,21 +187,29 @@ class RegistrarIncidenciaService
             default => throw new InvalidArgumentException('Origen de la incidencia no valido.'),
         };
 
-        $motivo = Motivo::tryFrom($datos->motivo);
-
-        if ($motivo === null || ! in_array($motivo, $permitidos, true)) {
-            throw new InvalidArgumentException('Seleccione un motivo de la lista.');
+        if ($datos->motivos === []) {
+            throw new InvalidArgumentException('Seleccione al menos un motivo.');
         }
 
-        return $motivo;
+        foreach ($datos->motivos as $valor) {
+            $motivo = Motivo::tryFrom((string) $valor);
+
+            if ($motivo === null || ! in_array($motivo, $permitidos, true)) {
+                throw new InvalidArgumentException('Seleccione motivos de la lista.');
+            }
+        }
+
+        return Motivo::lista($datos->motivos);
     }
 
     /**
      * @return ?string  La descripción sin espacios sobrantes, o null si quedó vacía.
      *
+     * @param  list<Motivo>  $motivos  Motivos ya validados.
+     *
      * @throws InvalidArgumentException  Si supera el tope o falta con el motivo "Otro".
      */
-    private function validarDetalle(Motivo $motivo, ?string $detalle): ?string
+    private function validarDetalle(array $motivos, ?string $detalle): ?string
     {
         $detalle = trim((string) $detalle);
 
@@ -189,7 +217,7 @@ class RegistrarIncidenciaService
             throw new InvalidArgumentException('La descripcion no debe superar los '.self::DESCRIPCION_MAXIMO.' caracteres.');
         }
 
-        if ($motivo === Motivo::Otro && $detalle === '') {
+        if (in_array(Motivo::Otro, $motivos, true) && $detalle === '') {
             throw new InvalidArgumentException('Describa el hecho cuando el motivo es Otro.');
         }
 
@@ -226,10 +254,14 @@ class RegistrarIncidenciaService
      * Da de alta al estudiante que no estaba en la base con los datos que dio.
      * Queda como no verificado y sin curso: no aparece en las listas de curso.
      *
-     * @throws InvalidArgumentException  Si faltan o no son válidos los nombres o apellidos.
+     * @throws InvalidArgumentException  Si el SIS no tiene 9 dígitos o faltan o no son válidos los nombres o apellidos.
      */
     private function altaNoVerificado(string $sis, RegistroIncidenciaDTO $datos): Estudiante
     {
+        if (preg_match(self::PATRON_SIS_NUEVO, $sis) !== 1) {
+            throw new InvalidArgumentException(self::MENSAJE_SIS);
+        }
+
         $nombre = $this->validarNombre($datos->nombre, 'los nombres');
         $apellido = $this->validarNombre($datos->apellido, 'los apellidos');
 

@@ -11,6 +11,7 @@
  * @updated 2026-10-24
  * @updated 2026-10-25
  * @updated 2026-10-26
+ * @updated 2026-11-07
  *
  * @description Pruebas HTTP con SQLite en memoria, sin usar Supabase, del
  * endpoint GET /api/incidencias/{idIncidencia}: datos completos del detalle
@@ -34,6 +35,11 @@
  *   las etiquetas de motivo van sin acentos (HU 5).
  * - 2026-10-26  [Valery D. Ortuno P]  test: el esquema de prueba ya no
  *   tiene `estado_incidencia` ni `id_confirmador`, eliminadas de la base.
+ * - 2026-11-07  [Valery D. Ortuno P]  test: el detalle trae
+ *   `numero_incidencia`.
+ * - 2026-11-07  [Valery D. Ortuno P]  test: el esquema arranca con
+ *   `central_riesgo.motivo` y corre la migración de motivos múltiples (que lo
+ *   pasa a `central_riesgo_motivo`); el detalle trae todos los motivos.
  *
  * @see App\Http\Controllers\Api\DetalleIncidenciaController
  * @see App\Services\CentralRiesgo\ConsultarDetalleIncidenciaService
@@ -58,6 +64,10 @@ class DetalleIncidenciaTest extends TestCase
         DB::setDefaultConnection('incidencias_pruebas');
         $this->crearEsquema();
         $this->crearDatos();
+
+        // Como Supabase antes de la migración: el motivo en la columna. La
+        // migración lo pasa a `central_riesgo_motivo`.
+        (require database_path('migrations/2026_11_07_000001_motivos_multiples_incidencia.php'))->up();
     }
 
     protected function tearDown(): void
@@ -77,8 +87,10 @@ class DetalleIncidenciaTest extends TestCase
                     'id_registro' => 1,
                     'estudiante_nombre' => 'María Gómez',
                     'sis_estudiante' => '20181111111',
+                    'numero_incidencia' => 1,
                     'estudiante_verificado' => true,
                     'motivo' => 'Copia o intercambio de respuestas',
+                    'motivos' => ['Copia o intercambio de respuestas'],
                     'curso' => 'Matemática Discreta - Grupo 3',
                     'materia' => 'Matemática Discreta',
                     'grupo' => '3',
@@ -89,6 +101,21 @@ class DetalleIncidenciaTest extends TestCase
                     'descripcion' => 'Copia visible desde el celular en el momento del examen.',
                 ],
                 'mensaje' => 'Detalle de la incidencia obtenido correctamente.',
+            ]);
+    }
+
+    /** @throws \Throwable Si el detalle no muestra todos los motivos de la incidencia. */
+    public function test_el_detalle_trae_todos_los_motivos(): void
+    {
+        DB::table('central_riesgo_motivo')->insert(['id_registro' => 1, 'motivo' => 'uso de dispositivos electronicos']);
+
+        $this->actingAs(Usuario::findOrFail(1), 'web')
+            ->getJson('/api/incidencias/1')
+            ->assertOk()
+            ->assertJsonPath('datos.motivo', 'Uso de dispositivos electronicos no autorizados · Copia o intercambio de respuestas')
+            ->assertJsonPath('datos.motivos', [
+                'Uso de dispositivos electronicos no autorizados',
+                'Copia o intercambio de respuestas',
             ]);
     }
 

@@ -9,6 +9,7 @@
  *
  * @updated 2026-10-10
  * @updated 2026-10-25
+ * @updated 2026-11-07
  *
  * @description
  * Pruebas de integración del monitor en vivo (issue de ingreso con Livewire):
@@ -35,6 +36,9 @@
  *   RegistrarIncidenciaService (HU 5): motivos según la vista, modal de
  *   confirmación y alta de un estudiante no verificado; sin sesión
  *   el registrador es el creador del examen.
+ * - 2026-11-07  [Valery D. Ortuno P]  test: los registros mandan `motivos`
+ *   (lista) y los motivos se guardan en `central_riesgo_motivo`; el SIS del
+ *   no inscrito tiene 9 dígitos.
  */
 
 namespace Tests\Feature\Monitoreo;
@@ -152,13 +156,16 @@ class MonitorEnVivoTest extends TestCase
     {
         $componente = Livewire::test(MonitorEnVivo::class)
             ->call('cambiarVista', 'monitor')
-            ->call('registrarTramposo', self::SIS, Motivo::CopiaOIntercambioDeRespuestas->value, 'Visto copiando.')
+            ->call('registrarTramposo', self::SIS, [Motivo::CopiaOIntercambioDeRespuestas->value], 'Visto copiando.')
             ->assertSet('mensajeError', '');
 
         $this->assertDatabaseHas('central_riesgo', [
             'sis_estudiante' => self::SIS,
             'id_examen' => $this->idExamen,
             'tipo_infraccion' => TipoInfraccion::Tramposo->value,
+        ]);
+        $this->assertDatabaseHas('central_riesgo_motivo', [
+            'id_registro' => CentralRiesgo::query()->where('id_examen', $this->idExamen)->max('id_registro'),
             'motivo' => Motivo::CopiaOIntercambioDeRespuestas->value,
         ]);
 
@@ -171,8 +178,8 @@ class MonitorEnVivoTest extends TestCase
         $antes = CentralRiesgo::query()->where('id_examen', $this->idExamen)->count();
 
         Livewire::test(MonitorEnVivo::class)
-            ->call('registrarTramposo', self::SIS, 'motivo-que-no-existe')
-            ->assertSet('mensajeError', 'Seleccione un motivo de la lista.')
+            ->call('registrarTramposo', self::SIS, ['motivo-que-no-existe'])
+            ->assertSet('mensajeError', 'Seleccione motivos de la lista.')
             ->assertSet('incidenciaRegistrada', false);
 
         $this->assertSame(
@@ -186,15 +193,15 @@ class MonitorEnVivoTest extends TestCase
     public function test_un_motivo_del_monitor_no_vale_en_el_ingreso(): void
     {
         Livewire::test(MonitorEnVivo::class)
-            ->call('registrarTramposo', self::SIS, Motivo::CopiaOIntercambioDeRespuestas->value)
-            ->assertSet('mensajeError', 'Seleccione un motivo de la lista.');
+            ->call('registrarTramposo', self::SIS, [Motivo::CopiaOIntercambioDeRespuestas->value])
+            ->assertSet('mensajeError', 'Seleccione motivos de la lista.');
     }
 
     /** Un SIS que no está en la base se registra como estudiante no verificado. */
     public function test_registrar_no_inscrito_da_de_alta_un_estudiante_no_verificado(): void
     {
         Livewire::test(MonitorEnVivo::class)
-            ->call('registrarNoInscrito', '900199991', Motivo::IntentoDeIngresoNoAutorizado->value, null, 'Juan Carlos', 'Perez Rojas')
+            ->call('registrarNoInscrito', '900199991', [Motivo::IntentoDeIngresoNoAutorizado->value], null, 'Juan Carlos', 'Perez Rojas')
             ->assertSet('mensajeError', '');
 
         $this->assertDatabaseHas('estudiante', [

@@ -44,14 +44,19 @@
  *   pueda correr sin querer contra Supabase u otra base compartida.
  * - 2026-10-26  [Valery D. Ortuno P]  refactor: ya no escribe
  *   `estado_incidencia`, eliminada de la base (el tipo es el estado).
+ * - 2026-11-07  [Valery D. Ortuno P]  refactor: el motivo va en
+ *   `central_riesgo_motivo` (MotivosIncidencia::guardar()), ya no en
+ *   `central_riesgo.motivo`.
  */
 
 namespace Database\Seeders;
 
+use App\Enums\Motivo;
 use App\Models\CentralRiesgo;
 use App\Models\Curso;
 use App\Models\Estudiante;
 use App\Models\EstudianteExamen;
+use App\Services\CentralRiesgo\MotivosIncidencia;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
@@ -171,7 +176,7 @@ class DevEstudiantesSeeder extends Seeder
             }
 
             if (isset($datos['infraccion'])) {
-                CentralRiesgo::create([
+                $incidencia = CentralRiesgo::create([
                     'id_registro' => $idRegistro++,
                     'id_registrador' => $idDocente,
                     'detalle_motivo' => 'Generado por DevEstudiantesSeeder para pruebas.',
@@ -180,8 +185,8 @@ class DevEstudiantesSeeder extends Seeder
                     'id_curso' => self::ID_CURSO,
                     'sis_estudiante' => $sis,
                     'id_examen' => $idExamen,
-                    'motivo' => 'otro',
                 ]);
+                MotivosIncidencia::guardar($incidencia->id_registro, [Motivo::Otro]);
             }
         }
 
