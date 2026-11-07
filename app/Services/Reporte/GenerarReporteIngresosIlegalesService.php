@@ -2,7 +2,9 @@
 
 namespace App\Services\Reporte;
 
+use App\Enums\Motivo;
 use App\Models\CentralRiesgo;
+use App\Services\CentralRiesgo\MotivosIncidencia;
 use Illuminate\Support\Collection;
 
 class GenerarReporteIngresosIlegalesService
@@ -10,6 +12,9 @@ class GenerarReporteIngresosIlegalesService
     public function ejecutar(int $idExamen, ?int $idCurso = null): Collection
     {
         $query = CentralRiesgo::query()
+            ->select('central_riesgo.*')
+            // Una incidencia puede tener varios motivos: se muestran todos.
+            ->tap(fn ($consulta) => MotivosIncidencia::seleccionar($consulta, 'motivos_texto'))
             ->with(['estudiante', 'examen.ambientes'])
             ->where('id_examen', $idExamen);
 
@@ -34,7 +39,7 @@ class GenerarReporteIngresosIlegalesService
                 'estudiante' => trim(($estudiante?->nombre_estudiante ?? '').' '.($estudiante?->apellido_estudiante ?? '')),
                 'carrera' => $estudiante?->carrera,
                 'aula' => $examen?->ambientes->first()?->nombre_ambiente,
-                'motivo' => $incidencia->motivo->etiqueta(),
+                'motivo' => Motivo::etiquetas($incidencia->getAttribute('motivos_texto')),
                 'tipo' => $incidencia->tipo_infraccion->etiqueta(),
                 'estado' => $incidencia->tipo_infraccion->estado(),
                 'fecha' => $incidencia->fecha_registro?->format('d/m/Y H:i'),

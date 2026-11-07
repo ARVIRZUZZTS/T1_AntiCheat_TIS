@@ -3,6 +3,7 @@
     @author  David E. Chavez T. <virzuzz12345@gmail.com>
     @created 2026-09-29
     @updated 2026-10-12
+    @updated 2026-11-07
 
     @description
     Vista del monitor en vivo: tarjetas de conteo, tabla de estudiantes del
@@ -72,6 +73,8 @@
       "Registrar incidencia" y abre el modal del estudiante no inscrito, y se
       suman el modal de confirmación del registro y el estado (Confirmado o En
       revision) según el rol en los modales (HU 5).
+    - 2026-11-07  [Valery D. Ortuno P]  fix: una incidencia puede tener varios
+      motivos; el badge «Incidencia» sale si alguno de ellos es de ingreso.
 --}}
 
 @section('title', 'Monitor en vivo')
@@ -152,8 +155,9 @@
             return $badgeGenerico('status-central-riesgos', 'C. de Riesgos');
         }
 
-        // Incidencia registrada durante el ingreso -> Incidencia (amarillo).
-        if (in_array($incidencia['motivo'] ?? '', $motivosIngreso, true)) {
+        // Incidencia registrada durante el ingreso -> Incidencia (amarillo):
+        // alguno de sus motivos es de ingreso.
+        if (array_intersect($incidencia['motivos'] ?? [], $motivosIngreso) !== []) {
             return $badgeGenerico('status-en-revision', 'Incidencia');
         }
 

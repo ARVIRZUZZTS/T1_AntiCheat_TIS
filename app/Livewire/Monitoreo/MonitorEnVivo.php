@@ -9,6 +9,7 @@
  *
  * @updated 2026-10-10
  * @updated 2026-10-25
+ * @updated 2026-11-07
  *
  * @description
  * Componente Livewire de página completa del monitor en vivo: resuelve el
@@ -66,6 +67,9 @@
  *   consultarEstudiante(), registrarNoInscrito()), que reemplaza al botón
  *   "Reportar SIS" que llevaba a la página de registro, ya retirada; si se
  *   buscó un nombre, llega repartido entre nombres y apellidos.
+ * - 2026-11-07  [Valery D. Ortuno P]  feat: registrarTramposo() y
+ *   registrarNoInscrito() reciben `motivos` (una lista): una incidencia puede
+ *   tener varios.
  */
 
 namespace App\Livewire\Monitoreo;
@@ -704,17 +708,17 @@ class MonitorEnVivo extends Component
      * con los motivos de la vista activa (ingreso o monitor).
      *
      * @param  string  $sis  Código SIS del estudiante.
-     * @param  ?string  $motivo  Valor de un caso de `Motivo`.
+     * @param  array<int, string>  $motivos  Valores de casos de `Motivo` (uno o varios).
      * @param  ?string  $detalle  Descripción libre del hecho.
      */
     #[On('registrar-tramposo')]
-    public function registrarTramposo(string $sis, ?string $motivo = null, ?string $detalle = null): void
+    public function registrarTramposo(string $sis, array $motivos = [], ?string $detalle = null): void
     {
         $this->registrarIncidencia(new RegistroIncidenciaDTO(
             sis: $sis,
             idExamen: $this->idExamen,
             origen: $this->modoVista,
-            motivo: (string) $motivo,
+            motivos: array_values($motivos),
             detalle: $detalle,
         ));
     }
@@ -730,7 +734,7 @@ class MonitorEnVivo extends Component
     #[On('registrar-no-inscrito')]
     public function registrarNoInscrito(
         string $sis,
-        ?string $motivo = null,
+        array $motivos = [],
         ?string $detalle = null,
         ?string $nombre = null,
         ?string $apellido = null,
@@ -739,7 +743,7 @@ class MonitorEnVivo extends Component
             sis: $sis,
             idExamen: $this->idExamen,
             origen: $this->modoVista,
-            motivo: (string) $motivo,
+            motivos: array_values($motivos),
             detalle: $detalle,
             nombre: $nombre,
             apellido: $apellido,

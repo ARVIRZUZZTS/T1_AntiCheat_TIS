@@ -4,6 +4,7 @@
     @created 2026-10-10
     @updated 2026-10-10
     @updated 2026-10-25
+    @updated 2026-11-07
 
     @description
     Componente UI Blade reutilizable para el registro rápido de incidencia
@@ -24,6 +25,9 @@
       descripción obligatoria con "Otro" y tope de 300), y el botón se
       deshabilita mientras falte un dato obligatorio; el encabezado ya no repite
       nombre y SIS, que se ven en la ficha (HU 5).
+    - 2026-11-07  [Valery D. Ortuno P]  feat: varios motivos por incidencia:
+      `motivo` pasa a `motivos` (arreglo), el botón pide al menos uno (y la
+      descripción si "Otro" está marcado) y el evento manda la lista.
 
     @see  resources/views/partials/modales/campos-incidencia.blade.php
     @see  resources/views/components/ui/modal-registrar-no-inscrito.blade.php
@@ -40,20 +44,20 @@
         show: false,
         nombre: '',
         sis: '',
-        motivo: '',
+        motivos: [],
         detalle: '',
         ahora: '',
         abrir(datos) {
             datos = datos || {};
             this.nombre = datos.nombre || '';
             this.sis = datos.sis || '';
-            this.motivo = '';
+            this.motivos = [];
             this.detalle = '';
             this.ahora = new Date().toLocaleString('es-BO', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
             this.show = true;
         },
         get completo() {
-            return this.motivo !== '' && (this.motivo !== 'otro' || this.detalle.trim() !== '');
+            return this.motivos.length > 0 && (! this.motivos.includes('otro') || this.detalle.trim() !== '');
         }
     }"
     x-show="show"
@@ -108,7 +112,7 @@
                     :disabled="! completo"
                     :class="completo ? 'text-white bg-danger border-transparent hover:bg-danger-strong cursor-pointer' : 'text-fg-disabled bg-disabled border-default-medium cursor-not-allowed'"
                     class="w-full inline-flex items-center justify-center box-border border focus:ring-4 focus:ring-danger-medium shadow-xs font-medium leading-5 rounded-base focus:outline-none px-4 py-2.5 text-sm"
-                    @click="$dispatch('registrar-tramposo', { sis: sis, motivo: motivo, detalle: detalle }); show = false"
+                    @click="$dispatch('registrar-tramposo', { sis: sis, motivos: motivos, detalle: detalle }); show = false"
                 >Registrar incidencia</button>
                 <x-ui.button-cancelar class="w-full" @click="show = false">Cancelar</x-ui.button-cancelar>
             </div>

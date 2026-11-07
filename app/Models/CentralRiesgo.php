@@ -48,11 +48,13 @@
  *   `tipo_infraccion` (TipoInfraccion::estado()).
  * - 2026-11-07  [Valery D. Ortuno P]  feat: scope conNumeroIncidencia(), el
  *   número de cada incidencia del estudiante en la central (1, 2, 3...).
+ * - 2026-11-07  [Valery D. Ortuno P]  refactor: se quita `motivo` de fillable y
+ *   casts: una incidencia puede tener varios motivos y pasan a
+ *   `central_riesgo_motivo` (ver MotivosIncidencia).
  */
 
 namespace App\Models;
 
-use App\Enums\Motivo;
 use App\Enums\TipoInfraccion;
 use App\Services\CentralRiesgo\CacheCentralRiesgo;
 use Illuminate\Database\Eloquent\Builder;
@@ -66,7 +68,6 @@ use Illuminate\Support\Carbon;
  * @property int $id_examen
  * @property ?int $id_curso
  * @property int $id_registrador
- * @property Motivo $motivo
  * @property ?string $detalle_motivo
  * @property Carbon $fecha_registro
  * @property TipoInfraccion $tipo_infraccion
@@ -90,7 +91,6 @@ class CentralRiesgo extends Model
         'id_examen',
         'id_curso',
         'id_registrador',
-        'motivo',
         'detalle_motivo',
         'fecha_registro',
         'tipo_infraccion',
@@ -101,7 +101,6 @@ class CentralRiesgo extends Model
     {
         return [
             'fecha_registro' => 'datetime',
-            'motivo' => Motivo::class,
             'tipo_infraccion' => TipoInfraccion::class,
         ];
     }
