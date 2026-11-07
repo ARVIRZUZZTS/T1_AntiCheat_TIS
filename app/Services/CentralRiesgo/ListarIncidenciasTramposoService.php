@@ -12,6 +12,7 @@
  * @updated 2026-10-24
  * @updated 2026-10-25
  * @updated 2026-10-26
+ * @updated 2026-11-07
  *
  * @description
  * Servicio de dominio que lista las incidencias de la central de riesgos con
@@ -75,10 +76,14 @@
  * - 2026-11-07  [Valery D. Ortuno P]  feat: cada registro trae
  *   `numero_incidencia` (1 la primera vez que el estudiante entra a la
  *   central, 2 la segunda...).
+ * - 2026-11-07  [Valery D. Ortuno P]  feat: varios motivos por incidencia:
+ *   `motivos` (valores) y `motivo_etiqueta` ("Motivo 1 · Motivo 2"), leídos
+ *   de `central_riesgo_motivo` en la misma consulta.
  */
 
 namespace App\Services\CentralRiesgo;
 
+use App\Enums\Motivo;
 use App\Enums\TipoInfraccion;
 use App\Models\CentralRiesgo;
 use App\Services\Examen\BusquedaEstudianteService;
@@ -162,6 +167,8 @@ class ListarIncidenciasTramposoService
 
         // La fecha es el orden base: es el que pide la central por defecto y el
         // que desempata a dos estudiantes con el mismo nombre en el orden A-Z.
+        MotivosIncidencia::seleccionar($query, 'lista_motivos');
+
         $incidencias = $query
             ->orderByDesc('central_riesgo.fecha_registro')
             ->orderByDesc('central_riesgo.id_registro')
@@ -318,8 +325,12 @@ class ListarIncidenciasTramposoService
             'numero_incidencia' => (int) $incidencia->getAttribute('lista_numero_incidencia'),
             'curso' => $curso,
             'materia' => $curso !== null ? NombreCurso::materia($curso) : null,
-            'motivo' => $incidencia->motivo,
-            'motivo_etiqueta' => $incidencia->motivo->etiqueta(),
+            // Una incidencia puede tener varios motivos.
+            'motivos' => array_map(
+                fn (Motivo $motivo): string => $motivo->value,
+                Motivo::lista($incidencia->getAttribute('lista_motivos')),
+            ),
+            'motivo_etiqueta' => Motivo::etiquetas($incidencia->getAttribute('lista_motivos')),
             // La central solo lista tramposos, y tramposo equivale a confirmado.
             'estado' => TipoInfraccion::Tramposo->estado(),
             'fecha' => $incidencia->fecha_registro->toDateTimeString(),

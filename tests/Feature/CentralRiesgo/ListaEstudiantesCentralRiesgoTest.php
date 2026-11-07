@@ -53,6 +53,10 @@
  * - 2026-11-07  [Valery D. Ortuno P]  test: número de incidencia del
  *   estudiante (sube cada vez que entra a la central, no cuenta las
  *   sospechosas y no cambia con el alcance) en la tabla y el detalle.
+ * - 2026-11-07  [Valery D. Ortuno P]  test: los motivos van en
+ *   `central_riesgo_motivo` (el esquema corre la migración de motivos
+ *   múltiples) y una incidencia con varios los muestra todos, en la lista y
+ *   en el detalle.
  */
 
 namespace Tests\Feature\CentralRiesgo;
@@ -210,6 +214,24 @@ class ListaEstudiantesCentralRiesgoTest extends TestCase
 
         // La del examen B es de otro docente y no se ve, pero sigue contando.
         $this->assertSame([1, 3], array_values($numeros));
+    }
+
+    /** Una incidencia con varios motivos los muestra todos: "Motivo 1 · Motivo 2". */
+    public function test_una_incidencia_con_varios_motivos_los_muestra_todos(): void
+    {
+        $this->crearEstudiante('900000062', 'Rita', 'Varios Motivos');
+        $this->crearIncidencia('900000062', self::EXAMEN_A, 'tramposo', '2026-10-05 09:00:00', motivos: [
+            'otro',
+            'copia o intercambio de respuestas',
+            'uso de dispositivos electronicos',
+        ]);
+
+        // En el orden de los formularios, sin importar cómo se guardaron.
+        $esperado = 'Uso de dispositivos electronicos no autorizados · Copia o intercambio de respuestas · Otro';
+        $componente = $this->institucion()->set('busqueda', '900000062');
+
+        $componente->assertSee($esperado);
+        $componente->call('verDetalle', $this->idDeIncidencia('900000062'))->assertSee($esperado);
     }
 
     public function test_mis_materias_muestra_solo_los_sancionados_en_materias_del_usuario(): void
@@ -509,7 +531,6 @@ class ListaEstudiantesCentralRiesgoTest extends TestCase
             'id_examen' => self::EXAMEN_A,
             'sis_estudiante' => '900000050',
             'id_registrador' => self::DOCENTE_A,
-            'motivo' => 'uso de dispositivos electronicos',
             'detalle_motivo' => 'Prueba de invalidación de la caché',
             'fecha_registro' => '2026-10-06 08:00:00',
             'tipo_infraccion' => 'tramposo',
@@ -583,6 +604,7 @@ class ListaEstudiantesCentralRiesgoTest extends TestCase
         string $fecha,
         int $registrador = self::DOCENTE_A,
         int|null|false $curso = false,
+        array $motivos = ['uso de dispositivos electronicos'],
     ): void {
         $cursoPorExamen = [
             self::EXAMEN_A => self::CURSO_A,
@@ -596,11 +618,17 @@ class ListaEstudiantesCentralRiesgoTest extends TestCase
             'id_curso' => $curso === false ? $cursoPorExamen[$idExamen] : $curso,
             'sis_estudiante' => $sis,
             'id_registrador' => $registrador,
-            'motivo' => 'uso de dispositivos electronicos',
             'detalle_motivo' => 'Motivo de prueba '.$sis,
             'fecha_registro' => $fecha,
             'tipo_infraccion' => $tipo,
         ]);
+
+        foreach ($motivos as $motivo) {
+            DB::table('central_riesgo_motivo')->insert([
+                'id_registro' => $this->ultimoIdRegistro,
+                'motivo' => $motivo,
+            ]);
+        }
     }
 
     private function crearEsquema(): void
@@ -649,12 +677,14 @@ class ListaEstudiantesCentralRiesgoTest extends TestCase
             $tabla->integer('id_curso')->nullable();
             $tabla->string('sis_estudiante');
             $tabla->integer('id_registrador');
-            $tabla->string('motivo');
             $tabla->string('detalle_motivo')->nullable();
             $tabla->dateTime('fecha_registro');
             $tabla->string('tipo_infraccion');
             $tabla->foreign('sis_estudiante')->references('sis_estudiante')->on('estudiante');
         });
+
+        // Los motivos van en su propia tabla (una incidencia puede tener varios).
+        (require database_path('migrations/2026_11_07_000001_motivos_multiples_incidencia.php'))->up();
     }
 
     private function crearDatos(): void

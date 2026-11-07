@@ -42,6 +42,9 @@
     - 2026-11-07  [Valery D. Ortuno P]  feat: número de incidencia del
       estudiante (1 la primera vez que entra a la central, 2 la segunda...) en
       las cards, en la tabla y en el detalle.
+    - 2026-11-07  [Valery D. Ortuno P]  feat: una incidencia puede tener varios
+      motivos; se muestran todos ("Motivo 1 · Motivo 2") en la lista y en el
+      detalle, y en la card van en su propia línea, debajo del número.
 
     @see  App\Livewire\CentralRiesgo\ListaEstudiantes
     @see  resources/views/partials/busqueda-estudiante.blade.php
@@ -144,10 +147,10 @@
                                 </div>
                             </div>
                             <div class="mt-3 flex items-center justify-between gap-3">
-                                <p class="min-w-0 break-words text-xs text-body">
-                                    <span class="font-semibold text-heading">Incidencia N° {{ $estudiante['numero_incidencia'] }}</span>
-                                    · {{ $estudiante['motivo_etiqueta'] }}
-                                </p>
+                                <div class="min-w-0 text-xs">
+                                    <p class="font-semibold text-heading">Incidencia N° {{ $estudiante['numero_incidencia'] }}</p>
+                                    <p class="mt-0.5 break-words text-body">{{ $estudiante['motivo_etiqueta'] }}</p>
+                                </div>
                                 <button type="button" wire:click.stop="verDetalle({{ $estudiante['id_registro'] }})"
                                         class="shrink-0 cursor-pointer border-0 bg-transparent p-0 text-xs font-bold text-fg-danger-strong hover:underline">
                                     Ver detalle ›

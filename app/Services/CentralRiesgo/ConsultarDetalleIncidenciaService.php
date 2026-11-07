@@ -11,6 +11,7 @@
  * @updated 2026-10-24
  * @updated 2026-10-25
  * @updated 2026-10-26
+ * @updated 2026-11-07
  *
  * @description
  * Servicio de dominio que devuelve el detalle de una incidencia de la
@@ -60,6 +61,9 @@
  * - 2026-11-07  [Valery D. Ortuno P]  feat: el detalle trae
  *   `numero_incidencia` (null si todavía es sospechosa y no está en la
  *   central).
+ * - 2026-11-07  [Valery D. Ortuno P]  feat: varios motivos por incidencia:
+ *   `motivo` trae todos ("Motivo 1 · Motivo 2") y `motivos` la lista de
+ *   etiquetas, leídos de `central_riesgo_motivo` en la misma consulta.
  *
  * @see  App\Policies\CentralRiesgoPolicy
  * @see  App\Models\CentralRiesgo
@@ -105,6 +109,7 @@ class ConsultarDetalleIncidenciaService
             ->selectRaw('usuario.apellido as det_usr_apellido')
             ->selectRaw('curso.nombre_curso as det_curso')
             ->conNumeroIncidencia('det_numero_incidencia')
+            ->tap(fn ($consulta) => MotivosIncidencia::seleccionar($consulta, 'det_motivos'))
             // Rol (docente/auxiliar) del registrador, sin segunda consulta.
             ->selectRaw(
                 '(select r.nombre_rol from rol_usuario ru'
@@ -138,7 +143,12 @@ class ConsultarDetalleIncidenciaService
                 : null,
             // False si el estudiante se dio de alta desde una incidencia (HU 5).
             'estudiante_verificado' => (bool) ($incidencia->getAttribute('det_est_verificado') ?? true),
-            'motivo' => $this->etiquetaMotivo($incidencia),
+            // Todos los motivos, en una línea como en la lista, y por separado.
+            'motivo' => Motivo::etiquetas($incidencia->getAttribute('det_motivos')),
+            'motivos' => array_map(
+                fn (Motivo $motivo): string => $motivo->etiqueta(),
+                Motivo::lista($incidencia->getAttribute('det_motivos')),
+            ),
             // "Calculo I - Grupo 2" completo, y por separado materia y grupo.
             'curso' => $curso,
             'materia' => $curso !== null ? NombreCurso::materia($curso) : null,
@@ -154,21 +164,6 @@ class ConsultarDetalleIncidenciaService
             'estado' => $this->estado($incidencia),
             'descripcion' => $incidencia->detalle_motivo,
         ];
-    }
-
-    private function etiquetaMotivo(CentralRiesgo $incidencia): ?string
-    {
-        $motivo = $incidencia->getAttribute('motivo');
-
-        if ($motivo instanceof Motivo) {
-            return $motivo->etiqueta();
-        }
-
-        if (is_string($motivo)) {
-            return Motivo::tryFrom($motivo)?->etiqueta() ?? $motivo;
-        }
-
-        return null;
     }
 
     /**
