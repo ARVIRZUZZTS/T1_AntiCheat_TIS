@@ -2,6 +2,7 @@
     @file    campos-incidencia.blade.php
     @author  Valery D. Ortuno P <valerydariana98@gmail.com>
     @created 2026-10-25
+    @updated 2026-11-07
 
     @description
     Campos comunes de los modales de registro de incidencia del monitor en
@@ -11,16 +12,20 @@
      - "Fecha y hora del registro" y "Estado de la incidencia", de solo
        lectura: el estado sale del rol (docente "Confirmado", auxiliar "En
        revision"); la hora la fija el servidor al guardar.
-     - "Motivo de la incidencia" (obligatorio): los motivos de la vista,
-       ingreso o monitor (Motivo::paraIngreso() / paraMonitor()).
-     - "Descripcion del hecho": hasta 300 caracteres, obligatoria con "Otro".
+     - "Motivo de la incidencia" (obligatorio): casillas con los motivos de la
+       vista, ingreso o monitor (Motivo::paraIngreso() / paraMonitor()); se
+       pueden marcar varios, también "Otro" junto con otros.
+     - "Descripcion del hecho": hasta 300 caracteres, obligatoria si "Otro"
+       está marcado.
 
-    Lo incluye un x-data que declara `ahora`, `motivo` y `detalle`. Recibe
+    Lo incluye un x-data que declara `ahora`, `motivos` (arreglo) y `detalle`. Recibe
     `$contexto` ('ingreso' o 'monitor'), `$comoAuxiliar` y `$prefijo` (para
     que los id no se repitan entre modales).
 
     @changelog
     - 2026-10-25  [Valery D. Ortuno P]  feat: creación inicial del parcial.
+    - 2026-11-07  [Valery D. Ortuno P]  feat: los motivos pasan de radio a
+      casillas: una incidencia puede tener varios (`motivos`).
 
     @see  resources/views/components/ui/modal-registrar-tramposo.blade.php
     @see  resources/views/components/ui/modal-registrar-no-inscrito.blade.php
@@ -52,22 +57,22 @@
 
 <div>
     <p class="mb-2 text-sm font-medium text-heading">Motivo de la incidencia <span class="text-fg-danger-strong" aria-hidden="true">*</span></p>
+    <p class="-mt-1 mb-2 text-xs text-muted">Puede marcar uno o varios.</p>
     <div class="space-y-2">
         @foreach ($motivos as $item)
             <label
                 for="{{ $prefijo }}-motivo-{{ $item->name }}"
                 class="flex cursor-pointer items-center gap-3 rounded-base p-3 transition"
-                :class="motivo === @js($item->value)
+                :class="motivos.includes(@js($item->value))
                     ? 'border-2 border-brand bg-brand-softer'
                     : 'border border-light hover:bg-neutral-secondary-soft'"
             >
                 <input
-                    type="radio"
+                    type="checkbox"
                     id="{{ $prefijo }}-motivo-{{ $item->name }}"
-                    name="{{ $prefijo }}_motivo"
                     value="{{ $item->value }}"
-                    x-model="motivo"
-                    class="h-4 w-4 shrink-0 accent-brand"
+                    x-model="motivos"
+                    class="h-4 w-4 shrink-0 rounded-xs accent-brand"
                 >
                 <span class="text-sm text-heading">{{ $item->etiqueta() }}</span>
             </label>
@@ -78,7 +83,7 @@
 <div>
     <label for="{{ $prefijo }}-detalle" class="mb-2 block text-sm font-medium text-heading">
         Descripcion del hecho
-        <span x-show="motivo === @js(Motivo::Otro->value)" class="text-fg-danger-strong" aria-hidden="true">*</span>
+        <span x-show="motivos.includes(@js(Motivo::Otro->value))" class="text-fg-danger-strong" aria-hidden="true">*</span>
     </label>
     <textarea
         id="{{ $prefijo }}-detalle"
