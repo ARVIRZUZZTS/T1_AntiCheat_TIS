@@ -4,6 +4,10 @@
     @created 2026-10-17
     @updated 2026-10-17
     @description Pantalla de inicio de sesión.
+    @updated 2026-11-07
+    @author Alisson D. Alvarado <alvaradoalissondalet@gmail.com>
+    @changelog
+    - 2026-11-07  [Alisson D. Alvarado]  feat: identificar el acceso a crear cuenta.
 --}}
 @extends('layouts.guest')
 
@@ -64,7 +68,7 @@
             </p>
             <p class="mt-2 text-center text-sm text-body">
                 ¿Eres docente y no tienes cuenta?
-                <a href="{{ route('registro') }}" class="font-semibold text-fg-brand">Regístrate aquí</a>
+                <a href="{{ route('registro') }}" class="font-semibold text-fg-brand">Crear cuenta</a>
             </p>
         </form>
 

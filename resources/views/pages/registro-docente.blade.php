@@ -1,9 +1,13 @@
 {{--
     @file    registro-docente.blade.php
     @author  T1 - Tech One SRL
+    @author  Alisson D. Alvarado <alvaradoalissondalet@gmail.com>
     @created 2026-10-17
-    @updated 2026-10-17
+    @updated 2026-11-07
     @description Formulario de registro de docente (mock de vista).
+    @changelog
+    - 2026-11-07  [Alisson D. Alvarado]  feat: validar los siete campos en el navegador.
+    - 2026-11-07  [Alisson D. Alvarado]  feat: limitar el código SIS y compactar el formulario.
 --}}
 @extends('layouts.guest')
 
@@ -22,55 +26,110 @@
     <div class="w-full max-w-md">
         <h2 class="mb-6 text-2xl font-semibold text-heading">Registrar nuevo docente</h2>
 
-        <form method="POST" action="#"
+        {{-- Los nombres registrados solo viven en esta vista hasta conectar el backend. --}}
+        <form novalidate onsubmit="return false"
               x-data="{
-                  nombre: '', apellido: '', correo: '', codSis: '', password: '', password2: '',
+                  nombre: '', apellido: '', usuario: '', correo: '', codSis: '', password: '', password2: '',
                   ver1: false, ver2: false,
-                  errores: {},
+                  errores: {}, intento: false, creado: false, usuarios: [],
                   validar() {
                       this.errores = {};
-                      if (!this.nombre) this.errores.nombre = 'Requerido';
-                      if (!this.apellido) this.errores.apellido = 'Requerido';
-                      if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(this.correo)) this.errores.correo = 'Correo inválido';
-                      if (!this.codSis) this.errores.codSis = 'Requerido';
-                      if (this.password.length < 8) this.errores.password = 'Mínimo 8 caracteres';
-                      if (this.password !== this.password2) this.errores.password2 = 'No coincide';
+                      if (!this.nombre.trim()) this.errores.nombre = 'El nombre es obligatorio';
+                      if (!this.apellido.trim()) this.errores.apellido = 'El apellido es obligatorio';
+                      if (!this.usuario.trim()) this.errores.usuario = 'El nombre de usuario es obligatorio';
+                      else if (this.usuarios.includes(this.usuario.trim().toLowerCase())) {
+                          this.errores.usuario = 'Este nombre de usuario ya está en uso';
+                      }
+                      if (!this.correo.trim()) this.errores.correo = 'El correo es obligatorio';
+                      else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(this.correo.trim())) {
+                          this.errores.correo = 'El correo electrónico no es válido';
+                      }
+                      if (!this.codSis.trim()) this.errores.codSis = 'El código SIS es obligatorio';
+                      else if (!/^\d{9}$/.test(this.codSis)) {
+                          this.errores.codSis = 'El código SIS debe tener 9 dígitos';
+                      }
+                      if (!this.password.trim()) this.errores.password = 'La contraseña es obligatoria';
+                      else if (this.password.trim().length < 8) {
+                          this.errores.password = 'La contraseña debe tener al menos 8 caracteres';
+                      }
+                      if (!this.password2.trim()) {
+                          this.errores.password2 = 'La confirmación de contraseña es obligatoria';
+                      } else if (this.password.trim() !== this.password2.trim()) {
+                          this.errores.password2 = 'Las contraseñas no coinciden';
+                      }
+                  },
+                  registrar() {
+                      this.intento = true;
+                      this.creado = false;
+                      this.validar();
                       if (Object.keys(this.errores).length) return;
-                      window.location.href = '{{ route('solicitud-revision') }}' + '?sis=' + encodeURIComponent(this.codSis) + '&nombre=' + encodeURIComponent(this.nombre);
+                      this.usuarios.push(this.usuario.trim().toLowerCase());
+                      this.creado = true;
+                      this.intento = false;
                   }
               }"
-              @submit.prevent="validar()">
-            @csrf
+              @input="if (intento) validar(); creado = false"
+              @submit.prevent="registrar()">
+            <p x-cloak x-show="creado" role="status" class="mb-4 text-sm text-fg-brand">
+                Cuenta creada exitosamente (simulación).
+            </p>
 
-            <div class="mb-4">
-                <x-ui.input name="nombre" label="NOMBRE" placeholder="Nombre" required x-model="nombre" />
-                <p x-show="errores.nombre" x-text="errores.nombre" class="mt-1 text-sm text-fg-danger-strong"></p>
+            <div class="mb-2">
+                <x-ui.input name="nombre" label="Nombre" placeholder="Nombre" required x-model="nombre"
+                            aria-describedby="error-nombre" x-bind:aria-invalid="!!errores.nombre" />
+                <p id="error-nombre" x-text="errores.nombre || ''" aria-live="polite"
+                   class="min-h-4 text-sm text-fg-danger-strong"></p>
             </div>
-            <div class="mb-4">
-                <x-ui.input name="apellido" label="APELLIDO" placeholder="Apellido" required x-model="apellido" />
-                <p x-show="errores.apellido" x-text="errores.apellido" class="mt-1 text-sm text-fg-danger-strong"></p>
+            <div class="mb-2">
+                <x-ui.input name="apellido" label="Apellido" placeholder="Apellido" required x-model="apellido"
+                            aria-describedby="error-apellido" x-bind:aria-invalid="!!errores.apellido" />
+                <p id="error-apellido" x-text="errores.apellido || ''" aria-live="polite"
+                   class="min-h-4 text-sm text-fg-danger-strong"></p>
             </div>
-            <div class="mb-4">
-                <x-ui.input name="correo" type="email" label="CORREO" placeholder="nombre.apellido@umss.edu" required x-model="correo" />
-                <p x-show="errores.correo" x-text="errores.correo" class="mt-1 text-sm text-fg-danger-strong"></p>
+            <div class="mb-2">
+                <x-ui.input name="usuario" label="Nombre de usuario" placeholder="Nombre de usuario" required
+                            x-model="usuario" autocomplete="username" aria-describedby="error-usuario"
+                            x-bind:aria-invalid="!!errores.usuario" />
+                <p id="error-usuario" x-text="errores.usuario || ''" aria-live="polite"
+                   class="min-h-4 text-sm text-fg-danger-strong"></p>
             </div>
-            <div class="mb-4">
-                <x-ui.input name="cod_sis" label="CÓDIGO SIS" placeholder="202301310" required x-model="codSis" />
-                <p x-show="errores.codSis" x-text="errores.codSis" class="mt-1 text-sm text-fg-danger-strong"></p>
+            <div class="mb-2">
+                <x-ui.input name="correo" type="email" label="Correo electrónico" placeholder="nombre.apellido@umss.edu"
+                            required x-model="correo" aria-describedby="error-correo"
+                            x-bind:aria-invalid="!!errores.correo" />
+                <p id="error-correo" x-text="errores.correo || ''" aria-live="polite"
+                   class="min-h-4 text-sm text-fg-danger-strong"></p>
             </div>
-            <div class="mb-4 relative">
-                <x-ui.input name="password" label="CONTRASEÑA" type="password" required x-model="password" x-ref="p1" />
-                <button type="button" class="absolute end-3 top-9 text-body" @click="ver1=!ver1; $refs.p1.type = ver1?'text':'password'">
+            <div class="mb-2">
+                <x-ui.input name="cod_sis" label="Código SIS" placeholder="202301310" required x-model="codSis"
+                            inputmode="numeric" maxlength="9" pattern="[0-9]{9}"
+                            @input="codSis = $event.target.value.replace(/[^0-9]/g, '').slice(0, 9); $event.target.value = codSis"
+                            aria-describedby="error-cod-sis" x-bind:aria-invalid="!!errores.codSis" />
+                <p id="error-cod-sis" x-text="errores.codSis || ''" aria-live="polite"
+                   class="min-h-4 text-sm text-fg-danger-strong"></p>
+            </div>
+            <div class="mb-2 relative">
+                <x-ui.input name="password" label="Contraseña" type="password" required x-model="password" x-ref="p1"
+                            autocomplete="new-password" aria-describedby="error-password"
+                            x-bind:aria-invalid="!!errores.password" />
+                <button type="button" class="absolute end-3 top-9 text-body" aria-label="Mostrar u ocultar contraseña"
+                        @click="ver1 = !ver1; $refs.p1.type = ver1 ? 'text' : 'password'">
                     <span x-text="ver1 ? 'Ocultar' : 'Ver'"></span>
                 </button>
-                <p x-show="errores.password" x-text="errores.password" class="mt-1 text-sm text-fg-danger-strong"></p>
+                <p id="error-password" x-text="errores.password || ''" aria-live="polite"
+                   class="min-h-4 text-sm text-fg-danger-strong"></p>
             </div>
-            <div class="mb-4 relative">
-                <x-ui.input name="password_confirmation" label="CONFIRMAR CONTRASEÑA" type="password" required x-model="password2" x-ref="p2" />
-                <button type="button" class="absolute end-3 top-9 text-body" @click="ver2=!ver2; $refs.p2.type = ver2?'text':'password'">
-                    <span x-text="ver2 ? 'Ocultar' : 'Ver'"></span>
+            <div class="mb-2 relative">
+                <x-ui.input name="password_confirmation" label="Confirmar contraseña" type="password" required
+                            x-model="password2" x-ref="p2" autocomplete="new-password"
+                            aria-describedby="error-password-confirmation" x-bind:aria-invalid="!!errores.password2" />
+                <button type="button" class="absolute end-3 top-9 text-body"
+                        aria-label="Mostrar u ocultar confirmación de contraseña"
+                        @click="ver2 = !ver2; $refs.p2.type = ver2 ? 'text' : 'password'">
+                    <span x-text="ver2 ? 'Ocultar' : 'Ver'></span>
                 </button>
-                <p x-show="errores.password2" x-text="errores.password2" class="mt-1 text-sm text-fg-danger-strong"></p>
+                <p id="error-password-confirmation" x-text="errores.password2 || ''" aria-live="polite"
+                   class="min-h-4 text-sm text-fg-danger-strong"></p>
             </div>
 
             <x-ui.alert type="warning" title="Necesitas 2 aprobaciones para activarte">
