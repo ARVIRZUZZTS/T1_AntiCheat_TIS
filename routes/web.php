@@ -138,6 +138,7 @@ Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
 Route::middleware(['auth', 'docente'])->group(function (): void {
     Route::view('/docentes', 'pages.docentes')->name('docentes');
+    Route::view('/docente/auxiliares', 'pages.docente-auxiliares')->name('docente.auxiliares');
 
     // Central de riesgos (HU 10): solo para docentes. La vista solo aporta el
     // layout; los datos los resuelve el componente Livewire ListaEstudiantes.
