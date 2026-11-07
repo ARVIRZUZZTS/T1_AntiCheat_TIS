@@ -26,8 +26,10 @@
     redirige con errores y el formulario manda el curso elegido.
 
     Editar Examen lista solo los exámenes propios con fecha futura y precarga el
-    mismo formulario con GET /api/examenes/{examen}/edicion. Por ahora el
-    formulario es de solo lectura: el botón "Guardar cambios" no envía nada.
+    mismo formulario con GET /api/examenes/{examen}/edicion. "Guardar cambios"
+    envía el formulario con PUT /api/examenes/{examen}/edicion (Task #261); al
+    guardar, el parcial refresca el listado para que el selector muestre los
+    datos nuevos.
 
     La división usa los ambientes que ya devuelve el endpoint. Si el examen
     tiene una sola aula, en lugar de los controles se muestra un texto simple
@@ -71,6 +73,9 @@
     - 2026-11-05  [Alex Candia]  feat: Editar Examen carga el detalle del examen
       propio elegido y precarga el formulario de alta. No guarda cambios: el
       submit está anulado y el botón queda inerte hasta implementar el guardado.
+    - 2026-11-07  [Diego Tejerina]  feat: "Guardar cambios" guarda la edición con
+      PUT /api/examenes/{examen}/edicion y, al terminar, refresca el listado
+      (refrescarExamenes) sin perder la selección ni el aviso de éxito (#261).
 
     @see  App\Http\Controllers\Api\CursoExamenController
     @see  App\Http\Controllers\Api\ExamenEdicionController
@@ -549,7 +554,28 @@
          ambientesDe(examen) {
              return (examen.ambientes || []).map((ambiente) => ambiente.nombre).join(', ') || '—';
          },
-     }">
+         // Tras guardar una edicion (Task #261), refresca el listado para que el
+         // selector muestre el tipo, la fecha y el horario nuevos. No cambia la
+         // seleccion ni reenvia los datos al formulario, asi el aviso de exito
+         // del formulario sigue a la vista.
+         async refrescarExamenes() {
+             if (! this.hayCurso) {
+                 return;
+             }
+             try {
+                 const url = this.urlExamenes.replace('__CURSO__', this.cursoSeleccionado);
+                 const respuesta = await fetch(url, { headers: { 'Accept': 'application/json' }, credentials: 'same-origin' });
+                 if (! respuesta.ok) {
+                     return;
+                 }
+                 const cuerpo = await respuesta.json();
+                 this.examenes = cuerpo.datos ?? [];
+             } catch (error) {
+                 // El listado se pone al dia al recargar la pagina.
+             }
+         },
+     }"
+     @examen-editado-guardado.window="refrescarExamenes()">
     @if (session('mensaje'))
         <x-ui.modal-aviso :mensaje="session('mensaje')" />
     @endif
@@ -779,6 +805,7 @@
                 modo="editar"
                 id-prefijo="editar"
                 :cancelar-url="route('examenes')"
+                :accion-url="route('api.examenes.edicion.actualizar', ['examen' => '__ID__'])"
             />
         </div>
     </section>
