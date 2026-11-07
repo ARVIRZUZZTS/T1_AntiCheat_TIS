@@ -54,6 +54,10 @@
  *   la base por alta.
  * - 2026-11-04  [Valery D. Ortuno P]  fix: la hora de inicio va de 06:00 a
  *   22:00 (antes 06:45 a 20:15).
+ * - 2026-11-07  [Diego Tejerina]  refactor: la conversion de fecha, hora, tipo
+ *   y lineas personalizadas pasa al trait NormalizaDatosExamen, para que la
+ *   edicion de examen (Task #261) la reutilice sin copiarla. Sin cambios de
+ *   comportamiento en el alta.
  */
 
 namespace App\Services\Examen;
@@ -64,15 +68,13 @@ use App\Models\Curso;
 use App\Models\Estudiante;
 use App\Models\EstudianteExamen;
 use App\Models\Examen;
-use App\Models\TipoExamen as TipoExamenCatalogo;
-use Carbon\Carbon;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
-use InvalidArgumentException;
 use RuntimeException;
 
 class RegistrarExamenService
 {
+    use NormalizaDatosExamen;
+
     /**
      * Techo de minutos de la duración. No es una regla del dominio sino un
      * tope contra un número sin sentido: nadie examina 300 minutos (5 horas).
@@ -238,86 +240,6 @@ class RegistrarExamenService
     }
 
     /**
-     * Id del tipo de examen en el catálogo.
-     *
-     * El formulario manda el nombre del tipo ('examen parcial', 'examen final'...)
-     * porque es lo que se muestra, y la columna guarda el id. Que el nombre sea
-     * válido lo controla el request; esto cubre el otro caso: que esté en el enum
-     * pero no tenga fila en `tipo_examen`.
-     *
-     * El id se cachea como los demás catálogos del alta
-     * (CatalogosExamenService::CACHE_MINUTOS): la aplicación no modifica
-     * `tipo_examen`. Un tipo que no existe no se cachea.
-     *
-     * @throws InvalidArgumentException Si el catálogo no tiene ese tipo.
-     */
-    private function idTipoExamen(string $codigo): int
-    {
-        $id = Cache::remember(
-            CatalogosExamenService::CACHE_PREFIJO.'tipo.'.$codigo,
-            now()->addMinutes(CatalogosExamenService::CACHE_MINUTOS),
-            fn (): mixed => TipoExamenCatalogo::query()
-                ->where('nombre_tipo_examen', $codigo)
-                ->value('id_tipo_examen'),
-        );
-
-        if ($id === null) {
-            throw new InvalidArgumentException("El tipo de examen {$codigo} no está en el catálogo.");
-        }
-
-        return (int) $id;
-    }
-
-    /**
-     * Fecha en ISO a partir del dd/mm/aaaa del formulario.
-     *
-     * La conversión va acá y no en el request a propósito: si se hiciera en el
-     * request, el input viejo que vuelve al formulario sería el ISO y el campo
-     * (que es texto con el separador puesto a mano) lo mostraría revuelto.
-     *
-     * Y es obligatoria: Postgres NO rechaza '05/12/2026', lo lee como mes/día y
-     * guarda el 12 de mayo. Sin esto la fecha se corrompe en silencio.
-     *
-     * @throws InvalidArgumentException Si la fecha no viene en dd/mm/aaaa.
-     */
-    private function fechaIso(string $fecha): string
-    {
-        $momento = Carbon::hasFormat($fecha, 'd/m/Y')
-            ? Carbon::createFromFormat('d/m/Y', $fecha)
-            : null;
-
-        // El round-trip es lo que descarta las fechas que están bien formadas pero
-        // no existen: hasFormat acepta 31/02/2026 y createFromFormat la correría a
-        // marzo. El request ya rechaza esas, pero acá no se da por hecho que
-        // alguien más vaya a pasar por esta capa.
-        if ($momento === null || $momento->format('d/m/Y') !== $fecha) {
-            throw new InvalidArgumentException("La fecha {$fecha} no es una fecha válida en dd/mm/aaaa.");
-        }
-
-        return $momento->format('Y-m-d');
-    }
-
-    /**
-     * Hora en H:i:s a partir del hh:mm del formulario. A diferencia de la fecha,
-     * Postgres no cambia el significado de una hora de 24 horas, pero se
-     * normaliza igual para que la columna quede siempre con segundos.
-     *
-     * @throws InvalidArgumentException Si la hora no viene en hh:mm.
-     */
-    private function horaIso(string $hora): string
-    {
-        $momento = Carbon::hasFormat($hora, 'H:i')
-            ? Carbon::createFromFormat('H:i', $hora)
-            : null;
-
-        if ($momento === null || $momento->format('H:i') !== $hora) {
-            throw new InvalidArgumentException("La hora {$hora} no está en formato hh:mm.");
-        }
-
-        return $momento->format('H:i:s');
-    }
-
-    /**
      * Material escrito a mano: una fila por renglón no vacío.
      */
     private function guardarMaterialesPersonalizados(Examen $examen, ?string $texto): void
@@ -341,26 +263,5 @@ class RegistrarExamenService
                 'descripcion_norma' => $linea['descripcion'],
             ]);
         }
-    }
-
-    /**
-     * Convierte el texto del formulario en las filas de las tablas de lo
-     * personalizado: una por renglón, numeradas desde 1, que es como ya vienen
-     * los datos que hay cargados.
-     *
-     * @param  ?string  $texto  Texto del textarea (puede ser null o estar vacío).
-     * @return list<array{numero: int, descripcion: string}>
-     */
-    private function lineas(?string $texto): array
-    {
-        return collect(preg_split('/\R/u', $texto ?? '') ?: [])
-            ->map(fn (string $linea): string => trim($linea))
-            ->filter()
-            ->values()
-            ->map(fn (string $descripcion, int $indice): array => [
-                'numero' => $indice + 1,
-                'descripcion' => $descripcion,
-            ])
-            ->all();
     }
 }

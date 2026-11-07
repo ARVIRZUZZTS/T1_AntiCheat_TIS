@@ -163,6 +163,10 @@
     - 2026-11-05  [Alex Candia]  feat: el formulario se reutiliza en la pestaña
       Editar con `modo` e `idPrefijo`, escucha `editar-examen-datos` y precarga
       los campos sin enviar: el submit queda anulado y el botón solo se muestra.
+    - 2026-11-07  [Diego Tejerina]  feat: en modo edición "Guardar cambios" envía
+      los campos con PUT a `accionUrl` (que reemplaza `__ID__` con el id que trae
+      `editar-examen-datos`). Pinta los errores por campo del 422, avisa el éxito
+      ("Examen actualizado con exito") y emite `examen-editado-guardado` (#261).
 
     @see  resources/views/pages/examen-crear.blade.php
     @see  App\Enums\TipoExamen
@@ -218,8 +222,16 @@
         modo: @js($modo),
         idPrefijo: @js($idPrefijo),
         accionUrl: @js($accionInicial),
+        // Id del examen que se edita; en el alta no se usa. Lo trae el evento
+        // `editar-examen-datos` (datos.id) junto con los campos a precargar.
+        examenId: '',
+        guardando: false,
+        exito: false,
+        csrfToken: document.querySelector('meta[name=csrf-token]')?.getAttribute('content') || '',
         get urlAccion() {
-            return this.accionUrl.replace('__CURSO__', this.cursoId);
+            return this.accionUrl
+                .replace('__CURSO__', this.cursoId)
+                .replace('__ID__', this.examenId);
         },
         tipo: @js(old('tipo_examen', '')),
         fecha: @js(old('fecha', '')),
@@ -262,7 +274,12 @@
             };
 
             Object.entries(camposConError).forEach(([propiedad, campos]) => {
-                this.$watch(propiedad, () => this.limpiarErrores(campos));
+                this.$watch(propiedad, () => {
+                    this.limpiarErrores(campos);
+                    // Tocar un campo tras guardar oculta el aviso de exito: lo
+                    // guardado ya no coincide del todo con lo que se ve.
+                    this.exito = false;
+                });
             });
         },
 
@@ -280,6 +297,8 @@
                 this.cargarIndiceAmbientes();
             }
 
+            this.examenId = datos.id ?? '';
+            this.exito = false;
             this.tipo = datos.tipo_examen ?? '';
             this.fecha = datos.fecha ?? '';
             this.horaInicio = datos.hora_inicio ?? '';
@@ -298,6 +317,84 @@
 
             this.errores = {};
             this.mostrarErrores = false;
+        },
+
+        // Guarda los cambios del examen editado (Task #261). En modo edicion el
+        // submit del formulario esta anulado, asi que el envio va por aca con
+        // fetch PUT: el endpoint responde JSON y hay que mostrar el exito o
+        // repintar los errores por campo sin recargar la pagina.
+        async guardar() {
+            if (this.guardando || this.examenId === '') {
+                return;
+            }
+
+            this.guardando = true;
+            this.exito = false;
+
+            try {
+                const respuesta = await fetch(this.urlAccion, {
+                    method: 'PUT',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': this.csrfToken,
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    body: JSON.stringify(this.cargaUtil()),
+                });
+
+                const cuerpo = await respuesta.json().catch(() => ({}));
+
+                if (respuesta.status === 422) {
+                    // Laravel devuelve {errors: {campo: [mensajes]}}; el
+                    // formulario guarda un mensaje por campo.
+                    this.errores = Object.fromEntries(
+                        Object.entries(cuerpo.errors ?? {}).map(([campo, lista]) => [campo, lista[0]])
+                    );
+                    this.mostrarErrores = true;
+
+                    return;
+                }
+
+                if (! respuesta.ok) {
+                    this.errores = { general: cuerpo.message || 'No se pudieron guardar los cambios.' };
+                    this.mostrarErrores = true;
+
+                    return;
+                }
+
+                this.errores = {};
+                this.mostrarErrores = false;
+                this.exito = true;
+
+                // El listado de la pestana filtra por fecha/hora futuras y arma
+                // las etiquetas: que se refresque para reflejar lo guardado.
+                window.dispatchEvent(new CustomEvent('examen-editado-guardado', {
+                    detail: { id: this.examenId },
+                }));
+            } catch (error) {
+                this.errores = { general: 'No se pudo conectar con el servidor.' };
+                this.mostrarErrores = true;
+            } finally {
+                this.guardando = false;
+            }
+        },
+
+        // Campos que viajan al backend, con los mismos nombres que valida
+        // UpdateExamenRequest (los mismos del alta).
+        cargaUtil() {
+            return {
+                tipo_examen: this.tipo,
+                fecha: this.fecha,
+                hora_inicio: this.horaInicio,
+                duracion: this.duracion,
+                ambientes: this.ambientesElegidos.map((ambiente) => ambiente.id),
+                materiales: this.materialesElegidos,
+                normas: this.normasElegidas,
+                materiales_personalizados: this.materialesPersonalizados,
+                normas_personalizadas: this.normasPersonalizadas,
+            };
         },
 
         // Quita los errores de esos campos, tambien los de sus items
@@ -773,13 +870,32 @@
         <p x-show="errorDe('normas_personalizadas')" x-text="errorDe('normas_personalizadas')"
            class="mt-1 text-sm text-fg-danger-strong"></p>
     </div>
+    @if ($esEdicion)
+        {{-- Resultado del guardado (Task #261): exito o un error que no sea de
+             un campo (por ejemplo, de red). Los errores por campo los muestra
+             cada campo con errorDe(). --}}
+        <div x-show="exito" x-cloak>
+            <x-ui.alert type="success" title="Examen actualizado">Examen actualizado con exito.</x-ui.alert>
+        </div>
+        <div x-show="errorDe('general')" x-cloak>
+            <x-ui.alert type="danger" title="No se pudo guardar">
+                <span x-text="errorDe('general')"></span>
+            </x-ui.alert>
+        </div>
+    @endif
+
     <div class="border-t border-default pt-4 flex flex-col-reverse gap-[2vh] sm:flex-row">
         {{-- {{ }} y no la directiva js: dentro del atributo de un componente
              Blade las directivas no se compilan y llegaban tal cual al
              navegador, así que el clic fallaba y no volvía. --}}
         <x-ui.button-cancelar class="flex-1" @click="window.location.href = {{ \Illuminate\Support\Js::from($urlCancelar) }}">Cancelar</x-ui.button-cancelar>
-        <x-ui.button type="{{ $esEdicion ? 'button' : 'submit' }}" variant="default" class="flex-1">
-            {{ $esEdicion ? 'Guardar cambios' : 'Guardar examen' }}
+        <x-ui.button type="{{ $esEdicion ? 'button' : 'submit' }}" variant="default" class="flex-1"
+            @if ($esEdicion) x-on:click="guardar()" x-bind:disabled="guardando" @endif>
+            @if ($esEdicion)
+                <span x-text="guardando ? 'Guardando...' : 'Guardar cambios'"></span>
+            @else
+                Guardar examen
+            @endif
         </x-ui.button>
     </div>
     </form>
