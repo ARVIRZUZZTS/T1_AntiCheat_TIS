@@ -9,6 +9,7 @@
  *
  * @updated 2026-10-11
  * @updated 2026-10-26
+ * @updated 2026-11-07
  *
  * @description
  * Modelo de la tabla `central_riesgo`: mapea las infracciones registradas
@@ -45,6 +46,8 @@
  * - 2026-10-26  [Valery D. Ortuno P]  refactor: se quitan `estado_incidencia`
  *   e `id_confirmador`, eliminadas de la base; el estado sale de
  *   `tipo_infraccion` (TipoInfraccion::estado()).
+ * - 2026-11-07  [Valery D. Ortuno P]  feat: scope conNumeroIncidencia(), el
+ *   número de cada incidencia del estudiante en la central (1, 2, 3...).
  */
 
 namespace App\Models;
@@ -163,6 +166,36 @@ class CentralRiesgo extends Model
     {
         return $query->whereHas('curso', fn (Builder $curso): Builder => $curso
             ->where('sis_doc', $idDocente));
+    }
+
+    /**
+     * Agrega el número de incidencia del estudiante: 1 la primera vez que
+     * entra a la central de riesgos, 2 la segunda, y así. Cuenta sus
+     * incidencias `tramposo` (las que están en la central) registradas hasta
+     * esta, en orden de registro (el id desempata dos del mismo instante).
+     *
+     * Es una subconsulta sobre toda la tabla, así que el número no cambia con
+     * los filtros de la consulta (alcance, búsqueda u orden). En una
+     * incidencia sospechosa, que todavía no está en la central, cuenta solo
+     * las anteriores: quien la muestre debe ignorarlo.
+     *
+     * @param  Builder<CentralRiesgo>  $query  Consulta con `central_riesgo` sin alias.
+     * @param  string  $alias  Columna en la que llega el número.
+     *
+     * @author Valery D. Ortuno P <valerydariana98@gmail.com>
+     * @since  2026-11-07
+     */
+    public function scopeConNumeroIncidencia(Builder $query, string $alias = 'numero_incidencia'): Builder
+    {
+        return $query->selectRaw(
+            '(select count(*) from central_riesgo as previa'
+            .' where previa.sis_estudiante = central_riesgo.sis_estudiante'
+            .' and previa.tipo_infraccion = ?'
+            .' and (previa.fecha_registro < central_riesgo.fecha_registro'
+            .' or (previa.fecha_registro = central_riesgo.fecha_registro'
+            .' and previa.id_registro <= central_riesgo.id_registro))) as '.$alias,
+            [TipoInfraccion::Tramposo->value],
+        );
     }
 
     /**

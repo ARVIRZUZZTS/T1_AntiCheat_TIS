@@ -5,6 +5,7 @@
     @updated 2026-10-11
     @updated 2026-10-24
     @updated 2026-10-25
+    @updated 2026-11-07
 
     @description
     Vista del componente Livewire ListaEstudiantes (HU 10): tabs de alcance
@@ -38,6 +39,9 @@
     - 2026-10-25  [Valery D. Ortuno P]  feat: etiqueta "No verificado" en la lista
       y aviso en el detalle para los estudiantes dados de alta desde una
       incidencia (HU 5).
+    - 2026-11-07  [Valery D. Ortuno P]  feat: número de incidencia del
+      estudiante (1 la primera vez que entra a la central, 2 la segunda...) en
+      las cards, en la tabla y en el detalle.
 
     @see  App\Livewire\CentralRiesgo\ListaEstudiantes
     @see  resources/views/partials/busqueda-estudiante.blade.php
@@ -140,7 +144,10 @@
                                 </div>
                             </div>
                             <div class="mt-3 flex items-center justify-between gap-3">
-                                <p class="min-w-0 break-words text-xs text-body">{{ $estudiante['motivo_etiqueta'] }}</p>
+                                <p class="min-w-0 break-words text-xs text-body">
+                                    <span class="font-semibold text-heading">Incidencia N° {{ $estudiante['numero_incidencia'] }}</span>
+                                    · {{ $estudiante['motivo_etiqueta'] }}
+                                </p>
                                 <button type="button" wire:click.stop="verDetalle({{ $estudiante['id_registro'] }})"
                                         class="shrink-0 cursor-pointer border-0 bg-transparent p-0 text-xs font-bold text-fg-danger-strong hover:underline">
                                     Ver detalle ›
@@ -162,6 +169,7 @@
                                     <th scope="col" class="px-4 py-3 text-[10px] font-medium uppercase tracking-wider text-body">Estudiante</th>
                                     <th scope="col" class="px-4 py-3 text-[10px] font-medium uppercase tracking-wider text-body">Codigo SIS</th>
                                     <th scope="col" class="px-4 py-3 text-[10px] font-medium uppercase tracking-wider text-body">Materia</th>
+                                    <th scope="col" class="px-4 py-3 text-[10px] font-medium uppercase tracking-wider text-body">N° incidencia</th>
                                     <th scope="col" class="px-4 py-3 text-[10px] font-medium uppercase tracking-wider text-body">Motivo</th>
                                     <th scope="col" class="px-4 py-3"><span class="sr-only">Acciones</span></th>
                                 </tr>
@@ -188,6 +196,7 @@
                                         </td>
                                         <td class="px-4 py-4 font-mono text-body">{{ $estudiante['sis'] }}</td>
                                         <td class="px-4 py-4 text-body">{{ $estudiante['materia'] ?? 'Sin materia' }}</td>
+                                        <td class="px-4 py-4 font-semibold text-heading">{{ $estudiante['numero_incidencia'] }}</td>
                                         <td class="px-4 py-4 text-body">{{ $estudiante['motivo_etiqueta'] }}</td>
                                         <td class="px-4 py-4 text-end">
                                             <button type="button" wire:click.stop="verDetalle({{ $estudiante['id_registro'] }})"
@@ -255,6 +264,12 @@
                         </div>
 
                         <dl class="space-y-4 text-sm">
+                            @if (($detalle['numero_incidencia'] ?? null) !== null)
+                                <div>
+                                    <dt class="text-[10px] font-medium uppercase tracking-wider text-body">Numero de incidencia</dt>
+                                    <dd class="mt-1 font-medium text-heading">{{ $detalle['numero_incidencia'] }}</dd>
+                                </div>
+                            @endif
                             <div>
                                 <dt class="text-[10px] font-medium uppercase tracking-wider text-body">Motivo</dt>
                                 <dd class="mt-1 font-medium text-heading">{{ $detalle['motivo'] }}</dd>

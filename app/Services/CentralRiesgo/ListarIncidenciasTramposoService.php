@@ -72,6 +72,9 @@
  * - 2026-10-26  [Valery D. Ortuno P]  refactor: el estado sale de
  *   TipoInfraccion::estado(); `estado_incidencia` y el enum
  *   EstadoIncidencia se eliminaron.
+ * - 2026-11-07  [Valery D. Ortuno P]  feat: cada registro trae
+ *   `numero_incidencia` (1 la primera vez que el estudiante entra a la
+ *   central, 2 la segunda...).
  */
 
 namespace App\Services\CentralRiesgo;
@@ -147,6 +150,7 @@ class ListarIncidenciasTramposoService
             ->selectRaw('estudiante.nombre_estudiante as lista_est_nombre')
             ->selectRaw('estudiante.apellido_estudiante as lista_est_apellido')
             ->selectRaw('estudiante.verificado as lista_est_verificado')
+            ->conNumeroIncidencia('lista_numero_incidencia')
             // El curso es el que quedó registrado en la incidencia.
             ->selectRaw('curso.nombre_curso as lista_curso');
 
@@ -310,6 +314,8 @@ class ListarIncidenciasTramposoService
             // False si el estudiante se dio de alta desde una incidencia (HU 5).
             'verificado' => (bool) ($incidencia->getAttribute('lista_est_verificado') ?? true),
             'sis' => $incidencia->getAttribute('sis_estudiante'),
+            // Qué vez es que el estudiante entra a la central (1, 2, 3...).
+            'numero_incidencia' => (int) $incidencia->getAttribute('lista_numero_incidencia'),
             'curso' => $curso,
             'materia' => $curso !== null ? NombreCurso::materia($curso) : null,
             'motivo' => $incidencia->motivo,

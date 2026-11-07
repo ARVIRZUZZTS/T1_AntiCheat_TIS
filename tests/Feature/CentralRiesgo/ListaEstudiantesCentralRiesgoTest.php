@@ -11,6 +11,7 @@
  * @updated 2026-10-24
  * @updated 2026-10-25
  * @updated 2026-10-26
+ * @updated 2026-11-07
  *
  * @description
  * Pruebas de la lista de estudiantes de la central de riesgos (HU 10), sobre el
@@ -49,6 +50,9 @@
  * - 2026-10-26  [Valery D. Ortuno P]  test: sin `estado_incidencia`,
  *   eliminada de la base; se quita la prueba de tramposo con estado
  *   Pendiente, que ya no puede darse.
+ * - 2026-11-07  [Valery D. Ortuno P]  test: número de incidencia del
+ *   estudiante (sube cada vez que entra a la central, no cuenta las
+ *   sospechosas y no cambia con el alcance) en la tabla y el detalle.
  */
 
 namespace Tests\Feature\CentralRiesgo;
@@ -165,6 +169,47 @@ class ListaEstudiantesCentralRiesgoTest extends TestCase
             ->assertSee('Calculo I')
             ->assertSee('Uso de dispositivos electronicos no autorizados')
             ->assertSee('Ver detalle');
+    }
+
+    /**
+     * Cada vez que el estudiante entra a la central su número sube: 1, 2, 3.
+     * Una incidencia sospechosa todavía no está en la central y no cuenta.
+     */
+    public function test_el_numero_de_incidencia_sube_cada_vez_que_el_estudiante_entra(): void
+    {
+        $this->crearEstudiante('900000060', 'Rita', 'Reincidente Mamani');
+        $this->crearIncidencia('900000060', self::EXAMEN_A, 'tramposo', '2026-09-01 08:00:00');
+        $this->crearIncidencia('900000060', self::EXAMEN_A, 'sospechoso', '2026-09-05 08:00:00');
+        $this->crearIncidencia('900000060', self::EXAMEN_B, 'tramposo', '2026-09-10 08:00:00');
+        $this->crearIncidencia('900000060', self::EXAMEN_A, 'tramposo', '2026-09-15 08:00:00');
+
+        $numeros = collect($this->institucion()->set('busqueda', '900000060')->instance()->estudiantes->items())
+            ->sortBy('fecha')
+            ->pluck('numero_incidencia')
+            ->all();
+
+        $this->assertSame([1, 2, 3], array_values($numeros));
+        $this->assertTextoEnOrden($this->institucion(), ['Codigo SIS', 'Materia', 'N° incidencia', 'Motivo']);
+    }
+
+    /** El número no cambia al filtrar: en Mis materias la tercera sigue siendo la 3. */
+    public function test_el_numero_de_incidencia_no_cambia_con_el_alcance(): void
+    {
+        $this->crearEstudiante('900000061', 'Rita', 'Reincidente Quispe');
+        $this->crearIncidencia('900000061', self::EXAMEN_A, 'tramposo', '2026-09-01 08:00:00');
+        $this->crearIncidencia('900000061', self::EXAMEN_B, 'tramposo', '2026-09-10 08:00:00');
+        $this->crearIncidencia('900000061', self::EXAMEN_A, 'tramposo', '2026-09-15 08:00:00');
+
+        $numeros = collect(Livewire::test(ListaEstudiantes::class)
+            ->call('cambiarAlcance', ListarIncidenciasTramposoService::ALCANCE_MIS_MATERIAS)
+            ->set('busqueda', '900000061')
+            ->instance()->estudiantes->items())
+            ->sortBy('fecha')
+            ->pluck('numero_incidencia')
+            ->all();
+
+        // La del examen B es de otro docente y no se ve, pero sigue contando.
+        $this->assertSame([1, 3], array_values($numeros));
     }
 
     public function test_mis_materias_muestra_solo_los_sancionados_en_materias_del_usuario(): void

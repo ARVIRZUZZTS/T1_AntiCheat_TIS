@@ -11,6 +11,7 @@
  * @updated 2026-10-24
  * @updated 2026-10-25
  * @updated 2026-10-26
+ * @updated 2026-11-07
  *
  * @description Pruebas HTTP con SQLite en memoria, sin usar Supabase, del
  * endpoint GET /api/incidencias/{idIncidencia}: datos completos del detalle
@@ -34,6 +35,8 @@
  *   las etiquetas de motivo van sin acentos (HU 5).
  * - 2026-10-26  [Valery D. Ortuno P]  test: el esquema de prueba ya no
  *   tiene `estado_incidencia` ni `id_confirmador`, eliminadas de la base.
+ * - 2026-11-07  [Valery D. Ortuno P]  test: el detalle trae
+ *   `numero_incidencia`.
  *
  * @see App\Http\Controllers\Api\DetalleIncidenciaController
  * @see App\Services\CentralRiesgo\ConsultarDetalleIncidenciaService
@@ -77,6 +80,7 @@ class DetalleIncidenciaTest extends TestCase
                     'id_registro' => 1,
                     'estudiante_nombre' => 'María Gómez',
                     'sis_estudiante' => '20181111111',
+                    'numero_incidencia' => 1,
                     'estudiante_verificado' => true,
                     'motivo' => 'Copia o intercambio de respuestas',
                     'curso' => 'Matemática Discreta - Grupo 3',

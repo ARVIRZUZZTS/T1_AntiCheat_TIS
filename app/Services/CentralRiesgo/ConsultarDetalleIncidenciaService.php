@@ -57,6 +57,9 @@
  * - 2026-10-26  [Valery D. Ortuno P]  refactor: el estado sale de
  *   TipoInfraccion::estado(); `estado_incidencia` y el enum
  *   EstadoIncidencia se eliminaron.
+ * - 2026-11-07  [Valery D. Ortuno P]  feat: el detalle trae
+ *   `numero_incidencia` (null si todavía es sospechosa y no está en la
+ *   central).
  *
  * @see  App\Policies\CentralRiesgoPolicy
  * @see  App\Models\CentralRiesgo
@@ -101,6 +104,7 @@ class ConsultarDetalleIncidenciaService
             ->selectRaw('usuario.nombre_usuario as det_usr_nombre')
             ->selectRaw('usuario.apellido as det_usr_apellido')
             ->selectRaw('curso.nombre_curso as det_curso')
+            ->conNumeroIncidencia('det_numero_incidencia')
             // Rol (docente/auxiliar) del registrador, sin segunda consulta.
             ->selectRaw(
                 '(select r.nombre_rol from rol_usuario ru'
@@ -127,6 +131,11 @@ class ConsultarDetalleIncidenciaService
                 : null,
             'sis_estudiante' => $incidencia->getAttribute('sis_estudiante')
                 ?? $incidencia->getAttribute('det_est_sis'),
+            // Qué vez es que el estudiante entra a la central; una sospechosa
+            // todavía no entró, así que no tiene número.
+            'numero_incidencia' => $incidencia->tipo_infraccion === TipoInfraccion::Tramposo
+                ? (int) $incidencia->getAttribute('det_numero_incidencia')
+                : null,
             // False si el estudiante se dio de alta desde una incidencia (HU 5).
             'estudiante_verificado' => (bool) ($incidencia->getAttribute('det_est_verificado') ?? true),
             'motivo' => $this->etiquetaMotivo($incidencia),
