@@ -68,6 +68,8 @@ class Usuario extends Authenticatable
         'password',
         'nombre_usuario',
         'apellido',
+        'nombre',
+        'fecha_creacion',
     ];
 
     /**

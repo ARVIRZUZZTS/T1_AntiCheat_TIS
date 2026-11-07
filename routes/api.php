@@ -32,10 +32,20 @@ use App\Http\Controllers\Api\EstudianteExamenController;
 use App\Http\Controllers\Api\ExamenEdicionController;
 use App\Http\Controllers\Api\ExamenMonitoreoController;
 use App\Http\Controllers\Api\InvitacionExamenController;
+use App\Http\Controllers\Api\LoginController;
 use App\Http\Controllers\Api\NotificacionController;
+use App\Http\Controllers\Api\RegistroController;
 use App\Http\Controllers\Api\ReporteHorarioIngresoController;
 use App\Http\Controllers\Api\ResolverIncidenciaController;
 use Illuminate\Support\Facades\Route;
+
+Route::middleware('web')->group(function (): void {
+    Route::post('/auth/registro', [RegistroController::class, 'store'])
+        ->name('api.auth.registro');
+
+    Route::post('/auth/login', [LoginController::class, 'login'])
+        ->name('api.auth.login');
+});
 
 // El proyecto autentica con sesiones Laravel: web aporta sesión y protección CSRF.
 Route::middleware(['web', 'auth:web'])->group(function (): void {
