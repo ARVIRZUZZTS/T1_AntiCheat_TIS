@@ -14,6 +14,9 @@
     - 2026-11-08  [Valery D. Ortuno P]  feat: la cuenta queda pendiente hasta que
       dos docentes la validen (HU 26): en vez de ir al login se muestra el
       mensaje del servidor y se limpia el formulario.
+    - 2026-11-08  [Alisson D. Alvarado]  feat: sugerir un usuario disponible y editable.
+    - 2026-11-08  [Alisson D. Alvarado]  fix: mostrar la sugerencia mientras se verifica su disponibilidad.
+    - 2026-11-08  [Alisson D. Alvarado]  fix: corregir el título de registro docente.
 --}}
 @extends('layouts.guest')
 
@@ -21,9 +24,9 @@
 
 @section('brand')
     @include('partials.marca-invitado', [
-        'titulo1' => 'Asínete como',
+        'titulo1' => 'Regístrate como',
         'titulo2' => 'docente',
-        'descripcion' => 'Tu cuenta será revisada por un docente ya habilitado antes de darte acceso.',
+        'descripcion' => 'Tu cuenta será revisada por dos docentes habilitados antes de darte acceso.',
         'stats' => false,
     ])
 @endsection
@@ -37,6 +40,54 @@
                   nombre: '', apellido: '', usuario: '', correo: '', codSis: '', password: '', password2: '',
                   ver1: false, ver2: false,
                   errores: {}, intento: false, creado: false, mensajeCreado: '', enviando: false, errorGeneral: '',
+                  usuarioEditado: false, solicitudUsuario: 0, esperaUsuario: null, avisoUsuario: '',
+                  actualizarSugerencia(evento) {
+                      const campo = evento.target.name;
+                      if (campo === 'usuario') {
+                          this.usuarioEditado = true;
+                          this.solicitudUsuario++;
+                          this.avisoUsuario = '';
+                          return;
+                      }
+                      if (!['nombre', 'apellido'].includes(campo) || this.usuarioEditado) return;
+                      const nombre = campo === 'nombre' ? evento.target.value : this.nombre;
+                      const apellido = campo === 'apellido' ? evento.target.value : this.apellido;
+                      const partes = (valor) => valor.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+                          .toLowerCase().match(/[a-z0-9]+/g) || [];
+                      const nombres = partes(nombre), apellidos = partes(apellido);
+                      this.usuario = nombres.length && apellidos.length ? nombres[0] + '.' + apellidos[0] : '';
+                      this.avisoUsuario = '';
+                      this.solicitudUsuario++;
+                      clearTimeout(this.esperaUsuario);
+                      if (this.usuario) this.esperaUsuario = setTimeout(() => this.sugerirUsuario(), 500);
+                  },
+                  async sugerirUsuario() {
+                      const solicitud = ++this.solicitudUsuario;
+                      if (this.usuarioEditado) return;
+                      if (!this.nombre.trim() || !this.apellido.trim()) {
+                          this.usuario = '';
+                          return;
+                      }
+                      const nombre = this.nombre, apellido = this.apellido;
+                      try {
+                          const respuesta = await fetch(@js(route('api.auth.sugerir-usuario')), {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json', 'Accept': 'application/json',
+                                  'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content },
+                              body: JSON.stringify({ nombre, apellido })
+                          });
+                          if (!respuesta.ok) throw new Error('No se pudo verificar la sugerencia');
+                          const datos = await respuesta.json();
+                          if (solicitud === this.solicitudUsuario && !this.usuarioEditado
+                              && nombre === this.nombre && apellido === this.apellido) {
+                              this.usuario = datos.nombreUsuario;
+                          }
+                      } catch (error) {
+                          if (solicitud === this.solicitudUsuario && !this.usuarioEditado) {
+                              this.avisoUsuario = 'La disponibilidad se verificará al registrar la cuenta.';
+                          }
+                      }
+                  },
                   validar() {
                       this.errores = {};
                       if (!this.nombre.trim()) this.errores.nombre = 'El nombre es obligatorio';
@@ -90,6 +141,10 @@
                           // Queda pendiente de validacion (HU 26): todavia no puede ingresar.
                           this.mensajeCreado = datos.mensaje || 'Cuenta creada exitosamente.';
                           this.nombre = this.apellido = this.usuario = this.correo = this.codSis = this.password = this.password2 = '';
+                          this.usuarioEditado = false;
+                          this.solicitudUsuario++;
+                          clearTimeout(this.esperaUsuario);
+                          this.avisoUsuario = '';
                           this.intento = false;
                           this.creado = true;
                       } catch (error) {
@@ -99,7 +154,7 @@
                       }
                   }
               }"
-              @input="if (intento) validar(); creado = false"
+              @input="actualizarSugerencia($event); if (intento) validar(); creado = false"
               @submit.prevent="registrar()">
             <p x-cloak x-show="creado" x-text="mensajeCreado" role="status" class="mb-4 text-sm text-fg-brand"></p>
             <p x-cloak x-show="errorGeneral" x-text="errorGeneral" role="alert"
@@ -123,6 +178,7 @@
                             x-bind:aria-invalid="!!errores.usuario" />
                 <p id="error-usuario" x-text="errores.usuario || ''" aria-live="polite"
                    class="min-h-4 text-sm text-fg-danger-strong"></p>
+                <p x-cloak x-show="avisoUsuario" x-text="avisoUsuario" role="status" class="text-sm text-body"></p>
             </div>
             <div class="mb-2">
                 <x-ui.input name="correo" type="email" label="Correo electrónico" placeholder="nombre.apellido@umss.edu"
