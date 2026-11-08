@@ -6,22 +6,8 @@
 
     @description
     Tarjeta presentacional de una notificación del docente, responsive
-    mobile-first. Conserva la API de props de dev (`id`, `titulo`,
-    `auxiliar`, `estudiante`, `examen`, `materia`, `hace`, `detalleHref`) para
-    no romper a quien ya la usa y suma un segundo tipo (HU 6 · T3): el
-    componente decide icono, color y acciones según `tipo`:
-
-      - `posible_tramposo` (por defecto): cuadro ámbar con triángulo de aviso,
-        descripción con auxiliar/estudiante/examen/materia, tiempo abajo a la
-        izquierda y acción roja "Ver detalle" a la derecha.
-      - `central_riesgo`: cuadro rojo claro con símbolo de prohibición, título
-        "Estudiante ingresado a central de riesgo", descripción con el nombre
-        del estudiante y la materia, y el tiempo justo debajo de la
-        descripción. NO lleva botón rojo de acción.
-
-    La X gris (arriba a la derecha) es un descarte: el handler de la página
-    llama a `PATCH /api/notificaciones/{id}/ocultar` y quita el nodo con clase
-    `js-notificacion`. NO cambia el estado del registro.
+    mobile-first. Muestra la descripción y la orientación correspondiente al
+    tipo de aviso sin ofrecer acciones sobre la notificación.
 
     @changelog
     - 2026-10-09  [Alisson D. Alvarado]  feat: creación inicial del componente.
@@ -34,6 +20,7 @@
       `data-incidencia` y no del onclick incrustado, para que el script de la
       página (que clona tarjetas desde un template estático) pueda
       reemplazarlo con el `referencia` de cada aviso.
+    - 2026-11-08  [Alisson D. Alvarado]  fix: dejar las tarjetas informativas.
 --}}
 
 @props([
@@ -82,37 +69,14 @@
         </span>
     @endif
 
-    <div class="flex-1 min-w-0 pe-8">
+    <div class="flex-1 min-w-0">
         <h3 class="text-sm font-bold leading-snug text-heading break-words">{{ $titulo }}</h3>
         <p class="js-descripcion mt-1 text-sm text-body break-words">{{ $descripcion }}</p>
-
-        @if ($esCentral)
-            <span class="js-hace mt-3 block text-xs text-muted">{{ $hace }}</span>
-        @else
-            <div class="mt-3 flex items-center justify-between gap-3">
-                <span class="js-hace text-xs text-muted">{{ $hace }}</span>
-
-            {{-- El botón se declara aquí (no usa x-ui.button a propósito) porque la
-                 especificación pide texto semibold y el botón base del sistema va en
-                 font-medium; se usa la variante roja pedida por la HU 12. --}}
-            {{-- El dispatch es JS plano (igual que la X): Alpine no inicializa
-                 @click en elementos fuera de un alcance x-data. El id de la
-                 incidencia vive en data-incidencia y no en el onclick: la
-                 página HU 6 clona tarjetas desde un <template> estático y su
-                 script reescribe ese atributo con el `referencia` de cada
-                 aviso (el onclick incrustado quedaría siempre en 0). --}}
-            <a href="{{ $detalleHref }}"
-               data-incidencia="{{ $id }}"
-               onclick="event.preventDefault(); window.dispatchEvent(new CustomEvent('abrir-detalle-incidencia', { detail: { id: parseInt(this.dataset.incidencia, 10) } }))"
-               class="shrink-0 inline-flex items-center justify-center px-4 py-2 text-sm font-semibold text-white bg-danger rounded-base hover:bg-danger-strong focus:ring-4 focus:ring-danger-medium focus:outline-none">
-                Ver detalle
-            </a>
-        </div>
-        @endif
+        <p class="mt-2 text-sm text-body">
+            {{ $esCentral
+                ? 'Dirigete a la central de riesgos para ver el detalle completo'
+                : 'Dirigete a la central de riesgos para aceptar o rechazar a este estudiante' }}
+        </p>
+        <span class="js-hace mt-3 block text-xs text-muted">{{ $hace }}</span>
     </div>
-
-    <button type="button" aria-label="Cerrar notificación" title="Cerrar"
-            class="js-cerrar-notificacion absolute end-2 top-2 inline-flex items-center justify-center w-8 h-8 bg-transparent rounded-base text-neutral-tertiary-medium hover:bg-neutral-tertiary-soft hover:text-heading focus:outline-none focus:ring-4 focus:ring-neutral-tertiary-soft">
-        <svg class="w-4 h-4" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6 18 17.94 6M18 18 6.06 6"/></svg>
-    </button>
 </div>
