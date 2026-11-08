@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\EstadoCuenta;
 use App\Http\Controllers\Controller;
 use App\Models\Usuario;
 use Illuminate\Http\JsonResponse;
@@ -27,6 +28,13 @@ class LoginController extends Controller
 
         if (! $usuario || ! Hash::check($contrasena, $usuario->password)) {
             return response()->json(['mensaje' => 'Credenciales inválidas'], 401);
+        }
+
+        // Una cuenta del registro no entra hasta que dos docentes la aprueben (HU 26).
+        $bloqueo = EstadoCuenta::mensajeAcceso($usuario->estado_cuenta);
+
+        if ($bloqueo !== null) {
+            return response()->json(['mensaje' => $bloqueo], 403);
         }
 
         Auth::login($usuario);

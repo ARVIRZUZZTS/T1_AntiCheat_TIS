@@ -2,8 +2,11 @@
 
 namespace App\Services\Auth;
 
+use App\Enums\EstadoCuenta;
 use App\Exceptions\RegistroDuplicadoException;
+use App\Models\Rol;
 use App\Models\Usuario;
+use App\Services\Docente\ListarSolicitudesRegistroService;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -115,7 +118,7 @@ class RegistrarCuentaService
     {
         $datos = $this->normalizar($datos);
 
-        return DB::transaction(function () use ($datos): Usuario {
+        $usuario = DB::transaction(function () use ($datos): Usuario {
             DB::statement('LOCK TABLE usuario IN SHARE ROW EXCLUSIVE MODE');
 
             if ($this->nombreUsuarioExiste($datos['nombreUsuario'])) {
@@ -133,6 +136,8 @@ class RegistrarCuentaService
             $usuario->correo = $datos['correo'];
             $usuario->password = Hash::make($datos['contrasena']);
             $usuario->fecha_creacion = now();
+            // No ingresa hasta que dos docentes la aprueben (HU 26).
+            $usuario->estado_cuenta = EstadoCuenta::Pendiente->value;
 
             try {
                 $usuario->save();
@@ -146,8 +151,19 @@ class RegistrarCuentaService
                 throw $error;
             }
 
+            // El registro solo crea docentes (los auxiliares los crea un docente).
+            DB::table('rol_usuario')->insertUsing(
+                ['id_usuario', 'id_rol'],
+                DB::table('rol')->selectRaw('?, id_rol', [$usuario->id_usuario])->where('nombre_rol', Rol::NOMBRE_DOCENTE),
+            );
+
             return $usuario;
         });
+
+        // El contador de solicitudes del sidebar suma esta cuenta (HU 26).
+        ListarSolicitudesRegistroService::olvidarPendientes();
+
+        return $usuario;
     }
 
     private function nombreUsuarioExiste(string $nombreUsuario): bool

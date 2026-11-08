@@ -2,6 +2,7 @@
 
 namespace App\Services\Invitacion;
 
+use App\Enums\EstadoCuenta;
 use App\Enums\InvitacionEstado;
 use App\Models\Examen;
 use App\Models\InvitacionExamenCompartido;
@@ -90,7 +91,9 @@ class EnviarInvitacionExamenService
 
     private function esDocente(Usuario $usuario): bool
     {
-        return $usuario->roles()->where('nombre_rol', Rol::NOMBRE_DOCENTE)->exists();
+        // Un docente del registro sin validar (o rechazado) no se invita (HU 26).
+        return $usuario->estado_cuenta === EstadoCuenta::Habilitada->value
+            && $usuario->roles()->where('nombre_rol', Rol::NOMBRE_DOCENTE)->exists();
     }
 
     /** @throws ValidationException */

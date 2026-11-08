@@ -8,6 +8,7 @@
  * @created 2026-09-24
  *
  * @updated 2026-09-28
+ * @updated 2026-11-08
  *
  * @description
  * Modelo de la tabla `usuario`: mapea docentes y auxiliares del sistema con
@@ -27,6 +28,9 @@
  * - 2026-09-28  [T1]         feat: extender Authenticatable; `usuario` pasa a
  *   ser la tabla de autenticación (login por `cod_sis`).
  * - 2026-09-28  [T1]         fix: `contraseña` -> `password` (fuera el ENIE).
+ * - 2026-11-08  [Valery D. Ortuno P]  feat: `estado_cuenta` (pendiente,
+ *   habilitada o rechazada, ver EstadoCuenta): una cuenta del registro no
+ *   ingresa hasta que dos docentes la aprueban (HU 26).
  *
  * @see  RegistroAsistencia
  */
@@ -44,6 +48,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
  * @property string $password
  * @property string $nombre_usuario
  * @property string $apellido
+ * @property string $estado_cuenta Valor de App\Enums\EstadoCuenta.
  */
 class Usuario extends Authenticatable
 {
@@ -70,6 +75,7 @@ class Usuario extends Authenticatable
         'apellido',
         'nombre',
         'fecha_creacion',
+        'estado_cuenta',
     ];
 
     /**

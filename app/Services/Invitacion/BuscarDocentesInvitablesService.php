@@ -2,6 +2,7 @@
 
 namespace App\Services\Invitacion;
 
+use App\Enums\EstadoCuenta;
 use App\Enums\InvitacionEstado;
 use App\Models\Examen;
 use App\Models\Rol;
@@ -38,6 +39,8 @@ class BuscarDocentesInvitablesService
             ->select(['usuario.id_usuario', 'usuario.cod_sis', 'usuario.nombre_usuario', 'usuario.apellido', 'usuario.correo'])
             ->where('usuario.id_usuario', '!=', $solicitante->id_usuario)
             ->whereHas('roles', fn ($consulta) => $consulta->where('nombre_rol', Rol::NOMBRE_DOCENTE))
+            // Un docente del registro sin validar (o rechazado) no se invita (HU 26).
+            ->where('usuario.estado_cuenta', EstadoCuenta::Habilitada->value)
             ->whereDoesntHave('invitacionesRecibidas', function ($consulta) use ($examen, $estadosActivos): void {
                 $consulta->where('id_examen', $examen->id_examen)
                     ->whereIn('estado', $estadosActivos);

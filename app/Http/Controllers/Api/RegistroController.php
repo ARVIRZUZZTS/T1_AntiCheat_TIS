@@ -10,6 +10,9 @@ use Illuminate\Http\Request;
 
 class RegistroController extends Controller
 {
+    /** La cuenta queda pendiente hasta que dos docentes la validen (HU 26). */
+    public const MENSAJE_CREADA = 'Cuenta creada exitosamente. Podras ingresar cuando dos docentes validen tu cuenta.';
+
     public function store(Request $request, RegistrarCuentaService $servicio): JsonResponse
     {
         $errores = $servicio->validar($request->all());
@@ -28,6 +31,6 @@ class RegistroController extends Controller
             return response()->json(['errores' => $error->errores()], 409);
         }
 
-        return response()->json(['mensaje' => 'Cuenta creada exitosamente'], 201);
+        return response()->json(['mensaje' => self::MENSAJE_CREADA], 201);
     }
 }
