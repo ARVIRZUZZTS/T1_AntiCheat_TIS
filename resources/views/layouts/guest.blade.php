@@ -1,9 +1,12 @@
 {{--
     @file    guest.blade.php
     @author  T1 - Tech One SRL
+    @author  Alisson D. Alvarado <alvaradoalissondalet@gmail.com>
     @created 2026-10-17
     @updated 2026-10-17
     @description Layout invitado (sin sidebar) para pantallas públicas de autenticación.
+    @changelog
+    - 2026-11-07  [Alisson D. Alvarado]  feat: adaptar el espacio de autenticación a móviles.
 --}}
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
@@ -17,10 +20,10 @@
     </head>
     <body class="bg-surface-page text-heading antialiased">
         <div class="min-h-screen flex flex-col lg:flex-row">
-            <aside class="lg:w-1/2 bg-brand text-neutral-primary">
+            <aside class="w-full lg:w-1/2 bg-brand text-neutral-primary">
                 @yield('brand')
             </aside>
-            <main class="flex-1 flex items-center justify-center p-6">
+            <main class="flex min-w-0 flex-1 items-center justify-center px-4 py-6 sm:p-6">
                 @yield('content')
             </main>
         </div>
