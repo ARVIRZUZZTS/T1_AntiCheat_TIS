@@ -19,9 +19,10 @@
  *
  * @changelog
  * - 2026-11-08  [OchoaCesar]  feat: GET /api/docentes/me/auxiliares.
+ * - 2026-11-08  [OchoaCesar]  fix: la docblock ya no referencia
+ *   FuenteAuxiliares (la pestaña "Ver auxiliares" se retiró).
  *
  * @see  App\Services\Auxiliar\ListarAuxiliaresDocenteService
- * @see  App\Livewire\Auxiliares\FuenteAuxiliares
  */
 
 namespace App\Http\Controllers\Api;
@@ -31,7 +32,7 @@ use App\Services\Auxiliar\ListarAuxiliaresDocenteService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
-/** Presenta la lista en un arreglo plano, tal como lo espera FuenteAuxiliares. */
+/** Presenta la lista en un arreglo plano, listo para cualquier consumidor JSON. */
 class AuxiliaresDocenteController extends Controller
 {
     /**
