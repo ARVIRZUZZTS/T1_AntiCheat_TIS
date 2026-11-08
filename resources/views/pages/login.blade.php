@@ -8,6 +8,7 @@
     @author Alisson D. Alvarado <alvaradoalissondalet@gmail.com>
     @changelog
     - 2026-11-07  [Alisson D. Alvarado]  feat: identificar el acceso a crear cuenta.
+    - 2026-11-07  [Alisson D. Alvarado]  feat: conectar el inicio de sesión con el backend.
 --}}
 @extends('layouts.guest')
 
@@ -17,7 +18,7 @@
     @include('partials.marca-invitado', [
         'titulo1' => 'Control de Ingreso',
         'titulo2' => 'a Exámenes masivos',
-        'descripcion' => 'Accede con tu código SIS para gestionar exámenes y monitoreo.',
+        'descripcion' => 'Accede con tu nombre de usuario para gestionar exámenes y monitoreo.',
         'stats' => true,
     ])
 @endsection
@@ -27,8 +28,32 @@
         codSis: '{{ old('cod_sis') }}',
         password: '',
         verPassword: false,
-        recordar: false,
-        rellenar(cod, pass) { this.codSis = cod; this.password = pass; }
+        enviando: false,
+        error: '',
+        rellenar(cod, pass) { this.codSis = cod; this.password = pass; },
+        async ingresar() {
+            if (this.enviando) return;
+            this.enviando = true;
+            this.error = '';
+            try {
+                const respuesta = await fetch(@js(route('api.auth.login')), {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content },
+                    body: JSON.stringify({ nombreUsuario: this.codSis, contrasena: this.password })
+                });
+                const datos = await respuesta.json();
+                if (!respuesta.ok) {
+                    this.error = datos.mensaje || 'Introduce tu usuario y contraseña.';
+                    return;
+                }
+                window.location.assign(@js(route('inicio')));
+            } catch (error) {
+                this.error = 'No se pudo conectar con el servidor. Inténtalo nuevamente.';
+            } finally {
+                this.enviando = false;
+            }
+        }
     }">
         <h2 class="mb-6 text-2xl font-semibold text-heading">Iniciar sesión</h2>
 
@@ -38,11 +63,12 @@
             </x-ui.alert>
         @endif
 
-        <form method="POST" action="{{ route('login.store') }}">
+        <p x-cloak x-show="error" x-text="error" role="alert" class="mb-4 text-sm text-fg-danger-strong"></p>
+        <form method="POST" action="{{ route('login.store') }}" @submit.prevent="ingresar()">
             @csrf
 
             <div class="mb-4">
-                <x-ui.input name="cod_sis" label="USUARIO O CÓDIGO SIS" placeholder="202301310"
+                <x-ui.input name="cod_sis" label="NOMBRE DE USUARIO" placeholder="Nombre de usuario"
                             required autocomplete="username" x-model="codSis" />
             </div>
 
@@ -56,15 +82,14 @@
                 </button>
             </div>
 
-            <div class="mb-4 flex items-center justify-between">
-                <x-ui.checkbox name="remember" label="Mantener sesión iniciada" x-model="recordar" />
+            <div class="mb-4 flex flex-wrap items-center justify-end gap-3">
                 <a href="#" class="text-sm font-semibold text-fg-brand">¿Olvidaste tu contraseña?</a>
             </div>
 
-            <x-ui.button type="submit" class="w-full justify-center">Entrar</x-ui.button>
+            <x-ui.button type="submit" class="w-full justify-center" x-bind:disabled="enviando">Entrar</x-ui.button>
 
             <p class="mt-4 text-center text-sm text-body">
-                El sistema asigna la vista según tu código SIS: docente o auxiliar.
+                El sistema asigna la vista según tu cuenta: docente o auxiliar.
             </p>
             <p class="mt-2 text-center text-sm text-body">
                 ¿Eres docente y no tienes cuenta?
