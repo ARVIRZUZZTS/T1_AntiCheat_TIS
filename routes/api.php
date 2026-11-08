@@ -22,7 +22,12 @@
  * - 2026-10-25  [Alisson D. Alvarado]  feat: rutas para previsualizar y confirmar división de examen por ambientes.
  * - 2026-11-05  [Alex Candia]  feat: detalle de examen para precargar la pestaña Editar Examen.
  * - 2026-11-07  [Diego Tejerina]  feat: PUT de guardado del examen editado (#261).
+<<<<<<< HEAD
  * - 2026-11-08  [OchoaCesar]  feat: GET de auxiliares del docente autenticado.
+=======
+ * - 2026-11-08  [Alisson D. Alvarado]  feat: ruta para sugerir nombres de usuario.
+ * @author Alisson D. Alvarado <alvaradoalissondalet@gmail.com>
+>>>>>>> 8a975d175e95dc5a8d3c7dcb1a6b608b5249b74d
  */
 
 use App\Http\Controllers\Api\AuxiliaresDocenteController;
@@ -46,6 +51,10 @@ use Illuminate\Support\Facades\Route;
 Route::middleware('web')->group(function (): void {
     Route::post('/auth/registro', [RegistroController::class, 'store'])
         ->name('api.auth.registro');
+
+    Route::post('/auth/registro/sugerir-usuario', [RegistroController::class, 'sugerirUsuario'])
+        ->middleware('throttle:60,1')
+        ->name('api.auth.sugerir-usuario');
 
     Route::post('/auth/login', [LoginController::class, 'login'])
         ->name('api.auth.login');
