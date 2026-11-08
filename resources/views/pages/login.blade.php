@@ -5,10 +5,14 @@
     @updated 2026-10-17
     @description Pantalla de inicio de sesión.
     @updated 2026-11-07
+    @updated 2026-11-08
     @author Alisson D. Alvarado <alvaradoalissondalet@gmail.com>
     @changelog
     - 2026-11-07  [Alisson D. Alvarado]  feat: identificar el acceso a crear cuenta.
     - 2026-11-07  [Alisson D. Alvarado]  feat: conectar el inicio de sesión con el backend.
+    - 2026-11-08  [Valery D. Ortuno P]  fix: el acceso rápido llena el nombre de
+      usuario (Roberto, Patricia, Diego) y no el código SIS: el login busca por
+      nombre de usuario y con el SIS rechazaba las credenciales.
 --}}
 @extends('layouts.guest')
 
@@ -101,11 +105,11 @@
             <p class="mb-3 text-sm font-medium text-heading">Acceso rápido — usuarios de prueba</p>
             <div class="flex flex-col gap-2">
                 <x-ui.button variant="secondary" type="button" class="w-full justify-center"
-                             @click="rellenar('DOC001', 'pass123')">Docente — Roberto Silva</x-ui.button>
+                             @click="rellenar('Roberto', 'pass123')">Docente — Roberto Silva</x-ui.button>
                 <x-ui.button variant="secondary" type="button" class="w-full justify-center"
-                             @click="rellenar('DOC002', 'pass456')">Docente — Patricia Rojas</x-ui.button>
+                             @click="rellenar('Patricia', 'pass456')">Docente — Patricia Rojas</x-ui.button>
                 <x-ui.button variant="secondary" type="button" class="w-full justify-center"
-                             @click="rellenar('AUX001', 'pass789')">Auxiliar — Diego Mendoza</x-ui.button>
+                             @click="rellenar('Diego', 'pass789')">Auxiliar — Diego Mendoza</x-ui.button>
             </div>
             <p class="mt-3 text-xs text-muted">Credenciales de la BD de prueba — el backend las valida.</p>
         </div>

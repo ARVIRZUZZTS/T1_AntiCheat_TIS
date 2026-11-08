@@ -4,12 +4,16 @@
     @author  Alisson D. Alvarado <alvaradoalissondalet@gmail.com>
     @created 2026-10-17
     @updated 2026-11-07
+    @updated 2026-11-08
     @description Formulario de registro de docente conectado al backend.
     @changelog
     - 2026-11-07  [Alisson D. Alvarado]  feat: validar los siete campos en el navegador.
     - 2026-11-07  [Alisson D. Alvarado]  feat: limitar el código SIS y compactar el formulario.
     - 2026-11-07  [Alisson D. Alvarado]  feat: conectar el registro con el servicio de cuentas.
     - 2026-11-07  [Alisson D. Alvarado]  feat: redirigir al inicio de sesión tras crear la cuenta.
+    - 2026-11-08  [Valery D. Ortuno P]  feat: la cuenta queda pendiente hasta que
+      dos docentes la validen (HU 26): en vez de ir al login se muestra el
+      mensaje del servidor y se limpia el formulario.
 --}}
 @extends('layouts.guest')
 
@@ -32,7 +36,7 @@
               x-data="{
                   nombre: '', apellido: '', usuario: '', correo: '', codSis: '', password: '', password2: '',
                   ver1: false, ver2: false,
-                  errores: {}, intento: false, creado: false, enviando: false, errorGeneral: '',
+                  errores: {}, intento: false, creado: false, mensajeCreado: '', enviando: false, errorGeneral: '',
                   validar() {
                       this.errores = {};
                       if (!this.nombre.trim()) this.errores.nombre = 'El nombre es obligatorio';
@@ -83,7 +87,11 @@
                               if (!Object.keys(this.errores).length) this.errorGeneral = 'No se pudo crear la cuenta.';
                               return;
                           }
-                          window.location.assign(@js(route('login')));
+                          // Queda pendiente de validacion (HU 26): todavia no puede ingresar.
+                          this.mensajeCreado = datos.mensaje || 'Cuenta creada exitosamente.';
+                          this.nombre = this.apellido = this.usuario = this.correo = this.codSis = this.password = this.password2 = '';
+                          this.intento = false;
+                          this.creado = true;
                       } catch (error) {
                           this.errorGeneral = 'No se pudo conectar con el servidor. Inténtalo nuevamente.';
                       } finally {
@@ -93,9 +101,7 @@
               }"
               @input="if (intento) validar(); creado = false"
               @submit.prevent="registrar()">
-            <p x-cloak x-show="creado" role="status" class="mb-4 text-sm text-fg-brand">
-                Cuenta creada exitosamente. Ya puedes iniciar sesión.
-            </p>
+            <p x-cloak x-show="creado" x-text="mensajeCreado" role="status" class="mb-4 text-sm text-fg-brand"></p>
             <p x-cloak x-show="errorGeneral" x-text="errorGeneral" role="alert"
                class="mb-4 text-sm text-fg-danger-strong"></p>
 

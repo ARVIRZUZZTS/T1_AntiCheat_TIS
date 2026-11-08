@@ -4,10 +4,13 @@
     @created 2026-09-24
     @updated 2026-10-10
     @updated 2026-10-24
+    @updated 2026-11-08
 
     @description
     Sidebar de navegación del panel. $items es un arreglo de ítems:
-    ['label', 'route' (nombre de ruta), 'badge', 'count']. El ítem activo
+    ['label', 'route' (nombre de ruta), 'badge', 'count', 'countEvent'].
+    Con 'countEvent' el contador se actualiza sin recargar al recibir ese
+    evento de ventana con `pendientes` en el detalle. El ítem activo
     se resalta en blanco sobre el fondo azul (`bg-surface-sidebar`); se
     detecta solo por la ruta actual y/o por el prop $active. El título
     ($title) se muestra junto al logo FCyT dentro de una caja blanca con
@@ -55,6 +58,9 @@
     - 2026-10-24  [Valery D. Ortuno P]  refactor: se quita "Inicio" del menú,
       "Exámenes" pasa a "Examenes" y Monitor en vivo y Central de riesgos pasan
       al final, en ese orden.
+    - 2026-11-08  [Valery D. Ortuno P]  feat: el contador de "Docentes" deja de
+      ser fijo (3): muestra las solicitudes de registro pendientes (cacheado),
+      solo al docente, y se actualiza al aprobar o desaprobar (HU 26).
 --}}
 
 @props([
@@ -68,6 +74,10 @@
 @php
     $current = (string) \Illuminate\Support\Facades\Route::currentRouteName();
 
+    $usuario = auth()->user();
+    $nombreUsuario = $usuario ? trim($usuario->nombre_usuario.' '.$usuario->apellido) : null;
+    $rolUsuario = $usuario?->roles->first()?->nombre_rol;
+
     $defaultItems = [
         ['label' => 'Cursos', 'route' => 'cursos'],
         ['label' => 'Examenes', 'route' => 'examenes'],
@@ -75,13 +85,13 @@
         ['label' => 'Reportes', 'route' => 'reportes'],
         ['label' => 'Ver auxiliares', 'route' => 'docente.auxiliares'],
         ['label' => 'Auxiliares', 'route' => 'auxiliares'],
-        ['label' => 'Docentes', 'route' => 'docentes', 'count' => 3],
+        ['label' => 'Docentes', 'route' => 'docentes', 'countEvent' => 'solicitudes-registro',
+            // Solo el docente valida registros: al resto no se le consulta.
+            'count' => $rolUsuario === \App\Models\Rol::NOMBRE_DOCENTE
+                ? \App\Services\Docente\ListarSolicitudesRegistroService::contarPendientes()
+                : 0],
         ['label' => 'Central de riesgos', 'route' => 'central-riesgo'],
     ];
-
-    $usuario = auth()->user();
-    $nombreUsuario = $usuario ? trim($usuario->nombre_usuario.' '.$usuario->apellido) : null;
-    $rolUsuario = $usuario?->roles->first()?->nombre_rol;
 
     $auxiliarItems = [
         // Sus cursos no son los del docente: tiene su propia ruta (HU aparte).
@@ -150,7 +160,11 @@
                             ])>{{ $item['badge'] }}</span>
                         @endif
 
-                        @if (! empty($item['count']))
+                        @if (! empty($item['countEvent']))
+                            <span x-data="{ n: {{ (int) ($item['count'] ?? 0) }} }" x-show="n > 0" @style(['display: none' => empty($item['count'])])
+                                  x-on:{{ $item['countEvent'] }}.window="n = $event.detail.pendientes" x-text="n > 99 ? '99+' : n"
+                                  class="inline-flex items-center justify-center min-w-5 h-5 px-1 ms-2 text-xs font-medium bg-danger-soft text-fg-danger-strong rounded-full">{{ $item['count'] ?? 0 }}</span>
+                        @elseif (! empty($item['count']))
                             <span class="inline-flex items-center justify-center w-5 h-5 ms-2 text-xs font-medium bg-danger-soft text-fg-danger-strong rounded-full">{{ $item['count'] }}</span>
                         @endif
                     </a>
