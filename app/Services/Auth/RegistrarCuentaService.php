@@ -1,5 +1,14 @@
 <?php
 
+/**
+ * @file RegistrarCuentaService.php
+ * @author Alisson D. Alvarado <alvaradoalissondalet@gmail.com>
+ * @updated 2026-11-08
+ * @description Validación y registro de cuentas docentes.
+ * @changelog
+ * - 2026-11-08  [Alisson D. Alvarado]  feat: sugerir nombres de usuario disponibles.
+ */
+
 namespace App\Services\Auth;
 
 use App\Enums\EstadoCuenta;
@@ -10,6 +19,7 @@ use App\Services\Docente\ListarSolicitudesRegistroService;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 
 class RegistrarCuentaService
 {
@@ -40,6 +50,44 @@ class RegistrarCuentaService
     public const MENSAJE_CONTRASENAS_DISTINTAS = 'Las contraseñas no coinciden';
 
     private const INDICE_USUARIO = 'usuario_nombre_usuario_unique';
+
+    /**
+     * Propone un usuario disponible con apellidos y, si hace falta, un sufijo.
+     *
+     * @param string $nombre Nombre del docente.
+     * @param string $apellido Apellidos del docente.
+     * @return string Nombre de usuario disponible o vacío si faltan datos.
+     * @throws \Illuminate\Database\QueryException Si falla la consulta.
+     * @author Alisson D. Alvarado <alvaradoalissondalet@gmail.com>
+     */
+    public function sugerirNombreUsuario(string $nombre, string $apellido): string
+    {
+        $nombres = array_values(array_filter(explode(' ', Str::slug($nombre, ' '))));
+        $apellidos = array_values(array_filter(explode(' ', Str::slug($apellido, ' '))));
+
+        if ($nombres === [] || $apellidos === []) {
+            return '';
+        }
+
+        $base = $nombres[0].'.'.$apellidos[0];
+        $candidato = $base;
+
+        foreach (array_slice($apellidos, 1) as $parte) {
+            if (! $this->nombreUsuarioExiste($candidato)) {
+                return $candidato;
+            }
+
+            $candidato .= '.'.$parte;
+        }
+
+        $base = $candidato;
+        $numero = 2;
+        while ($this->nombreUsuarioExiste($candidato)) {
+            $candidato = $base.$numero++;
+        }
+
+        return $candidato;
+    }
 
     /**
      * @param  array<string, mixed>  $datos
