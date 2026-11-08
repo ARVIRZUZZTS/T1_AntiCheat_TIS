@@ -4,10 +4,12 @@
     @author  Alisson D. Alvarado <alvaradoalissondalet@gmail.com>
     @created 2026-10-17
     @updated 2026-11-07
-    @description Formulario de registro de docente (mock de vista).
+    @description Formulario de registro de docente conectado al backend.
     @changelog
     - 2026-11-07  [Alisson D. Alvarado]  feat: validar los siete campos en el navegador.
     - 2026-11-07  [Alisson D. Alvarado]  feat: limitar el código SIS y compactar el formulario.
+    - 2026-11-07  [Alisson D. Alvarado]  feat: conectar el registro con el servicio de cuentas.
+    - 2026-11-07  [Alisson D. Alvarado]  feat: redirigir al inicio de sesión tras crear la cuenta.
 --}}
 @extends('layouts.guest')
 
@@ -26,22 +28,18 @@
     <div class="w-full max-w-md">
         <h2 class="mb-6 text-2xl font-semibold text-heading">Registrar nuevo docente</h2>
 
-        {{-- Los nombres registrados solo viven en esta vista hasta conectar el backend. --}}
-        <form novalidate onsubmit="return false"
+        <form novalidate
               x-data="{
                   nombre: '', apellido: '', usuario: '', correo: '', codSis: '', password: '', password2: '',
                   ver1: false, ver2: false,
-                  errores: {}, intento: false, creado: false, usuarios: [],
+                  errores: {}, intento: false, creado: false, enviando: false, errorGeneral: '',
                   validar() {
                       this.errores = {};
                       if (!this.nombre.trim()) this.errores.nombre = 'El nombre es obligatorio';
                       if (!this.apellido.trim()) this.errores.apellido = 'El apellido es obligatorio';
                       if (!this.usuario.trim()) this.errores.usuario = 'El nombre de usuario es obligatorio';
-                      else if (this.usuarios.includes(this.usuario.trim().toLowerCase())) {
-                          this.errores.usuario = 'Este nombre de usuario ya está en uso';
-                      }
                       if (!this.correo.trim()) this.errores.correo = 'El correo es obligatorio';
-                      else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(this.correo.trim())) {
+                      else if (!/^[^\s@]+@umss\.edu$/i.test(this.correo.trim())) {
                           this.errores.correo = 'El correo electrónico no es válido';
                       }
                       if (!this.codSis.trim()) this.errores.codSis = 'El código SIS es obligatorio';
@@ -58,21 +56,48 @@
                           this.errores.password2 = 'Las contraseñas no coinciden';
                       }
                   },
-                  registrar() {
+                  async registrar() {
+                      if (this.enviando) return;
                       this.intento = true;
                       this.creado = false;
+                      this.errorGeneral = '';
                       this.validar();
                       if (Object.keys(this.errores).length) return;
-                      this.usuarios.push(this.usuario.trim().toLowerCase());
-                      this.creado = true;
-                      this.intento = false;
+                      this.enviando = true;
+                      try {
+                          const respuesta = await fetch(@js(route('api.auth.registro')), {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json', 'Accept': 'application/json',
+                                  'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content },
+                              body: JSON.stringify({ nombre: this.nombre, apellido: this.apellido,
+                                  nombreUsuario: this.usuario, correo: this.correo, codigoSis: this.codSis,
+                                  contrasena: this.password, confirmarContrasena: this.password2 })
+                          });
+                          const datos = await respuesta.json();
+                          if (!respuesta.ok) {
+                              const campos = { nombreUsuario: 'usuario', codigoSis: 'codSis',
+                                  contrasena: 'password', confirmarContrasena: 'password2' };
+                              for (const [campo, mensaje] of Object.entries(datos.errores || {})) {
+                                  this.errores[campos[campo] || campo] = mensaje;
+                              }
+                              if (!Object.keys(this.errores).length) this.errorGeneral = 'No se pudo crear la cuenta.';
+                              return;
+                          }
+                          window.location.assign(@js(route('login')));
+                      } catch (error) {
+                          this.errorGeneral = 'No se pudo conectar con el servidor. Inténtalo nuevamente.';
+                      } finally {
+                          this.enviando = false;
+                      }
                   }
               }"
               @input="if (intento) validar(); creado = false"
               @submit.prevent="registrar()">
             <p x-cloak x-show="creado" role="status" class="mb-4 text-sm text-fg-brand">
-                Cuenta creada exitosamente (simulación).
+                Cuenta creada exitosamente. Ya puedes iniciar sesión.
             </p>
+            <p x-cloak x-show="errorGeneral" x-text="errorGeneral" role="alert"
+               class="mb-4 text-sm text-fg-danger-strong"></p>
 
             <div class="mb-2">
                 <x-ui.input name="nombre" label="Nombre" placeholder="Nombre" required x-model="nombre"
@@ -132,11 +157,9 @@
                    class="min-h-4 text-sm text-fg-danger-strong"></p>
             </div>
 
-            <x-ui.alert type="warning" title="Necesitas 2 aprobaciones para activarte">
-                Dos docentes ya verificados deben aceptar tu solicitud.
-            </x-ui.alert>
-
-            <x-ui.button type="submit" class="w-full justify-center">Registrarme</x-ui.button>
+            <x-ui.button type="submit" class="w-full justify-center" x-bind:disabled="enviando">
+                <span x-text="enviando ? 'Registrando...' : 'Registrarme'"></span>
+            </x-ui.button>
 
             <p class="mt-4 text-center text-sm text-body">
                 ¿Ya tienes cuenta?
