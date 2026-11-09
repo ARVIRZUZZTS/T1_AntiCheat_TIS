@@ -64,13 +64,13 @@
                     </div>
 
                     <form wire:submit="crear" class="space-y-4 py-4">
-                        <x-ui.input name="nombre" label="Nombre" wire:model="nombre" />
-                        <x-ui.input name="apellido" label="Apellido" wire:model="apellido" />
-                        <x-ui.input name="codSis" label="Código SIS" wire:model="codSis" />
-                        <x-ui.input name="password" type="password" label="Contraseña" wire:model="password" />
+                        <x-ui.input name="nombre" label="Nombre" wire:model="nombre" required minlength="2" maxlength="50" pattern="[\p{L}\s]+" />
+                        <x-ui.input name="apellido" label="Apellido" wire:model="apellido" required minlength="2" maxlength="50" pattern="[\p{L}\s]+" />
+                        <x-ui.input name="codSis" label="Código SIS" wire:model="codSis" required inputmode="numeric" maxlength="9" pattern="[0-9]{9}" />
+                        <x-ui.input name="password" type="password" label="Contraseña" wire:model="password" minlength="8" maxlength="50" placeholder="Si se deja vacía, será 12345678" helper="Mínimo 8 caracteres. Si se deja vacía, se usará 12345678." />
                         <div>
                             <label class="block text-sm font-medium text-heading mb-1">Curso</label>
-                            <select wire:model="idCurso" class="w-full rounded-base border border-default px-3 py-2">
+                            <select wire:model="idCurso" required class="w-full rounded-base border border-default px-3 py-2">
                                 @foreach ($cursos as $curso)
                                     <option value="{{ $curso->id_curso }}">{{ $curso->nombre_curso }}</option>
                                 @endforeach

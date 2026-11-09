@@ -25,9 +25,10 @@ namespace App\Livewire\Auxiliares;
 use App\Models\Curso;
 use App\Models\Rol;
 use App\Models\Usuario;
+use App\Support\Validadores;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\Rule;
+
 use Livewire\Component;
 
 /**
@@ -184,13 +185,19 @@ class GestionAuxiliares extends Component
      */
     public function crear(): void
     {
-        $this->validate([
-            'nombre' => ['required', 'string', 'max:50'],
-            'apellido' => ['required', 'string', 'max:50'],
-            'codSis' => ['required', 'string', 'max:20', Rule::unique('usuario', 'cod_sis')],
-            'password' => ['required', 'string', 'min:8'],
-            'idCurso' => ['required', 'integer'],
-        ]);
+        if (trim($this->password) === '') {
+            $this->password = '12345678';
+        }
+
+        $this->validate(
+            Validadores::reglasAuxiliar(),
+            Validadores::mensajesAuxiliar(),
+        );
+
+        if (Usuario::query()->where('cod_sis', $this->codSis)->exists()) {
+            $this->addError('codSis', 'Ya existe un usuario con este código SIS.');
+            return;
+        }
 
         $curso = Curso::query()
             ->where('id_curso', $this->idCurso)
