@@ -75,12 +75,15 @@ class Index extends Component
             return;
         }
 
-        $this->examenes = $servicio->ejecutar($this->idCurso)
-            ->map(fn (Examen $examen): array => [
-                'id' => (int) $examen->id_examen,
-                'nombre' => (string) $examen->nombre_examen,
-            ])
-            ->all();
+        $examenes = $servicio->ejecutar($this->idCurso);
+
+        $this->examenes = array_values(array_map(
+            fn (array $examen): array => [
+                'id' => (int) $examen['id'],
+                'nombre' => (string) $examen['nombre'],
+            ],
+            $examenes,
+        ));
     }
 
     public function cambiarTab(string $tab): void
