@@ -7,6 +7,7 @@
     @updated 2026-10-24
     @updated 2026-10-25
     @updated 2026-11-04
+    @updated 2026-11-09
 
     @description
     Componente UI Blade reutilizable con el formulario de alta de un examen en
@@ -167,6 +168,10 @@
       los campos con PUT a `accionUrl` (que reemplaza `__ID__` con el id que trae
       `editar-examen-datos`). Pinta los errores por campo del 422, avisa el éxito
       ("Examen actualizado con exito") y emite `examen-editado-guardado` (#261).
+    - 2026-11-09  [Valery D. Ortuno P]  fix: los atributos de edición del botón de
+      guardar pasan de `@if` a ternarios. El `@if` dentro de los atributos de
+      `<x-ui.button>` no se compila (los atributos de un componente no admiten
+      directivas) y el `@endif` suelto rompía la página de Exámenes.
 
     @see  resources/views/pages/examen-crear.blade.php
     @see  App\Enums\TipoExamen
@@ -889,8 +894,12 @@
              Blade las directivas no se compilan y llegaban tal cual al
              navegador, así que el clic fallaba y no volvía. --}}
         <x-ui.button-cancelar class="flex-1" @click="window.location.href = {{ \Illuminate\Support\Js::from($urlCancelar) }}">Cancelar</x-ui.button-cancelar>
+        {{-- Los atributos de un componente Blade no admiten @if (el @endif
+             quedaba suelto y rompía la página): lo de edición va con ternarios.
+             Al crear, el clic no hace nada extra y el botón envía el form. --}}
         <x-ui.button type="{{ $esEdicion ? 'button' : 'submit' }}" variant="default" class="flex-1"
-            @if ($esEdicion) x-on:click="guardar()" x-bind:disabled="guardando" @endif>
+            x-on:click="{{ $esEdicion ? 'guardar()' : '' }}"
+            x-bind:disabled="{{ $esEdicion ? 'guardando' : 'false' }}">
             @if ($esEdicion)
                 <span x-text="guardando ? 'Guardando...' : 'Guardar cambios'"></span>
             @else
