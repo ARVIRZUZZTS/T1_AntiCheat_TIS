@@ -1,3 +1,21 @@
+{{--
+    @file    gestion-auxiliares.blade.php
+    @author  David E. Chavez T. <virzuzz12345@gmail.com>
+    @created 2026-10-19
+    @updated 2026-11-08
+
+    @description
+    Vista del componente Livewire GestionAuxiliares: listado de auxiliares
+    asignados y modal para crear un nuevo auxiliar.
+
+    @changelog
+    - 2026-10-19  [ARVIRZUZZTS]  feat: creación inicial de la vista.
+    - 2026-11-08  [David E. Chavez T.]  style: mover la creación a un modal
+      con inputs verticales y botones Cancelar/Guardar.
+
+    @see  app/Livewire/Auxiliares/GestionAuxiliares.php
+--}}
+
 @section('title', 'Auxiliares')
 
 <div class="flex flex-col gap-6 px-[2vh] mt-[2vh]">
