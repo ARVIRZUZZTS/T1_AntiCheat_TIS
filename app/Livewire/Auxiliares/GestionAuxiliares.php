@@ -21,9 +21,23 @@ class GestionAuxiliares extends Component
     public string $mensajeExito = '';
     public string $mensajeError = '';
 
+    public bool $mostrarModalCrear = false;
+
     public function mount(): void
     {
         $this->idCurso = $this->cursos()->first()?->id_curso;
+    }
+
+    public function abrirModalCrear(): void
+    {
+        $this->resetErrorBag();
+        $this->mensajeError = '';
+        $this->mostrarModalCrear = true;
+    }
+
+    public function cerrarModalCrear(): void
+    {
+        $this->mostrarModalCrear = false;
     }
 
     public function cursos()
@@ -91,6 +105,7 @@ class GestionAuxiliares extends Component
         $this->reset(['nombre', 'apellido', 'codSis', 'password']);
         $this->mensajeExito = 'Auxiliar creado y asignado.';
         $this->mensajeError = '';
+        $this->mostrarModalCrear = false;
     }
 
     public function render()
