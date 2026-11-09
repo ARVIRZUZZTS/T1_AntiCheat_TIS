@@ -61,6 +61,8 @@
     - 2026-11-08  [Valery D. Ortuno P]  feat: el contador de "Docentes" deja de
       ser fijo (3): muestra las solicitudes de registro pendientes (cacheado),
       solo al docente, y se actualiza al aprobar o desaprobar (HU 26).
+    - 2026-11-08  [OchoaCesar]  refactor: se retira el ítem "Ver auxiliares"
+      (pestaña redundante); los auxiliares se consultan desde "Auxiliares".
 --}}
 
 @props([
@@ -83,7 +85,6 @@
         ['label' => 'Examenes', 'route' => 'examenes'],
         ['label' => 'Monitor en vivo', 'route' => 'monitoreo'],
         ['label' => 'Reportes', 'route' => 'reportes'],
-        ['label' => 'Ver auxiliares', 'route' => 'docente.auxiliares'],
         ['label' => 'Auxiliares', 'route' => 'auxiliares'],
         ['label' => 'Docentes', 'route' => 'docentes', 'countEvent' => 'solicitudes-registro',
             // Solo el docente valida registros: al resto no se le consulta.

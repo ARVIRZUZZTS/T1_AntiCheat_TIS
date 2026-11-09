@@ -13,6 +13,7 @@
  * @updated 2026-10-21
  * @updated 2026-10-24
  * @updated 2026-10-25
+ * @updated 2026-11-08
  *
  * @description
  * Definición de rutas web del panel. Incluye vistas estáticas y componentes Livewire.
@@ -75,6 +76,8 @@
  * - 2026-10-25  [Alex Candia]  feat: /examenes pasa a ser una sola página con
  *   selector de materia; las rutas /examenes/curso/{curso} quedan por
  *   compatibilidad.
+ * - 2026-11-08  [OchoaCesar]  refactor: se retira la ruta /docente/auxiliares
+ *   (pestaña "Ver auxiliares"); los auxiliares se consultan desde /auxiliares.
  */
 
 use App\Http\Controllers\AuthController;
@@ -138,7 +141,6 @@ Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
 Route::middleware(['auth', 'docente'])->group(function (): void {
     Route::view('/docentes', 'pages.docentes')->name('docentes');
-    Route::view('/docente/auxiliares', 'pages.docente-auxiliares')->name('docente.auxiliares');
 
     // Central de riesgos (HU 10): solo para docentes. La vista solo aporta el
     // layout; los datos los resuelve el componente Livewire ListaEstudiantes.

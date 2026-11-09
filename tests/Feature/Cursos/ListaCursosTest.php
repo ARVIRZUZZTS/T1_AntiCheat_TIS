@@ -1,5 +1,30 @@
 <?php
 
+/**
+ * @file    ListaCursosTest.php
+ *
+ * @author  Diegootm <josediegotejerinamolina@gmail.com>
+ *
+ * @created 2026-11-06
+ *
+ * @updated 2026-11-08
+ *
+ * @description
+ * Pruebas de la lista de cursos del docente: acceso autorizado (propios e
+ * invitados), resumen con métricas, estados vacíos y detalle con invitaciones
+ * pendientes o rechazadas.
+ *
+ * @changelog
+ * - 2026-11-06  [Diegootm]  test: creación inicial del listado de cursos.
+ * - 2026-11-08  [OchoaCesar]  fix: fixtures compatibles con el esquema
+ *   actual — nombres únicos en los usuarios de prueba (índice
+ *   usuario_nombre_usuario_unique de la migración HU 26) y columnas
+ *   sis_estudiante/id_examen/fecha_registro en la incidencia de ejemplo
+ *   (NOT NULL en una BD recién migrada según 2026_10_10_000004).
+ *
+ * @see  App\Services\Curso\ListarCursosDocenteService
+ */
+
 namespace Tests\Feature\Cursos;
 
 use App\Models\Usuario;
@@ -47,7 +72,7 @@ class ListaCursosTest extends TestCase
         foreach ([self::DOCENTE, self::OTRO, self::VACIO] as $id) {
             DB::table('usuario')->insert([
                 'id_usuario' => $id, 'cod_sis' => 'DOC'.$id,
-                'password' => 'x', 'nombre_usuario' => 'Docente', 'apellido' => (string) $id,
+                'password' => 'x', 'nombre_usuario' => 'Docente'.$id, 'apellido' => (string) $id,
             ]);
             DB::table('rol_usuario')->insert(['id_usuario' => $id, 'id_rol' => $rol]);
         }
@@ -132,6 +157,11 @@ class ListaCursosTest extends TestCase
             'id_registro' => 996101, 'id_ingreso' => 996101,
             'id_registrador' => self::DOCENTE, 'id_curso' => self::CURSO_PROPIO,
             'tipo_infraccion' => 'sospechoso',
+            // En una BD recién migrada la migración 2026_10_10_000004 deja
+            // estas columnas NOT NULL (solo las relaja si ya hay filas null).
+            'sis_estudiante' => '996101',
+            'id_examen' => self::EXAMEN_PROXIMO,
+            'fecha_registro' => now()->toDateTimeString(),
         ]);
     }
 
@@ -139,7 +169,7 @@ class ListaCursosTest extends TestCase
     {
         $filas = app(ListarCursosDocenteService::class)->conMetricas(self::DOCENTE);
 
-        $this->assertSameCanonicalizing(
+        $this->assertEqualsCanonicalizing(
             [self::CURSO_PROPIO, self::CURSO_FINALIZADO, self::CURSO_INVITADO, self::CURSO_INVITADO_FINALIZADO],
             $filas->pluck('curso.id_curso')->all(),
         );

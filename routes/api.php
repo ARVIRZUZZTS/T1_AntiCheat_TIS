@@ -10,6 +10,7 @@
  * @updated 2026-10-09
  * @updated 2026-10-25
  * @updated 2026-11-05
+ * @updated 2026-11-08
  *
  * @description Rutas JSON del backend.
  *
@@ -21,10 +22,15 @@
  * - 2026-10-25  [Alisson D. Alvarado]  feat: rutas para previsualizar y confirmar división de examen por ambientes.
  * - 2026-11-05  [Alex Candia]  feat: detalle de examen para precargar la pestaña Editar Examen.
  * - 2026-11-07  [Diego Tejerina]  feat: PUT de guardado del examen editado (#261).
+<<<<<<< HEAD
+ * - 2026-11-08  [OchoaCesar]  feat: GET de auxiliares del docente autenticado.
+=======
  * - 2026-11-08  [Alisson D. Alvarado]  feat: ruta para sugerir nombres de usuario.
  * @author Alisson D. Alvarado <alvaradoalissondalet@gmail.com>
+>>>>>>> 8a975d175e95dc5a8d3c7dcb1a6b608b5249b74d
  */
 
+use App\Http\Controllers\Api\AuxiliaresDocenteController;
 use App\Http\Controllers\Api\CentralRiesgoController;
 use App\Http\Controllers\Api\ConfiguracionExamenDocenteController;
 use App\Http\Controllers\Api\CursoEstudianteController;
@@ -173,4 +179,11 @@ Route::middleware(['web', 'auth:web'])->group(function (): void {
 
     Route::get('/central-riesgo', [CentralRiesgoController::class, 'index'])
         ->name('api.central-riesgo.listar');
+
+    // Auxiliares del docente autenticado (lista de la pantalla "Auxiliares"):
+    // el docente sale de la sesión, nunca de un parámetro, para que nadie
+    // vea auxiliares de otro docente. Solo lectura: no hay rutas de escritura.
+    Route::get('/docentes/me/auxiliares', [AuxiliaresDocenteController::class, 'index'])
+        ->middleware('docente')
+        ->name('api.docentes.me.auxiliares');
 });

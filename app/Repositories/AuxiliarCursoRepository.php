@@ -22,9 +22,11 @@
  *
  * @changelog
  * - 2026-11-08  [OchoaCesar]  feat: creación inicial con `delDocente()`.
+ * - 2026-11-08  [OchoaCesar]  fix: la docblock ya no referencia
+ *   FuenteAuxiliares (la pestaña "Ver auxiliares" se retiró).
  *
  * @see  App\Services\Auxiliar\ListarAuxiliaresDocenteService
- * @see  App\Livewire\Auxiliares\FuenteAuxiliares
+ * @see  App\Http\Controllers\Api\AuxiliaresDocenteController
  */
 
 namespace App\Repositories;

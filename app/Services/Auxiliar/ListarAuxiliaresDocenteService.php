@@ -15,7 +15,7 @@
  *
  * La consulta (union auxiliar + curso + estado, orden por curso y luego por
  * apellido, sin N+1) vive en `AuxiliarCursoRepository`; este servicio la
- * proyecta al contrato de `FuenteAuxiliares` —`id`, `nombre`, `apellido`,
+ * proyecta al contrato de la lista —`id`, `nombre`, `apellido`,
  * `codigoSis`, `curso`, `estado`— y normaliza el estado a dos valores:
  *
  *  - `ACTIVO`  cuando la asignación está activa (`auxiliar_curso.estado`
@@ -28,9 +28,11 @@
  * @changelog
  * - 2026-11-08  [OchoaCesar]  feat: creación inicial del servicio con
  *   normalización de estado a ACTIVO/BAJA.
+ * - 2026-11-08  [OchoaCesar]  fix: la docblock ya no referencia
+ *   FuenteAuxiliares (la pestaña "Ver auxiliares" se retiró).
  *
  * @see  App\Repositories\AuxiliarCursoRepository
- * @see  App\Livewire\Auxiliares\FuenteAuxiliares
+ * @see  App\Http\Controllers\Api\AuxiliaresDocenteController
  */
 
 namespace App\Services\Auxiliar;
