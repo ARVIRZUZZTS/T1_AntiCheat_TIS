@@ -42,9 +42,10 @@
             @else
                 @foreach ($invitacionesRecibidas as $invitacion)
                     <div class="border border-default rounded-base p-4 space-y-2">
-                        <p class="font-medium text-heading">{{ $invitacion['examen']['nombre'] }}</p>
+                        <p class="font-medium text-heading">Curso: {{ $invitacion['curso'] ?? '—' }}</p>
+                        <p class="text-sm text-body">Examen: {{ $invitacion['examen']['nombre'] }}</p>
                         <p class="text-sm text-body">Invitado por: {{ $invitacion['invitador']['nombre'] }}</p>
-                        <p class="text-sm text-muted">{{ $invitacion['enviada_en'] }}</p>
+                        <p class="text-sm text-muted">{{ $invitacion['enviada_en'] ? \Carbon\Carbon::parse($invitacion['enviada_en'])->format('d-m-Y') : '' }}</p>
                         <div class="flex gap-2">
                             <x-ui.button type="button" variant="default" wire:click="aceptar({{ $invitacion['id'] }})">
                                 Aceptar

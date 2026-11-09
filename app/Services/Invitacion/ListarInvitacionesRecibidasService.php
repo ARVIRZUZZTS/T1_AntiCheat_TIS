@@ -38,13 +38,18 @@ class ListarInvitacionesRecibidasService
         return InvitacionExamenCompartido::query()
             ->where('id_docente_invitado', $docente->id_usuario)
             ->where('estado', 'pendiente')
-            ->with(['examen:id_examen,nombre_examen', 'invitador:id_usuario,nombre_usuario,apellido'])
+            ->with([
+                'examen:id_examen,nombre_examen',
+                'examen.cursos:id_curso,nombre_curso',
+                'invitador:id_usuario,nombre_usuario,apellido',
+            ])
             ->orderByDesc('created_at')
             ->get()
             ->map(fn (InvitacionExamenCompartido $invitacion): array => [
                 'id' => (int) $invitacion->id_invitacion,
                 'estado' => $invitacion->estado->value,
                 'enviada_en' => $invitacion->created_at?->toISOString(),
+                'curso' => $invitacion->examen->cursos->first()?->nombre_curso,
                 'examen' => [
                     'id' => (int) $invitacion->examen->id_examen,
                     'nombre' => (string) $invitacion->examen->nombre_examen,
