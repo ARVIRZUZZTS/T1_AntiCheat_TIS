@@ -18,6 +18,7 @@
 
 namespace App\Services\Invitacion;
 
+use App\Enums\TipoExamen;
 use App\Models\InvitacionExamenCompartido;
 use App\Models\Usuario;
 use Illuminate\Support\Collection;
@@ -39,7 +40,8 @@ class ListarInvitacionesRecibidasService
             ->where('id_docente_invitado', $docente->id_usuario)
             ->where('estado', 'pendiente')
             ->with([
-                'examen:id_examen,nombre_examen',
+                'examen:id_examen,nombre_examen,tipo_examen',
+                'examen.tipoExamen',
                 'examen.cursos:id_curso,nombre_curso',
                 'invitador:id_usuario,nombre_usuario,apellido',
             ])
@@ -52,7 +54,9 @@ class ListarInvitacionesRecibidasService
                 'curso' => $invitacion->examen->cursos->first()?->nombre_curso,
                 'examen' => [
                     'id' => (int) $invitacion->examen->id_examen,
-                    'nombre' => (string) $invitacion->examen->nombre_examen,
+                    'nombre' => (string) ($invitacion->examen->nombre_examen
+                        ?? TipoExamen::etiquetaDe($invitacion->examen->tipoExamen?->nombre_tipo_examen)
+                        ?? ('Examen #'.$invitacion->examen->id_examen)),
                 ],
                 'invitador' => [
                     'id' => (int) $invitacion->invitador->id_usuario,
