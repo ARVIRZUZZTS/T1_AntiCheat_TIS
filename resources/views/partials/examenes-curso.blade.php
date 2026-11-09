@@ -627,12 +627,6 @@
             </button>
 
             <button type="button" class="{{ $tabClases }}"
-                    :class="tab === 'invitar' ? '{{ $tabActivo }}' : '{{ $tabInactivo }}'"
-                    @click="tab = 'invitar'">
-                Invitar Docente a Examen
-            </button>
-
-            <button type="button" class="{{ $tabClases }}"
                     :class="tab === 'dividir' ? '{{ $tabActivo }}' : '{{ $tabInactivo }}'"
                     @click="tab = 'dividir'">
                 Dividir Examen

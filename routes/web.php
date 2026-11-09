@@ -89,6 +89,7 @@ use App\Livewire\Examenes\EstudiantesCurso;
 use App\Livewire\Monitoreo\MonitorEnVivo;
 use App\Livewire\Monitoreo\AccesoMonitor;
 use App\Livewire\Auxiliares\GestionAuxiliares;
+use App\Livewire\Invitaciones\Index as InvitacionesIndex;
 use App\Models\Usuario;
 use App\Services\Reporte\ListarFiltrosReporteService;
 use Illuminate\Http\RedirectResponse;
@@ -106,6 +107,7 @@ Route::view('/mis-cursos', 'pages.auxiliar-cursos')->name('auxiliar.cursos');
 Route::get('/monitoreo', MonitorEnVivo::class)->name('monitoreo');
 Route::get('/monitoreo/acceso', AccesoMonitor::class)->name('monitoreo.acceso');
 Route::get('/auxiliares', GestionAuxiliares::class)->name('auxiliares');
+Route::get('/invitaciones', InvitacionesIndex::class)->name('invitaciones');
 Route::view('/monitoreo/mock', 'livewire.monitoreo.mock')->name('monitoreo.mock');
 
 Route::get('/reportes', function (Request $request, ListarFiltrosReporteService $filtros) {
