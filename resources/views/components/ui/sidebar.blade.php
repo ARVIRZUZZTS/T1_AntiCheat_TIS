@@ -86,6 +86,10 @@
         ['label' => 'Monitor en vivo', 'route' => 'monitoreo'],
         ['label' => 'Reportes', 'route' => 'reportes'],
         ['label' => 'Auxiliares', 'route' => 'auxiliares'],
+        ['label' => 'Invitaciones', 'route' => 'invitaciones', 'countEvent' => 'invitaciones-pendientes',
+            'count' => $rolUsuario === \App\Models\Rol::NOMBRE_DOCENTE && $usuario
+                ? app(\App\Services\Invitacion\ListarInvitacionesRecibidasService::class)->contarPendientes($usuario)
+                : 0],
         ['label' => 'Docentes', 'route' => 'docentes', 'countEvent' => 'solicitudes-registro',
             // Solo el docente valida registros: al resto no se le consulta.
             'count' => $rolUsuario === \App\Models\Rol::NOMBRE_DOCENTE
