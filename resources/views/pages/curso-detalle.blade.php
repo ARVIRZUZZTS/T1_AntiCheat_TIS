@@ -123,7 +123,6 @@
             <nav class="flex min-w-0 gap-2 overflow-x-auto" aria-label="Secciones del curso">
                 <button type="button" @click="tab = 'estudiantes'" :class="tab === 'estudiantes' ? '{{ $tabActivo }}' : '{{ $tabInactivo }}'" class="{{ $tabClases }}">Estudiantes</button>
                 <button type="button" @click="tab = 'habilitacion'" :class="tab === 'habilitacion' ? '{{ $tabActivo }}' : '{{ $tabInactivo }}'" class="{{ $tabClases }}">Habilitaciones</button>
-                <button type="button" @click="tab = 'auxiliares'" :class="tab === 'auxiliares' ? '{{ $tabActivo }}' : '{{ $tabInactivo }}'" class="{{ $tabClases }}">Auxiliares</button>
             </nav>
 
             <x-ui.button variant="tertiary" pill class="shrink-0" x-show="tab === 'estudiantes'">
