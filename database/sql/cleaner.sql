@@ -45,6 +45,13 @@ DROP TABLE IF EXISTS "users" CASCADE;
 DROP TABLE IF EXISTS "usuario" CASCADE;
 DROP TABLE IF EXISTS "validacion_registro" CASCADE;
 
+DROP SEQUENCE IF EXISTS configuracion_examen_docente_id_configuracion_examen_seq CASCADE;
+DROP SEQUENCE IF EXISTS configuracion_material_personaliz_id_configuracion_material_seq CASCADE;
+DROP SEQUENCE IF EXISTS configuracion_norma_personalizada_id_configuracion_norma_seq CASCADE;
+DROP SEQUENCE IF EXISTS failed_jobs_id_seq CASCADE;
+DROP SEQUENCE IF EXISTS jobs_id_seq CASCADE;
+DROP SEQUENCE IF EXISTS migrations_id_seq CASCADE;
+DROP SEQUENCE IF EXISTS users_id_seq CASCADE;
 DROP TYPE IF EXISTS curso_estado CASCADE;
 DROP TYPE IF EXISTS estado_notificacion CASCADE;
 DROP TYPE IF EXISTS estado_usuario CASCADE;
