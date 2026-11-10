@@ -4,9 +4,11 @@
  * @file RegistrarCuentaService.php
  * @author Alisson D. Alvarado <alvaradoalissondalet@gmail.com>
  * @updated 2026-11-08
+ * @updated 2026-11-09
  * @description Validación y registro de cuentas docentes.
  * @changelog
  * - 2026-11-08  [Alisson D. Alvarado]  feat: sugerir nombres de usuario disponibles.
+ * - 2026-11-09  [Alisson D. Alvarado]  fix: distinguir conflictos y evitar correos como usuario.
  */
 
 namespace App\Services\Auth;
@@ -30,6 +32,8 @@ class RegistrarCuentaService
     public const MENSAJE_USUARIO_REQUERIDO = 'El nombre de usuario es obligatorio';
 
     public const MENSAJE_USUARIO_EN_USO = 'Este nombre de usuario ya está en uso';
+
+    public const MENSAJE_USUARIO_INVALIDO = 'El nombre de usuario no puede ser un correo electrónico';
 
     public const MENSAJE_CORREO_REQUERIDO = 'El correo es obligatorio';
 
@@ -125,6 +129,8 @@ class RegistrarCuentaService
 
         if ($datos['nombreUsuario'] === '') {
             $errores['nombreUsuario'] = self::MENSAJE_USUARIO_REQUERIDO;
+        } elseif (str_contains($datos['nombreUsuario'], '@')) {
+            $errores['nombreUsuario'] = self::MENSAJE_USUARIO_INVALIDO;
         } elseif ($this->nombreUsuarioExiste($datos['nombreUsuario'])) {
             $errores['nombreUsuario'] = self::MENSAJE_USUARIO_EN_USO;
         }
@@ -230,9 +236,10 @@ class RegistrarCuentaService
             return null;
         }
 
-        $mensaje = $error->getMessage();
+        // El mensaje completo de Laravel incluye el INSERT y todos sus campos, no solo el conflicto.
+        $mensaje = $error->errorInfo[2] ?? '';
 
-        if (str_contains($mensaje, self::INDICE_USUARIO) || str_contains($mensaje, 'nombre_usuario')) {
+        if (str_contains($mensaje, self::INDICE_USUARIO) || str_contains($mensaje, '(nombre_usuario)')) {
             return ['nombreUsuario' => self::MENSAJE_USUARIO_EN_USO];
         }
 
