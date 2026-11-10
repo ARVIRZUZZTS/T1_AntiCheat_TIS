@@ -494,7 +494,7 @@ CREATE UNIQUE INDEX usuario_nombre_usuario_unique ON public.usuario USING btree 
 -- ============================================================================
 --  DATOS
 -- ============================================================================
-SET session_replication_role = replica;
+-- (sin deshabilitar triggers; orden topologico por FKs)
 
 -- ambiente: 5 filas
 INSERT INTO "ambiente" ("id_ambiente", "nombre_ambiente") VALUES (3, 'Laboratorio 1');
@@ -502,17 +502,6 @@ INSERT INTO "ambiente" ("id_ambiente", "nombre_ambiente") VALUES (4, 'Laboratori
 INSERT INTO "ambiente" ("id_ambiente", "nombre_ambiente") VALUES (1, 'Aula 623');
 INSERT INTO "ambiente" ("id_ambiente", "nombre_ambiente") VALUES (2, 'Aula 692A');
 INSERT INTO "ambiente" ("id_ambiente", "nombre_ambiente") VALUES (5, 'Aula 690B');
-
--- auxiliar_curso: 9 filas
-INSERT INTO "auxiliar_curso" ("id_auxiliar", "id_curso", "estado") VALUES (3, 1, 'Activo');
-INSERT INTO "auxiliar_curso" ("id_auxiliar", "id_curso", "estado") VALUES (4, 2, 'Activo');
-INSERT INTO "auxiliar_curso" ("id_auxiliar", "id_curso", "estado") VALUES (3, 3, 'Activo');
-INSERT INTO "auxiliar_curso" ("id_auxiliar", "id_curso", "estado") VALUES (4, 4, 'Baja');
-INSERT INTO "auxiliar_curso" ("id_auxiliar", "id_curso", "estado") VALUES (3, 5, 'Activo');
-INSERT INTO "auxiliar_curso" ("id_auxiliar", "id_curso", "estado") VALUES (9, 4, 'Activo');
-INSERT INTO "auxiliar_curso" ("id_auxiliar", "id_curso", "estado") VALUES (10, 3, 'Activo');
-INSERT INTO "auxiliar_curso" ("id_auxiliar", "id_curso", "estado") VALUES (14, 14, 'Activo');
-INSERT INTO "auxiliar_curso" ("id_auxiliar", "id_curso", "estado") VALUES (16, 1, 'Activo');
 
 -- cache: 30 filas
 INSERT INTO "cache" ("key", "value", "expiration") VALUES ('5c785c036466adea360111aa28563bfd556b5fba:timer', 'i:1794273997;', 1794273998);
@@ -547,71 +536,379 @@ INSERT INTO "cache" ("key", "value", "expiration") VALUES ('catalogos.examen.tip
 INSERT INTO "cache" ("key", "value", "expiration") VALUES ('central-riesgo:lista:v3:1:mis-materias:an:0', 'TzoyOToiSWxsdW1pbmF0ZVxTdXBwb3J0XENvbGxlY3Rpb24iOjI6e3M6ODoiACoAaXRlbXMiO2E6Nzp7aTowO2E6MTM6e3M6MjoiaWQiO2k6MzI7czoxMToiaWRfcmVnaXN0cm8iO2k6MzI7czo2OiJub21icmUiO3M6NzoiRGFuaWVsYSI7czo4OiJhcGVsbGlkbyI7czo3OiJDYWJyZXJhIjtzOjEwOiJ2ZXJpZmljYWRvIjtiOjE7czozOiJzaXMiO3M6OToiMjAyMTAxMjg5IjtzOjE3OiJudW1lcm9faW5jaWRlbmNpYSI7aToxO3M6NToiY3Vyc28iO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1hdGVyaWEiO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1vdGl2b3MiO2E6MTp7aTowO3M6MzM6ImNvcGlhIG8gaW50ZXJjYW1iaW8gZGUgcmVzcHVlc3RhcyI7fXM6MTU6Im1vdGl2b19ldGlxdWV0YSI7czozMzoiQ29waWEgbyBpbnRlcmNhbWJpbyBkZSByZXNwdWVzdGFzIjtzOjY6ImVzdGFkbyI7czoxMDoiQ29uZmlybWFkbyI7czo1OiJmZWNoYSI7czoxOToiMjAyNi0xMC0yNyAwNzoxODowOSI7fWk6MTthOjEzOntzOjI6ImlkIjtpOjI1O3M6MTE6ImlkX3JlZ2lzdHJvIjtpOjI1O3M6Njoibm9tYnJlIjtzOjM6IkFuYSI7czo4OiJhcGVsbGlkbyI7czo2OiJMw7NwZXoiO3M6MTA6InZlcmlmaWNhZG8iO2I6MTtzOjM6InNpcyI7czo5OiIyMDIyMDEwMTMiO3M6MTc6Im51bWVyb19pbmNpZGVuY2lhIjtpOjI7czo1OiJjdXJzbyI7czoxNDoiUHJvZ3JhbWFjaW9uIEkiO3M6NzoibWF0ZXJpYSI7czoxNDoiUHJvZ3JhbWFjaW9uIEkiO3M6NzoibW90aXZvcyI7YToxOntpOjA7czozMzoiY29waWEgbyBpbnRlcmNhbWJpbyBkZSByZXNwdWVzdGFzIjt9czoxNToibW90aXZvX2V0aXF1ZXRhIjtzOjMzOiJDb3BpYSBvIGludGVyY2FtYmlvIGRlIHJlc3B1ZXN0YXMiO3M6NjoiZXN0YWRvIjtzOjEwOiJDb25maXJtYWRvIjtzOjU6ImZlY2hhIjtzOjE5OiIyMDI2LTEwLTI3IDA1OjExOjQ1Ijt9aToyO2E6MTM6e3M6MjoiaWQiO2k6MjI7czoxMToiaWRfcmVnaXN0cm8iO2k6MjI7czo2OiJub21icmUiO3M6ODoiQ3Jpc3RpYW4iO3M6ODoiYXBlbGxpZG8iO3M6NjoiTW9saW5hIjtzOjEwOiJ2ZXJpZmljYWRvIjtiOjE7czozOiJzaXMiO3M6OToiMjAyMjAxMjc4IjtzOjE3OiJudW1lcm9faW5jaWRlbmNpYSI7aToxO3M6NToiY3Vyc28iO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1hdGVyaWEiO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1vdGl2b3MiO2E6MTp7aTowO3M6NDQ6ImludGVudG8gZGUgaW5ncmVzbyBkZSBtYXRlcmlhbCBubyBhdXRvcml6YWRvIjt9czoxNToibW90aXZvX2V0aXF1ZXRhIjtzOjQ1OiJJbnRlbnRvIGRlIGluZ3Jlc28gY29uIG1hdGVyaWFsIG5vIGF1dG9yaXphZG8iO3M6NjoiZXN0YWRvIjtzOjEwOiJDb25maXJtYWRvIjtzOjU6ImZlY2hhIjtzOjE5OiIyMDI2LTEwLTI1IDE4OjMyOjI1Ijt9aTozO2E6MTM6e3M6MjoiaWQiO2k6MjE7czoxMToiaWRfcmVnaXN0cm8iO2k6MjE7czo2OiJub21icmUiO3M6MzoiQW5hIjtzOjg6ImFwZWxsaWRvIjtzOjY6IkzDs3BleiI7czoxMDoidmVyaWZpY2FkbyI7YjoxO3M6Mzoic2lzIjtzOjk6IjIwMjIwMTAxMyI7czoxNzoibnVtZXJvX2luY2lkZW5jaWEiO2k6MTtzOjU6ImN1cnNvIjtzOjE0OiJQcm9ncmFtYWNpb24gSSI7czo3OiJtYXRlcmlhIjtzOjE0OiJQcm9ncmFtYWNpb24gSSI7czo3OiJtb3Rpdm9zIjthOjE6e2k6MDtzOjQ0OiJpbnRlbnRvIGRlIGluZ3Jlc28gZGUgbWF0ZXJpYWwgbm8gYXV0b3JpemFkbyI7fXM6MTU6Im1vdGl2b19ldGlxdWV0YSI7czo0NToiSW50ZW50byBkZSBpbmdyZXNvIGNvbiBtYXRlcmlhbCBubyBhdXRvcml6YWRvIjtzOjY6ImVzdGFkbyI7czoxMDoiQ29uZmlybWFkbyI7czo1OiJmZWNoYSI7czoxOToiMjAyNi0xMC0yNSAxODoxMTo0MyI7fWk6NDthOjEzOntzOjI6ImlkIjtpOjEyO3M6MTE6ImlkX3JlZ2lzdHJvIjtpOjEyO3M6Njoibm9tYnJlIjtzOjc6IkFuZHLDqXMiO3M6ODoiYXBlbGxpZG8iO3M6NToiUm9qYXMiO3M6MTA6InZlcmlmaWNhZG8iO2I6MTtzOjM6InNpcyI7czo5OiIyMDIyMDEyNTYiO3M6MTc6Im51bWVyb19pbmNpZGVuY2lhIjtpOjE7czo1OiJjdXJzbyI7czoxNDoiUHJvZ3JhbWFjaW9uIEkiO3M6NzoibWF0ZXJpYSI7czoxNDoiUHJvZ3JhbWFjaW9uIEkiO3M6NzoibW90aXZvcyI7YToxOntpOjA7czozMjoiaW50ZW50byBkZSBpbmdyZXNvIG5vIGF1dG9yaXphZG8iO31zOjE1OiJtb3Rpdm9fZXRpcXVldGEiO3M6MzU6IkludGVudG8gZGUgaW5ncmVzbyBzaW4gYXV0b3JpemFjaW9uIjtzOjY6ImVzdGFkbyI7czoxMDoiQ29uZmlybWFkbyI7czo1OiJmZWNoYSI7czoxOToiMjAyNi0xMC0xMCAyMjozMDo0NiI7fWk6NTthOjEzOntzOjI6ImlkIjtpOjc7czoxMToiaWRfcmVnaXN0cm8iO2k6NztzOjY6Im5vbWJyZSI7czo3OiJHYWJyaWVsIjtzOjg6ImFwZWxsaWRvIjtzOjY6Ik1hbWFuaSI7czoxMDoidmVyaWZpY2FkbyI7YjoxO3M6Mzoic2lzIjtzOjk6IjIwMjEwMTA3OCI7czoxNzoibnVtZXJvX2luY2lkZW5jaWEiO2k6MTtzOjU6ImN1cnNvIjtzOjE0OiJQcm9ncmFtYWNpb24gSSI7czo3OiJtYXRlcmlhIjtzOjE0OiJQcm9ncmFtYWNpb24gSSI7czo3OiJtb3Rpdm9zIjthOjE6e2k6MDtzOjMzOiJjb3BpYSBvIGludGVyY2FtYmlvIGRlIHJlc3B1ZXN0YXMiO31zOjE1OiJtb3Rpdm9fZXRpcXVldGEiO3M6MzM6IkNvcGlhIG8gaW50ZXJjYW1iaW8gZGUgcmVzcHVlc3RhcyI7czo2OiJlc3RhZG8iO3M6MTA6IkNvbmZpcm1hZG8iO3M6NToiZmVjaGEiO3M6MTk6IjIwMjYtMTAtMTAgMDg6NDA6MDAiO31pOjY7YToxMzp7czoyOiJpZCI7aToxO3M6MTE6ImlkX3JlZ2lzdHJvIjtpOjE7czo2OiJub21icmUiO3M6MzoiQW5hIjtzOjg6ImFwZWxsaWRvIjtzOjU6IlBlcmV6IjtzOjEwOiJ2ZXJpZmljYWRvIjtiOjE7czozOiJzaXMiO3M6ODoiMjAyMTAwMDEiO3M6MTc6Im51bWVyb19pbmNpZGVuY2lhIjtpOjE7czo1OiJjdXJzbyI7czo5OiJDYWxjdWxvIEkiO3M6NzoibWF0ZXJpYSI7czo5OiJDYWxjdWxvIEkiO3M6NzoibW90aXZvcyI7YToxOntpOjA7czo0OiJvdHJvIjt9czoxNToibW90aXZvX2V0aXF1ZXRhIjtzOjQ6Ik90cm8iO3M6NjoiZXN0YWRvIjtzOjEwOiJDb25maXJtYWRvIjtzOjU6ImZlY2hhIjtzOjE5OiIyMDI0LTA2LTEwIDA4OjMwOjAwIjt9fXM6Mjg6IgAqAGVzY2FwZVdoZW5DYXN0aW5nVG9TdHJpbmciO2I6MDt9', 1794278125);
 INSERT INTO "cache" ("key", "value", "expiration") VALUES ('central-riesgo:lista:v3:1:toda-la-institucion:rojas:0', 'TzoyOToiSWxsdW1pbmF0ZVxTdXBwb3J0XENvbGxlY3Rpb24iOjI6e3M6ODoiACoAaXRlbXMiO2E6Mjp7aTowO2E6MTM6e3M6MjoiaWQiO2k6MTI7czoxMToiaWRfcmVnaXN0cm8iO2k6MTI7czo2OiJub21icmUiO3M6NzoiQW5kcsOpcyI7czo4OiJhcGVsbGlkbyI7czo1OiJSb2phcyI7czoxMDoidmVyaWZpY2FkbyI7YjoxO3M6Mzoic2lzIjtzOjk6IjIwMjIwMTI1NiI7czoxNzoibnVtZXJvX2luY2lkZW5jaWEiO2k6MTtzOjU6ImN1cnNvIjtzOjE0OiJQcm9ncmFtYWNpb24gSSI7czo3OiJtYXRlcmlhIjtzOjE0OiJQcm9ncmFtYWNpb24gSSI7czo3OiJtb3Rpdm9zIjthOjE6e2k6MDtzOjMyOiJpbnRlbnRvIGRlIGluZ3Jlc28gbm8gYXV0b3JpemFkbyI7fXM6MTU6Im1vdGl2b19ldGlxdWV0YSI7czozNToiSW50ZW50byBkZSBpbmdyZXNvIHNpbiBhdXRvcml6YWNpb24iO3M6NjoiZXN0YWRvIjtzOjEwOiJDb25maXJtYWRvIjtzOjU6ImZlY2hhIjtzOjE5OiIyMDI2LTEwLTEwIDIyOjMwOjQ2Ijt9aToxO2E6MTM6e3M6MjoiaWQiO2k6NDtzOjExOiJpZF9yZWdpc3RybyI7aTo0O3M6Njoibm9tYnJlIjtzOjY6IkNhcmxvcyI7czo4OiJhcGVsbGlkbyI7czo1OiJSb2phcyI7czoxMDoidmVyaWZpY2FkbyI7YjoxO3M6Mzoic2lzIjtzOjg6IjIwMjEwMDA0IjtzOjE3OiJudW1lcm9faW5jaWRlbmNpYSI7aToxO3M6NToiY3Vyc28iO3M6MTQ6IkFsZ2VicmEgTGluZWFsIjtzOjc6Im1hdGVyaWEiO3M6MTQ6IkFsZ2VicmEgTGluZWFsIjtzOjc6Im1vdGl2b3MiO2E6MTp7aTowO3M6Mjk6InVzbyBkZSBtYXRlcmlhbCBubyBhdXRvcml6YWRvIjt9czoxNToibW90aXZvX2V0aXF1ZXRhIjtzOjI5OiJVc28gZGUgbWF0ZXJpYWwgbm8gYXV0b3JpemFkbyI7czo2OiJlc3RhZG8iO3M6MTA6IkNvbmZpcm1hZG8iO3M6NToiZmVjaGEiO3M6MTk6IjIwMjQtMDYtMTMgMDg6NDU6MDAiO319czoyODoiACoAZXNjYXBlV2hlbkNhc3RpbmdUb1N0cmluZyI7YjowO30=', 1794278139);
 
--- central_riesgo: 31 filas
-INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (21, 1, NULL, '2026-10-25T18:11:43'::timestamp, 'tramposo', 17, '202201013', 3, 223);
-INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (25, 1, NULL, '2026-10-27T05:11:45'::timestamp, 'tramposo', 27, '202201013', 3, 625);
-INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (23, 3, 'Prueba central de riesgos', '2026-10-27T04:25:19'::timestamp, 'tramposo', 27, '202101423', 3, 621);
-INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (28, 1, NULL, '2026-10-27T06:28:08'::timestamp, 'tramposo', 27, '202201356', 3, 642);
-INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (31, 1, NULL, '2026-10-27T07:04:36'::timestamp, 'sospechoso', 35, '202201212', 3, 790);
-INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (1, 3, 'Estudiante mirando hacia otro lado', '2024-06-10T08:30:00'::timestamp, 'tramposo', 1, '20210001', 1, 1);
-INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (13, 1, NULL, '2026-10-10T19:30:17'::timestamp, 'sospechoso', 14, '20210004', 3, NULL);
-INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (12, 1, NULL, '2026-10-10T22:30:46'::timestamp, 'tramposo', 14, '202201256', 3, 174);
-INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (2, 4, 'Uso de celular durante el examen', '2024-06-11T10:30:00'::timestamp, 'tramposo', 2, '20210002', 2, 2);
-INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (3, 3, 'Posible intento de ingreso no autorizado', '2024-06-12T14:30:00'::timestamp, 'sospechoso', 3, '20210003', 3, 3);
-INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (4, 4, 'Uso de material no autorizado', '2024-06-13T08:45:00'::timestamp, 'tramposo', 4, '20210004', 4, 4);
-INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (5, 3, 'Comportamiento sospechoso', '2024-06-14T16:30:00'::timestamp, 'sospechoso', 5, '20210005', 5, 5);
-INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (6, 3, 'Uso de celular durante el examen', '2026-10-10T08:40:00'::timestamp, 'tramposo', 14, '202201089', 3, 157);
-INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (7, 3, 'Intercambio de respuestas con el compañero de al lado', '2026-10-10T08:40:00'::timestamp, 'tramposo', 14, '202101078', 3, 156);
-INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (8, 3, 'Material no autorizado sobre la mesa', '2026-10-10T08:40:00'::timestamp, 'tramposo', 14, '202201056', 3, 155);
-INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (10, 1, NULL, '2026-10-10T21:50:57'::timestamp, 'sospechoso', 14, '202201013', 3, 150);
-INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (11, 1, NULL, '2026-10-10T22:23:21'::timestamp, 'sospechoso', 14, '202201123', 3, 161);
-INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (15, 1, NULL, '2026-10-11T01:43:49'::timestamp, 'sospechoso', 14, '202202045', 3, 153);
-INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (16, 1, NULL, '2026-10-11T02:13:20'::timestamp, 'sospechoso', 14, '202201201', 3, 169);
-INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (18, 1, NULL, '2026-10-12T03:34:01'::timestamp, 'tramposo', 14, '202101178', 3, 166);
-INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (19, 1, 'tramposo', '2026-10-12T00:13:17'::timestamp, 'tramposo', 14, '202101090', 3, 158);
-INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (22, 1, NULL, '2026-10-25T18:32:25'::timestamp, 'tramposo', 19, '202201278', 3, 336);
-INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (24, 1, NULL, '2026-10-27T04:55:06'::timestamp, 'tramposo', 27, '202202045', 3, 650);
-INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (26, 1, NULL, '2026-10-27T06:12:54'::timestamp, 'tramposo', 27, '202201456', 3, 647);
-INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (27, 1, NULL, '2026-10-27T06:13:32'::timestamp, 'tramposo', 27, '202101401', 3, 620);
-INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (29, 5, 'Prueba central de riesgos (examen pasado)', '2026-10-25T06:35:37'::timestamp, 'tramposo', 17, '202101489', 3, 222);
-INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (30, 5, 'Prueba central de riesgos (examen pasado)', '2026-10-25T06:35:39'::timestamp, 'tramposo', 17, '202101223', 3, 209);
-INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (32, 1, NULL, '2026-10-27T07:18:09'::timestamp, 'tramposo', 35, '202101289', 3, 769);
-INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (14, 1, NULL, '2026-10-11T01:15:50'::timestamp, 'sospechoso', 1, '20210001', 1, 1);
-INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (17, 1, NULL, '2026-10-12T01:30:52'::timestamp, 'tramposo', 14, '202101467', 3, 195);
-INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (20, 1, 'Se la vio sacando su celular', '2026-10-12T16:34:44'::timestamp, 'tramposo', 14, '202201212', 3, 170);
+-- estudiante: 58 filas
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('90600001', 'Maria Fernanda Alejandra', 'Gutierrez Condori Villarroel', 'Ingenieria', true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('90600002', 'Luis Alberto Maximiliano', 'Quispe Mamani de la Torre', 'Ingenieria', true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('90600003', 'Juan Carlos Eduardo', 'Perez Montano Arancibia', 'Ingenieria', true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('90600004', 'Ana Sofia Valentina', 'Rojas Camacho Balderrama', 'Ingenieria', true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('20210001', 'Ana', 'Perez', 'Informatica', true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('20210002', 'Luis', 'Mamani', 'Informatica', true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('20210003', 'Maria', 'Lopez', 'Sistemas', true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('20210004', 'Carlos', 'Rojas', 'Informatica', true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('20210005', 'Sofia', 'Flores', 'Sistemas', true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201013', 'Ana', 'López', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202101022', 'Bruno', 'Díaz', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201031', 'Carla', 'Ruiz', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202202045', 'Diego', 'Soto', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202002107', 'Ernesto', 'Vera', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201056', 'Fátima', 'Quispe', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202101078', 'Gabriel', 'Mamani', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201089', 'Helena', 'Choque', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202101090', 'Iván', 'Flores', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201101', 'Julia', 'García', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202101112', 'Kevin', 'López', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201123', 'Laura', 'Díaz', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202101134', 'Miguel', 'Soto', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201145', 'Nadia', 'Vera', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202101156', 'Óscar', 'Quispe', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201167', 'Patricia', 'Mamani', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202101178', 'Raúl', 'Choque', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201189', 'Sofía', 'Flores', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202101190', 'Tomás', 'García', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201201', 'Valeria', 'López', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201212', 'Wendy', 'Zapata', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202101223', 'Xavier', 'Vargas', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201234', 'Yolanda', 'Ticona', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202101245', 'Zoe', 'Siles', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201256', 'Andrés', 'Rojas', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202101267', 'Bianca', 'Paredes', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201278', 'Cristian', 'Molina', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202101289', 'Daniela', 'Cabrera', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201290', 'Eduardo', 'Salazar', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202101301', 'Fernanda', 'Vega', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201312', 'Gonzalo', 'Arce', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202101323', 'Hugo', 'Camacho', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201334', 'Inés', 'Delgado', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202101345', 'Javier', 'Espinoza', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201356', 'Karen', 'Fuentes', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202101367', 'Luis', 'Gutiérrez', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201378', 'María', 'Herrera', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202101389', 'Nicolás', 'Iriarte', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201390', 'Olga', 'Jiménez', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202101401', 'Pablo', 'Kowalski', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201412', 'Rosa', 'Luna', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202101423', 'Sergio', 'Mendoza', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201434', 'Tatiana', 'Núñez', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202101445', 'Ulises', 'Orellana', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201456', 'Verónica', 'Paz', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202101467', 'Walter', 'Quiroga', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201478', 'Ximena', 'Ramírez', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202101489', 'Yamil', 'Sánchez', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201490', 'Zaira', 'Toledo', NULL, true);
 
--- central_riesgo_motivo: 31 filas
-INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (21, 'intento de ingreso de material no autorizado');
-INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (25, 'copia o intercambio de respuestas');
-INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (23, 'otro');
-INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (28, 'intento de ingreso no autorizado');
-INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (31, 'intento de ingreso no autorizado');
-INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (1, 'otro');
-INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (13, 'intento de ingreso no autorizado');
-INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (2, 'uso de dispositivos electronicos');
-INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (3, 'intento de ingreso no autorizado');
-INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (4, 'uso de material no autorizado');
-INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (5, 'otro');
-INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (6, 'uso de dispositivos electronicos');
-INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (7, 'copia o intercambio de respuestas');
-INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (8, 'uso de material no autorizado');
-INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (10, 'copia o intercambio de respuestas');
-INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (11, 'suplantacion de identidad');
-INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (12, 'intento de ingreso no autorizado');
-INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (15, 'uso de dispositivos electronicos');
-INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (16, 'uso de material no autorizado');
-INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (18, 'suplantacion de identidad');
-INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (19, 'otro');
-INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (22, 'intento de ingreso de material no autorizado');
-INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (24, 'uso de dispositivos electronicos');
-INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (26, 'intento de ingreso no autorizado');
-INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (27, 'aula equivocada');
-INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (29, 'otro');
-INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (30, 'otro');
-INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (32, 'copia o intercambio de respuestas');
-INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (14, 'intento de ingreso no autorizado');
-INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (17, 'copia o intercambio de respuestas');
-INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (20, 'uso de dispositivos electronicos');
+-- material: 5 filas
+INSERT INTO "material" ("id_material", "descripcion") VALUES (1, 'Calculadora cientifica');
+INSERT INTO "material" ("id_material", "descripcion") VALUES (2, 'Computadora
+');
+INSERT INTO "material" ("id_material", "descripcion") VALUES (3, 'Formulario');
+INSERT INTO "material" ("id_material", "descripcion") VALUES (4, 'Apuntes de la materia');
+INSERT INTO "material" ("id_material", "descripcion") VALUES (5, 'Hojas de examen en blanco');
+
+-- migrations: 25 filas
+INSERT INTO "migrations" ("id", "migration", "batch") VALUES (1, '0001_01_01_000000_create_users_table', 1);
+INSERT INTO "migrations" ("id", "migration", "batch") VALUES (2, '0001_01_01_000001_create_cache_table', 1);
+INSERT INTO "migrations" ("id", "migration", "batch") VALUES (3, '0001_01_01_000002_create_jobs_table', 1);
+INSERT INTO "migrations" ("id", "migration", "batch") VALUES (4, '2026_09_27_000001_migracion_servidor_oficial', 1);
+INSERT INTO "migrations" ("id", "migration", "batch") VALUES (5, '2026_09_28_000001_actualizar_usuario', 1);
+INSERT INTO "migrations" ("id", "migration", "batch") VALUES (6, '2026_10_09_000001_agregar_revision_incidencia', 2);
+INSERT INTO "migrations" ("id", "migration", "batch") VALUES (7, '2026_10_10_000001_reparar_enums_y_personalizadas', 3);
+INSERT INTO "migrations" ("id", "migration", "batch") VALUES (8, '2026_10_10_000002_quitar_hora_fin_de_examen', 4);
+INSERT INTO "migrations" ("id", "migration", "batch") VALUES (9, '2026_10_10_000003_agregar_curso_a_central_riesgo', 5);
+INSERT INTO "migrations" ("id", "migration", "batch") VALUES (10, '2026_10_11_000001_agregar_oculta_a_notificacion_docente', 6);
+INSERT INTO "migrations" ("id", "migration", "batch") VALUES (11, '2026_10_11_000002_agregar_tipo_a_notificacion_docente', 7);
+INSERT INTO "migrations" ("id", "migration", "batch") VALUES (12, '2026_10_10_000004_alinear_central_riesgo', 8);
+INSERT INTO "migrations" ("id", "migration", "batch") VALUES (13, '2026_10_17_171754_agregar_motivos_ingreso_a_enum_motivo', 9);
+INSERT INTO "migrations" ("id", "migration", "batch") VALUES (14, '2026_10_24_000001_agregar_anio_a_curso_tipo_gestion', 10);
+INSERT INTO "migrations" ("id", "migration", "batch") VALUES (15, '2026_10_24_000002_completar_curso_en_central_riesgo', 11);
+INSERT INTO "migrations" ("id", "migration", "batch") VALUES (16, '2026_10_24_000003_agregar_ambiente_a_curso_y_nombre_a_examen', 12);
+INSERT INTO "migrations" ("id", "migration", "batch") VALUES (17, '2026_10_24_000003_completar_invitaciones_examen', 13);
+INSERT INTO "migrations" ("id", "migration", "batch") VALUES (18, '2026_10_24_000004_adaptar_notificaciones_a_invitaciones', 14);
+INSERT INTO "migrations" ("id", "migration", "batch") VALUES (19, '2026_10_25_000001_separar_configuracion_examen_por_docente', 15);
+INSERT INTO "migrations" ("id", "migration", "batch") VALUES (20, '2026_10_25_000002_asociar_estudiantes_con_docente', 16);
+INSERT INTO "migrations" ("id", "migration", "batch") VALUES (21, '2026_10_25_000003_registro_incidencias_estudiante_no_verificado', 17);
+INSERT INTO "migrations" ("id", "migration", "batch") VALUES (22, '2026_10_26_000001_unificar_estado_incidencia_en_tipo_infraccion', 18);
+INSERT INTO "migrations" ("id", "migration", "batch") VALUES (23, '2026_11_07_000001_motivos_multiples_incidencia', 18);
+INSERT INTO "migrations" ("id", "migration", "batch") VALUES (24, '2026_11_07_000002_crear_cuenta_usuario', 19);
+INSERT INTO "migrations" ("id", "migration", "batch") VALUES (26, '2026_11_08_000001_validacion_registro_docente', 20);
+
+-- norma: 5 filas
+INSERT INTO "norma" ("id_norma", "detalle_norma") VALUES (5, 'No utilizar material no autorizado');
+INSERT INTO "norma" ("id_norma", "detalle_norma") VALUES (1, 'Portar CI durante toda la evaluación');
+INSERT INTO "norma" ("id_norma", "detalle_norma") VALUES (2, 'Mantener dispositivos electrónicos guardados');
+INSERT INTO "norma" ("id_norma", "detalle_norma") VALUES (3, 'Tolerancia máxima de ingreso: 15 minutos');
+INSERT INTO "norma" ("id_norma", "detalle_norma") VALUES (4, 'Prohibido hablar, consultar levantando la mano');
+
+-- rol: 2 filas
+INSERT INTO "rol" ("id_rol", "nombre_rol") VALUES (1, 'docente');
+INSERT INTO "rol" ("id_rol", "nombre_rol") VALUES (2, 'auxiliar');
+
+-- sessions: 2 filas
+INSERT INTO "sessions" ("id", "user_id", "ip_address", "user_agent", "payload", "last_activity") VALUES ('HNAlQaeBbhYTDVEAJPQkiQSHu1vSYZn56pysE95B', 1, '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0', 'YTo0OntzOjY6Il90b2tlbiI7czo0MDoiblFvdWlzZEUzYUFyamJMWldmVExnRHhoS2p5VzN2WGVnMTQxOHhnZiI7czo2OiJfZmxhc2giO2E6Mjp7czozOiJvbGQiO2E6MDp7fXM6MzoibmV3IjthOjA6e319czo5OiJfcHJldmlvdXMiO2E6MTp7czozOiJ1cmwiO3M6NDA6Imh0dHA6Ly8xMjcuMC4wLjE6ODAwMC9hcGkvbm90aWZpY2FjaW9uZXMiO31zOjUwOiJsb2dpbl93ZWJfNTliYTM2YWRkYzJiMmY5NDAxNTgwZjAxNGM3ZjU4ZWE0ZTMwOTg5ZCI7aToxO30=', 1794280328);
+INSERT INTO "sessions" ("id", "user_id", "ip_address", "user_agent", "payload", "last_activity") VALUES ('AXw4cd3O0jgHUcG4g0zNkT0qEkyhD5zSw4EvQ2jD', NULL, '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0', 'YTo0OntzOjY6Il90b2tlbiI7czo0MDoiNFQ0VkpIY1hjNGNSemxIdkViZ2tIOXJiWjFlRHpRWXFPSDRtVXE0dCI7czozOiJ1cmwiO2E6MTp7czo4OiJpbnRlbmRlZCI7czoyMToiaHR0cDovLzEyNy4wLjAuMTo4MDAwIjt9czo5OiJfcHJldmlvdXMiO2E6MTp7czozOiJ1cmwiO3M6MjE6Imh0dHA6Ly8xMjcuMC4wLjE6ODAwMCI7fXM6NjoiX2ZsYXNoIjthOjI6e3M6Mzoib2xkIjthOjA6e31zOjM6Im5ldyI7YTowOnt9fX0=', 1794273842);
+
+-- tipo_examen: 3 filas
+INSERT INTO "tipo_examen" ("id_tipo_examen", "nombre_tipo_examen") VALUES (1, 'examen parcial');
+INSERT INTO "tipo_examen" ("id_tipo_examen", "nombre_tipo_examen") VALUES (2, 'examen final');
+INSERT INTO "tipo_examen" ("id_tipo_examen", "nombre_tipo_examen") VALUES (3, 'segunda instancia');
+
+-- tipo_gestion: 4 filas
+INSERT INTO "tipo_gestion" ("id_tipo_gestion", "nombre_tipo_gestion") VALUES (1, 'primer semestre');
+INSERT INTO "tipo_gestion" ("id_tipo_gestion", "nombre_tipo_gestion") VALUES (2, 'invierno');
+INSERT INTO "tipo_gestion" ("id_tipo_gestion", "nombre_tipo_gestion") VALUES (3, 'segundo semestre');
+INSERT INTO "tipo_gestion" ("id_tipo_gestion", "nombre_tipo_gestion") VALUES (4, 'verano');
+
+-- usuario: 16 filas
+INSERT INTO "usuario" ("id_usuario", "cod_sis", "password", "nombre_usuario", "apellido", "correo", "nombre", "fecha_creacion", "estado_cuenta") VALUES (1, 'DOC001', '$2y$12$Q2NT4rFjKIiDm5rYZmhrVuvdRUoOeHRfbgkwKI3GZTsb5kn6olG1C', 'Roberto', 'Silva', NULL, 'Roberto', '2026-11-08T02:48:15'::timestamp, 'habilitada');
+INSERT INTO "usuario" ("id_usuario", "cod_sis", "password", "nombre_usuario", "apellido", "correo", "nombre", "fecha_creacion", "estado_cuenta") VALUES (2, 'DOC002', '$2y$12$cR9BiLcmfx2slphCGEJcfOrRHsfYSyY7dB2EX3ReggaZstvKvWhGK', 'Patricia', 'Rojas', NULL, 'Patricia', '2026-11-08T02:48:15'::timestamp, 'habilitada');
+INSERT INTO "usuario" ("id_usuario", "cod_sis", "password", "nombre_usuario", "apellido", "correo", "nombre", "fecha_creacion", "estado_cuenta") VALUES (3, 'AUX001', '$2y$12$88aNYUoZRhyfw9oA4BdsAujllCecA3ZpOgoe3ltMHkgpndwPwNDWq', 'Diego', 'Mendoza', NULL, 'Diego', '2026-11-08T02:48:15'::timestamp, 'habilitada');
+INSERT INTO "usuario" ("id_usuario", "cod_sis", "password", "nombre_usuario", "apellido", "correo", "nombre", "fecha_creacion", "estado_cuenta") VALUES (4, 'AUX002', '$2y$12$mzepLz/sQ9IvxSgRk0vUC.WL.mYTSPu/xIaH0NOaQHVI13ZGdi9Y2', 'Sofia', 'Castro', NULL, 'Sofia', '2026-11-08T02:48:15'::timestamp, 'habilitada');
+INSERT INTO "usuario" ("id_usuario", "cod_sis", "password", "nombre_usuario", "apellido", "correo", "nombre", "fecha_creacion", "estado_cuenta") VALUES (5, 'DOC003', '$2y$12$0hAV63bJ8fER57b4eyNCI.77qGdXZW3nsEIcsV1yZlnsI0JHbfgZW', 'Fernando', 'Vargas', NULL, 'Fernando', '2026-11-08T02:48:15'::timestamp, 'habilitada');
+INSERT INTO "usuario" ("id_usuario", "cod_sis", "password", "nombre_usuario", "apellido", "correo", "nombre", "fecha_creacion", "estado_cuenta") VALUES (14, '202600111', '$2y$12$/1RLS4MQ39MaEAChWczxue.BvqTCJMP/WyEEGNO5V9o7lGbCTNdRe', 'Auxiliar', 'gaga', NULL, NULL, '2026-11-10T01:16:22'::timestamp, 'habilitada');
+INSERT INTO "usuario" ("id_usuario", "cod_sis", "password", "nombre_usuario", "apellido", "correo", "nombre", "fecha_creacion", "estado_cuenta") VALUES (15, '111111111', '$2y$12$aIY5Pq5GQhLlP1qUK6bgwOjYl81HreujHD3NE0eastmjx/tsoycCW', 'dariana.panozo', 'Panozo', '123454@umss.edu', 'Darian', '2026-11-10T01:26:41'::timestamp, 'habilitada');
+INSERT INTO "usuario" ("id_usuario", "cod_sis", "password", "nombre_usuario", "apellido", "correo", "nombre", "fecha_creacion", "estado_cuenta") VALUES (6, '202300047', '$2y$12$VY.Ov4e/VbOgr.LDo298he9pXx9x4wJybzDPVB2sBnufBYeYtXnwi', 'zzebnell', 'Zeballos', '202300047@umss.edu', 'Leonel', '2026-11-08T03:11:52'::timestamp, 'habilitada');
+INSERT INTO "usuario" ("id_usuario", "cod_sis", "password", "nombre_usuario", "apellido", "correo", "nombre", "fecha_creacion", "estado_cuenta") VALUES (7, '201605998', '$2y$12$X0VkmJcZfz2BzsIYD6f3DePB6oe5QRakIi/rXHn.P05MgqN2b1rCa', 'ValeryPanozo', 'Panozo', 'valery@umss.edu', 'Valery', '2026-11-08T11:53:08'::timestamp, 'rechazada');
+INSERT INTO "usuario" ("id_usuario", "cod_sis", "password", "nombre_usuario", "apellido", "correo", "nombre", "fecha_creacion", "estado_cuenta") VALUES (8, '676767676', '$2y$12$dXUar98eiHpTiKtnSZIQ5elX4eU1sxr9hSkewGuVjZ1CQVnkcdcym', 'aimee.p3', 'petres', '20211@umss.edu', 'aimee', '2026-11-08T22:23:53'::timestamp, 'rechazada');
+INSERT INTO "usuario" ("id_usuario", "cod_sis", "password", "nombre_usuario", "apellido", "correo", "nombre", "fecha_creacion", "estado_cuenta") VALUES (9, '202300548', '$2y$12$R24FdBMddA2Hrd.gD2E/dO0ARl9D8DdrP3zR.wyA9HckxYMfOPEEW', 'auxi', 'gaga', NULL, NULL, '2026-11-08T22:58:08'::timestamp, 'habilitada');
+INSERT INTO "usuario" ("id_usuario", "cod_sis", "password", "nombre_usuario", "apellido", "correo", "nombre", "fecha_creacion", "estado_cuenta") VALUES (10, '202000128', '$2y$12$rLlAh6v3vU.6C3oZXkt9DeyQd84q1ve9jXfMUSvgLNmAwloiNzyle', 'Dennis', 'Man', NULL, NULL, '2026-11-09T14:21:28'::timestamp, 'habilitada');
+INSERT INTO "usuario" ("id_usuario", "cod_sis", "password", "nombre_usuario", "apellido", "correo", "nombre", "fecha_creacion", "estado_cuenta") VALUES (11, '202300001', '$2y$12$S.XppgICPLFFXiruFSm6teKAmxvcX5JNzHo31bhPkD1Lw3SCfTSg.', 'corina.flores', 'Flores', 'hola.hola@umss.edu', 'Corina', '2026-11-09T14:41:20'::timestamp, 'habilitada');
+INSERT INTO "usuario" ("id_usuario", "cod_sis", "password", "nombre_usuario", "apellido", "correo", "nombre", "fecha_creacion", "estado_cuenta") VALUES (12, '202300002', '$2y$12$dk3HXPCytDjmfFA1j.X73.gyA.IsSnjwVW6SUuRjWabMygrh0sCQm', 'ruben.ayaviri', 'Ayaviri', 'hola.adios@umss.edu', 'Ruben', '2026-11-09T14:52:25'::timestamp, 'habilitada');
+INSERT INTO "usuario" ("id_usuario", "cod_sis", "password", "nombre_usuario", "apellido", "correo", "nombre", "fecha_creacion", "estado_cuenta") VALUES (13, '202500123', '$2y$12$76ZIbcVeT70xRSW7BXHds.GXQ6bwG56JCGPm//..bpgYkjkpHsxTm', 'Campeon', 'Docente', NULL, 'Campeon', '2026-11-09T11:54:31'::timestamp, 'habilitada');
+INSERT INTO "usuario" ("id_usuario", "cod_sis", "password", "nombre_usuario", "apellido", "correo", "nombre", "fecha_creacion", "estado_cuenta") VALUES (16, '202302032', '$2y$12$xVMsMYJP0JRrz0I3Zhaq4eS85PMA8JUxGphc.HVN7bqCIecB4ctya', 'Cesar', 'Ochoa', NULL, NULL, '2026-11-10T03:26:00'::timestamp, 'habilitada');
+
+-- curso: 14 filas
+INSERT INTO "curso" ("id_curso", "nombre_curso", "sis_doc", "fecha_creacion", "estado", "id_ambiente") VALUES (1, 'Calculo I', 1, '2024-02-01'::date, 'EnCurso', NULL);
+INSERT INTO "curso" ("id_curso", "nombre_curso", "sis_doc", "fecha_creacion", "estado", "id_ambiente") VALUES (2, 'Fisica I', 2, '2024-02-01'::date, 'EnCurso', NULL);
+INSERT INTO "curso" ("id_curso", "nombre_curso", "sis_doc", "fecha_creacion", "estado", "id_ambiente") VALUES (4, 'Algebra Lineal', 1, '2024-02-03'::date, 'Finalizo', NULL);
+INSERT INTO "curso" ("id_curso", "nombre_curso", "sis_doc", "fecha_creacion", "estado", "id_ambiente") VALUES (5, 'Quimica General', 2, '2024-02-04'::date, 'EnCurso', NULL);
+INSERT INTO "curso" ("id_curso", "nombre_curso", "sis_doc", "fecha_creacion", "estado", "id_ambiente") VALUES (7, 'Introduccion a la Programacion - Grupo 4', 2, '2026-10-24'::date, 'EnCurso', NULL);
+INSERT INTO "curso" ("id_curso", "nombre_curso", "sis_doc", "fecha_creacion", "estado", "id_ambiente") VALUES (8, 'Introduccion a la Programacion - Grupo 15A', 2, '2026-10-24'::date, 'EnCurso', NULL);
+INSERT INTO "curso" ("id_curso", "nombre_curso", "sis_doc", "fecha_creacion", "estado", "id_ambiente") VALUES (9, 'Programacion I - Grupo 8', 1, '2026-11-04'::date, 'EnCurso', NULL);
+INSERT INTO "curso" ("id_curso", "nombre_curso", "sis_doc", "fecha_creacion", "estado", "id_ambiente") VALUES (10, 'Programacion I - Grupo 8', 1, '2026-11-04'::date, 'EnCurso', NULL);
+INSERT INTO "curso" ("id_curso", "nombre_curso", "sis_doc", "fecha_creacion", "estado", "id_ambiente") VALUES (11, 'Programacion I - Grupo 8', 1, '2026-11-04'::date, 'EnCurso', NULL);
+INSERT INTO "curso" ("id_curso", "nombre_curso", "sis_doc", "fecha_creacion", "estado", "id_ambiente") VALUES (12, 'Programacion I - Grupo 8', 1, '2026-11-04'::date, 'EnCurso', NULL);
+INSERT INTO "curso" ("id_curso", "nombre_curso", "sis_doc", "fecha_creacion", "estado", "id_ambiente") VALUES (13, 'Base de Datos 2 - Grupo JJ', 1, '2026-11-09'::date, 'EnCurso', NULL);
+INSERT INTO "curso" ("id_curso", "nombre_curso", "sis_doc", "fecha_creacion", "estado", "id_ambiente") VALUES (14, 'Base de Datos 2', 13, '2026-11-09'::date, 'EnCurso', NULL);
+INSERT INTO "curso" ("id_curso", "nombre_curso", "sis_doc", "fecha_creacion", "estado", "id_ambiente") VALUES (3, 'Programacion I', 1, '2024-02-02'::date, 'EnCurso', NULL);
+INSERT INTO "curso" ("id_curso", "nombre_curso", "sis_doc", "fecha_creacion", "estado", "id_ambiente") VALUES (6, 'Programacion I - Grupo 1', 2, '2026-10-24'::date, 'EnCurso', NULL);
+
+-- examen: 39 filas
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (1, '2024-06-10'::date, '08:00:00'::time, 120, 1, 1, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (2, '2024-06-11'::date, '10:00:00'::time, 120, 2, 2, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (3, '2024-06-12'::date, '14:00:00'::time, 120, 5, 3, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (4, '2024-06-13'::date, '08:00:00'::time, 120, 1, 1, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (5, '2024-06-14'::date, '16:00:00'::time, 120, 2, 2, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (8, '0262-12-10'::date, '08:15:00'::time, 90, 1, 2, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (27, '2026-10-27'::date, '06:38:30'::time, 90, 1, 2, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (28, '2026-10-27'::date, '10:52:09'::time, 90, 1, 1, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (29, '2026-10-27'::date, '10:55:31'::time, 90, 1, 1, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (35, '2026-10-27'::date, '07:17:57'::time, 90, 1, 1, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (36, '2026-11-04'::date, '11:07:00'::time, 90, 1, 1, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (32, '2026-11-07'::date, '12:26:17'::time, 90, 1, 1, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (34, '2026-11-07'::date, '14:48:44'::time, 90, 1, 1, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (14, '2026-10-24'::date, '18:20:40'::time, 90, 5, 2, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (33, '2026-11-08'::date, '19:10:42'::time, 90, 1, 1, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (37, '2026-11-08'::date, '21:11:01'::time, 180, 1, 1, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (38, '2026-11-12'::date, '16:00:00'::time, 90, 1, 2, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (10, '2004-05-12'::date, '12:32:00'::time, 180, 1, 1, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (11, '2001-06-13'::date, '00:32:00'::time, 90, 1, 2, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (17, '2026-10-25'::date, '18:10:11'::time, 90, 1, 1, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (18, '2026-10-25'::date, '18:14:47'::time, 90, 1, 1, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (19, '2026-10-25'::date, '18:30:08'::time, 90, 1, 1, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (20, '2026-10-25'::date, '18:35:23'::time, 90, 1, 1, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (13, '1900-12-31'::date, '23:59:00'::time, 88, 5, 1, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (15, '1998-07-03'::date, '07:08:00'::time, 90, 5, 2, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (9, '2024-07-15'::date, '08:30:00'::time, 90, 1, 2, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (12, '2024-07-16'::date, '23:59:00'::time, 90, 5, 1, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (7, '2024-07-17'::date, '18:45:00'::time, 90, 1, 1, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (6, '2024-07-18'::date, '18:45:00'::time, 90, 1, 1, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (21, '2026-10-25'::date, '18:42:34'::time, 90, 1, 1, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (22, '2026-10-25'::date, '19:05:16'::time, 90, 1, 1, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (23, '2026-10-25'::date, '20:11:56'::time, 90, 1, 1, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (24, '2026-10-26'::date, '12:45:00'::time, 90, 1, 1, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (25, '2026-10-26'::date, '20:14:09'::time, 90, 1, 1, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (16, '2026-10-26'::date, '18:56:34'::time, 90, 2, 1, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (26, '2026-10-26'::date, '21:57:12'::time, 120, 1, 3, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (30, '2026-11-03'::date, '09:00:00'::time, 90, 1, 1, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (31, '2026-11-05'::date, '09:00:00'::time, 90, 1, 1, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (39, '2026-11-10'::date, '06:00:00'::time, 30, 1, 3, NULL);
+
+-- rol_usuario: 16 filas
+INSERT INTO "rol_usuario" ("id_usuario", "id_rol") VALUES (1, 1);
+INSERT INTO "rol_usuario" ("id_usuario", "id_rol") VALUES (2, 1);
+INSERT INTO "rol_usuario" ("id_usuario", "id_rol") VALUES (3, 2);
+INSERT INTO "rol_usuario" ("id_usuario", "id_rol") VALUES (4, 2);
+INSERT INTO "rol_usuario" ("id_usuario", "id_rol") VALUES (5, 1);
+INSERT INTO "rol_usuario" ("id_usuario", "id_rol") VALUES (6, 1);
+INSERT INTO "rol_usuario" ("id_usuario", "id_rol") VALUES (7, 1);
+INSERT INTO "rol_usuario" ("id_usuario", "id_rol") VALUES (8, 1);
+INSERT INTO "rol_usuario" ("id_usuario", "id_rol") VALUES (9, 2);
+INSERT INTO "rol_usuario" ("id_usuario", "id_rol") VALUES (10, 2);
+INSERT INTO "rol_usuario" ("id_usuario", "id_rol") VALUES (11, 1);
+INSERT INTO "rol_usuario" ("id_usuario", "id_rol") VALUES (12, 1);
+INSERT INTO "rol_usuario" ("id_usuario", "id_rol") VALUES (13, 1);
+INSERT INTO "rol_usuario" ("id_usuario", "id_rol") VALUES (14, 2);
+INSERT INTO "rol_usuario" ("id_usuario", "id_rol") VALUES (15, 1);
+INSERT INTO "rol_usuario" ("id_usuario", "id_rol") VALUES (16, 2);
+
+-- validacion_registro: 10 filas
+INSERT INTO "validacion_registro" ("id_solicitante", "id_validador", "decision", "motivo", "fecha") VALUES (6, 1, 'aprobado', NULL, '2026-11-08T11:49:48'::timestamp);
+INSERT INTO "validacion_registro" ("id_solicitante", "id_validador", "decision", "motivo", "fecha") VALUES (6, 2, 'aprobado', NULL, '2026-11-08T11:54:26'::timestamp);
+INSERT INTO "validacion_registro" ("id_solicitante", "id_validador", "decision", "motivo", "fecha") VALUES (7, 2, 'desaprobado', 'Hable con el docente y no es su cuenta', '2026-11-08T11:54:53'::timestamp);
+INSERT INTO "validacion_registro" ("id_solicitante", "id_validador", "decision", "motivo", "fecha") VALUES (8, 6, 'desaprobado', 'me cae mal', '2026-11-08T22:25:35'::timestamp);
+INSERT INTO "validacion_registro" ("id_solicitante", "id_validador", "decision", "motivo", "fecha") VALUES (11, 1, 'aprobado', NULL, '2026-11-09T14:42:36'::timestamp);
+INSERT INTO "validacion_registro" ("id_solicitante", "id_validador", "decision", "motivo", "fecha") VALUES (11, 2, 'aprobado', NULL, '2026-11-09T14:44:48'::timestamp);
+INSERT INTO "validacion_registro" ("id_solicitante", "id_validador", "decision", "motivo", "fecha") VALUES (12, 1, 'aprobado', NULL, '2026-11-09T14:53:59'::timestamp);
+INSERT INTO "validacion_registro" ("id_solicitante", "id_validador", "decision", "motivo", "fecha") VALUES (12, 2, 'aprobado', NULL, '2026-11-09T14:55:21'::timestamp);
+INSERT INTO "validacion_registro" ("id_solicitante", "id_validador", "decision", "motivo", "fecha") VALUES (15, 1, 'aprobado', NULL, '2026-11-09T21:29:47'::timestamp);
+INSERT INTO "validacion_registro" ("id_solicitante", "id_validador", "decision", "motivo", "fecha") VALUES (15, 2, 'aprobado', NULL, '2026-11-09T21:31:02'::timestamp);
+
+-- auxiliar_curso: 9 filas
+INSERT INTO "auxiliar_curso" ("id_auxiliar", "id_curso", "estado") VALUES (3, 1, 'Activo');
+INSERT INTO "auxiliar_curso" ("id_auxiliar", "id_curso", "estado") VALUES (4, 2, 'Activo');
+INSERT INTO "auxiliar_curso" ("id_auxiliar", "id_curso", "estado") VALUES (3, 3, 'Activo');
+INSERT INTO "auxiliar_curso" ("id_auxiliar", "id_curso", "estado") VALUES (4, 4, 'Baja');
+INSERT INTO "auxiliar_curso" ("id_auxiliar", "id_curso", "estado") VALUES (3, 5, 'Activo');
+INSERT INTO "auxiliar_curso" ("id_auxiliar", "id_curso", "estado") VALUES (9, 4, 'Activo');
+INSERT INTO "auxiliar_curso" ("id_auxiliar", "id_curso", "estado") VALUES (10, 3, 'Activo');
+INSERT INTO "auxiliar_curso" ("id_auxiliar", "id_curso", "estado") VALUES (14, 14, 'Activo');
+INSERT INTO "auxiliar_curso" ("id_auxiliar", "id_curso", "estado") VALUES (16, 1, 'Activo');
+
+-- curso_tipo_gestion: 14 filas
+INSERT INTO "curso_tipo_gestion" ("id_curso", "id_tg", "anio") VALUES (1, 1, 2024);
+INSERT INTO "curso_tipo_gestion" ("id_curso", "id_tg", "anio") VALUES (2, 1, 2024);
+INSERT INTO "curso_tipo_gestion" ("id_curso", "id_tg", "anio") VALUES (4, 3, 2024);
+INSERT INTO "curso_tipo_gestion" ("id_curso", "id_tg", "anio") VALUES (5, 4, 2024);
+INSERT INTO "curso_tipo_gestion" ("id_curso", "id_tg", "anio") VALUES (3, 2, 2024);
+INSERT INTO "curso_tipo_gestion" ("id_curso", "id_tg", "anio") VALUES (6, 3, 2026);
+INSERT INTO "curso_tipo_gestion" ("id_curso", "id_tg", "anio") VALUES (7, 1, 2026);
+INSERT INTO "curso_tipo_gestion" ("id_curso", "id_tg", "anio") VALUES (8, 1, 2026);
+INSERT INTO "curso_tipo_gestion" ("id_curso", "id_tg", "anio") VALUES (9, 1, 2026);
+INSERT INTO "curso_tipo_gestion" ("id_curso", "id_tg", "anio") VALUES (10, 1, 2026);
+INSERT INTO "curso_tipo_gestion" ("id_curso", "id_tg", "anio") VALUES (11, 2, 2026);
+INSERT INTO "curso_tipo_gestion" ("id_curso", "id_tg", "anio") VALUES (12, 2, 2027);
+INSERT INTO "curso_tipo_gestion" ("id_curso", "id_tg", "anio") VALUES (13, 3, 2026);
+INSERT INTO "curso_tipo_gestion" ("id_curso", "id_tg", "anio") VALUES (14, 3, 2026);
+
+-- estudiante_curso: 112 filas
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('20210001', 1);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('20210002', 2);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('20210003', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('20210004', 4);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('20210005', 5);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('90600001', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('90600002', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('90600003', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('90600004', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('20210001', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('20210002', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('20210003', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('20210004', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('20210005', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201013', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101022', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201031', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202202045', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202002107', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201056', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101078', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201089', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101090', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201101', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101112', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201123', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201013', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101022', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201031', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202202045', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202002107', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201056', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101078', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201089', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101090', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201101', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101112', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201123', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101134', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201145', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101156', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201167', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101178', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201189', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101190', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201201', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201212', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101223', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201234', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101245', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201256', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101267', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201278', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101289', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201290', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101301', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201312', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101323', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201334', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101345', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201356', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101367', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201378', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101389', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201390', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101401', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201412', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101423', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201434', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101445', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201456', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101467', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201478', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101489', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201490', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101134', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201145', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101156', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201167', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101178', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201189', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101190', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201201', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201212', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101223', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201234', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101245', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201256', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101267', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201278', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101289', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201290', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101301', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201312', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101323', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201334', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101345', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201356', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101367', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201378', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101389', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201390', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101401', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201412', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101423', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201434', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101445', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201456', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101467', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201478', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101489', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201490', 14);
+
+-- notificacion_auxiliar: 5 filas
+INSERT INTO "notificacion_auxiliar" ("id_notificacion", "id_curso", "id_ambiente", "estado") VALUES (1, 1, 1, 'recibido');
+INSERT INTO "notificacion_auxiliar" ("id_notificacion", "id_curso", "id_ambiente", "estado") VALUES (2, 2, 2, 'visto');
+INSERT INTO "notificacion_auxiliar" ("id_notificacion", "id_curso", "id_ambiente", "estado") VALUES (3, 3, 3, 'recibido');
+INSERT INTO "notificacion_auxiliar" ("id_notificacion", "id_curso", "id_ambiente", "estado") VALUES (4, 4, 4, 'visto');
+INSERT INTO "notificacion_auxiliar" ("id_notificacion", "id_curso", "id_ambiente", "estado") VALUES (5, 5, 5, 'recibido');
 
 -- configuracion_examen_docente: 49 filas
 INSERT INTO "configuracion_examen_docente" ("id_configuracion_examen", "id_examen", "id_docente", "created_at", "updated_at") VALUES (1, 1, 1, '2026-10-25T15:23:13'::timestamp, '2026-10-25T15:23:13'::timestamp);
@@ -663,6 +960,189 @@ INSERT INTO "configuracion_examen_docente" ("id_configuracion_examen", "id_exame
 INSERT INTO "configuracion_examen_docente" ("id_configuracion_examen", "id_examen", "id_docente", "created_at", "updated_at") VALUES (57, 38, 1, '2026-11-10T00:34:33'::timestamp, '2026-11-10T00:34:33'::timestamp);
 INSERT INTO "configuracion_examen_docente" ("id_configuracion_examen", "id_examen", "id_docente", "created_at", "updated_at") VALUES (58, 5, 1, '2026-11-09T21:29:16'::timestamp, '2026-11-09T21:29:16'::timestamp);
 INSERT INTO "configuracion_examen_docente" ("id_configuracion_examen", "id_examen", "id_docente", "created_at", "updated_at") VALUES (59, 39, 1, '2026-11-10T02:54:07'::timestamp, '2026-11-10T02:54:07'::timestamp);
+
+-- examen_ambiente: 42 filas
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (1, 1);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (2, 2);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (3, 3);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (4, 4);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (5, 5);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (6, 2);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (7, 2);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (8, 1);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (9, 1);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (10, 5);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (11, 2);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (12, 2);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (13, 2);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (14, 1);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (15, 5);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (16, 5);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (17, 1);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (18, 1);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (19, 1);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (20, 1);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (21, 1);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (22, 1);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (23, 1);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (24, 1);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (24, 5);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (25, 2);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (25, 5);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (26, 5);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (26, 2);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (27, 2);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (28, 1);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (29, 1);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (30, 1);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (31, 1);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (32, 1);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (33, 1);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (34, 1);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (35, 5);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (36, 1);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (37, 3);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (38, 5);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (39, 5);
+
+-- examen_curso: 39 filas
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (1, 1);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (2, 2);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (3, 3);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (4, 4);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (5, 5);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (13, 3);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (14, 3);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (6, 1);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (7, 1);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (8, 1);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (15, 3);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (9, 1);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (16, 7);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (10, 1);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (11, 1);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (17, 3);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (18, 3);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (19, 3);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (20, 3);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (21, 3);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (12, 3);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (22, 3);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (23, 3);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (39, 13);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (24, 1);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (25, 3);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (26, 1);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (27, 3);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (28, 1);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (29, 3);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (30, 4);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (31, 1);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (32, 3);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (33, 4);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (34, 1);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (35, 3);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (36, 3);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (37, 3);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (38, 13);
+
+-- examen_material_permitido: 31 filas
+INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (1, 1);
+INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (2, 2);
+INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (3, 3);
+INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (4, 4);
+INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (5, 5);
+INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (6, 5);
+INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (7, 5);
+INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (8, 1);
+INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (8, 2);
+INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (9, 1);
+INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (10, 3);
+INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (11, 1);
+INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (11, 3);
+INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (14, 4);
+INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (14, 1);
+INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (15, 2);
+INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (15, 3);
+INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (24, 1);
+INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (25, 4);
+INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (25, 1);
+INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (25, 2);
+INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (25, 3);
+INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (26, 4);
+INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (26, 2);
+INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (27, 4);
+INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (27, 2);
+INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (35, 1);
+INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (37, 4);
+INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (37, 1);
+INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (38, 4);
+INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (38, 1);
+
+-- examen_norma: 29 filas
+INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (1, 1);
+INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (2, 2);
+INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (3, 3);
+INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (4, 4);
+INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (5, 5);
+INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (6, 1);
+INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (7, 1);
+INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (8, 1);
+INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (9, 1);
+INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (10, 2);
+INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (11, 5);
+INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (14, 2);
+INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (14, 5);
+INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (14, 1);
+INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (14, 4);
+INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (14, 3);
+INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (15, 1);
+INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (15, 4);
+INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (24, 4);
+INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (26, 2);
+INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (26, 3);
+INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (27, 1);
+INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (35, 5);
+INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (37, 1);
+INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (37, 4);
+INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (38, 2);
+INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (38, 1);
+INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (38, 4);
+INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (38, 5);
+
+-- invitacion_examen_compartido: 11 filas
+INSERT INTO "invitacion_examen_compartido" ("id_invitacion", "id_docente_invitado", "id_examen", "estado", "id_docente_invitador", "created_at", "updated_at") VALUES (1, 2, 1, 'aceptado', 1, '2026-10-25T15:14:15'::timestamp, '2026-10-25T15:14:15'::timestamp);
+INSERT INTO "invitacion_examen_compartido" ("id_invitacion", "id_docente_invitado", "id_examen", "estado", "id_docente_invitador", "created_at", "updated_at") VALUES (2, 5, 2, 'pendiente', 2, '2026-10-25T15:14:15'::timestamp, '2026-10-25T15:14:15'::timestamp);
+INSERT INTO "invitacion_examen_compartido" ("id_invitacion", "id_docente_invitado", "id_examen", "estado", "id_docente_invitador", "created_at", "updated_at") VALUES (3, 1, 3, 'rechazado', 5, '2026-10-25T15:14:15'::timestamp, '2026-10-25T15:14:15'::timestamp);
+INSERT INTO "invitacion_examen_compartido" ("id_invitacion", "id_docente_invitado", "id_examen", "estado", "id_docente_invitador", "created_at", "updated_at") VALUES (4, 2, 4, 'aceptado', 1, '2026-10-25T15:14:15'::timestamp, '2026-10-25T15:14:15'::timestamp);
+INSERT INTO "invitacion_examen_compartido" ("id_invitacion", "id_docente_invitado", "id_examen", "estado", "id_docente_invitador", "created_at", "updated_at") VALUES (5, 5, 5, 'pendiente', 2, '2026-10-25T15:14:15'::timestamp, '2026-10-25T15:14:15'::timestamp);
+INSERT INTO "invitacion_examen_compartido" ("id_invitacion", "id_docente_invitado", "id_examen", "estado", "id_docente_invitador", "created_at", "updated_at") VALUES (6, 5, 1, 'cancelado', 1, '2026-10-26T17:12:31'::timestamp, '2026-10-26T17:12:46'::timestamp);
+INSERT INTO "invitacion_examen_compartido" ("id_invitacion", "id_docente_invitado", "id_examen", "estado", "id_docente_invitador", "created_at", "updated_at") VALUES (7, 5, 1, 'aceptado', 1, '2026-10-26T17:13:14'::timestamp, '2026-10-26T17:13:34'::timestamp);
+INSERT INTO "invitacion_examen_compartido" ("id_invitacion", "id_docente_invitado", "id_examen", "estado", "id_docente_invitador", "created_at", "updated_at") VALUES (8, 5, 4, 'cancelado', 1, '2026-10-26T17:15:38'::timestamp, '2026-10-26T17:16:18'::timestamp);
+INSERT INTO "invitacion_examen_compartido" ("id_invitacion", "id_docente_invitado", "id_examen", "estado", "id_docente_invitador", "created_at", "updated_at") VALUES (9, 2, 26, 'aceptado', 1, '2026-10-26T18:24:15'::timestamp, '2026-10-26T18:46:55'::timestamp);
+INSERT INTO "invitacion_examen_compartido" ("id_invitacion", "id_docente_invitado", "id_examen", "estado", "id_docente_invitador", "created_at", "updated_at") VALUES (10, 13, 11, 'pendiente', 1, '2026-11-09T13:43:37'::timestamp, '2026-11-09T13:43:37'::timestamp);
+INSERT INTO "invitacion_examen_compartido" ("id_invitacion", "id_docente_invitado", "id_examen", "estado", "id_docente_invitador", "created_at", "updated_at") VALUES (11, 1, 5, 'aceptado', 2, '2026-11-09T21:18:11'::timestamp, '2026-11-09T21:29:14'::timestamp);
+
+-- material_personalizado: 4 filas
+INSERT INTO "material_personalizado" ("id_examen", "numero_material", "descripcion_material") VALUES (10, 1, 'asdada');
+INSERT INTO "material_personalizado" ("id_examen", "numero_material", "descripcion_material") VALUES (11, 1, 'sd23123');
+INSERT INTO "material_personalizado" ("id_examen", "numero_material", "descripcion_material") VALUES (13, 1, 'Calculadora programable');
+INSERT INTO "material_personalizado" ("id_examen", "numero_material", "descripcion_material") VALUES (25, 1, 'adasd');
+
+-- norma_personalizada: 13 filas
+INSERT INTO "norma_personalizada" ("id_examen", "numero_norma", "descripcion_norma") VALUES (1, 1, 'Se permite el uso de calculadora científica no programable.');
+INSERT INTO "norma_personalizada" ("id_examen", "numero_norma", "descripcion_norma") VALUES (1, 2, 'No se permite hojas adicionales, usar el reverso del examen.');
+INSERT INTO "norma_personalizada" ("id_examen", "numero_norma", "descripcion_norma") VALUES (2, 1, 'El código debe compilar sin errores para ser evaluado.');
+INSERT INTO "norma_personalizada" ("id_examen", "numero_norma", "descripcion_norma") VALUES (2, 2, 'Prohibido el acceso a internet o repositorios externos.');
+INSERT INTO "norma_personalizada" ("id_examen", "numero_norma", "descripcion_norma") VALUES (3, 1, 'Tiempo estricto de 45 minutos. No hay prórroga.');
+INSERT INTO "norma_personalizada" ("id_examen", "numero_norma", "descripcion_norma") VALUES (4, 1, 'Uso obligatorio de bata de laboratorio y gafas de seguridad.');
+INSERT INTO "norma_personalizada" ("id_examen", "numero_norma", "descripcion_norma") VALUES (4, 2, 'Entregar el reporte de datos antes de salir del aula.');
+INSERT INTO "norma_personalizada" ("id_examen", "numero_norma", "descripcion_norma") VALUES (5, 1, 'Responder únicamente con bolígrafo de tinta negra o azul.');
+INSERT INTO "norma_personalizada" ("id_examen", "numero_norma", "descripcion_norma") VALUES (5, 2, 'Desactivar y guardar teléfonos móviles en la mochila.');
+INSERT INTO "norma_personalizada" ("id_examen", "numero_norma", "descripcion_norma") VALUES (10, 1, 'dadad');
+INSERT INTO "norma_personalizada" ("id_examen", "numero_norma", "descripcion_norma") VALUES (11, 1, 'dffgs');
+INSERT INTO "norma_personalizada" ("id_examen", "numero_norma", "descripcion_norma") VALUES (13, 1, 'Ingreso sin mochilas');
+INSERT INTO "norma_personalizada" ("id_examen", "numero_norma", "descripcion_norma") VALUES (25, 1, 'adsasdsa');
 
 -- configuracion_examen_material: 42 filas
 INSERT INTO "configuracion_examen_material" ("id_configuracion_examen", "id_material") VALUES (1, 1);
@@ -783,212 +1263,6 @@ INSERT INTO "configuracion_norma_personalizada" ("id_configuracion_norma", "id_c
 INSERT INTO "configuracion_norma_personalizada" ("id_configuracion_norma", "id_configuracion_examen", "numero_norma", "descripcion_norma") VALUES (22, 44, 2, 'No se permite hojas adicionales, usar el reverso del examen.');
 INSERT INTO "configuracion_norma_personalizada" ("id_configuracion_norma", "id_configuracion_examen", "numero_norma", "descripcion_norma") VALUES (23, 58, 1, 'Responder únicamente con bolígrafo de tinta negra o azul.');
 INSERT INTO "configuracion_norma_personalizada" ("id_configuracion_norma", "id_configuracion_examen", "numero_norma", "descripcion_norma") VALUES (24, 58, 2, 'Desactivar y guardar teléfonos móviles en la mochila.');
-
--- curso: 14 filas
-INSERT INTO "curso" ("id_curso", "nombre_curso", "sis_doc", "fecha_creacion", "estado", "id_ambiente") VALUES (1, 'Calculo I', 1, '2024-02-01'::date, 'EnCurso', NULL);
-INSERT INTO "curso" ("id_curso", "nombre_curso", "sis_doc", "fecha_creacion", "estado", "id_ambiente") VALUES (2, 'Fisica I', 2, '2024-02-01'::date, 'EnCurso', NULL);
-INSERT INTO "curso" ("id_curso", "nombre_curso", "sis_doc", "fecha_creacion", "estado", "id_ambiente") VALUES (4, 'Algebra Lineal', 1, '2024-02-03'::date, 'Finalizo', NULL);
-INSERT INTO "curso" ("id_curso", "nombre_curso", "sis_doc", "fecha_creacion", "estado", "id_ambiente") VALUES (5, 'Quimica General', 2, '2024-02-04'::date, 'EnCurso', NULL);
-INSERT INTO "curso" ("id_curso", "nombre_curso", "sis_doc", "fecha_creacion", "estado", "id_ambiente") VALUES (7, 'Introduccion a la Programacion - Grupo 4', 2, '2026-10-24'::date, 'EnCurso', NULL);
-INSERT INTO "curso" ("id_curso", "nombre_curso", "sis_doc", "fecha_creacion", "estado", "id_ambiente") VALUES (8, 'Introduccion a la Programacion - Grupo 15A', 2, '2026-10-24'::date, 'EnCurso', NULL);
-INSERT INTO "curso" ("id_curso", "nombre_curso", "sis_doc", "fecha_creacion", "estado", "id_ambiente") VALUES (9, 'Programacion I - Grupo 8', 1, '2026-11-04'::date, 'EnCurso', NULL);
-INSERT INTO "curso" ("id_curso", "nombre_curso", "sis_doc", "fecha_creacion", "estado", "id_ambiente") VALUES (10, 'Programacion I - Grupo 8', 1, '2026-11-04'::date, 'EnCurso', NULL);
-INSERT INTO "curso" ("id_curso", "nombre_curso", "sis_doc", "fecha_creacion", "estado", "id_ambiente") VALUES (11, 'Programacion I - Grupo 8', 1, '2026-11-04'::date, 'EnCurso', NULL);
-INSERT INTO "curso" ("id_curso", "nombre_curso", "sis_doc", "fecha_creacion", "estado", "id_ambiente") VALUES (12, 'Programacion I - Grupo 8', 1, '2026-11-04'::date, 'EnCurso', NULL);
-INSERT INTO "curso" ("id_curso", "nombre_curso", "sis_doc", "fecha_creacion", "estado", "id_ambiente") VALUES (13, 'Base de Datos 2 - Grupo JJ', 1, '2026-11-09'::date, 'EnCurso', NULL);
-INSERT INTO "curso" ("id_curso", "nombre_curso", "sis_doc", "fecha_creacion", "estado", "id_ambiente") VALUES (14, 'Base de Datos 2', 13, '2026-11-09'::date, 'EnCurso', NULL);
-INSERT INTO "curso" ("id_curso", "nombre_curso", "sis_doc", "fecha_creacion", "estado", "id_ambiente") VALUES (3, 'Programacion I', 1, '2024-02-02'::date, 'EnCurso', NULL);
-INSERT INTO "curso" ("id_curso", "nombre_curso", "sis_doc", "fecha_creacion", "estado", "id_ambiente") VALUES (6, 'Programacion I - Grupo 1', 2, '2026-10-24'::date, 'EnCurso', NULL);
-
--- curso_tipo_gestion: 14 filas
-INSERT INTO "curso_tipo_gestion" ("id_curso", "id_tg", "anio") VALUES (1, 1, 2024);
-INSERT INTO "curso_tipo_gestion" ("id_curso", "id_tg", "anio") VALUES (2, 1, 2024);
-INSERT INTO "curso_tipo_gestion" ("id_curso", "id_tg", "anio") VALUES (4, 3, 2024);
-INSERT INTO "curso_tipo_gestion" ("id_curso", "id_tg", "anio") VALUES (5, 4, 2024);
-INSERT INTO "curso_tipo_gestion" ("id_curso", "id_tg", "anio") VALUES (3, 2, 2024);
-INSERT INTO "curso_tipo_gestion" ("id_curso", "id_tg", "anio") VALUES (6, 3, 2026);
-INSERT INTO "curso_tipo_gestion" ("id_curso", "id_tg", "anio") VALUES (7, 1, 2026);
-INSERT INTO "curso_tipo_gestion" ("id_curso", "id_tg", "anio") VALUES (8, 1, 2026);
-INSERT INTO "curso_tipo_gestion" ("id_curso", "id_tg", "anio") VALUES (9, 1, 2026);
-INSERT INTO "curso_tipo_gestion" ("id_curso", "id_tg", "anio") VALUES (10, 1, 2026);
-INSERT INTO "curso_tipo_gestion" ("id_curso", "id_tg", "anio") VALUES (11, 2, 2026);
-INSERT INTO "curso_tipo_gestion" ("id_curso", "id_tg", "anio") VALUES (12, 2, 2027);
-INSERT INTO "curso_tipo_gestion" ("id_curso", "id_tg", "anio") VALUES (13, 3, 2026);
-INSERT INTO "curso_tipo_gestion" ("id_curso", "id_tg", "anio") VALUES (14, 3, 2026);
-
--- estudiante: 58 filas
-INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('90600001', 'Maria Fernanda Alejandra', 'Gutierrez Condori Villarroel', 'Ingenieria', true);
-INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('90600002', 'Luis Alberto Maximiliano', 'Quispe Mamani de la Torre', 'Ingenieria', true);
-INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('90600003', 'Juan Carlos Eduardo', 'Perez Montano Arancibia', 'Ingenieria', true);
-INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('90600004', 'Ana Sofia Valentina', 'Rojas Camacho Balderrama', 'Ingenieria', true);
-INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('20210001', 'Ana', 'Perez', 'Informatica', true);
-INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('20210002', 'Luis', 'Mamani', 'Informatica', true);
-INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('20210003', 'Maria', 'Lopez', 'Sistemas', true);
-INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('20210004', 'Carlos', 'Rojas', 'Informatica', true);
-INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('20210005', 'Sofia', 'Flores', 'Sistemas', true);
-INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201013', 'Ana', 'López', NULL, true);
-INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202101022', 'Bruno', 'Díaz', NULL, true);
-INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201031', 'Carla', 'Ruiz', NULL, true);
-INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202202045', 'Diego', 'Soto', NULL, true);
-INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202002107', 'Ernesto', 'Vera', NULL, true);
-INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201056', 'Fátima', 'Quispe', NULL, true);
-INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202101078', 'Gabriel', 'Mamani', NULL, true);
-INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201089', 'Helena', 'Choque', NULL, true);
-INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202101090', 'Iván', 'Flores', NULL, true);
-INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201101', 'Julia', 'García', NULL, true);
-INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202101112', 'Kevin', 'López', NULL, true);
-INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201123', 'Laura', 'Díaz', NULL, true);
-INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202101134', 'Miguel', 'Soto', NULL, true);
-INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201145', 'Nadia', 'Vera', NULL, true);
-INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202101156', 'Óscar', 'Quispe', NULL, true);
-INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201167', 'Patricia', 'Mamani', NULL, true);
-INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202101178', 'Raúl', 'Choque', NULL, true);
-INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201189', 'Sofía', 'Flores', NULL, true);
-INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202101190', 'Tomás', 'García', NULL, true);
-INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201201', 'Valeria', 'López', NULL, true);
-INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201212', 'Wendy', 'Zapata', NULL, true);
-INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202101223', 'Xavier', 'Vargas', NULL, true);
-INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201234', 'Yolanda', 'Ticona', NULL, true);
-INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202101245', 'Zoe', 'Siles', NULL, true);
-INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201256', 'Andrés', 'Rojas', NULL, true);
-INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202101267', 'Bianca', 'Paredes', NULL, true);
-INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201278', 'Cristian', 'Molina', NULL, true);
-INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202101289', 'Daniela', 'Cabrera', NULL, true);
-INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201290', 'Eduardo', 'Salazar', NULL, true);
-INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202101301', 'Fernanda', 'Vega', NULL, true);
-INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201312', 'Gonzalo', 'Arce', NULL, true);
-INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202101323', 'Hugo', 'Camacho', NULL, true);
-INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201334', 'Inés', 'Delgado', NULL, true);
-INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202101345', 'Javier', 'Espinoza', NULL, true);
-INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201356', 'Karen', 'Fuentes', NULL, true);
-INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202101367', 'Luis', 'Gutiérrez', NULL, true);
-INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201378', 'María', 'Herrera', NULL, true);
-INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202101389', 'Nicolás', 'Iriarte', NULL, true);
-INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201390', 'Olga', 'Jiménez', NULL, true);
-INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202101401', 'Pablo', 'Kowalski', NULL, true);
-INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201412', 'Rosa', 'Luna', NULL, true);
-INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202101423', 'Sergio', 'Mendoza', NULL, true);
-INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201434', 'Tatiana', 'Núñez', NULL, true);
-INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202101445', 'Ulises', 'Orellana', NULL, true);
-INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201456', 'Verónica', 'Paz', NULL, true);
-INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202101467', 'Walter', 'Quiroga', NULL, true);
-INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201478', 'Ximena', 'Ramírez', NULL, true);
-INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202101489', 'Yamil', 'Sánchez', NULL, true);
-INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201490', 'Zaira', 'Toledo', NULL, true);
-
--- estudiante_curso: 112 filas
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('20210001', 1);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('20210002', 2);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('20210003', 3);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('20210004', 4);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('20210005', 5);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('90600001', 14);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('90600002', 14);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('90600003', 14);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('90600004', 14);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('20210001', 14);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('20210002', 14);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('20210003', 14);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('20210004', 14);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('20210005', 14);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201013', 14);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101022', 14);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201031', 14);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202202045', 14);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202002107', 14);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201056', 14);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101078', 14);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201089', 14);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101090', 14);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201101', 14);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101112', 14);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201123', 14);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201013', 3);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101022', 3);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201031', 3);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202202045', 3);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202002107', 3);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201056', 3);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101078', 3);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201089', 3);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101090', 3);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201101', 3);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101112', 3);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201123', 3);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101134', 3);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201145', 3);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101156', 3);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201167', 3);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101178', 3);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201189', 3);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101190', 3);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201201', 3);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201212', 3);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101223', 3);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201234', 3);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101245', 3);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201256', 3);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101267', 3);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201278', 3);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101289', 3);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201290', 3);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101301', 3);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201312', 3);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101323', 3);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201334', 3);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101345', 3);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201356', 3);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101367', 3);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201378', 3);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101389', 3);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201390', 3);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101401', 3);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201412', 3);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101423', 3);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201434', 3);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101445', 3);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201456', 3);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101467', 3);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201478', 3);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101489', 3);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201490', 3);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101134', 14);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201145', 14);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101156', 14);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201167', 14);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101178', 14);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201189', 14);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101190', 14);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201201', 14);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201212', 14);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101223', 14);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201234', 14);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101245', 14);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201256', 14);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101267', 14);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201278', 14);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101289', 14);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201290', 14);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101301', 14);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201312', 14);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101323', 14);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201334', 14);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101345', 14);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201356', 14);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101367', 14);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201378', 14);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101389', 14);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201390', 14);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101401', 14);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201412', 14);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101423', 14);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201434', 14);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101445', 14);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201456', 14);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101467', 14);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201478', 14);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101489', 14);
-INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201490', 14);
 
 -- estudiante_examen: 810 filas
 INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (199, '202002107', 17, 'habilitado', NULL, NULL, NULL, 29, 3);
@@ -1802,6 +2076,39 @@ INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_e
 INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (904, '202201490', 37, 'habilitado', NULL, NULL, NULL, 56, 3);
 INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (905, '202202045', 37, 'habilitado', NULL, NULL, NULL, 56, 3);
 
+-- central_riesgo: 31 filas
+INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (21, 1, NULL, '2026-10-25T18:11:43'::timestamp, 'tramposo', 17, '202201013', 3, 223);
+INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (25, 1, NULL, '2026-10-27T05:11:45'::timestamp, 'tramposo', 27, '202201013', 3, 625);
+INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (23, 3, 'Prueba central de riesgos', '2026-10-27T04:25:19'::timestamp, 'tramposo', 27, '202101423', 3, 621);
+INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (28, 1, NULL, '2026-10-27T06:28:08'::timestamp, 'tramposo', 27, '202201356', 3, 642);
+INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (31, 1, NULL, '2026-10-27T07:04:36'::timestamp, 'sospechoso', 35, '202201212', 3, 790);
+INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (1, 3, 'Estudiante mirando hacia otro lado', '2024-06-10T08:30:00'::timestamp, 'tramposo', 1, '20210001', 1, 1);
+INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (13, 1, NULL, '2026-10-10T19:30:17'::timestamp, 'sospechoso', 14, '20210004', 3, NULL);
+INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (12, 1, NULL, '2026-10-10T22:30:46'::timestamp, 'tramposo', 14, '202201256', 3, 174);
+INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (2, 4, 'Uso de celular durante el examen', '2024-06-11T10:30:00'::timestamp, 'tramposo', 2, '20210002', 2, 2);
+INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (3, 3, 'Posible intento de ingreso no autorizado', '2024-06-12T14:30:00'::timestamp, 'sospechoso', 3, '20210003', 3, 3);
+INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (4, 4, 'Uso de material no autorizado', '2024-06-13T08:45:00'::timestamp, 'tramposo', 4, '20210004', 4, 4);
+INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (5, 3, 'Comportamiento sospechoso', '2024-06-14T16:30:00'::timestamp, 'sospechoso', 5, '20210005', 5, 5);
+INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (6, 3, 'Uso de celular durante el examen', '2026-10-10T08:40:00'::timestamp, 'tramposo', 14, '202201089', 3, 157);
+INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (7, 3, 'Intercambio de respuestas con el compañero de al lado', '2026-10-10T08:40:00'::timestamp, 'tramposo', 14, '202101078', 3, 156);
+INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (8, 3, 'Material no autorizado sobre la mesa', '2026-10-10T08:40:00'::timestamp, 'tramposo', 14, '202201056', 3, 155);
+INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (10, 1, NULL, '2026-10-10T21:50:57'::timestamp, 'sospechoso', 14, '202201013', 3, 150);
+INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (11, 1, NULL, '2026-10-10T22:23:21'::timestamp, 'sospechoso', 14, '202201123', 3, 161);
+INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (15, 1, NULL, '2026-10-11T01:43:49'::timestamp, 'sospechoso', 14, '202202045', 3, 153);
+INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (16, 1, NULL, '2026-10-11T02:13:20'::timestamp, 'sospechoso', 14, '202201201', 3, 169);
+INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (18, 1, NULL, '2026-10-12T03:34:01'::timestamp, 'tramposo', 14, '202101178', 3, 166);
+INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (19, 1, 'tramposo', '2026-10-12T00:13:17'::timestamp, 'tramposo', 14, '202101090', 3, 158);
+INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (22, 1, NULL, '2026-10-25T18:32:25'::timestamp, 'tramposo', 19, '202201278', 3, 336);
+INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (24, 1, NULL, '2026-10-27T04:55:06'::timestamp, 'tramposo', 27, '202202045', 3, 650);
+INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (26, 1, NULL, '2026-10-27T06:12:54'::timestamp, 'tramposo', 27, '202201456', 3, 647);
+INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (27, 1, NULL, '2026-10-27T06:13:32'::timestamp, 'tramposo', 27, '202101401', 3, 620);
+INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (29, 5, 'Prueba central de riesgos (examen pasado)', '2026-10-25T06:35:37'::timestamp, 'tramposo', 17, '202101489', 3, 222);
+INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (30, 5, 'Prueba central de riesgos (examen pasado)', '2026-10-25T06:35:39'::timestamp, 'tramposo', 17, '202101223', 3, 209);
+INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (32, 1, NULL, '2026-10-27T07:18:09'::timestamp, 'tramposo', 35, '202101289', 3, 769);
+INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (14, 1, NULL, '2026-10-11T01:15:50'::timestamp, 'sospechoso', 1, '20210001', 1, 1);
+INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (17, 1, NULL, '2026-10-12T01:30:52'::timestamp, 'tramposo', 14, '202101467', 3, 195);
+INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (20, 1, 'Se la vio sacando su celular', '2026-10-12T16:34:44'::timestamp, 'tramposo', 14, '202201212', 3, 170);
+
 -- estudiante_examen_ambiente: 56 filas
 INSERT INTO "estudiante_examen_ambiente" ("id_ee", "id_ambiente") VALUES (1, 1);
 INSERT INTO "estudiante_examen_ambiente" ("id_ee", "id_ambiente") VALUES (2, 2);
@@ -1859,307 +2166,6 @@ INSERT INTO "estudiante_examen_ambiente" ("id_ee", "id_ambiente") VALUES (564, 2
 INSERT INTO "estudiante_examen_ambiente" ("id_ee", "id_ambiente") VALUES (550, 5);
 INSERT INTO "estudiante_examen_ambiente" ("id_ee", "id_ambiente") VALUES (580, 2);
 INSERT INTO "estudiante_examen_ambiente" ("id_ee", "id_ambiente") VALUES (584, 5);
-
--- examen: 39 filas
-INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (1, '2024-06-10'::date, '08:00:00'::time, 120, 1, 1, NULL);
-INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (2, '2024-06-11'::date, '10:00:00'::time, 120, 2, 2, NULL);
-INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (3, '2024-06-12'::date, '14:00:00'::time, 120, 5, 3, NULL);
-INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (4, '2024-06-13'::date, '08:00:00'::time, 120, 1, 1, NULL);
-INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (5, '2024-06-14'::date, '16:00:00'::time, 120, 2, 2, NULL);
-INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (8, '0262-12-10'::date, '08:15:00'::time, 90, 1, 2, NULL);
-INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (27, '2026-10-27'::date, '06:38:30'::time, 90, 1, 2, NULL);
-INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (28, '2026-10-27'::date, '10:52:09'::time, 90, 1, 1, NULL);
-INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (29, '2026-10-27'::date, '10:55:31'::time, 90, 1, 1, NULL);
-INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (35, '2026-10-27'::date, '07:17:57'::time, 90, 1, 1, NULL);
-INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (36, '2026-11-04'::date, '11:07:00'::time, 90, 1, 1, NULL);
-INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (32, '2026-11-07'::date, '12:26:17'::time, 90, 1, 1, NULL);
-INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (34, '2026-11-07'::date, '14:48:44'::time, 90, 1, 1, NULL);
-INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (14, '2026-10-24'::date, '18:20:40'::time, 90, 5, 2, NULL);
-INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (33, '2026-11-08'::date, '19:10:42'::time, 90, 1, 1, NULL);
-INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (37, '2026-11-08'::date, '21:11:01'::time, 180, 1, 1, NULL);
-INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (38, '2026-11-12'::date, '16:00:00'::time, 90, 1, 2, NULL);
-INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (10, '2004-05-12'::date, '12:32:00'::time, 180, 1, 1, NULL);
-INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (11, '2001-06-13'::date, '00:32:00'::time, 90, 1, 2, NULL);
-INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (17, '2026-10-25'::date, '18:10:11'::time, 90, 1, 1, NULL);
-INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (18, '2026-10-25'::date, '18:14:47'::time, 90, 1, 1, NULL);
-INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (19, '2026-10-25'::date, '18:30:08'::time, 90, 1, 1, NULL);
-INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (20, '2026-10-25'::date, '18:35:23'::time, 90, 1, 1, NULL);
-INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (13, '1900-12-31'::date, '23:59:00'::time, 88, 5, 1, NULL);
-INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (15, '1998-07-03'::date, '07:08:00'::time, 90, 5, 2, NULL);
-INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (9, '2024-07-15'::date, '08:30:00'::time, 90, 1, 2, NULL);
-INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (12, '2024-07-16'::date, '23:59:00'::time, 90, 5, 1, NULL);
-INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (7, '2024-07-17'::date, '18:45:00'::time, 90, 1, 1, NULL);
-INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (6, '2024-07-18'::date, '18:45:00'::time, 90, 1, 1, NULL);
-INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (21, '2026-10-25'::date, '18:42:34'::time, 90, 1, 1, NULL);
-INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (22, '2026-10-25'::date, '19:05:16'::time, 90, 1, 1, NULL);
-INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (23, '2026-10-25'::date, '20:11:56'::time, 90, 1, 1, NULL);
-INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (24, '2026-10-26'::date, '12:45:00'::time, 90, 1, 1, NULL);
-INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (25, '2026-10-26'::date, '20:14:09'::time, 90, 1, 1, NULL);
-INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (16, '2026-10-26'::date, '18:56:34'::time, 90, 2, 1, NULL);
-INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (26, '2026-10-26'::date, '21:57:12'::time, 120, 1, 3, NULL);
-INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (30, '2026-11-03'::date, '09:00:00'::time, 90, 1, 1, NULL);
-INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (31, '2026-11-05'::date, '09:00:00'::time, 90, 1, 1, NULL);
-INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (39, '2026-11-10'::date, '06:00:00'::time, 30, 1, 3, NULL);
-
--- examen_ambiente: 42 filas
-INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (1, 1);
-INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (2, 2);
-INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (3, 3);
-INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (4, 4);
-INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (5, 5);
-INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (6, 2);
-INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (7, 2);
-INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (8, 1);
-INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (9, 1);
-INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (10, 5);
-INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (11, 2);
-INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (12, 2);
-INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (13, 2);
-INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (14, 1);
-INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (15, 5);
-INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (16, 5);
-INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (17, 1);
-INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (18, 1);
-INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (19, 1);
-INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (20, 1);
-INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (21, 1);
-INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (22, 1);
-INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (23, 1);
-INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (24, 1);
-INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (24, 5);
-INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (25, 2);
-INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (25, 5);
-INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (26, 5);
-INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (26, 2);
-INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (27, 2);
-INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (28, 1);
-INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (29, 1);
-INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (30, 1);
-INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (31, 1);
-INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (32, 1);
-INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (33, 1);
-INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (34, 1);
-INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (35, 5);
-INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (36, 1);
-INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (37, 3);
-INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (38, 5);
-INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (39, 5);
-
--- examen_curso: 39 filas
-INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (1, 1);
-INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (2, 2);
-INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (3, 3);
-INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (4, 4);
-INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (5, 5);
-INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (13, 3);
-INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (14, 3);
-INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (6, 1);
-INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (7, 1);
-INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (8, 1);
-INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (15, 3);
-INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (9, 1);
-INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (16, 7);
-INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (10, 1);
-INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (11, 1);
-INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (17, 3);
-INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (18, 3);
-INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (19, 3);
-INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (20, 3);
-INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (21, 3);
-INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (12, 3);
-INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (22, 3);
-INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (23, 3);
-INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (39, 13);
-INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (24, 1);
-INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (25, 3);
-INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (26, 1);
-INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (27, 3);
-INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (28, 1);
-INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (29, 3);
-INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (30, 4);
-INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (31, 1);
-INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (32, 3);
-INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (33, 4);
-INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (34, 1);
-INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (35, 3);
-INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (36, 3);
-INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (37, 3);
-INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (38, 13);
-
--- examen_material_permitido: 31 filas
-INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (1, 1);
-INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (2, 2);
-INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (3, 3);
-INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (4, 4);
-INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (5, 5);
-INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (6, 5);
-INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (7, 5);
-INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (8, 1);
-INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (8, 2);
-INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (9, 1);
-INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (10, 3);
-INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (11, 1);
-INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (11, 3);
-INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (14, 4);
-INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (14, 1);
-INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (15, 2);
-INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (15, 3);
-INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (24, 1);
-INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (25, 4);
-INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (25, 1);
-INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (25, 2);
-INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (25, 3);
-INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (26, 4);
-INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (26, 2);
-INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (27, 4);
-INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (27, 2);
-INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (35, 1);
-INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (37, 4);
-INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (37, 1);
-INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (38, 4);
-INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (38, 1);
-
--- examen_norma: 29 filas
-INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (1, 1);
-INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (2, 2);
-INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (3, 3);
-INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (4, 4);
-INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (5, 5);
-INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (6, 1);
-INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (7, 1);
-INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (8, 1);
-INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (9, 1);
-INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (10, 2);
-INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (11, 5);
-INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (14, 2);
-INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (14, 5);
-INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (14, 1);
-INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (14, 4);
-INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (14, 3);
-INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (15, 1);
-INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (15, 4);
-INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (24, 4);
-INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (26, 2);
-INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (26, 3);
-INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (27, 1);
-INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (35, 5);
-INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (37, 1);
-INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (37, 4);
-INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (38, 2);
-INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (38, 1);
-INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (38, 4);
-INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (38, 5);
-
--- invitacion_examen_compartido: 11 filas
-INSERT INTO "invitacion_examen_compartido" ("id_invitacion", "id_docente_invitado", "id_examen", "estado", "id_docente_invitador", "created_at", "updated_at") VALUES (1, 2, 1, 'aceptado', 1, '2026-10-25T15:14:15'::timestamp, '2026-10-25T15:14:15'::timestamp);
-INSERT INTO "invitacion_examen_compartido" ("id_invitacion", "id_docente_invitado", "id_examen", "estado", "id_docente_invitador", "created_at", "updated_at") VALUES (2, 5, 2, 'pendiente', 2, '2026-10-25T15:14:15'::timestamp, '2026-10-25T15:14:15'::timestamp);
-INSERT INTO "invitacion_examen_compartido" ("id_invitacion", "id_docente_invitado", "id_examen", "estado", "id_docente_invitador", "created_at", "updated_at") VALUES (3, 1, 3, 'rechazado', 5, '2026-10-25T15:14:15'::timestamp, '2026-10-25T15:14:15'::timestamp);
-INSERT INTO "invitacion_examen_compartido" ("id_invitacion", "id_docente_invitado", "id_examen", "estado", "id_docente_invitador", "created_at", "updated_at") VALUES (4, 2, 4, 'aceptado', 1, '2026-10-25T15:14:15'::timestamp, '2026-10-25T15:14:15'::timestamp);
-INSERT INTO "invitacion_examen_compartido" ("id_invitacion", "id_docente_invitado", "id_examen", "estado", "id_docente_invitador", "created_at", "updated_at") VALUES (5, 5, 5, 'pendiente', 2, '2026-10-25T15:14:15'::timestamp, '2026-10-25T15:14:15'::timestamp);
-INSERT INTO "invitacion_examen_compartido" ("id_invitacion", "id_docente_invitado", "id_examen", "estado", "id_docente_invitador", "created_at", "updated_at") VALUES (6, 5, 1, 'cancelado', 1, '2026-10-26T17:12:31'::timestamp, '2026-10-26T17:12:46'::timestamp);
-INSERT INTO "invitacion_examen_compartido" ("id_invitacion", "id_docente_invitado", "id_examen", "estado", "id_docente_invitador", "created_at", "updated_at") VALUES (7, 5, 1, 'aceptado', 1, '2026-10-26T17:13:14'::timestamp, '2026-10-26T17:13:34'::timestamp);
-INSERT INTO "invitacion_examen_compartido" ("id_invitacion", "id_docente_invitado", "id_examen", "estado", "id_docente_invitador", "created_at", "updated_at") VALUES (8, 5, 4, 'cancelado', 1, '2026-10-26T17:15:38'::timestamp, '2026-10-26T17:16:18'::timestamp);
-INSERT INTO "invitacion_examen_compartido" ("id_invitacion", "id_docente_invitado", "id_examen", "estado", "id_docente_invitador", "created_at", "updated_at") VALUES (9, 2, 26, 'aceptado', 1, '2026-10-26T18:24:15'::timestamp, '2026-10-26T18:46:55'::timestamp);
-INSERT INTO "invitacion_examen_compartido" ("id_invitacion", "id_docente_invitado", "id_examen", "estado", "id_docente_invitador", "created_at", "updated_at") VALUES (10, 13, 11, 'pendiente', 1, '2026-11-09T13:43:37'::timestamp, '2026-11-09T13:43:37'::timestamp);
-INSERT INTO "invitacion_examen_compartido" ("id_invitacion", "id_docente_invitado", "id_examen", "estado", "id_docente_invitador", "created_at", "updated_at") VALUES (11, 1, 5, 'aceptado', 2, '2026-11-09T21:18:11'::timestamp, '2026-11-09T21:29:14'::timestamp);
-
--- material: 5 filas
-INSERT INTO "material" ("id_material", "descripcion") VALUES (1, 'Calculadora cientifica');
-INSERT INTO "material" ("id_material", "descripcion") VALUES (2, 'Computadora
-');
-INSERT INTO "material" ("id_material", "descripcion") VALUES (3, 'Formulario');
-INSERT INTO "material" ("id_material", "descripcion") VALUES (4, 'Apuntes de la materia');
-INSERT INTO "material" ("id_material", "descripcion") VALUES (5, 'Hojas de examen en blanco');
-
--- material_personalizado: 4 filas
-INSERT INTO "material_personalizado" ("id_examen", "numero_material", "descripcion_material") VALUES (10, 1, 'asdada');
-INSERT INTO "material_personalizado" ("id_examen", "numero_material", "descripcion_material") VALUES (11, 1, 'sd23123');
-INSERT INTO "material_personalizado" ("id_examen", "numero_material", "descripcion_material") VALUES (13, 1, 'Calculadora programable');
-INSERT INTO "material_personalizado" ("id_examen", "numero_material", "descripcion_material") VALUES (25, 1, 'adasd');
-
--- migrations: 25 filas
-INSERT INTO "migrations" ("id", "migration", "batch") VALUES (1, '0001_01_01_000000_create_users_table', 1);
-INSERT INTO "migrations" ("id", "migration", "batch") VALUES (2, '0001_01_01_000001_create_cache_table', 1);
-INSERT INTO "migrations" ("id", "migration", "batch") VALUES (3, '0001_01_01_000002_create_jobs_table', 1);
-INSERT INTO "migrations" ("id", "migration", "batch") VALUES (4, '2026_09_27_000001_migracion_servidor_oficial', 1);
-INSERT INTO "migrations" ("id", "migration", "batch") VALUES (5, '2026_09_28_000001_actualizar_usuario', 1);
-INSERT INTO "migrations" ("id", "migration", "batch") VALUES (6, '2026_10_09_000001_agregar_revision_incidencia', 2);
-INSERT INTO "migrations" ("id", "migration", "batch") VALUES (7, '2026_10_10_000001_reparar_enums_y_personalizadas', 3);
-INSERT INTO "migrations" ("id", "migration", "batch") VALUES (8, '2026_10_10_000002_quitar_hora_fin_de_examen', 4);
-INSERT INTO "migrations" ("id", "migration", "batch") VALUES (9, '2026_10_10_000003_agregar_curso_a_central_riesgo', 5);
-INSERT INTO "migrations" ("id", "migration", "batch") VALUES (10, '2026_10_11_000001_agregar_oculta_a_notificacion_docente', 6);
-INSERT INTO "migrations" ("id", "migration", "batch") VALUES (11, '2026_10_11_000002_agregar_tipo_a_notificacion_docente', 7);
-INSERT INTO "migrations" ("id", "migration", "batch") VALUES (12, '2026_10_10_000004_alinear_central_riesgo', 8);
-INSERT INTO "migrations" ("id", "migration", "batch") VALUES (13, '2026_10_17_171754_agregar_motivos_ingreso_a_enum_motivo', 9);
-INSERT INTO "migrations" ("id", "migration", "batch") VALUES (14, '2026_10_24_000001_agregar_anio_a_curso_tipo_gestion', 10);
-INSERT INTO "migrations" ("id", "migration", "batch") VALUES (15, '2026_10_24_000002_completar_curso_en_central_riesgo', 11);
-INSERT INTO "migrations" ("id", "migration", "batch") VALUES (16, '2026_10_24_000003_agregar_ambiente_a_curso_y_nombre_a_examen', 12);
-INSERT INTO "migrations" ("id", "migration", "batch") VALUES (17, '2026_10_24_000003_completar_invitaciones_examen', 13);
-INSERT INTO "migrations" ("id", "migration", "batch") VALUES (18, '2026_10_24_000004_adaptar_notificaciones_a_invitaciones', 14);
-INSERT INTO "migrations" ("id", "migration", "batch") VALUES (19, '2026_10_25_000001_separar_configuracion_examen_por_docente', 15);
-INSERT INTO "migrations" ("id", "migration", "batch") VALUES (20, '2026_10_25_000002_asociar_estudiantes_con_docente', 16);
-INSERT INTO "migrations" ("id", "migration", "batch") VALUES (21, '2026_10_25_000003_registro_incidencias_estudiante_no_verificado', 17);
-INSERT INTO "migrations" ("id", "migration", "batch") VALUES (22, '2026_10_26_000001_unificar_estado_incidencia_en_tipo_infraccion', 18);
-INSERT INTO "migrations" ("id", "migration", "batch") VALUES (23, '2026_11_07_000001_motivos_multiples_incidencia', 18);
-INSERT INTO "migrations" ("id", "migration", "batch") VALUES (24, '2026_11_07_000002_crear_cuenta_usuario', 19);
-INSERT INTO "migrations" ("id", "migration", "batch") VALUES (26, '2026_11_08_000001_validacion_registro_docente', 20);
-
--- norma: 5 filas
-INSERT INTO "norma" ("id_norma", "detalle_norma") VALUES (5, 'No utilizar material no autorizado');
-INSERT INTO "norma" ("id_norma", "detalle_norma") VALUES (1, 'Portar CI durante toda la evaluación');
-INSERT INTO "norma" ("id_norma", "detalle_norma") VALUES (2, 'Mantener dispositivos electrónicos guardados');
-INSERT INTO "norma" ("id_norma", "detalle_norma") VALUES (3, 'Tolerancia máxima de ingreso: 15 minutos');
-INSERT INTO "norma" ("id_norma", "detalle_norma") VALUES (4, 'Prohibido hablar, consultar levantando la mano');
-
--- norma_personalizada: 13 filas
-INSERT INTO "norma_personalizada" ("id_examen", "numero_norma", "descripcion_norma") VALUES (1, 1, 'Se permite el uso de calculadora científica no programable.');
-INSERT INTO "norma_personalizada" ("id_examen", "numero_norma", "descripcion_norma") VALUES (1, 2, 'No se permite hojas adicionales, usar el reverso del examen.');
-INSERT INTO "norma_personalizada" ("id_examen", "numero_norma", "descripcion_norma") VALUES (2, 1, 'El código debe compilar sin errores para ser evaluado.');
-INSERT INTO "norma_personalizada" ("id_examen", "numero_norma", "descripcion_norma") VALUES (2, 2, 'Prohibido el acceso a internet o repositorios externos.');
-INSERT INTO "norma_personalizada" ("id_examen", "numero_norma", "descripcion_norma") VALUES (3, 1, 'Tiempo estricto de 45 minutos. No hay prórroga.');
-INSERT INTO "norma_personalizada" ("id_examen", "numero_norma", "descripcion_norma") VALUES (4, 1, 'Uso obligatorio de bata de laboratorio y gafas de seguridad.');
-INSERT INTO "norma_personalizada" ("id_examen", "numero_norma", "descripcion_norma") VALUES (4, 2, 'Entregar el reporte de datos antes de salir del aula.');
-INSERT INTO "norma_personalizada" ("id_examen", "numero_norma", "descripcion_norma") VALUES (5, 1, 'Responder únicamente con bolígrafo de tinta negra o azul.');
-INSERT INTO "norma_personalizada" ("id_examen", "numero_norma", "descripcion_norma") VALUES (5, 2, 'Desactivar y guardar teléfonos móviles en la mochila.');
-INSERT INTO "norma_personalizada" ("id_examen", "numero_norma", "descripcion_norma") VALUES (10, 1, 'dadad');
-INSERT INTO "norma_personalizada" ("id_examen", "numero_norma", "descripcion_norma") VALUES (11, 1, 'dffgs');
-INSERT INTO "norma_personalizada" ("id_examen", "numero_norma", "descripcion_norma") VALUES (13, 1, 'Ingreso sin mochilas');
-INSERT INTO "norma_personalizada" ("id_examen", "numero_norma", "descripcion_norma") VALUES (25, 1, 'adsasdsa');
-
--- notificacion_auxiliar: 5 filas
-INSERT INTO "notificacion_auxiliar" ("id_notificacion", "id_curso", "id_ambiente", "estado") VALUES (1, 1, 1, 'recibido');
-INSERT INTO "notificacion_auxiliar" ("id_notificacion", "id_curso", "id_ambiente", "estado") VALUES (2, 2, 2, 'visto');
-INSERT INTO "notificacion_auxiliar" ("id_notificacion", "id_curso", "id_ambiente", "estado") VALUES (3, 3, 3, 'recibido');
-INSERT INTO "notificacion_auxiliar" ("id_notificacion", "id_curso", "id_ambiente", "estado") VALUES (4, 4, 4, 'visto');
-INSERT INTO "notificacion_auxiliar" ("id_notificacion", "id_curso", "id_ambiente", "estado") VALUES (5, 5, 5, 'recibido');
-
--- notificacion_docente: 26 filas
-INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (2, 2, 2, 'recibido', false, 'posible_tramposo', NULL, NULL);
-INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (3, 3, 3, 'visto', false, 'posible_tramposo', NULL, NULL);
-INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (5, 5, 5, 'visto', false, 'posible_tramposo', NULL, NULL);
-INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (6, 17, 3, 'recibido', false, 'central_riesgo', NULL, NULL);
-INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (4, 4, 4, 'recibido', true, 'posible_tramposo', NULL, NULL);
-INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (1, 1, 1, 'visto', true, 'posible_tramposo', NULL, NULL);
-INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (7, 18, 3, 'recibido', false, 'central_riesgo', NULL, NULL);
-INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (8, 19, 3, 'recibido', false, 'central_riesgo', NULL, NULL);
-INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (9, 20, 3, 'recibido', false, 'central_riesgo', NULL, NULL);
-INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (10, 21, 3, 'recibido', false, 'central_riesgo', NULL, NULL);
-INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (11, 22, 3, 'recibido', false, 'central_riesgo', NULL, NULL);
-INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (12, NULL, NULL, 'recibido', true, 'invitacion_examen', 5, 6);
-INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (13, NULL, NULL, 'recibido', false, 'respuesta_invitacion', 1, 7);
-INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (14, NULL, NULL, 'recibido', true, 'invitacion_examen', 5, 8);
-INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (15, NULL, NULL, 'recibido', false, 'respuesta_invitacion', 1, 9);
-INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (16, 24, 3, 'recibido', false, 'central_riesgo', NULL, NULL);
-INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (17, 25, 3, 'recibido', false, 'central_riesgo', NULL, NULL);
-INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (18, 26, 3, 'recibido', false, 'central_riesgo', NULL, NULL);
-INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (19, 27, 3, 'recibido', false, 'central_riesgo', NULL, NULL);
-INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (20, 28, 3, 'recibido', false, 'central_riesgo', NULL, NULL);
-INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (21, 31, 3, 'recibido', false, 'posible_tramposo', NULL, NULL);
-INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (22, 32, 3, 'recibido', false, 'central_riesgo', NULL, NULL);
-INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (23, NULL, NULL, 'recibido', false, 'invitacion_examen', 13, 10);
-INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (24, NULL, NULL, 'recibido', false, 'respuesta_invitacion', 2, 11);
-INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (25, 12, 14, 'recibido', false, 'central_riesgo', NULL, NULL);
-INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (26, 12, 3, 'recibido', false, 'central_riesgo', NULL, NULL);
 
 -- registro_asistencia: 81 filas
 INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (338, '18:14:12'::time, 17, '202201256', 1, 235);
@@ -2244,74 +2250,66 @@ INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "i
 INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (336, '01:51:36'::time, 14, '202201145', 1, 163);
 INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (337, '18:21:49'::time, 14, '202101423', 2, 191);
 
--- rol: 2 filas
-INSERT INTO "rol" ("id_rol", "nombre_rol") VALUES (1, 'docente');
-INSERT INTO "rol" ("id_rol", "nombre_rol") VALUES (2, 'auxiliar');
+-- central_riesgo_motivo: 31 filas
+INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (21, 'intento de ingreso de material no autorizado');
+INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (25, 'copia o intercambio de respuestas');
+INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (23, 'otro');
+INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (28, 'intento de ingreso no autorizado');
+INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (31, 'intento de ingreso no autorizado');
+INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (1, 'otro');
+INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (13, 'intento de ingreso no autorizado');
+INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (2, 'uso de dispositivos electronicos');
+INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (3, 'intento de ingreso no autorizado');
+INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (4, 'uso de material no autorizado');
+INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (5, 'otro');
+INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (6, 'uso de dispositivos electronicos');
+INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (7, 'copia o intercambio de respuestas');
+INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (8, 'uso de material no autorizado');
+INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (10, 'copia o intercambio de respuestas');
+INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (11, 'suplantacion de identidad');
+INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (12, 'intento de ingreso no autorizado');
+INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (15, 'uso de dispositivos electronicos');
+INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (16, 'uso de material no autorizado');
+INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (18, 'suplantacion de identidad');
+INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (19, 'otro');
+INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (22, 'intento de ingreso de material no autorizado');
+INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (24, 'uso de dispositivos electronicos');
+INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (26, 'intento de ingreso no autorizado');
+INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (27, 'aula equivocada');
+INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (29, 'otro');
+INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (30, 'otro');
+INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (32, 'copia o intercambio de respuestas');
+INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (14, 'intento de ingreso no autorizado');
+INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (17, 'copia o intercambio de respuestas');
+INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (20, 'uso de dispositivos electronicos');
 
--- rol_usuario: 16 filas
-INSERT INTO "rol_usuario" ("id_usuario", "id_rol") VALUES (1, 1);
-INSERT INTO "rol_usuario" ("id_usuario", "id_rol") VALUES (2, 1);
-INSERT INTO "rol_usuario" ("id_usuario", "id_rol") VALUES (3, 2);
-INSERT INTO "rol_usuario" ("id_usuario", "id_rol") VALUES (4, 2);
-INSERT INTO "rol_usuario" ("id_usuario", "id_rol") VALUES (5, 1);
-INSERT INTO "rol_usuario" ("id_usuario", "id_rol") VALUES (6, 1);
-INSERT INTO "rol_usuario" ("id_usuario", "id_rol") VALUES (7, 1);
-INSERT INTO "rol_usuario" ("id_usuario", "id_rol") VALUES (8, 1);
-INSERT INTO "rol_usuario" ("id_usuario", "id_rol") VALUES (9, 2);
-INSERT INTO "rol_usuario" ("id_usuario", "id_rol") VALUES (10, 2);
-INSERT INTO "rol_usuario" ("id_usuario", "id_rol") VALUES (11, 1);
-INSERT INTO "rol_usuario" ("id_usuario", "id_rol") VALUES (12, 1);
-INSERT INTO "rol_usuario" ("id_usuario", "id_rol") VALUES (13, 1);
-INSERT INTO "rol_usuario" ("id_usuario", "id_rol") VALUES (14, 2);
-INSERT INTO "rol_usuario" ("id_usuario", "id_rol") VALUES (15, 1);
-INSERT INTO "rol_usuario" ("id_usuario", "id_rol") VALUES (16, 2);
-
--- sessions: 2 filas
-INSERT INTO "sessions" ("id", "user_id", "ip_address", "user_agent", "payload", "last_activity") VALUES ('HNAlQaeBbhYTDVEAJPQkiQSHu1vSYZn56pysE95B', 1, '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0', 'YTo0OntzOjY6Il90b2tlbiI7czo0MDoiblFvdWlzZEUzYUFyamJMWldmVExnRHhoS2p5VzN2WGVnMTQxOHhnZiI7czo2OiJfZmxhc2giO2E6Mjp7czozOiJvbGQiO2E6MDp7fXM6MzoibmV3IjthOjA6e319czo5OiJfcHJldmlvdXMiO2E6MTp7czozOiJ1cmwiO3M6NDA6Imh0dHA6Ly8xMjcuMC4wLjE6ODAwMC9hcGkvbm90aWZpY2FjaW9uZXMiO31zOjUwOiJsb2dpbl93ZWJfNTliYTM2YWRkYzJiMmY5NDAxNTgwZjAxNGM3ZjU4ZWE0ZTMwOTg5ZCI7aToxO30=', 1794280328);
-INSERT INTO "sessions" ("id", "user_id", "ip_address", "user_agent", "payload", "last_activity") VALUES ('AXw4cd3O0jgHUcG4g0zNkT0qEkyhD5zSw4EvQ2jD', NULL, '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0', 'YTo0OntzOjY6Il90b2tlbiI7czo0MDoiNFQ0VkpIY1hjNGNSemxIdkViZ2tIOXJiWjFlRHpRWXFPSDRtVXE0dCI7czozOiJ1cmwiO2E6MTp7czo4OiJpbnRlbmRlZCI7czoyMToiaHR0cDovLzEyNy4wLjAuMTo4MDAwIjt9czo5OiJfcHJldmlvdXMiO2E6MTp7czozOiJ1cmwiO3M6MjE6Imh0dHA6Ly8xMjcuMC4wLjE6ODAwMCI7fXM6NjoiX2ZsYXNoIjthOjI6e3M6Mzoib2xkIjthOjA6e31zOjM6Im5ldyI7YTowOnt9fX0=', 1794273842);
-
--- tipo_examen: 3 filas
-INSERT INTO "tipo_examen" ("id_tipo_examen", "nombre_tipo_examen") VALUES (1, 'examen parcial');
-INSERT INTO "tipo_examen" ("id_tipo_examen", "nombre_tipo_examen") VALUES (2, 'examen final');
-INSERT INTO "tipo_examen" ("id_tipo_examen", "nombre_tipo_examen") VALUES (3, 'segunda instancia');
-
--- tipo_gestion: 4 filas
-INSERT INTO "tipo_gestion" ("id_tipo_gestion", "nombre_tipo_gestion") VALUES (1, 'primer semestre');
-INSERT INTO "tipo_gestion" ("id_tipo_gestion", "nombre_tipo_gestion") VALUES (2, 'invierno');
-INSERT INTO "tipo_gestion" ("id_tipo_gestion", "nombre_tipo_gestion") VALUES (3, 'segundo semestre');
-INSERT INTO "tipo_gestion" ("id_tipo_gestion", "nombre_tipo_gestion") VALUES (4, 'verano');
-
--- usuario: 16 filas
-INSERT INTO "usuario" ("id_usuario", "cod_sis", "password", "nombre_usuario", "apellido", "correo", "nombre", "fecha_creacion", "estado_cuenta") VALUES (1, 'DOC001', '$2y$12$Q2NT4rFjKIiDm5rYZmhrVuvdRUoOeHRfbgkwKI3GZTsb5kn6olG1C', 'Roberto', 'Silva', NULL, 'Roberto', '2026-11-08T02:48:15'::timestamp, 'habilitada');
-INSERT INTO "usuario" ("id_usuario", "cod_sis", "password", "nombre_usuario", "apellido", "correo", "nombre", "fecha_creacion", "estado_cuenta") VALUES (2, 'DOC002', '$2y$12$cR9BiLcmfx2slphCGEJcfOrRHsfYSyY7dB2EX3ReggaZstvKvWhGK', 'Patricia', 'Rojas', NULL, 'Patricia', '2026-11-08T02:48:15'::timestamp, 'habilitada');
-INSERT INTO "usuario" ("id_usuario", "cod_sis", "password", "nombre_usuario", "apellido", "correo", "nombre", "fecha_creacion", "estado_cuenta") VALUES (3, 'AUX001', '$2y$12$88aNYUoZRhyfw9oA4BdsAujllCecA3ZpOgoe3ltMHkgpndwPwNDWq', 'Diego', 'Mendoza', NULL, 'Diego', '2026-11-08T02:48:15'::timestamp, 'habilitada');
-INSERT INTO "usuario" ("id_usuario", "cod_sis", "password", "nombre_usuario", "apellido", "correo", "nombre", "fecha_creacion", "estado_cuenta") VALUES (4, 'AUX002', '$2y$12$mzepLz/sQ9IvxSgRk0vUC.WL.mYTSPu/xIaH0NOaQHVI13ZGdi9Y2', 'Sofia', 'Castro', NULL, 'Sofia', '2026-11-08T02:48:15'::timestamp, 'habilitada');
-INSERT INTO "usuario" ("id_usuario", "cod_sis", "password", "nombre_usuario", "apellido", "correo", "nombre", "fecha_creacion", "estado_cuenta") VALUES (5, 'DOC003', '$2y$12$0hAV63bJ8fER57b4eyNCI.77qGdXZW3nsEIcsV1yZlnsI0JHbfgZW', 'Fernando', 'Vargas', NULL, 'Fernando', '2026-11-08T02:48:15'::timestamp, 'habilitada');
-INSERT INTO "usuario" ("id_usuario", "cod_sis", "password", "nombre_usuario", "apellido", "correo", "nombre", "fecha_creacion", "estado_cuenta") VALUES (14, '202600111', '$2y$12$/1RLS4MQ39MaEAChWczxue.BvqTCJMP/WyEEGNO5V9o7lGbCTNdRe', 'Auxiliar', 'gaga', NULL, NULL, '2026-11-10T01:16:22'::timestamp, 'habilitada');
-INSERT INTO "usuario" ("id_usuario", "cod_sis", "password", "nombre_usuario", "apellido", "correo", "nombre", "fecha_creacion", "estado_cuenta") VALUES (15, '111111111', '$2y$12$aIY5Pq5GQhLlP1qUK6bgwOjYl81HreujHD3NE0eastmjx/tsoycCW', 'dariana.panozo', 'Panozo', '123454@umss.edu', 'Darian', '2026-11-10T01:26:41'::timestamp, 'habilitada');
-INSERT INTO "usuario" ("id_usuario", "cod_sis", "password", "nombre_usuario", "apellido", "correo", "nombre", "fecha_creacion", "estado_cuenta") VALUES (6, '202300047', '$2y$12$VY.Ov4e/VbOgr.LDo298he9pXx9x4wJybzDPVB2sBnufBYeYtXnwi', 'zzebnell', 'Zeballos', '202300047@umss.edu', 'Leonel', '2026-11-08T03:11:52'::timestamp, 'habilitada');
-INSERT INTO "usuario" ("id_usuario", "cod_sis", "password", "nombre_usuario", "apellido", "correo", "nombre", "fecha_creacion", "estado_cuenta") VALUES (7, '201605998', '$2y$12$X0VkmJcZfz2BzsIYD6f3DePB6oe5QRakIi/rXHn.P05MgqN2b1rCa', 'ValeryPanozo', 'Panozo', 'valery@umss.edu', 'Valery', '2026-11-08T11:53:08'::timestamp, 'rechazada');
-INSERT INTO "usuario" ("id_usuario", "cod_sis", "password", "nombre_usuario", "apellido", "correo", "nombre", "fecha_creacion", "estado_cuenta") VALUES (8, '676767676', '$2y$12$dXUar98eiHpTiKtnSZIQ5elX4eU1sxr9hSkewGuVjZ1CQVnkcdcym', 'aimee.p3', 'petres', '20211@umss.edu', 'aimee', '2026-11-08T22:23:53'::timestamp, 'rechazada');
-INSERT INTO "usuario" ("id_usuario", "cod_sis", "password", "nombre_usuario", "apellido", "correo", "nombre", "fecha_creacion", "estado_cuenta") VALUES (9, '202300548', '$2y$12$R24FdBMddA2Hrd.gD2E/dO0ARl9D8DdrP3zR.wyA9HckxYMfOPEEW', 'auxi', 'gaga', NULL, NULL, '2026-11-08T22:58:08'::timestamp, 'habilitada');
-INSERT INTO "usuario" ("id_usuario", "cod_sis", "password", "nombre_usuario", "apellido", "correo", "nombre", "fecha_creacion", "estado_cuenta") VALUES (10, '202000128', '$2y$12$rLlAh6v3vU.6C3oZXkt9DeyQd84q1ve9jXfMUSvgLNmAwloiNzyle', 'Dennis', 'Man', NULL, NULL, '2026-11-09T14:21:28'::timestamp, 'habilitada');
-INSERT INTO "usuario" ("id_usuario", "cod_sis", "password", "nombre_usuario", "apellido", "correo", "nombre", "fecha_creacion", "estado_cuenta") VALUES (11, '202300001', '$2y$12$S.XppgICPLFFXiruFSm6teKAmxvcX5JNzHo31bhPkD1Lw3SCfTSg.', 'corina.flores', 'Flores', 'hola.hola@umss.edu', 'Corina', '2026-11-09T14:41:20'::timestamp, 'habilitada');
-INSERT INTO "usuario" ("id_usuario", "cod_sis", "password", "nombre_usuario", "apellido", "correo", "nombre", "fecha_creacion", "estado_cuenta") VALUES (12, '202300002', '$2y$12$dk3HXPCytDjmfFA1j.X73.gyA.IsSnjwVW6SUuRjWabMygrh0sCQm', 'ruben.ayaviri', 'Ayaviri', 'hola.adios@umss.edu', 'Ruben', '2026-11-09T14:52:25'::timestamp, 'habilitada');
-INSERT INTO "usuario" ("id_usuario", "cod_sis", "password", "nombre_usuario", "apellido", "correo", "nombre", "fecha_creacion", "estado_cuenta") VALUES (13, '202500123', '$2y$12$76ZIbcVeT70xRSW7BXHds.GXQ6bwG56JCGPm//..bpgYkjkpHsxTm', 'Campeon', 'Docente', NULL, 'Campeon', '2026-11-09T11:54:31'::timestamp, 'habilitada');
-INSERT INTO "usuario" ("id_usuario", "cod_sis", "password", "nombre_usuario", "apellido", "correo", "nombre", "fecha_creacion", "estado_cuenta") VALUES (16, '202302032', '$2y$12$xVMsMYJP0JRrz0I3Zhaq4eS85PMA8JUxGphc.HVN7bqCIecB4ctya', 'Cesar', 'Ochoa', NULL, NULL, '2026-11-10T03:26:00'::timestamp, 'habilitada');
-
--- validacion_registro: 10 filas
-INSERT INTO "validacion_registro" ("id_solicitante", "id_validador", "decision", "motivo", "fecha") VALUES (6, 1, 'aprobado', NULL, '2026-11-08T11:49:48'::timestamp);
-INSERT INTO "validacion_registro" ("id_solicitante", "id_validador", "decision", "motivo", "fecha") VALUES (6, 2, 'aprobado', NULL, '2026-11-08T11:54:26'::timestamp);
-INSERT INTO "validacion_registro" ("id_solicitante", "id_validador", "decision", "motivo", "fecha") VALUES (7, 2, 'desaprobado', 'Hable con el docente y no es su cuenta', '2026-11-08T11:54:53'::timestamp);
-INSERT INTO "validacion_registro" ("id_solicitante", "id_validador", "decision", "motivo", "fecha") VALUES (8, 6, 'desaprobado', 'me cae mal', '2026-11-08T22:25:35'::timestamp);
-INSERT INTO "validacion_registro" ("id_solicitante", "id_validador", "decision", "motivo", "fecha") VALUES (11, 1, 'aprobado', NULL, '2026-11-09T14:42:36'::timestamp);
-INSERT INTO "validacion_registro" ("id_solicitante", "id_validador", "decision", "motivo", "fecha") VALUES (11, 2, 'aprobado', NULL, '2026-11-09T14:44:48'::timestamp);
-INSERT INTO "validacion_registro" ("id_solicitante", "id_validador", "decision", "motivo", "fecha") VALUES (12, 1, 'aprobado', NULL, '2026-11-09T14:53:59'::timestamp);
-INSERT INTO "validacion_registro" ("id_solicitante", "id_validador", "decision", "motivo", "fecha") VALUES (12, 2, 'aprobado', NULL, '2026-11-09T14:55:21'::timestamp);
-INSERT INTO "validacion_registro" ("id_solicitante", "id_validador", "decision", "motivo", "fecha") VALUES (15, 1, 'aprobado', NULL, '2026-11-09T21:29:47'::timestamp);
-INSERT INTO "validacion_registro" ("id_solicitante", "id_validador", "decision", "motivo", "fecha") VALUES (15, 2, 'aprobado', NULL, '2026-11-09T21:31:02'::timestamp);
-
-SET session_replication_role = DEFAULT;
+-- notificacion_docente: 26 filas
+INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (2, 2, 2, 'recibido', false, 'posible_tramposo', NULL, NULL);
+INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (3, 3, 3, 'visto', false, 'posible_tramposo', NULL, NULL);
+INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (5, 5, 5, 'visto', false, 'posible_tramposo', NULL, NULL);
+INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (6, 17, 3, 'recibido', false, 'central_riesgo', NULL, NULL);
+INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (4, 4, 4, 'recibido', true, 'posible_tramposo', NULL, NULL);
+INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (1, 1, 1, 'visto', true, 'posible_tramposo', NULL, NULL);
+INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (7, 18, 3, 'recibido', false, 'central_riesgo', NULL, NULL);
+INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (8, 19, 3, 'recibido', false, 'central_riesgo', NULL, NULL);
+INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (9, 20, 3, 'recibido', false, 'central_riesgo', NULL, NULL);
+INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (10, 21, 3, 'recibido', false, 'central_riesgo', NULL, NULL);
+INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (11, 22, 3, 'recibido', false, 'central_riesgo', NULL, NULL);
+INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (12, NULL, NULL, 'recibido', true, 'invitacion_examen', 5, 6);
+INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (13, NULL, NULL, 'recibido', false, 'respuesta_invitacion', 1, 7);
+INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (14, NULL, NULL, 'recibido', true, 'invitacion_examen', 5, 8);
+INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (15, NULL, NULL, 'recibido', false, 'respuesta_invitacion', 1, 9);
+INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (16, 24, 3, 'recibido', false, 'central_riesgo', NULL, NULL);
+INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (17, 25, 3, 'recibido', false, 'central_riesgo', NULL, NULL);
+INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (18, 26, 3, 'recibido', false, 'central_riesgo', NULL, NULL);
+INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (19, 27, 3, 'recibido', false, 'central_riesgo', NULL, NULL);
+INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (20, 28, 3, 'recibido', false, 'central_riesgo', NULL, NULL);
+INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (21, 31, 3, 'recibido', false, 'posible_tramposo', NULL, NULL);
+INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (22, 32, 3, 'recibido', false, 'central_riesgo', NULL, NULL);
+INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (23, NULL, NULL, 'recibido', false, 'invitacion_examen', 13, 10);
+INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (24, NULL, NULL, 'recibido', false, 'respuesta_invitacion', 2, 11);
+INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (25, 12, 14, 'recibido', false, 'central_riesgo', NULL, NULL);
+INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (26, 12, 3, 'recibido', false, 'central_riesgo', NULL, NULL);
 
 -- ============================================================================
 --  SECUENCIAS
