@@ -1,1778 +1,2316 @@
 -- ============================================================================
 --  TECH ONE / T1 - DUMP COMPLETO: esquema + datos + tablas de Laravel
 --  Motor: PostgreSQL
---  Subir via: https://techone.tis.cs.umss.edu.bo/phppgadmin/  ->  SQL
+--  Generado automaticamente desde Supabase
 --
---  ------------------------------------------------------------------
 --  COMO USAR (importante)
---  ------------------------------------------------------------------
 --  1. Desmarca la casilla "Paginar resultados" / "Paginate results".
---     Si la dejas marcada, phpPgAdmin envuelve el script en
---     SELECT COUNT(*) AS total FROM ( ... ) AS sub y TODO falla con
---     "syntax error at or near CREATE", aunque el SQL este perfecto.
---
 --  2. Pega este contenido completo en el textarea y dale "Ejecutar".
---     (O usa el input "Cargar un archivo" de esa misma pagina.)
---
---  3. La base seleccionada tiene que ser la misma a la que apunta
---     DB_DATABASE en el .env del servidor: techone_db.
---
---  ------------------------------------------------------------------
---  QUE CONTIENE
---  ------------------------------------------------------------------
---  - Los 11 tipos ENUM y las 33 tablas del proyecto (25 del dominio +
---    8 de Laravel) mas la tabla migrations.
---  - Todos los datos de la base de desarrollo: los 5 usuarios de prueba
---    con sus passwords ya hasheados, 54 estudiantes, 5 examenes, 31
---    registros de asistencia, etc.
---  - Los sequences quedan sincronizados (setval), asi que los INSERT que
---    haga la aplicacion despues no chocan con las filas ya cargadas.
---
---  ------------------------------------------------------------------
---  BASE VACIA O YA CARGADA
---  ------------------------------------------------------------------
---  Este script NO es idempotente: crea tipos y tablas. Si la base ya
---  tiene las 25 tablas, no lo vuelvas a correr (tira "already exists").
---  Para una base ya existente usa 004_actualizar_usuario.sql.
---
---  ------------------------------------------------------------------
---  COMO SE GENERO
---  ------------------------------------------------------------------
---  pg_dump -h 127.0.0.1 -U techone -d techone_db \
---          --no-owner --no-privileges --encoding=UTF8 --inserts
---
---  El flag --inserts es obligatorio aca: sin el, pg_dump escribe COPY
---  FROM stdin, y phpPgAdmin no sabe ejecutar COPY. Igual se le quitan
---  las lineas \restrict / \unrestrict, que son meta-comandos de psql y
---  tambien rompen phpPgAdmin.
+--  3. La base seleccionada tiene que ser la misma a la que apunta DB_DATABASE.
 -- ============================================================================
 
---
--- PostgreSQL database dump
---
-
--- Dumped from database version 15.19
--- Dumped by pg_dump version 15.19
-
-SET statement_timeout = 0;
-SET lock_timeout = 0;
-SET idle_in_transaction_session_timeout = 0;
 SET client_encoding = 'UTF8';
-SET standard_conforming_strings = on;
-SELECT pg_catalog.set_config('search_path', '', false);
-SET check_function_bodies = false;
-SET xmloption = content;
-SET client_min_messages = warning;
-SET row_security = off;
 
---
--- Name: curso_estado; Type: TYPE; Schema: public; Owner: -
---
+-- ============================================================================
+--  ENUMS
+-- ============================================================================
+DO $$ BEGIN CREATE TYPE curso_estado AS ENUM ('EnCurso', 'Finalizo'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE estado_notificacion AS ENUM ('visto', 'recibido'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE estado_usuario AS ENUM ('Activo', 'Baja'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE estudiante_examen_estado AS ENUM ('habilitado', 'deshabilitado'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE invitacion_estado AS ENUM ('aceptado', 'rechazado', 'pendiente', 'cancelado'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE motivo AS ENUM ('intento de ingreso no autorizado', 'uso de dispositivos electronicos', 'copia o intercambio de respuestas', 'uso de material no autorizado', 'suplantacion de identidad', 'otro', 'intento de ingreso duplicado', 'aula equivocada', 'intento de ingreso de material no autorizado', 'en examen sin registro de ingreso'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE nombre_tipo_gestion AS ENUM ('primer semestre', 'invierno', 'segundo semestre', 'verano'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE registrador_tipo AS ENUM ('docente', 'auxiliar'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE roles AS ENUM ('docente', 'auxiliar'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE tipo_examen_nombre AS ENUM ('examen parcial', 'examen final', 'segunda instancia'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE tipo_infraccion AS ENUM ('tramposo', 'sospechoso'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
-CREATE TYPE public.curso_estado AS ENUM (
-    'EnCurso',
-    'Finalizo'
+-- ============================================================================
+--  TABLAS
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS "ambiente" (
+    "id_ambiente" integer NOT NULL,
+    "nombre_ambiente" varchar(50) NOT NULL
 );
 
-
---
--- Name: estado_incidencia; Type: TYPE; Schema: public; Owner: -
---
-
-CREATE TYPE public.estado_incidencia AS ENUM (
-    'Confirmado',
-    'Pendiente'
+CREATE TABLE IF NOT EXISTS "auxiliar_curso" (
+    "id_auxiliar" integer NOT NULL,
+    "id_curso" integer NOT NULL,
+    "estado" estado_usuario NOT NULL
 );
 
-
---
--- Name: estado_notificacion; Type: TYPE; Schema: public; Owner: -
---
-
-CREATE TYPE public.estado_notificacion AS ENUM (
-    'visto',
-    'recibido'
+CREATE TABLE IF NOT EXISTS "cache" (
+    "key" varchar(255) NOT NULL,
+    "value" text NOT NULL,
+    "expiration" integer NOT NULL
 );
 
-
---
--- Name: estado_usuario; Type: TYPE; Schema: public; Owner: -
---
-
-CREATE TYPE public.estado_usuario AS ENUM (
-    'Activo',
-    'Baja'
+CREATE TABLE IF NOT EXISTS "cache_locks" (
+    "key" varchar(255) NOT NULL,
+    "owner" varchar(255) NOT NULL,
+    "expiration" integer NOT NULL
 );
 
-
---
--- Name: estudiante_examen_estado; Type: TYPE; Schema: public; Owner: -
---
-
-CREATE TYPE public.estudiante_examen_estado AS ENUM (
-    'habilitado',
-    'deshabilitado'
+CREATE TABLE IF NOT EXISTS "central_riesgo" (
+    "id_registro" integer NOT NULL,
+    "id_registrador" integer NOT NULL,
+    "detalle_motivo" varchar(255),
+    "fecha_registro" timestamp NOT NULL,
+    "tipo_infraccion" tipo_infraccion NOT NULL,
+    "id_examen" integer NOT NULL,
+    "sis_estudiante" varchar(20) NOT NULL,
+    "id_curso" integer,
+    "id_estudiante_examen" integer
 );
 
-
---
--- Name: invitacion_estado; Type: TYPE; Schema: public; Owner: -
---
-
-CREATE TYPE public.invitacion_estado AS ENUM (
-    'aceptado',
-    'rechazado',
-    'pendiente'
+CREATE TABLE IF NOT EXISTS "central_riesgo_motivo" (
+    "id_registro" integer NOT NULL,
+    "motivo" motivo NOT NULL
 );
 
-
---
--- Name: nombre_tipo_gestion; Type: TYPE; Schema: public; Owner: -
---
-
-CREATE TYPE public.nombre_tipo_gestion AS ENUM (
-    'Primer sem',
-    'inv',
-    'Seg sem',
-    'ver'
+CREATE TABLE IF NOT EXISTS "configuracion_examen_docente" (
+    "id_configuracion_examen" integer DEFAULT nextval('configuracion_examen_docente_id_configuracion_examen_seq'::regclass) NOT NULL,
+    "id_examen" integer NOT NULL,
+    "id_docente" integer NOT NULL,
+    "created_at" timestamp,
+    "updated_at" timestamp
 );
 
-
---
--- Name: registrador_tipo; Type: TYPE; Schema: public; Owner: -
---
-
-CREATE TYPE public.registrador_tipo AS ENUM (
-    'docente',
-    'auxiliar'
+CREATE TABLE IF NOT EXISTS "configuracion_examen_material" (
+    "id_configuracion_examen" integer NOT NULL,
+    "id_material" integer NOT NULL
 );
 
-
---
--- Name: roles; Type: TYPE; Schema: public; Owner: -
---
-
-CREATE TYPE public.roles AS ENUM (
-    'docente',
-    'auxiliar'
+CREATE TABLE IF NOT EXISTS "configuracion_examen_norma" (
+    "id_configuracion_examen" integer NOT NULL,
+    "id_norma" integer NOT NULL
 );
 
-
---
--- Name: tipo_examen_nombre; Type: TYPE; Schema: public; Owner: -
---
-
-CREATE TYPE public.tipo_examen_nombre AS ENUM (
-    'PP',
-    'SP',
-    'FINAL',
-    'SI',
-    'PARCIAL',
-    'PRACTICA'
+CREATE TABLE IF NOT EXISTS "configuracion_material_personalizado" (
+    "id_configuracion_material" integer DEFAULT nextval('configuracion_material_personaliz_id_configuracion_material_seq'::regclass) NOT NULL,
+    "id_configuracion_examen" integer NOT NULL,
+    "numero_material" integer NOT NULL,
+    "descripcion_material" text NOT NULL
 );
 
-
---
--- Name: tipo_infraccion; Type: TYPE; Schema: public; Owner: -
---
-
-CREATE TYPE public.tipo_infraccion AS ENUM (
-    'tramposo',
-    'sospechoso',
-    'pendiente',
-    'aula equivocada'
+CREATE TABLE IF NOT EXISTS "configuracion_norma_personalizada" (
+    "id_configuracion_norma" integer DEFAULT nextval('configuracion_norma_personalizada_id_configuracion_norma_seq'::regclass) NOT NULL,
+    "id_configuracion_examen" integer NOT NULL,
+    "numero_norma" integer NOT NULL,
+    "descripcion_norma" text NOT NULL
 );
 
-
-SET default_tablespace = '';
-
-SET default_table_access_method = heap;
-
---
--- Name: ambiente; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.ambiente (
-    id_ambiente integer NOT NULL,
-    nombre_ambiente character varying(50) NOT NULL
+CREATE TABLE IF NOT EXISTS "curso" (
+    "id_curso" integer NOT NULL,
+    "nombre_curso" varchar(100) NOT NULL,
+    "sis_doc" integer NOT NULL,
+    "fecha_creacion" date,
+    "estado" curso_estado NOT NULL,
+    "id_ambiente" integer
 );
 
-
---
--- Name: auxiliar_curso; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.auxiliar_curso (
-    id_auxiliar integer NOT NULL,
-    id_curso integer NOT NULL,
-    estado public.estado_usuario NOT NULL
+CREATE TABLE IF NOT EXISTS "curso_tipo_gestion" (
+    "id_curso" integer NOT NULL,
+    "id_tg" integer NOT NULL,
+    "anio" smallint NOT NULL
 );
 
-
---
--- Name: cache; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.cache (
-    key character varying(255) NOT NULL,
-    value text NOT NULL,
-    expiration integer NOT NULL
+CREATE TABLE IF NOT EXISTS "estudiante" (
+    "sis_estudiante" varchar(20) NOT NULL,
+    "nombre_estudiante" varchar(50) NOT NULL,
+    "apellido_estudiante" varchar(50) NOT NULL,
+    "carrera" varchar(80),
+    "verificado" boolean DEFAULT true NOT NULL
 );
 
-
---
--- Name: cache_locks; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.cache_locks (
-    key character varying(255) NOT NULL,
-    owner character varying(255) NOT NULL,
-    expiration integer NOT NULL
+CREATE TABLE IF NOT EXISTS "estudiante_curso" (
+    "sis_estudiante" varchar(20) NOT NULL,
+    "id_curso" integer NOT NULL
 );
 
-
---
--- Name: central_riesgo; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.central_riesgo (
-    id_registro integer NOT NULL,
-    id_ingreso integer NOT NULL,
-    id_registrador integer NOT NULL,
-    detalle_motivo character varying(255),
-    fecha_registro date,
-    tipo_infraccion public.tipo_infraccion NOT NULL,
-    estado_incidencia public.estado_incidencia NOT NULL
+CREATE TABLE IF NOT EXISTS "estudiante_examen" (
+    "id_estudiante_examen" integer NOT NULL,
+    "sis_estudiante" varchar(20) NOT NULL,
+    "id_examen" integer NOT NULL,
+    "estado" estudiante_examen_estado NOT NULL,
+    "motivo" varchar(255),
+    "modificado_por" integer,
+    "fecha_modificacion" timestamp,
+    "id_configuracion_examen" integer,
+    "id_curso" integer
 );
 
-
---
--- Name: curso; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.curso (
-    id_curso integer NOT NULL,
-    nombre_curso character varying(100) NOT NULL,
-    sis_doc integer NOT NULL,
-    fecha_creacion date,
-    estado public.curso_estado NOT NULL
+CREATE TABLE IF NOT EXISTS "estudiante_examen_ambiente" (
+    "id_ee" integer NOT NULL,
+    "id_ambiente" integer NOT NULL
 );
 
-
---
--- Name: curso_tipo_gestion; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.curso_tipo_gestion (
-    id_curso integer NOT NULL,
-    id_tg integer NOT NULL
+CREATE TABLE IF NOT EXISTS "examen" (
+    "id_examen" integer NOT NULL,
+    "fecha" date,
+    "hora_inicio" time,
+    "duracion" integer,
+    "creador" integer NOT NULL,
+    "tipo_examen" integer,
+    "nombre_examen" varchar(100)
 );
 
-
---
--- Name: estudiante; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.estudiante (
-    sis_estudiante character varying(20) NOT NULL,
-    nombre_estudiante character varying(50) NOT NULL,
-    apellido_estudiante character varying(50) NOT NULL,
-    carrera character varying(80)
+CREATE TABLE IF NOT EXISTS "examen_ambiente" (
+    "id_examen" integer NOT NULL,
+    "id_ambiente" integer NOT NULL
 );
 
-
---
--- Name: estudiante_curso; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.estudiante_curso (
-    sis_estudiante character varying(20) NOT NULL,
-    id_curso integer NOT NULL
+CREATE TABLE IF NOT EXISTS "examen_curso" (
+    "id_examen" integer NOT NULL,
+    "id_curso" integer NOT NULL
 );
 
-
---
--- Name: estudiante_examen; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.estudiante_examen (
-    id_estudiante_examen integer NOT NULL,
-    sis_estudiante character varying(20) NOT NULL,
-    id_examen integer NOT NULL,
-    estado public.estudiante_examen_estado NOT NULL,
-    motivo character varying(255),
-    modificado_por integer,
-    fecha_modificacion timestamp without time zone
+CREATE TABLE IF NOT EXISTS "examen_material_permitido" (
+    "id_examen" integer NOT NULL,
+    "id_material_permitido" integer NOT NULL
 );
 
-
---
--- Name: estudiante_examen_ambiente; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.estudiante_examen_ambiente (
-    id_ee integer NOT NULL,
-    id_ambiente integer NOT NULL
+CREATE TABLE IF NOT EXISTS "examen_norma" (
+    "id_examen" integer NOT NULL,
+    "id_norma" integer NOT NULL
 );
 
-
---
--- Name: examen; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.examen (
-    id_examen integer NOT NULL,
-    fecha date,
-    hora_inicio time without time zone,
-    hora_fin time without time zone,
-    duracion integer,
-    creador integer NOT NULL,
-    tipo_examen integer NOT NULL
+CREATE TABLE IF NOT EXISTS "failed_jobs" (
+    "id" bigint DEFAULT nextval('failed_jobs_id_seq'::regclass) NOT NULL,
+    "uuid" varchar(255) NOT NULL,
+    "connection" text NOT NULL,
+    "queue" text NOT NULL,
+    "payload" text NOT NULL,
+    "exception" text NOT NULL,
+    "failed_at" timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
-
---
--- Name: examen_ambiente; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.examen_ambiente (
-    id_examen integer NOT NULL,
-    id_ambiente integer NOT NULL
+CREATE TABLE IF NOT EXISTS "invitacion_examen_compartido" (
+    "id_invitacion" integer NOT NULL,
+    "id_docente_invitado" integer NOT NULL,
+    "id_examen" integer NOT NULL,
+    "estado" invitacion_estado NOT NULL,
+    "id_docente_invitador" integer NOT NULL,
+    "created_at" timestamp NOT NULL,
+    "updated_at" timestamp NOT NULL
 );
 
-
---
--- Name: examen_curso; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.examen_curso (
-    id_examen integer NOT NULL,
-    id_curso integer NOT NULL
+CREATE TABLE IF NOT EXISTS "job_batches" (
+    "id" varchar(255) NOT NULL,
+    "name" varchar(255) NOT NULL,
+    "total_jobs" integer NOT NULL,
+    "pending_jobs" integer NOT NULL,
+    "failed_jobs" integer NOT NULL,
+    "failed_job_ids" text NOT NULL,
+    "options" text,
+    "cancelled_at" integer,
+    "created_at" integer NOT NULL,
+    "finished_at" integer
 );
 
-
---
--- Name: examen_material_permitido; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.examen_material_permitido (
-    id_examen integer NOT NULL,
-    id_material_permitido integer NOT NULL
+CREATE TABLE IF NOT EXISTS "jobs" (
+    "id" bigint DEFAULT nextval('jobs_id_seq'::regclass) NOT NULL,
+    "queue" varchar(255) NOT NULL,
+    "payload" text NOT NULL,
+    "attempts" smallint NOT NULL,
+    "reserved_at" integer,
+    "available_at" integer NOT NULL,
+    "created_at" integer NOT NULL
 );
 
-
---
--- Name: examen_norma; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.examen_norma (
-    id_examen integer NOT NULL,
-    id_norma integer NOT NULL
+CREATE TABLE IF NOT EXISTS "material" (
+    "id_material" integer NOT NULL,
+    "descripcion" varchar(100) NOT NULL
 );
 
-
---
--- Name: failed_jobs; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.failed_jobs (
-    id bigint NOT NULL,
-    uuid character varying(255) NOT NULL,
-    connection text NOT NULL,
-    queue text NOT NULL,
-    payload text NOT NULL,
-    exception text NOT NULL,
-    failed_at timestamp(0) without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+CREATE TABLE IF NOT EXISTS "material_personalizado" (
+    "id_examen" integer NOT NULL,
+    "numero_material" integer NOT NULL,
+    "descripcion_material" text NOT NULL
 );
 
-
---
--- Name: failed_jobs_id_seq; Type: SEQUENCE; Schema: public; Owner: -
---
-
-CREATE SEQUENCE public.failed_jobs_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: failed_jobs_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
---
-
-ALTER SEQUENCE public.failed_jobs_id_seq OWNED BY public.failed_jobs.id;
-
-
---
--- Name: invitacion_examen_compartido; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.invitacion_examen_compartido (
-    id_invitacion integer NOT NULL,
-    id_docente_invitado integer NOT NULL,
-    id_examen integer NOT NULL,
-    estado public.invitacion_estado NOT NULL
+CREATE TABLE IF NOT EXISTS "migrations" (
+    "id" integer DEFAULT nextval('migrations_id_seq'::regclass) NOT NULL,
+    "migration" varchar(255) NOT NULL,
+    "batch" integer NOT NULL
 );
 
-
---
--- Name: job_batches; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.job_batches (
-    id character varying(255) NOT NULL,
-    name character varying(255) NOT NULL,
-    total_jobs integer NOT NULL,
-    pending_jobs integer NOT NULL,
-    failed_jobs integer NOT NULL,
-    failed_job_ids text NOT NULL,
-    options text,
-    cancelled_at integer,
-    created_at integer NOT NULL,
-    finished_at integer
+CREATE TABLE IF NOT EXISTS "norma" (
+    "id_norma" integer NOT NULL,
+    "detalle_norma" varchar(255) NOT NULL
 );
 
-
---
--- Name: jobs; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.jobs (
-    id bigint NOT NULL,
-    queue character varying(255) NOT NULL,
-    payload text NOT NULL,
-    attempts smallint NOT NULL,
-    reserved_at integer,
-    available_at integer NOT NULL,
-    created_at integer NOT NULL
+CREATE TABLE IF NOT EXISTS "norma_personalizada" (
+    "id_examen" integer NOT NULL,
+    "numero_norma" integer NOT NULL,
+    "descripcion_norma" text NOT NULL
 );
 
-
---
--- Name: jobs_id_seq; Type: SEQUENCE; Schema: public; Owner: -
---
-
-CREATE SEQUENCE public.jobs_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: jobs_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
---
-
-ALTER SEQUENCE public.jobs_id_seq OWNED BY public.jobs.id;
-
-
---
--- Name: material; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.material (
-    id_material integer NOT NULL,
-    descripcion character varying(100) NOT NULL
+CREATE TABLE IF NOT EXISTS "notificacion_auxiliar" (
+    "id_notificacion" integer NOT NULL,
+    "id_curso" integer NOT NULL,
+    "id_ambiente" integer NOT NULL,
+    "estado" estado_notificacion NOT NULL
 );
 
-
---
--- Name: migrations; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.migrations (
-    id integer NOT NULL,
-    migration character varying(255) NOT NULL,
-    batch integer NOT NULL
+CREATE TABLE IF NOT EXISTS "notificacion_docente" (
+    "id_notificacion" integer NOT NULL,
+    "id_central_riesgo" integer,
+    "id_curso" integer,
+    "estado" estado_notificacion NOT NULL,
+    "oculta" boolean DEFAULT false NOT NULL,
+    "tipo" varchar(255) DEFAULT 'posible_tramposo'::character varying NOT NULL,
+    "id_docente_destinatario" integer,
+    "id_invitacion" integer
 );
 
-
---
--- Name: migrations_id_seq; Type: SEQUENCE; Schema: public; Owner: -
---
-
-CREATE SEQUENCE public.migrations_id_seq
-    AS integer
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: migrations_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
---
-
-ALTER SEQUENCE public.migrations_id_seq OWNED BY public.migrations.id;
-
-
---
--- Name: norma; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.norma (
-    id_norma integer NOT NULL,
-    detalle_norma character varying(255) NOT NULL
+CREATE TABLE IF NOT EXISTS "password_reset_tokens" (
+    "email" varchar(255) NOT NULL,
+    "token" varchar(255) NOT NULL,
+    "created_at" timestamp
 );
 
-
---
--- Name: notificacion_auxiliar; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.notificacion_auxiliar (
-    id_notificacion integer NOT NULL,
-    id_curso integer NOT NULL,
-    id_ambiente integer NOT NULL,
-    estado public.estado_notificacion NOT NULL
+CREATE TABLE IF NOT EXISTS "registro_asistencia" (
+    "id_ingreso" integer NOT NULL,
+    "hora_ingreso" time,
+    "id_examen" integer NOT NULL,
+    "id_estudiante" varchar(20) NOT NULL,
+    "id_registrador" integer NOT NULL,
+    "id_estudiante_examen" integer
 );
 
-
---
--- Name: notificacion_docente; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.notificacion_docente (
-    id_notificacion integer NOT NULL,
-    id_central_riesgo integer NOT NULL,
-    id_curso integer NOT NULL,
-    estado public.estado_notificacion NOT NULL
+CREATE TABLE IF NOT EXISTS "rol" (
+    "id_rol" integer NOT NULL,
+    "nombre_rol" roles NOT NULL
 );
 
-
---
--- Name: password_reset_tokens; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.password_reset_tokens (
-    email character varying(255) NOT NULL,
-    token character varying(255) NOT NULL,
-    created_at timestamp(0) without time zone
+CREATE TABLE IF NOT EXISTS "rol_usuario" (
+    "id_usuario" integer NOT NULL,
+    "id_rol" integer NOT NULL
 );
 
-
---
--- Name: registro_asistencia; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.registro_asistencia (
-    id_ingreso integer NOT NULL,
-    hora_ingreso time without time zone,
-    id_examen integer NOT NULL,
-    id_estudiante character varying(20) NOT NULL,
-    id_registrador integer NOT NULL
+CREATE TABLE IF NOT EXISTS "sessions" (
+    "id" varchar(255) NOT NULL,
+    "user_id" bigint,
+    "ip_address" varchar(45),
+    "user_agent" text,
+    "payload" text NOT NULL,
+    "last_activity" integer NOT NULL
 );
 
-
---
--- Name: rol; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.rol (
-    id_rol integer NOT NULL,
-    nombre_rol public.roles NOT NULL
+CREATE TABLE IF NOT EXISTS "tipo_examen" (
+    "id_tipo_examen" integer NOT NULL,
+    "nombre_tipo_examen" tipo_examen_nombre NOT NULL
 );
 
-
---
--- Name: rol_usuario; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.rol_usuario (
-    id_usuario integer NOT NULL,
-    id_rol integer NOT NULL
+CREATE TABLE IF NOT EXISTS "tipo_gestion" (
+    "id_tipo_gestion" integer NOT NULL,
+    "nombre_tipo_gestion" nombre_tipo_gestion NOT NULL
 );
 
-
---
--- Name: sessions; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.sessions (
-    id character varying(255) NOT NULL,
-    user_id bigint,
-    ip_address character varying(45),
-    user_agent text,
-    payload text NOT NULL,
-    last_activity integer NOT NULL
+CREATE TABLE IF NOT EXISTS "users" (
+    "id" bigint DEFAULT nextval('users_id_seq'::regclass) NOT NULL,
+    "name" varchar(255) NOT NULL,
+    "email" varchar(255) NOT NULL,
+    "email_verified_at" timestamp,
+    "password" varchar(255) NOT NULL,
+    "remember_token" varchar(100),
+    "created_at" timestamp,
+    "updated_at" timestamp
 );
 
-
---
--- Name: tipo_examen; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.tipo_examen (
-    id_tipo_examen integer NOT NULL,
-    nombre_tipo_examen public.tipo_examen_nombre NOT NULL
+CREATE TABLE IF NOT EXISTS "usuario" (
+    "id_usuario" integer NOT NULL,
+    "cod_sis" varchar(20) NOT NULL,
+    "password" varchar(100) NOT NULL,
+    "nombre_usuario" varchar(50) NOT NULL,
+    "apellido" varchar(50) NOT NULL,
+    "correo" varchar(254),
+    "nombre" varchar(50),
+    "fecha_creacion" timestamp DEFAULT CURRENT_TIMESTAMP,
+    "estado_cuenta" varchar(10) DEFAULT 'habilitada'::character varying NOT NULL
 );
 
-
---
--- Name: tipo_gestion; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.tipo_gestion (
-    id_tipo_gestion integer NOT NULL,
-    nombre_tipo_gestion public.nombre_tipo_gestion NOT NULL
+CREATE TABLE IF NOT EXISTS "validacion_registro" (
+    "id_solicitante" integer NOT NULL,
+    "id_validador" integer NOT NULL,
+    "decision" varchar(11) NOT NULL,
+    "motivo" varchar(300),
+    "fecha" timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
-
---
--- Name: users; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.users (
-    id bigint NOT NULL,
-    name character varying(255) NOT NULL,
-    email character varying(255) NOT NULL,
-    email_verified_at timestamp(0) without time zone,
-    password character varying(255) NOT NULL,
-    remember_token character varying(100),
-    created_at timestamp(0) without time zone,
-    updated_at timestamp(0) without time zone
-);
-
-
---
--- Name: users_id_seq; Type: SEQUENCE; Schema: public; Owner: -
---
-
-CREATE SEQUENCE public.users_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: users_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
---
-
-ALTER SEQUENCE public.users_id_seq OWNED BY public.users.id;
-
-
---
--- Name: usuario; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.usuario (
-    id_usuario integer NOT NULL,
-    cod_sis character varying(20) NOT NULL,
-    password character varying(100) NOT NULL,
-    nombre_usuario character varying(50) NOT NULL,
-    apellido character varying(50) NOT NULL
-);
-
-
---
--- Name: failed_jobs id; Type: DEFAULT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.failed_jobs ALTER COLUMN id SET DEFAULT nextval('public.failed_jobs_id_seq'::regclass);
-
-
---
--- Name: jobs id; Type: DEFAULT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.jobs ALTER COLUMN id SET DEFAULT nextval('public.jobs_id_seq'::regclass);
-
-
---
--- Name: migrations id; Type: DEFAULT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.migrations ALTER COLUMN id SET DEFAULT nextval('public.migrations_id_seq'::regclass);
-
-
---
--- Name: users id; Type: DEFAULT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.users ALTER COLUMN id SET DEFAULT nextval('public.users_id_seq'::regclass);
-
-
---
--- Data for Name: ambiente; Type: TABLE DATA; Schema: public; Owner: -
---
-
-INSERT INTO public.ambiente VALUES (1, 'Aula 101');
-INSERT INTO public.ambiente VALUES (2, 'Aula 102');
-INSERT INTO public.ambiente VALUES (3, 'Laboratorio A');
-INSERT INTO public.ambiente VALUES (4, 'Laboratorio B');
-INSERT INTO public.ambiente VALUES (5, 'Aula Magna');
-
-
---
--- Data for Name: auxiliar_curso; Type: TABLE DATA; Schema: public; Owner: -
---
-
-INSERT INTO public.auxiliar_curso VALUES (3, 1, 'Activo');
-INSERT INTO public.auxiliar_curso VALUES (4, 2, 'Activo');
-INSERT INTO public.auxiliar_curso VALUES (3, 3, 'Activo');
-INSERT INTO public.auxiliar_curso VALUES (4, 4, 'Baja');
-INSERT INTO public.auxiliar_curso VALUES (3, 5, 'Activo');
-
-
---
--- Data for Name: cache; Type: TABLE DATA; Schema: public; Owner: -
---
-
-
-
---
--- Data for Name: cache_locks; Type: TABLE DATA; Schema: public; Owner: -
---
-
-
-
---
--- Data for Name: central_riesgo; Type: TABLE DATA; Schema: public; Owner: -
---
-
-INSERT INTO public.central_riesgo VALUES (1, 1, 3, 'Estudiante mirando hacia otro lado', '2024-06-10', 'sospechoso', 'Pendiente');
-INSERT INTO public.central_riesgo VALUES (2, 2, 4, 'Uso de celular durante el examen', '2024-06-11', 'tramposo', 'Confirmado');
-INSERT INTO public.central_riesgo VALUES (3, 3, 3, 'Llegada tarde al examen', '2024-06-12', 'pendiente', 'Pendiente');
-INSERT INTO public.central_riesgo VALUES (4, 4, 4, 'Estudiante en aula equivocada', '2024-06-13', 'aula equivocada', 'Confirmado');
-
-
---
--- Data for Name: curso; Type: TABLE DATA; Schema: public; Owner: -
---
-
-INSERT INTO public.curso VALUES (1, 'Calculo I', 1, '2024-02-01', 'EnCurso');
-INSERT INTO public.curso VALUES (2, 'Fisica I', 2, '2024-02-05', 'EnCurso');
-INSERT INTO public.curso VALUES (3, 'Programacion I', 5, '2024-02-10', 'EnCurso');
-INSERT INTO public.curso VALUES (4, 'Algebra Lineal', 1, '2024-02-15', 'Finalizo');
-INSERT INTO public.curso VALUES (5, 'Quimica General', 2, '2024-02-20', 'EnCurso');
-
-
---
--- Data for Name: curso_tipo_gestion; Type: TABLE DATA; Schema: public; Owner: -
---
-
-INSERT INTO public.curso_tipo_gestion VALUES (1, 1);
-INSERT INTO public.curso_tipo_gestion VALUES (2, 1);
-INSERT INTO public.curso_tipo_gestion VALUES (3, 1);
-INSERT INTO public.curso_tipo_gestion VALUES (4, 2);
-INSERT INTO public.curso_tipo_gestion VALUES (5, 3);
-
-
---
--- Data for Name: estudiante; Type: TABLE DATA; Schema: public; Owner: -
---
-
-INSERT INTO public.estudiante VALUES ('20210001', 'Juan', 'Perez', 'Ingenieria de Sistemas');
-INSERT INTO public.estudiante VALUES ('20210002', 'Maria', 'Lopez', 'Ingenieria Civil');
-INSERT INTO public.estudiante VALUES ('20210003', 'Carlos', 'Gomez', 'Ingenieria Electronica');
-INSERT INTO public.estudiante VALUES ('20210004', 'Ana', 'Martinez', 'Ingenieria Industrial');
-INSERT INTO public.estudiante VALUES ('20210005', 'Luis', 'Fernandez', 'Ingenieria de Sistemas');
-INSERT INTO public.estudiante VALUES ('202201013', 'Ana', 'López', NULL);
-INSERT INTO public.estudiante VALUES ('202101022', 'Bruno', 'Díaz', NULL);
-INSERT INTO public.estudiante VALUES ('202201031', 'Carla', 'Ruiz', NULL);
-INSERT INTO public.estudiante VALUES ('202202045', 'Diego', 'Soto', NULL);
-INSERT INTO public.estudiante VALUES ('202002107', 'Ernesto', 'Vera', NULL);
-INSERT INTO public.estudiante VALUES ('202201056', 'Fátima', 'Quispe', NULL);
-INSERT INTO public.estudiante VALUES ('202101078', 'Gabriel', 'Mamani', NULL);
-INSERT INTO public.estudiante VALUES ('202201089', 'Helena', 'Choque', NULL);
-INSERT INTO public.estudiante VALUES ('202101090', 'Iván', 'Flores', NULL);
-INSERT INTO public.estudiante VALUES ('202201101', 'Julia', 'García', NULL);
-INSERT INTO public.estudiante VALUES ('202101112', 'Kevin', 'López', NULL);
-INSERT INTO public.estudiante VALUES ('202201123', 'Laura', 'Díaz', NULL);
-INSERT INTO public.estudiante VALUES ('202101134', 'Miguel', 'Soto', NULL);
-INSERT INTO public.estudiante VALUES ('202201145', 'Nadia', 'Vera', NULL);
-INSERT INTO public.estudiante VALUES ('202101156', 'Óscar', 'Quispe', NULL);
-INSERT INTO public.estudiante VALUES ('202201167', 'Patricia', 'Mamani', NULL);
-INSERT INTO public.estudiante VALUES ('202101178', 'Raúl', 'Choque', NULL);
-INSERT INTO public.estudiante VALUES ('202201189', 'Sofía', 'Flores', NULL);
-INSERT INTO public.estudiante VALUES ('202101190', 'Tomás', 'García', NULL);
-INSERT INTO public.estudiante VALUES ('202201201', 'Valeria', 'López', NULL);
-INSERT INTO public.estudiante VALUES ('202201212', 'Wendy', 'Zapata', NULL);
-INSERT INTO public.estudiante VALUES ('202101223', 'Xavier', 'Vargas', NULL);
-INSERT INTO public.estudiante VALUES ('202201234', 'Yolanda', 'Ticona', NULL);
-INSERT INTO public.estudiante VALUES ('202101245', 'Zoe', 'Siles', NULL);
-INSERT INTO public.estudiante VALUES ('202201256', 'Andrés', 'Rojas', NULL);
-INSERT INTO public.estudiante VALUES ('202101267', 'Bianca', 'Paredes', NULL);
-INSERT INTO public.estudiante VALUES ('202201278', 'Cristian', 'Molina', NULL);
-INSERT INTO public.estudiante VALUES ('202101289', 'Daniela', 'Cabrera', NULL);
-INSERT INTO public.estudiante VALUES ('202201290', 'Eduardo', 'Salazar', NULL);
-INSERT INTO public.estudiante VALUES ('202101301', 'Fernanda', 'Vega', NULL);
-INSERT INTO public.estudiante VALUES ('202201312', 'Gonzalo', 'Arce', NULL);
-INSERT INTO public.estudiante VALUES ('202101323', 'Hugo', 'Camacho', NULL);
-INSERT INTO public.estudiante VALUES ('202201334', 'Inés', 'Delgado', NULL);
-INSERT INTO public.estudiante VALUES ('202101345', 'Javier', 'Espinoza', NULL);
-INSERT INTO public.estudiante VALUES ('202201356', 'Karen', 'Fuentes', NULL);
-INSERT INTO public.estudiante VALUES ('202101367', 'Luis', 'Gutiérrez', NULL);
-INSERT INTO public.estudiante VALUES ('202201378', 'María', 'Herrera', NULL);
-INSERT INTO public.estudiante VALUES ('202101389', 'Nicolás', 'Iriarte', NULL);
-INSERT INTO public.estudiante VALUES ('202201390', 'Olga', 'Jiménez', NULL);
-INSERT INTO public.estudiante VALUES ('202101401', 'Pablo', 'Kowalski', NULL);
-INSERT INTO public.estudiante VALUES ('202201412', 'Rosa', 'Luna', NULL);
-INSERT INTO public.estudiante VALUES ('202101423', 'Sergio', 'Mendoza', NULL);
-INSERT INTO public.estudiante VALUES ('202201434', 'Tatiana', 'Núñez', NULL);
-INSERT INTO public.estudiante VALUES ('202101445', 'Ulises', 'Orellana', NULL);
-INSERT INTO public.estudiante VALUES ('202201456', 'Verónica', 'Paz', NULL);
-INSERT INTO public.estudiante VALUES ('202101467', 'Walter', 'Quiroga', NULL);
-INSERT INTO public.estudiante VALUES ('202201478', 'Ximena', 'Ramírez', NULL);
-INSERT INTO public.estudiante VALUES ('202101489', 'Yamil', 'Sánchez', NULL);
-INSERT INTO public.estudiante VALUES ('202201490', 'Zaira', 'Toledo', NULL);
-
-
---
--- Data for Name: estudiante_curso; Type: TABLE DATA; Schema: public; Owner: -
---
-
-INSERT INTO public.estudiante_curso VALUES ('20210001', 1);
-INSERT INTO public.estudiante_curso VALUES ('20210002', 2);
-INSERT INTO public.estudiante_curso VALUES ('20210003', 3);
-INSERT INTO public.estudiante_curso VALUES ('20210004', 4);
-INSERT INTO public.estudiante_curso VALUES ('20210005', 5);
-
-
---
--- Data for Name: estudiante_examen; Type: TABLE DATA; Schema: public; Owner: -
---
-
-INSERT INTO public.estudiante_examen VALUES (1, '20210001', 1, 'habilitado', NULL, NULL, NULL);
-INSERT INTO public.estudiante_examen VALUES (2, '20210002', 2, 'habilitado', NULL, NULL, NULL);
-INSERT INTO public.estudiante_examen VALUES (3, '20210003', 3, 'deshabilitado', 'No cumple requisitos', NULL, NULL);
-INSERT INTO public.estudiante_examen VALUES (4, '20210004', 4, 'habilitado', NULL, NULL, NULL);
-INSERT INTO public.estudiante_examen VALUES (101, '202201013', 5, 'habilitado', NULL, NULL, NULL);
-INSERT INTO public.estudiante_examen VALUES (102, '202101022', 5, 'habilitado', NULL, NULL, NULL);
-INSERT INTO public.estudiante_examen VALUES (103, '202201031', 5, 'habilitado', NULL, NULL, NULL);
-INSERT INTO public.estudiante_examen VALUES (104, '202202045', 5, 'deshabilitado', NULL, NULL, NULL);
-INSERT INTO public.estudiante_examen VALUES (105, '202002107', 5, 'habilitado', NULL, NULL, NULL);
-INSERT INTO public.estudiante_examen VALUES (106, '202201056', 5, 'habilitado', NULL, NULL, NULL);
-INSERT INTO public.estudiante_examen VALUES (107, '202101078', 5, 'deshabilitado', NULL, NULL, NULL);
-INSERT INTO public.estudiante_examen VALUES (108, '202201089', 5, 'habilitado', NULL, NULL, NULL);
-INSERT INTO public.estudiante_examen VALUES (109, '202101090', 5, 'habilitado', NULL, NULL, NULL);
-INSERT INTO public.estudiante_examen VALUES (110, '202201101', 5, 'habilitado', NULL, NULL, NULL);
-INSERT INTO public.estudiante_examen VALUES (111, '202101112', 5, 'habilitado', NULL, NULL, NULL);
-INSERT INTO public.estudiante_examen VALUES (112, '202201123', 5, 'habilitado', NULL, NULL, NULL);
-INSERT INTO public.estudiante_examen VALUES (113, '202101134', 5, 'deshabilitado', NULL, NULL, NULL);
-INSERT INTO public.estudiante_examen VALUES (114, '202201145', 5, 'habilitado', NULL, NULL, NULL);
-INSERT INTO public.estudiante_examen VALUES (115, '202101156', 5, 'habilitado', NULL, NULL, NULL);
-INSERT INTO public.estudiante_examen VALUES (116, '202201167', 5, 'habilitado', NULL, NULL, NULL);
-INSERT INTO public.estudiante_examen VALUES (117, '202101178', 5, 'habilitado', NULL, NULL, NULL);
-INSERT INTO public.estudiante_examen VALUES (118, '202201189', 5, 'habilitado', NULL, NULL, NULL);
-INSERT INTO public.estudiante_examen VALUES (119, '202101190', 5, 'deshabilitado', NULL, NULL, NULL);
-INSERT INTO public.estudiante_examen VALUES (120, '202201201', 5, 'habilitado', NULL, NULL, NULL);
-INSERT INTO public.estudiante_examen VALUES (121, '202201212', 5, 'habilitado', NULL, NULL, NULL);
-INSERT INTO public.estudiante_examen VALUES (122, '202101223', 5, 'habilitado', NULL, NULL, NULL);
-INSERT INTO public.estudiante_examen VALUES (123, '202201234', 5, 'habilitado', NULL, NULL, NULL);
-INSERT INTO public.estudiante_examen VALUES (124, '202101245', 5, 'habilitado', NULL, NULL, NULL);
-INSERT INTO public.estudiante_examen VALUES (125, '202201256', 5, 'habilitado', NULL, NULL, NULL);
-INSERT INTO public.estudiante_examen VALUES (126, '202101267', 5, 'habilitado', NULL, NULL, NULL);
-INSERT INTO public.estudiante_examen VALUES (127, '202201278', 5, 'habilitado', NULL, NULL, NULL);
-INSERT INTO public.estudiante_examen VALUES (128, '202101289', 5, 'habilitado', NULL, NULL, NULL);
-INSERT INTO public.estudiante_examen VALUES (129, '202201290', 5, 'habilitado', NULL, NULL, NULL);
-INSERT INTO public.estudiante_examen VALUES (130, '202101301', 5, 'habilitado', NULL, NULL, NULL);
-INSERT INTO public.estudiante_examen VALUES (131, '202201312', 5, 'habilitado', NULL, NULL, NULL);
-INSERT INTO public.estudiante_examen VALUES (132, '202101323', 5, 'habilitado', NULL, NULL, NULL);
-INSERT INTO public.estudiante_examen VALUES (133, '202201334', 5, 'habilitado', NULL, NULL, NULL);
-INSERT INTO public.estudiante_examen VALUES (134, '202101345', 5, 'habilitado', NULL, NULL, NULL);
-INSERT INTO public.estudiante_examen VALUES (135, '202201356', 5, 'habilitado', NULL, NULL, NULL);
-INSERT INTO public.estudiante_examen VALUES (136, '202101367', 5, 'habilitado', NULL, NULL, NULL);
-INSERT INTO public.estudiante_examen VALUES (137, '202201378', 5, 'habilitado', NULL, NULL, NULL);
-INSERT INTO public.estudiante_examen VALUES (138, '202101389', 5, 'habilitado', NULL, NULL, NULL);
-INSERT INTO public.estudiante_examen VALUES (139, '202201390', 5, 'habilitado', NULL, NULL, NULL);
-INSERT INTO public.estudiante_examen VALUES (140, '202101401', 5, 'habilitado', NULL, NULL, NULL);
-INSERT INTO public.estudiante_examen VALUES (141, '202201412', 5, 'habilitado', NULL, NULL, NULL);
-INSERT INTO public.estudiante_examen VALUES (142, '202101423', 5, 'habilitado', NULL, NULL, NULL);
-INSERT INTO public.estudiante_examen VALUES (143, '202201434', 5, 'habilitado', NULL, NULL, NULL);
-INSERT INTO public.estudiante_examen VALUES (144, '202101445', 5, 'habilitado', NULL, NULL, NULL);
-INSERT INTO public.estudiante_examen VALUES (145, '202201456', 5, 'habilitado', NULL, NULL, NULL);
-INSERT INTO public.estudiante_examen VALUES (146, '202101467', 5, 'habilitado', NULL, NULL, NULL);
-INSERT INTO public.estudiante_examen VALUES (147, '202201478', 5, 'habilitado', NULL, NULL, NULL);
-INSERT INTO public.estudiante_examen VALUES (148, '202101489', 5, 'habilitado', NULL, NULL, NULL);
-INSERT INTO public.estudiante_examen VALUES (149, '202201490', 5, 'habilitado', NULL, NULL, NULL);
-
-
---
--- Data for Name: estudiante_examen_ambiente; Type: TABLE DATA; Schema: public; Owner: -
---
-
-INSERT INTO public.estudiante_examen_ambiente VALUES (1, 1);
-INSERT INTO public.estudiante_examen_ambiente VALUES (2, 2);
-INSERT INTO public.estudiante_examen_ambiente VALUES (3, 3);
-INSERT INTO public.estudiante_examen_ambiente VALUES (4, 4);
-
-
---
--- Data for Name: examen; Type: TABLE DATA; Schema: public; Owner: -
---
-
-INSERT INTO public.examen VALUES (1, '2024-06-10', '08:00:00', '10:00:00', 120, 1, 1);
-INSERT INTO public.examen VALUES (2, '2024-06-11', '10:00:00', '12:00:00', 120, 2, 2);
-INSERT INTO public.examen VALUES (3, '2024-06-12', '14:00:00', '16:00:00', 120, 5, 3);
-INSERT INTO public.examen VALUES (4, '2024-06-13', '08:00:00', '09:30:00', 90, 1, 4);
-INSERT INTO public.examen VALUES (5, '2024-06-14', '16:00:00', '18:00:00', 120, 2, 5);
-
-
---
--- Data for Name: examen_ambiente; Type: TABLE DATA; Schema: public; Owner: -
---
-
-INSERT INTO public.examen_ambiente VALUES (1, 1);
-INSERT INTO public.examen_ambiente VALUES (2, 2);
-INSERT INTO public.examen_ambiente VALUES (3, 3);
-INSERT INTO public.examen_ambiente VALUES (4, 4);
-INSERT INTO public.examen_ambiente VALUES (5, 5);
-
-
---
--- Data for Name: examen_curso; Type: TABLE DATA; Schema: public; Owner: -
---
-
-INSERT INTO public.examen_curso VALUES (1, 1);
-INSERT INTO public.examen_curso VALUES (2, 2);
-INSERT INTO public.examen_curso VALUES (3, 3);
-INSERT INTO public.examen_curso VALUES (4, 4);
-INSERT INTO public.examen_curso VALUES (5, 5);
-
-
---
--- Data for Name: examen_material_permitido; Type: TABLE DATA; Schema: public; Owner: -
---
-
-INSERT INTO public.examen_material_permitido VALUES (1, 1);
-INSERT INTO public.examen_material_permitido VALUES (2, 2);
-INSERT INTO public.examen_material_permitido VALUES (3, 3);
-INSERT INTO public.examen_material_permitido VALUES (4, 4);
-INSERT INTO public.examen_material_permitido VALUES (5, 5);
-
-
---
--- Data for Name: examen_norma; Type: TABLE DATA; Schema: public; Owner: -
---
-
-INSERT INTO public.examen_norma VALUES (1, 1);
-INSERT INTO public.examen_norma VALUES (2, 2);
-INSERT INTO public.examen_norma VALUES (3, 3);
-INSERT INTO public.examen_norma VALUES (4, 4);
-INSERT INTO public.examen_norma VALUES (5, 5);
-
-
---
--- Data for Name: failed_jobs; Type: TABLE DATA; Schema: public; Owner: -
---
-
-
-
---
--- Data for Name: invitacion_examen_compartido; Type: TABLE DATA; Schema: public; Owner: -
---
-
-INSERT INTO public.invitacion_examen_compartido VALUES (1, 2, 1, 'aceptado');
-INSERT INTO public.invitacion_examen_compartido VALUES (2, 5, 2, 'pendiente');
-INSERT INTO public.invitacion_examen_compartido VALUES (3, 1, 3, 'rechazado');
-INSERT INTO public.invitacion_examen_compartido VALUES (4, 2, 4, 'aceptado');
-INSERT INTO public.invitacion_examen_compartido VALUES (5, 5, 5, 'pendiente');
-
-
---
--- Data for Name: job_batches; Type: TABLE DATA; Schema: public; Owner: -
---
-
-
-
---
--- Data for Name: jobs; Type: TABLE DATA; Schema: public; Owner: -
---
-
-
-
---
--- Data for Name: material; Type: TABLE DATA; Schema: public; Owner: -
---
-
-INSERT INTO public.material VALUES (1, 'Calculadora cientifica');
-INSERT INTO public.material VALUES (2, 'Formulario impreso');
-INSERT INTO public.material VALUES (3, 'Tabla periodica');
-INSERT INTO public.material VALUES (4, 'Regla y compas');
-INSERT INTO public.material VALUES (5, 'Hoja de apuntes');
-
-
---
--- Data for Name: migrations; Type: TABLE DATA; Schema: public; Owner: -
---
-
-INSERT INTO public.migrations VALUES (5, '0001_01_01_000000_create_users_table', 1);
-INSERT INTO public.migrations VALUES (6, '0001_01_01_000001_create_cache_table', 1);
-INSERT INTO public.migrations VALUES (7, '0001_01_01_000002_create_jobs_table', 1);
-INSERT INTO public.migrations VALUES (8, '2026_09_27_000001_migracion_servidor_oficial', 1);
-
-
---
--- Data for Name: norma; Type: TABLE DATA; Schema: public; Owner: -
---
-
-INSERT INTO public.norma VALUES (1, 'No usar celulares durante el examen');
-INSERT INTO public.norma VALUES (2, 'Prohibido hablar con otros estudiantes');
-INSERT INTO public.norma VALUES (3, 'Solo material autorizado en la mesa');
-INSERT INTO public.norma VALUES (4, 'Prohibido salir del aula sin permiso');
-INSERT INTO public.norma VALUES (5, 'No se permite calculadora programable');
-
-
---
--- Data for Name: notificacion_auxiliar; Type: TABLE DATA; Schema: public; Owner: -
---
-
-INSERT INTO public.notificacion_auxiliar VALUES (1, 1, 1, 'visto');
-INSERT INTO public.notificacion_auxiliar VALUES (2, 2, 2, 'recibido');
-INSERT INTO public.notificacion_auxiliar VALUES (3, 3, 3, 'visto');
-INSERT INTO public.notificacion_auxiliar VALUES (4, 4, 4, 'recibido');
-INSERT INTO public.notificacion_auxiliar VALUES (5, 5, 5, 'visto');
-
-
---
--- Data for Name: notificacion_docente; Type: TABLE DATA; Schema: public; Owner: -
---
-
-INSERT INTO public.notificacion_docente VALUES (1, 1, 1, 'visto');
-INSERT INTO public.notificacion_docente VALUES (2, 2, 2, 'recibido');
-INSERT INTO public.notificacion_docente VALUES (3, 3, 3, 'visto');
-INSERT INTO public.notificacion_docente VALUES (4, 4, 4, 'recibido');
-
-
---
--- Data for Name: password_reset_tokens; Type: TABLE DATA; Schema: public; Owner: -
---
-
-
-
---
--- Data for Name: registro_asistencia; Type: TABLE DATA; Schema: public; Owner: -
---
-
-INSERT INTO public.registro_asistencia VALUES (1, '08:05:00', 1, '20210001', 3);
-INSERT INTO public.registro_asistencia VALUES (2, '10:03:00', 2, '20210002', 4);
-INSERT INTO public.registro_asistencia VALUES (3, '14:10:00', 3, '20210003', 3);
-INSERT INTO public.registro_asistencia VALUES (4, '08:02:00', 4, '20210004', 4);
-INSERT INTO public.registro_asistencia VALUES (201, '16:45:00', 5, '202201013', 1);
-INSERT INTO public.registro_asistencia VALUES (202, '16:16:00', 5, '202101022', 2);
-INSERT INTO public.registro_asistencia VALUES (203, '16:16:00', 5, '202002107', 2);
-INSERT INTO public.registro_asistencia VALUES (204, '16:21:00', 5, '202101078', 1);
-INSERT INTO public.registro_asistencia VALUES (205, '16:26:00', 5, '202201101', 1);
-INSERT INTO public.registro_asistencia VALUES (206, '16:02:00', 5, '202201123', 2);
-INSERT INTO public.registro_asistencia VALUES (207, '16:33:00', 5, '202101156', 2);
-INSERT INTO public.registro_asistencia VALUES (208, '16:46:00', 5, '202201189', 1);
-INSERT INTO public.registro_asistencia VALUES (301, '16:41:00', 5, '202101223', 1);
-INSERT INTO public.registro_asistencia VALUES (302, '16:52:00', 5, '202201234', 1);
-INSERT INTO public.registro_asistencia VALUES (303, '16:39:00', 5, '202201256', 2);
-INSERT INTO public.registro_asistencia VALUES (304, '16:29:00', 5, '202101267', 1);
-INSERT INTO public.registro_asistencia VALUES (305, '16:54:00', 5, '202101289', 2);
-INSERT INTO public.registro_asistencia VALUES (306, '16:20:00', 5, '202201290', 2);
-INSERT INTO public.registro_asistencia VALUES (307, '16:05:00', 5, '202201312', 2);
-INSERT INTO public.registro_asistencia VALUES (308, '16:24:00', 5, '202101323', 1);
-INSERT INTO public.registro_asistencia VALUES (309, '16:37:00', 5, '202101345', 1);
-INSERT INTO public.registro_asistencia VALUES (310, '16:02:00', 5, '202201356', 2);
-INSERT INTO public.registro_asistencia VALUES (311, '16:52:00', 5, '202201378', 1);
-INSERT INTO public.registro_asistencia VALUES (312, '16:10:00', 5, '202101389', 2);
-INSERT INTO public.registro_asistencia VALUES (313, '16:38:00', 5, '202101401', 1);
-INSERT INTO public.registro_asistencia VALUES (314, '16:45:00', 5, '202201412', 2);
-INSERT INTO public.registro_asistencia VALUES (315, '16:10:00', 5, '202201434', 2);
-INSERT INTO public.registro_asistencia VALUES (316, '16:53:00', 5, '202101445', 1);
-INSERT INTO public.registro_asistencia VALUES (317, '16:31:00', 5, '202101467', 2);
-INSERT INTO public.registro_asistencia VALUES (318, '16:09:00', 5, '202201478', 2);
-INSERT INTO public.registro_asistencia VALUES (319, '16:17:00', 5, '202201490', 1);
-
-
---
--- Data for Name: rol; Type: TABLE DATA; Schema: public; Owner: -
---
-
-INSERT INTO public.rol VALUES (1, 'docente');
-INSERT INTO public.rol VALUES (2, 'auxiliar');
-
-
---
--- Data for Name: rol_usuario; Type: TABLE DATA; Schema: public; Owner: -
---
-
-INSERT INTO public.rol_usuario VALUES (1, 1);
-INSERT INTO public.rol_usuario VALUES (2, 1);
-INSERT INTO public.rol_usuario VALUES (3, 2);
-INSERT INTO public.rol_usuario VALUES (4, 2);
-INSERT INTO public.rol_usuario VALUES (5, 1);
-
-
---
--- Data for Name: sessions; Type: TABLE DATA; Schema: public; Owner: -
---
-
-
-
---
--- Data for Name: tipo_examen; Type: TABLE DATA; Schema: public; Owner: -
---
-
-INSERT INTO public.tipo_examen VALUES (1, 'PP');
-INSERT INTO public.tipo_examen VALUES (2, 'SP');
-INSERT INTO public.tipo_examen VALUES (3, 'FINAL');
-INSERT INTO public.tipo_examen VALUES (4, 'SI');
-INSERT INTO public.tipo_examen VALUES (5, 'PARCIAL');
-
-
---
--- Data for Name: tipo_gestion; Type: TABLE DATA; Schema: public; Owner: -
---
-
-INSERT INTO public.tipo_gestion VALUES (1, 'Primer sem');
-INSERT INTO public.tipo_gestion VALUES (2, 'inv');
-INSERT INTO public.tipo_gestion VALUES (3, 'Seg sem');
-INSERT INTO public.tipo_gestion VALUES (4, 'ver');
-
-
---
--- Data for Name: users; Type: TABLE DATA; Schema: public; Owner: -
---
-
-
-
---
--- Data for Name: usuario; Type: TABLE DATA; Schema: public; Owner: -
---
-
-INSERT INTO public.usuario VALUES (5, 'DOC003', '$2y$10$vE0SJjVzqLk40oLrhN2Kd.G8BETIyz5kmecym86oaELv8wZk8Ak9S', 'Fernando', 'Vargas');
-INSERT INTO public.usuario VALUES (4, 'AUX002', '$2y$10$oCKNmUI8S9rOkYZDe3r9LOyOU6Ouk4/YyRJvsJYdmYDnATSjK.76a', 'Sofia', 'Castro');
-INSERT INTO public.usuario VALUES (1, 'DOC001', '$2y$12$Tt4sKwgJnuyrGPNrJdX7l.nl072YQkoq2T9WN/Flaj6nxEUZjrpSa', 'Roberto', 'Silva');
-INSERT INTO public.usuario VALUES (2, 'DOC002', '$2y$12$ufTD.e4y8DEmaWJW4dHrc.ui/PiamKKTiLploZEWUx0Ki9HxqZg/C', 'Patricia', 'Rojas');
-INSERT INTO public.usuario VALUES (3, 'AUX001', '$2y$12$SCsM./qdbhkp27Q2tx2Ufey.oDWhdTBafZsr4eU.pRCp32PKk0eyu', 'Diego', 'Mendoza');
-
-
---
--- Name: failed_jobs_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
---
-
-SELECT pg_catalog.setval('public.failed_jobs_id_seq', 1, false);
-
-
---
--- Name: jobs_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
---
-
-SELECT pg_catalog.setval('public.jobs_id_seq', 1, false);
-
-
---
--- Name: migrations_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
---
-
-SELECT pg_catalog.setval('public.migrations_id_seq', 8, true);
-
-
---
--- Name: users_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
---
-
-SELECT pg_catalog.setval('public.users_id_seq', 1, false);
-
-
---
--- Name: ambiente ambiente_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.ambiente
-    ADD CONSTRAINT ambiente_pkey PRIMARY KEY (id_ambiente);
-
-
---
--- Name: auxiliar_curso auxiliar_curso_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.auxiliar_curso
-    ADD CONSTRAINT auxiliar_curso_pkey PRIMARY KEY (id_auxiliar, id_curso);
-
-
---
--- Name: cache_locks cache_locks_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.cache_locks
-    ADD CONSTRAINT cache_locks_pkey PRIMARY KEY (key);
-
-
---
--- Name: cache cache_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.cache
-    ADD CONSTRAINT cache_pkey PRIMARY KEY (key);
-
-
---
--- Name: central_riesgo central_riesgo_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.central_riesgo
-    ADD CONSTRAINT central_riesgo_pkey PRIMARY KEY (id_registro);
-
-
---
--- Name: curso curso_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.curso
-    ADD CONSTRAINT curso_pkey PRIMARY KEY (id_curso);
-
-
---
--- Name: curso_tipo_gestion curso_tipo_gestion_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.curso_tipo_gestion
-    ADD CONSTRAINT curso_tipo_gestion_pkey PRIMARY KEY (id_curso, id_tg);
-
-
---
--- Name: estudiante_curso estudiante_curso_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.estudiante_curso
-    ADD CONSTRAINT estudiante_curso_pkey PRIMARY KEY (sis_estudiante, id_curso);
-
-
---
--- Name: estudiante_examen_ambiente estudiante_examen_ambiente_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.estudiante_examen_ambiente
-    ADD CONSTRAINT estudiante_examen_ambiente_pkey PRIMARY KEY (id_ee, id_ambiente);
-
-
---
--- Name: estudiante_examen estudiante_examen_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.estudiante_examen
-    ADD CONSTRAINT estudiante_examen_pkey PRIMARY KEY (id_estudiante_examen);
-
-
---
--- Name: estudiante estudiante_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.estudiante
-    ADD CONSTRAINT estudiante_pkey PRIMARY KEY (sis_estudiante);
-
-
---
--- Name: examen_ambiente examen_ambiente_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.examen_ambiente
-    ADD CONSTRAINT examen_ambiente_pkey PRIMARY KEY (id_examen, id_ambiente);
-
-
---
--- Name: examen_curso examen_curso_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.examen_curso
-    ADD CONSTRAINT examen_curso_pkey PRIMARY KEY (id_examen, id_curso);
-
-
---
--- Name: examen_material_permitido examen_material_permitido_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.examen_material_permitido
-    ADD CONSTRAINT examen_material_permitido_pkey PRIMARY KEY (id_examen, id_material_permitido);
-
-
---
--- Name: examen_norma examen_norma_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.examen_norma
-    ADD CONSTRAINT examen_norma_pkey PRIMARY KEY (id_examen, id_norma);
-
-
---
--- Name: examen examen_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.examen
-    ADD CONSTRAINT examen_pkey PRIMARY KEY (id_examen);
-
-
---
--- Name: failed_jobs failed_jobs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.failed_jobs
-    ADD CONSTRAINT failed_jobs_pkey PRIMARY KEY (id);
-
-
---
--- Name: failed_jobs failed_jobs_uuid_unique; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.failed_jobs
-    ADD CONSTRAINT failed_jobs_uuid_unique UNIQUE (uuid);
-
-
---
--- Name: invitacion_examen_compartido invitacion_examen_compartido_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.invitacion_examen_compartido
-    ADD CONSTRAINT invitacion_examen_compartido_pkey PRIMARY KEY (id_invitacion);
-
-
---
--- Name: job_batches job_batches_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.job_batches
-    ADD CONSTRAINT job_batches_pkey PRIMARY KEY (id);
-
-
---
--- Name: jobs jobs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.jobs
-    ADD CONSTRAINT jobs_pkey PRIMARY KEY (id);
-
-
---
--- Name: material material_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.material
-    ADD CONSTRAINT material_pkey PRIMARY KEY (id_material);
-
-
---
--- Name: migrations migrations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.migrations
-    ADD CONSTRAINT migrations_pkey PRIMARY KEY (id);
-
-
---
--- Name: norma norma_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.norma
-    ADD CONSTRAINT norma_pkey PRIMARY KEY (id_norma);
-
-
---
--- Name: notificacion_auxiliar notificacion_auxiliar_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.notificacion_auxiliar
-    ADD CONSTRAINT notificacion_auxiliar_pkey PRIMARY KEY (id_notificacion);
-
-
---
--- Name: notificacion_docente notificacion_docente_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.notificacion_docente
-    ADD CONSTRAINT notificacion_docente_pkey PRIMARY KEY (id_notificacion);
-
-
---
--- Name: password_reset_tokens password_reset_tokens_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.password_reset_tokens
-    ADD CONSTRAINT password_reset_tokens_pkey PRIMARY KEY (email);
-
-
---
--- Name: registro_asistencia registro_asistencia_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.registro_asistencia
-    ADD CONSTRAINT registro_asistencia_pkey PRIMARY KEY (id_ingreso);
-
-
---
--- Name: rol rol_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.rol
-    ADD CONSTRAINT rol_pkey PRIMARY KEY (id_rol);
-
-
---
--- Name: rol_usuario rol_usuario_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.rol_usuario
-    ADD CONSTRAINT rol_usuario_pkey PRIMARY KEY (id_usuario, id_rol);
-
-
---
--- Name: sessions sessions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.sessions
-    ADD CONSTRAINT sessions_pkey PRIMARY KEY (id);
-
-
---
--- Name: tipo_examen tipo_examen_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.tipo_examen
-    ADD CONSTRAINT tipo_examen_pkey PRIMARY KEY (id_tipo_examen);
-
-
---
--- Name: tipo_gestion tipo_gestion_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.tipo_gestion
-    ADD CONSTRAINT tipo_gestion_pkey PRIMARY KEY (id_tipo_gestion);
-
-
---
--- Name: users users_email_unique; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.users
-    ADD CONSTRAINT users_email_unique UNIQUE (email);
-
-
---
--- Name: users users_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.users
-    ADD CONSTRAINT users_pkey PRIMARY KEY (id);
-
-
---
--- Name: usuario usuario_cod_sis_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.usuario
-    ADD CONSTRAINT usuario_cod_sis_key UNIQUE (cod_sis);
-
-
---
--- Name: usuario usuario_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.usuario
-    ADD CONSTRAINT usuario_pkey PRIMARY KEY (id_usuario);
-
-
---
--- Name: jobs_queue_index; Type: INDEX; Schema: public; Owner: -
---
-
+-- ============================================================================
+--  CONSTRAINTS
+-- ============================================================================
+ALTER TABLE "ambiente" ADD CONSTRAINT "ambiente_pkey" PRIMARY KEY (id_ambiente);
+ALTER TABLE "auxiliar_curso" ADD CONSTRAINT "fk_ac_auxiliar" FOREIGN KEY (id_auxiliar) REFERENCES usuario(id_usuario);
+ALTER TABLE "auxiliar_curso" ADD CONSTRAINT "fk_ac_curso" FOREIGN KEY (id_curso) REFERENCES curso(id_curso);
+ALTER TABLE "auxiliar_curso" ADD CONSTRAINT "auxiliar_curso_pkey" PRIMARY KEY (id_auxiliar, id_curso);
+ALTER TABLE "cache" ADD CONSTRAINT "cache_pkey" PRIMARY KEY (key);
+ALTER TABLE "cache_locks" ADD CONSTRAINT "cache_locks_pkey" PRIMARY KEY (key);
+ALTER TABLE "central_riesgo" ADD CONSTRAINT "central_riesgo_id_curso_foreign" FOREIGN KEY (id_curso) REFERENCES curso(id_curso);
+ALTER TABLE "central_riesgo" ADD CONSTRAINT "fk_cr_estudiante" FOREIGN KEY (sis_estudiante) REFERENCES estudiante(sis_estudiante);
+ALTER TABLE "central_riesgo" ADD CONSTRAINT "fk_cr_examen" FOREIGN KEY (id_examen) REFERENCES examen(id_examen);
+ALTER TABLE "central_riesgo" ADD CONSTRAINT "fk_cr_inscripcion" FOREIGN KEY (id_estudiante_examen) REFERENCES estudiante_examen(id_estudiante_examen);
+ALTER TABLE "central_riesgo" ADD CONSTRAINT "fk_cr_registrador" FOREIGN KEY (id_registrador) REFERENCES usuario(id_usuario);
+ALTER TABLE "central_riesgo" ADD CONSTRAINT "central_riesgo_pkey" PRIMARY KEY (id_registro);
+ALTER TABLE "central_riesgo_motivo" ADD CONSTRAINT "central_riesgo_motivo_id_registro_fkey" FOREIGN KEY (id_registro) REFERENCES central_riesgo(id_registro) ON DELETE CASCADE;
+ALTER TABLE "central_riesgo_motivo" ADD CONSTRAINT "central_riesgo_motivo_pkey" PRIMARY KEY (id_registro, motivo);
+ALTER TABLE "configuracion_examen_docente" ADD CONSTRAINT "fk_config_docente" FOREIGN KEY (id_docente) REFERENCES usuario(id_usuario);
+ALTER TABLE "configuracion_examen_docente" ADD CONSTRAINT "fk_config_examen" FOREIGN KEY (id_examen) REFERENCES examen(id_examen);
+ALTER TABLE "configuracion_examen_docente" ADD CONSTRAINT "configuracion_examen_docente_pkey" PRIMARY KEY (id_configuracion_examen);
+ALTER TABLE "configuracion_examen_docente" ADD CONSTRAINT "config_examen_docente_unique" UNIQUE (id_examen, id_docente);
+ALTER TABLE "configuracion_examen_material" ADD CONSTRAINT "fk_config_material_config" FOREIGN KEY (id_configuracion_examen) REFERENCES configuracion_examen_docente(id_configuracion_examen) ON DELETE CASCADE;
+ALTER TABLE "configuracion_examen_material" ADD CONSTRAINT "fk_config_material_material" FOREIGN KEY (id_material) REFERENCES material(id_material);
+ALTER TABLE "configuracion_examen_material" ADD CONSTRAINT "configuracion_examen_material_pkey" PRIMARY KEY (id_configuracion_examen, id_material);
+ALTER TABLE "configuracion_examen_norma" ADD CONSTRAINT "fk_config_norma_config" FOREIGN KEY (id_configuracion_examen) REFERENCES configuracion_examen_docente(id_configuracion_examen) ON DELETE CASCADE;
+ALTER TABLE "configuracion_examen_norma" ADD CONSTRAINT "fk_config_norma_norma" FOREIGN KEY (id_norma) REFERENCES norma(id_norma);
+ALTER TABLE "configuracion_examen_norma" ADD CONSTRAINT "configuracion_examen_norma_pkey" PRIMARY KEY (id_configuracion_examen, id_norma);
+ALTER TABLE "configuracion_material_personalizado" ADD CONSTRAINT "fk_config_material_personalizado" FOREIGN KEY (id_configuracion_examen) REFERENCES configuracion_examen_docente(id_configuracion_examen) ON DELETE CASCADE;
+ALTER TABLE "configuracion_material_personalizado" ADD CONSTRAINT "configuracion_material_personalizado_pkey" PRIMARY KEY (id_configuracion_material);
+ALTER TABLE "configuracion_material_personalizado" ADD CONSTRAINT "config_material_numero_unique" UNIQUE (id_configuracion_examen, numero_material);
+ALTER TABLE "configuracion_norma_personalizada" ADD CONSTRAINT "fk_config_norma_personalizada" FOREIGN KEY (id_configuracion_examen) REFERENCES configuracion_examen_docente(id_configuracion_examen) ON DELETE CASCADE;
+ALTER TABLE "configuracion_norma_personalizada" ADD CONSTRAINT "configuracion_norma_personalizada_pkey" PRIMARY KEY (id_configuracion_norma);
+ALTER TABLE "configuracion_norma_personalizada" ADD CONSTRAINT "config_norma_numero_unique" UNIQUE (id_configuracion_examen, numero_norma);
+ALTER TABLE "curso" ADD CONSTRAINT "fk_curso_ambiente" FOREIGN KEY (id_ambiente) REFERENCES ambiente(id_ambiente);
+ALTER TABLE "curso" ADD CONSTRAINT "fk_curso_docente" FOREIGN KEY (sis_doc) REFERENCES usuario(id_usuario);
+ALTER TABLE "curso" ADD CONSTRAINT "curso_pkey" PRIMARY KEY (id_curso);
+ALTER TABLE "curso_tipo_gestion" ADD CONSTRAINT "fk_ctg_curso" FOREIGN KEY (id_curso) REFERENCES curso(id_curso);
+ALTER TABLE "curso_tipo_gestion" ADD CONSTRAINT "fk_ctg_tg" FOREIGN KEY (id_tg) REFERENCES tipo_gestion(id_tipo_gestion);
+ALTER TABLE "curso_tipo_gestion" ADD CONSTRAINT "curso_tipo_gestion_pkey" PRIMARY KEY (id_curso, id_tg);
+ALTER TABLE "estudiante" ADD CONSTRAINT "estudiante_pkey" PRIMARY KEY (sis_estudiante);
+ALTER TABLE "estudiante_curso" ADD CONSTRAINT "fk_ec_curso" FOREIGN KEY (id_curso) REFERENCES curso(id_curso);
+ALTER TABLE "estudiante_curso" ADD CONSTRAINT "fk_ec_estudiante" FOREIGN KEY (sis_estudiante) REFERENCES estudiante(sis_estudiante);
+ALTER TABLE "estudiante_curso" ADD CONSTRAINT "estudiante_curso_pkey" PRIMARY KEY (sis_estudiante, id_curso);
+ALTER TABLE "estudiante_examen" ADD CONSTRAINT "fk_ee_configuracion" FOREIGN KEY (id_configuracion_examen) REFERENCES configuracion_examen_docente(id_configuracion_examen);
+ALTER TABLE "estudiante_examen" ADD CONSTRAINT "fk_ee_curso" FOREIGN KEY (id_curso) REFERENCES curso(id_curso);
+ALTER TABLE "estudiante_examen" ADD CONSTRAINT "fk_ee_estudiante" FOREIGN KEY (sis_estudiante) REFERENCES estudiante(sis_estudiante);
+ALTER TABLE "estudiante_examen" ADD CONSTRAINT "fk_ee_examen" FOREIGN KEY (id_examen) REFERENCES examen(id_examen);
+ALTER TABLE "estudiante_examen" ADD CONSTRAINT "fk_ee_modificador" FOREIGN KEY (modificado_por) REFERENCES usuario(id_usuario);
+ALTER TABLE "estudiante_examen" ADD CONSTRAINT "estudiante_examen_pkey" PRIMARY KEY (id_estudiante_examen);
+ALTER TABLE "estudiante_examen" ADD CONSTRAINT "estudiante_examen_docente_estudiante_unique" UNIQUE (id_examen, id_configuracion_examen, sis_estudiante);
+ALTER TABLE "estudiante_examen_ambiente" ADD CONSTRAINT "fk_eea_ambiente" FOREIGN KEY (id_ambiente) REFERENCES ambiente(id_ambiente);
+ALTER TABLE "estudiante_examen_ambiente" ADD CONSTRAINT "fk_eea_ee" FOREIGN KEY (id_ee) REFERENCES estudiante_examen(id_estudiante_examen);
+ALTER TABLE "estudiante_examen_ambiente" ADD CONSTRAINT "estudiante_examen_ambiente_pkey" PRIMARY KEY (id_ee, id_ambiente);
+ALTER TABLE "examen" ADD CONSTRAINT "fk_examen_creador" FOREIGN KEY (creador) REFERENCES usuario(id_usuario);
+ALTER TABLE "examen" ADD CONSTRAINT "fk_examen_tipo" FOREIGN KEY (tipo_examen) REFERENCES tipo_examen(id_tipo_examen);
+ALTER TABLE "examen" ADD CONSTRAINT "examen_pkey" PRIMARY KEY (id_examen);
+ALTER TABLE "examen_ambiente" ADD CONSTRAINT "fk_ea_ambiente" FOREIGN KEY (id_ambiente) REFERENCES ambiente(id_ambiente);
+ALTER TABLE "examen_ambiente" ADD CONSTRAINT "fk_ea_examen" FOREIGN KEY (id_examen) REFERENCES examen(id_examen);
+ALTER TABLE "examen_ambiente" ADD CONSTRAINT "examen_ambiente_pkey" PRIMARY KEY (id_examen, id_ambiente);
+ALTER TABLE "examen_curso" ADD CONSTRAINT "fk_exc_curso" FOREIGN KEY (id_curso) REFERENCES curso(id_curso);
+ALTER TABLE "examen_curso" ADD CONSTRAINT "fk_exc_examen" FOREIGN KEY (id_examen) REFERENCES examen(id_examen);
+ALTER TABLE "examen_curso" ADD CONSTRAINT "examen_curso_pkey" PRIMARY KEY (id_examen, id_curso);
+ALTER TABLE "examen_material_permitido" ADD CONSTRAINT "fk_emp_examen" FOREIGN KEY (id_examen) REFERENCES examen(id_examen);
+ALTER TABLE "examen_material_permitido" ADD CONSTRAINT "fk_emp_material" FOREIGN KEY (id_material_permitido) REFERENCES material(id_material);
+ALTER TABLE "examen_material_permitido" ADD CONSTRAINT "examen_material_permitido_pkey" PRIMARY KEY (id_examen, id_material_permitido);
+ALTER TABLE "examen_norma" ADD CONSTRAINT "fk_en_examen" FOREIGN KEY (id_examen) REFERENCES examen(id_examen);
+ALTER TABLE "examen_norma" ADD CONSTRAINT "fk_en_norma" FOREIGN KEY (id_norma) REFERENCES norma(id_norma);
+ALTER TABLE "examen_norma" ADD CONSTRAINT "examen_norma_pkey" PRIMARY KEY (id_examen, id_norma);
+ALTER TABLE "failed_jobs" ADD CONSTRAINT "failed_jobs_pkey" PRIMARY KEY (id);
+ALTER TABLE "failed_jobs" ADD CONSTRAINT "failed_jobs_uuid_unique" UNIQUE (uuid);
+ALTER TABLE "invitacion_examen_compartido" ADD CONSTRAINT "fk_iec_docente" FOREIGN KEY (id_docente_invitado) REFERENCES usuario(id_usuario);
+ALTER TABLE "invitacion_examen_compartido" ADD CONSTRAINT "fk_iec_examen" FOREIGN KEY (id_examen) REFERENCES examen(id_examen);
+ALTER TABLE "invitacion_examen_compartido" ADD CONSTRAINT "fk_iec_invitador" FOREIGN KEY (id_docente_invitador) REFERENCES usuario(id_usuario);
+ALTER TABLE "invitacion_examen_compartido" ADD CONSTRAINT "invitacion_examen_compartido_pkey" PRIMARY KEY (id_invitacion);
+ALTER TABLE "job_batches" ADD CONSTRAINT "job_batches_pkey" PRIMARY KEY (id);
+ALTER TABLE "jobs" ADD CONSTRAINT "jobs_pkey" PRIMARY KEY (id);
+ALTER TABLE "material" ADD CONSTRAINT "material_pkey" PRIMARY KEY (id_material);
+ALTER TABLE "material_personalizado" ADD CONSTRAINT "fk_material_personalizado_examen" FOREIGN KEY (id_examen) REFERENCES examen(id_examen);
+ALTER TABLE "migrations" ADD CONSTRAINT "migrations_pkey" PRIMARY KEY (id);
+ALTER TABLE "norma" ADD CONSTRAINT "norma_pkey" PRIMARY KEY (id_norma);
+ALTER TABLE "norma_personalizada" ADD CONSTRAINT "fk_norma_personalizada_examen" FOREIGN KEY (id_examen) REFERENCES examen(id_examen);
+ALTER TABLE "notificacion_auxiliar" ADD CONSTRAINT "fk_na_ambiente" FOREIGN KEY (id_ambiente) REFERENCES ambiente(id_ambiente);
+ALTER TABLE "notificacion_auxiliar" ADD CONSTRAINT "fk_na_curso" FOREIGN KEY (id_curso) REFERENCES curso(id_curso);
+ALTER TABLE "notificacion_auxiliar" ADD CONSTRAINT "notificacion_auxiliar_pkey" PRIMARY KEY (id_notificacion);
+ALTER TABLE "notificacion_docente" ADD CONSTRAINT "fk_nd_central" FOREIGN KEY (id_central_riesgo) REFERENCES central_riesgo(id_registro);
+ALTER TABLE "notificacion_docente" ADD CONSTRAINT "fk_nd_curso" FOREIGN KEY (id_curso) REFERENCES curso(id_curso);
+ALTER TABLE "notificacion_docente" ADD CONSTRAINT "fk_nd_destinatario" FOREIGN KEY (id_docente_destinatario) REFERENCES usuario(id_usuario);
+ALTER TABLE "notificacion_docente" ADD CONSTRAINT "fk_nd_invitacion" FOREIGN KEY (id_invitacion) REFERENCES invitacion_examen_compartido(id_invitacion);
+ALTER TABLE "notificacion_docente" ADD CONSTRAINT "notificacion_docente_pkey" PRIMARY KEY (id_notificacion);
+ALTER TABLE "notificacion_docente" ADD CONSTRAINT "notificacion_invitacion_unique" UNIQUE (id_invitacion);
+ALTER TABLE "password_reset_tokens" ADD CONSTRAINT "password_reset_tokens_pkey" PRIMARY KEY (email);
+ALTER TABLE "registro_asistencia" ADD CONSTRAINT "fk_ra_estudiante" FOREIGN KEY (id_estudiante) REFERENCES estudiante(sis_estudiante);
+ALTER TABLE "registro_asistencia" ADD CONSTRAINT "fk_ra_examen" FOREIGN KEY (id_examen) REFERENCES examen(id_examen);
+ALTER TABLE "registro_asistencia" ADD CONSTRAINT "fk_ra_inscripcion" FOREIGN KEY (id_estudiante_examen) REFERENCES estudiante_examen(id_estudiante_examen);
+ALTER TABLE "registro_asistencia" ADD CONSTRAINT "fk_ra_registrador" FOREIGN KEY (id_registrador) REFERENCES usuario(id_usuario);
+ALTER TABLE "registro_asistencia" ADD CONSTRAINT "registro_asistencia_pkey" PRIMARY KEY (id_ingreso);
+ALTER TABLE "registro_asistencia" ADD CONSTRAINT "registro_asistencia_inscripcion_unique" UNIQUE (id_estudiante_examen);
+ALTER TABLE "rol" ADD CONSTRAINT "rol_pkey" PRIMARY KEY (id_rol);
+ALTER TABLE "rol_usuario" ADD CONSTRAINT "fk_ru_rol" FOREIGN KEY (id_rol) REFERENCES rol(id_rol);
+ALTER TABLE "rol_usuario" ADD CONSTRAINT "fk_ru_usuario" FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario);
+ALTER TABLE "rol_usuario" ADD CONSTRAINT "rol_usuario_pkey" PRIMARY KEY (id_usuario, id_rol);
+ALTER TABLE "sessions" ADD CONSTRAINT "sessions_pkey" PRIMARY KEY (id);
+ALTER TABLE "tipo_examen" ADD CONSTRAINT "tipo_examen_pkey" PRIMARY KEY (id_tipo_examen);
+ALTER TABLE "tipo_gestion" ADD CONSTRAINT "tipo_gestion_pkey" PRIMARY KEY (id_tipo_gestion);
+ALTER TABLE "users" ADD CONSTRAINT "users_pkey" PRIMARY KEY (id);
+ALTER TABLE "users" ADD CONSTRAINT "users_email_unique" UNIQUE (email);
+ALTER TABLE "usuario" ADD CONSTRAINT "usuario_estado_cuenta_check" CHECK (((estado_cuenta)::text = ANY ((ARRAY['pendiente'::character varying, 'habilitada'::character varying, 'rechazada'::character varying])::text[])));
+ALTER TABLE "usuario" ADD CONSTRAINT "usuario_pkey" PRIMARY KEY (id_usuario);
+ALTER TABLE "usuario" ADD CONSTRAINT "usuario_cod_sis_key" UNIQUE (cod_sis);
+ALTER TABLE "usuario" ADD CONSTRAINT "usuario_correo_unique" UNIQUE (correo);
+ALTER TABLE "validacion_registro" ADD CONSTRAINT "validacion_registro_decision_check" CHECK (((decision)::text = ANY ((ARRAY['aprobado'::character varying, 'desaprobado'::character varying])::text[])));
+ALTER TABLE "validacion_registro" ADD CONSTRAINT "validacion_registro_id_solicitante_foreign" FOREIGN KEY (id_solicitante) REFERENCES usuario(id_usuario) ON DELETE CASCADE;
+ALTER TABLE "validacion_registro" ADD CONSTRAINT "validacion_registro_id_validador_foreign" FOREIGN KEY (id_validador) REFERENCES usuario(id_usuario) ON DELETE CASCADE;
+ALTER TABLE "validacion_registro" ADD CONSTRAINT "validacion_registro_pkey" PRIMARY KEY (id_solicitante, id_validador);
+
+-- ============================================================================
+--  INDICES
+-- ============================================================================
+CREATE INDEX central_riesgo_id_curso_index ON public.central_riesgo USING btree (id_curso);
+CREATE INDEX central_riesgo_inscripcion_index ON public.central_riesgo USING btree (id_estudiante_examen);
+CREATE INDEX idx_curso_ambiente ON public.curso USING btree (id_ambiente);
+CREATE INDEX estudiante_examen_config_index ON public.estudiante_examen USING btree (id_configuracion_examen);
+CREATE INDEX estudiante_examen_curso_index ON public.estudiante_examen USING btree (id_curso);
+CREATE UNIQUE INDEX invitacion_examen_activa_unique ON public.invitacion_examen_compartido USING btree (id_examen, id_docente_invitado) WHERE (estado = ANY (ARRAY['pendiente'::invitacion_estado, 'aceptado'::invitacion_estado]));
+CREATE INDEX invitacion_examen_examen_index ON public.invitacion_examen_compartido USING btree (id_examen);
+CREATE INDEX invitacion_examen_invitado_index ON public.invitacion_examen_compartido USING btree (id_docente_invitado);
+CREATE INDEX invitacion_examen_invitador_index ON public.invitacion_examen_compartido USING btree (id_docente_invitador);
 CREATE INDEX jobs_queue_index ON public.jobs USING btree (queue);
-
-
---
--- Name: sessions_last_activity_index; Type: INDEX; Schema: public; Owner: -
---
-
+CREATE INDEX material_personalizado_id_examen_index ON public.material_personalizado USING btree (id_examen);
+CREATE INDEX norma_personalizada_id_examen_index ON public.norma_personalizada USING btree (id_examen);
+CREATE INDEX notificacion_destinatario_index ON public.notificacion_docente USING btree (id_docente_destinatario);
+CREATE INDEX registro_asistencia_inscripcion_index ON public.registro_asistencia USING btree (id_estudiante_examen);
 CREATE INDEX sessions_last_activity_index ON public.sessions USING btree (last_activity);
-
-
---
--- Name: sessions_user_id_index; Type: INDEX; Schema: public; Owner: -
---
-
 CREATE INDEX sessions_user_id_index ON public.sessions USING btree (user_id);
-
-
---
--- Name: auxiliar_curso fk_ac_auxiliar; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.auxiliar_curso
-    ADD CONSTRAINT fk_ac_auxiliar FOREIGN KEY (id_auxiliar) REFERENCES public.usuario(id_usuario);
-
-
---
--- Name: auxiliar_curso fk_ac_curso; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.auxiliar_curso
-    ADD CONSTRAINT fk_ac_curso FOREIGN KEY (id_curso) REFERENCES public.curso(id_curso);
-
-
---
--- Name: central_riesgo fk_cr_ingreso; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.central_riesgo
-    ADD CONSTRAINT fk_cr_ingreso FOREIGN KEY (id_ingreso) REFERENCES public.registro_asistencia(id_ingreso);
-
-
---
--- Name: central_riesgo fk_cr_registrador; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.central_riesgo
-    ADD CONSTRAINT fk_cr_registrador FOREIGN KEY (id_registrador) REFERENCES public.usuario(id_usuario);
-
-
---
--- Name: curso_tipo_gestion fk_ctg_curso; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.curso_tipo_gestion
-    ADD CONSTRAINT fk_ctg_curso FOREIGN KEY (id_curso) REFERENCES public.curso(id_curso);
-
-
---
--- Name: curso_tipo_gestion fk_ctg_tg; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.curso_tipo_gestion
-    ADD CONSTRAINT fk_ctg_tg FOREIGN KEY (id_tg) REFERENCES public.tipo_gestion(id_tipo_gestion);
-
-
---
--- Name: curso fk_curso_docente; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.curso
-    ADD CONSTRAINT fk_curso_docente FOREIGN KEY (sis_doc) REFERENCES public.usuario(id_usuario);
-
-
---
--- Name: examen_ambiente fk_ea_ambiente; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.examen_ambiente
-    ADD CONSTRAINT fk_ea_ambiente FOREIGN KEY (id_ambiente) REFERENCES public.ambiente(id_ambiente);
-
-
---
--- Name: examen_ambiente fk_ea_examen; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.examen_ambiente
-    ADD CONSTRAINT fk_ea_examen FOREIGN KEY (id_examen) REFERENCES public.examen(id_examen);
-
-
---
--- Name: estudiante_curso fk_ec_curso; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.estudiante_curso
-    ADD CONSTRAINT fk_ec_curso FOREIGN KEY (id_curso) REFERENCES public.curso(id_curso);
-
-
---
--- Name: estudiante_curso fk_ec_estudiante; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.estudiante_curso
-    ADD CONSTRAINT fk_ec_estudiante FOREIGN KEY (sis_estudiante) REFERENCES public.estudiante(sis_estudiante);
-
-
---
--- Name: estudiante_examen fk_ee_estudiante; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.estudiante_examen
-    ADD CONSTRAINT fk_ee_estudiante FOREIGN KEY (sis_estudiante) REFERENCES public.estudiante(sis_estudiante);
-
-
---
--- Name: estudiante_examen fk_ee_examen; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.estudiante_examen
-    ADD CONSTRAINT fk_ee_examen FOREIGN KEY (id_examen) REFERENCES public.examen(id_examen);
-
-
---
--- Name: estudiante_examen fk_ee_modificador; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.estudiante_examen
-    ADD CONSTRAINT fk_ee_modificador FOREIGN KEY (modificado_por) REFERENCES public.usuario(id_usuario);
-
-
---
--- Name: estudiante_examen_ambiente fk_eea_ambiente; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.estudiante_examen_ambiente
-    ADD CONSTRAINT fk_eea_ambiente FOREIGN KEY (id_ambiente) REFERENCES public.ambiente(id_ambiente);
-
-
---
--- Name: estudiante_examen_ambiente fk_eea_ee; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.estudiante_examen_ambiente
-    ADD CONSTRAINT fk_eea_ee FOREIGN KEY (id_ee) REFERENCES public.estudiante_examen(id_estudiante_examen);
-
-
---
--- Name: examen_material_permitido fk_emp_examen; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.examen_material_permitido
-    ADD CONSTRAINT fk_emp_examen FOREIGN KEY (id_examen) REFERENCES public.examen(id_examen);
-
-
---
--- Name: examen_material_permitido fk_emp_material; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.examen_material_permitido
-    ADD CONSTRAINT fk_emp_material FOREIGN KEY (id_material_permitido) REFERENCES public.material(id_material);
-
-
---
--- Name: examen_norma fk_en_examen; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.examen_norma
-    ADD CONSTRAINT fk_en_examen FOREIGN KEY (id_examen) REFERENCES public.examen(id_examen);
-
-
---
--- Name: examen_norma fk_en_norma; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.examen_norma
-    ADD CONSTRAINT fk_en_norma FOREIGN KEY (id_norma) REFERENCES public.norma(id_norma);
-
-
---
--- Name: examen fk_examen_creador; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.examen
-    ADD CONSTRAINT fk_examen_creador FOREIGN KEY (creador) REFERENCES public.usuario(id_usuario);
-
-
---
--- Name: examen fk_examen_tipo; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.examen
-    ADD CONSTRAINT fk_examen_tipo FOREIGN KEY (tipo_examen) REFERENCES public.tipo_examen(id_tipo_examen);
-
-
---
--- Name: examen_curso fk_exc_curso; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.examen_curso
-    ADD CONSTRAINT fk_exc_curso FOREIGN KEY (id_curso) REFERENCES public.curso(id_curso);
-
-
---
--- Name: examen_curso fk_exc_examen; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.examen_curso
-    ADD CONSTRAINT fk_exc_examen FOREIGN KEY (id_examen) REFERENCES public.examen(id_examen);
-
-
---
--- Name: invitacion_examen_compartido fk_iec_docente; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.invitacion_examen_compartido
-    ADD CONSTRAINT fk_iec_docente FOREIGN KEY (id_docente_invitado) REFERENCES public.usuario(id_usuario);
-
-
---
--- Name: invitacion_examen_compartido fk_iec_examen; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.invitacion_examen_compartido
-    ADD CONSTRAINT fk_iec_examen FOREIGN KEY (id_examen) REFERENCES public.examen(id_examen);
-
-
---
--- Name: notificacion_auxiliar fk_na_ambiente; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.notificacion_auxiliar
-    ADD CONSTRAINT fk_na_ambiente FOREIGN KEY (id_ambiente) REFERENCES public.ambiente(id_ambiente);
-
-
---
--- Name: notificacion_auxiliar fk_na_curso; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.notificacion_auxiliar
-    ADD CONSTRAINT fk_na_curso FOREIGN KEY (id_curso) REFERENCES public.curso(id_curso);
-
-
---
--- Name: notificacion_docente fk_nd_central; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.notificacion_docente
-    ADD CONSTRAINT fk_nd_central FOREIGN KEY (id_central_riesgo) REFERENCES public.central_riesgo(id_registro);
-
-
---
--- Name: notificacion_docente fk_nd_curso; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.notificacion_docente
-    ADD CONSTRAINT fk_nd_curso FOREIGN KEY (id_curso) REFERENCES public.curso(id_curso);
-
-
---
--- Name: registro_asistencia fk_ra_estudiante; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.registro_asistencia
-    ADD CONSTRAINT fk_ra_estudiante FOREIGN KEY (id_estudiante) REFERENCES public.estudiante(sis_estudiante);
-
-
---
--- Name: registro_asistencia fk_ra_examen; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.registro_asistencia
-    ADD CONSTRAINT fk_ra_examen FOREIGN KEY (id_examen) REFERENCES public.examen(id_examen);
-
-
---
--- Name: registro_asistencia fk_ra_registrador; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.registro_asistencia
-    ADD CONSTRAINT fk_ra_registrador FOREIGN KEY (id_registrador) REFERENCES public.usuario(id_usuario);
-
-
---
--- Name: rol_usuario fk_ru_rol; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.rol_usuario
-    ADD CONSTRAINT fk_ru_rol FOREIGN KEY (id_rol) REFERENCES public.rol(id_rol);
-
-
---
--- Name: rol_usuario fk_ru_usuario; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.rol_usuario
-    ADD CONSTRAINT fk_ru_usuario FOREIGN KEY (id_usuario) REFERENCES public.usuario(id_usuario);
-
-
---
--- PostgreSQL database dump complete
---
-
+CREATE UNIQUE INDEX usuario_nombre_usuario_unique ON public.usuario USING btree (lower(btrim((nombre_usuario)::text)));
+
+-- ============================================================================
+--  DATOS
+-- ============================================================================
+SET session_replication_role = replica;
+
+-- ambiente: 5 filas
+INSERT INTO "ambiente" ("id_ambiente", "nombre_ambiente") VALUES (3, 'Laboratorio 1');
+INSERT INTO "ambiente" ("id_ambiente", "nombre_ambiente") VALUES (4, 'Laboratorio 2');
+INSERT INTO "ambiente" ("id_ambiente", "nombre_ambiente") VALUES (1, 'Aula 623');
+INSERT INTO "ambiente" ("id_ambiente", "nombre_ambiente") VALUES (2, 'Aula 692A');
+INSERT INTO "ambiente" ("id_ambiente", "nombre_ambiente") VALUES (5, 'Aula 690B');
+
+-- auxiliar_curso: 9 filas
+INSERT INTO "auxiliar_curso" ("id_auxiliar", "id_curso", "estado") VALUES (3, 1, 'Activo');
+INSERT INTO "auxiliar_curso" ("id_auxiliar", "id_curso", "estado") VALUES (4, 2, 'Activo');
+INSERT INTO "auxiliar_curso" ("id_auxiliar", "id_curso", "estado") VALUES (3, 3, 'Activo');
+INSERT INTO "auxiliar_curso" ("id_auxiliar", "id_curso", "estado") VALUES (4, 4, 'Baja');
+INSERT INTO "auxiliar_curso" ("id_auxiliar", "id_curso", "estado") VALUES (3, 5, 'Activo');
+INSERT INTO "auxiliar_curso" ("id_auxiliar", "id_curso", "estado") VALUES (9, 4, 'Activo');
+INSERT INTO "auxiliar_curso" ("id_auxiliar", "id_curso", "estado") VALUES (10, 3, 'Activo');
+INSERT INTO "auxiliar_curso" ("id_auxiliar", "id_curso", "estado") VALUES (14, 14, 'Activo');
+INSERT INTO "auxiliar_curso" ("id_auxiliar", "id_curso", "estado") VALUES (16, 1, 'Activo');
+
+-- cache: 30 filas
+INSERT INTO "cache" ("key", "value", "expiration") VALUES ('5c785c036466adea360111aa28563bfd556b5fba:timer', 'i:1794273997;', 1794273998);
+INSERT INTO "cache" ("key", "value", "expiration") VALUES ('monitoreo.informe.37.docente.1', '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b1N0cmluZyI7YjowO31zOjI0OiJtYXRlcmlhbGVzUGVyc29uYWxpemFkb3MiO086Mzk6IklsbHVtaW5hdGVcRGF0YWJhc2VcRWxvcXVlbnRcQ29sbGVjdGlvbiI6Mjp7czo4OiIAKgBpdGVtcyI7YTowOnt9czoyODoiACoAZXNjYXBlV2hlbkNhc3RpbmdUb1N0cmluZyI7YjowO31zOjIwOiJub3JtYXNQZXJzb25hbGl6YWRhcyI7TzozOToiSWxsdW1pbmF0ZVxEYXRhYmFzZVxFbG9xdWVudFxDb2xsZWN0aW9uIjoyOntzOjg6IgAqAGl0ZW1zIjthOjA6e31zOjI4OiIAKgBlc2NhcGVXaGVuQ2FzdGluZ1RvU3RyaW5nIjtiOjA7fXM6MTA6InRpcG9FeGFtZW4iO086MjE6IkFwcFxNb2RlbHNcVGlwb0V4YW1lbiI6MzA6e3M6MTM6IgAqAGNvbm5lY3Rpb24iO3M6NToicGdzcWwiO3M6ODoiACoAdGFibGUiO3M6MTE6InRpcG9fZXhhbWVuIjtzOjEzOiIAKgBwcmltYXJ5S2V5IjtzOjE0OiJpZF90aXBvX2V4YW1lbiI7czoxMDoiACoAa2V5VHlwZSI7czozOiJpbnQiO3M6MTI6ImluY3JlbWVudGluZyI7YjowO3M6NzoiACoAd2l0aCI7YTowOnt9czoxMjoiACoAd2l0aENvdW50IjthOjA6e31zOjE5OiJwcmV2ZW50c0xhenlMb2FkaW5nIjtiOjA7czoxMDoiACoAcGVyUGFnZSI7aToxNTtzOjY6ImV4aXN0cyI7YjoxO3M6MTg6Indhc1JlY2VudGx5Q3JlYXRlZCI7YjowO3M6Mjg6IgAqAGVzY2FwZVdoZW5DYXN0aW5nVG9TdHJpbmciO2I6MDtzOjEzOiIAKgBhdHRyaWJ1dGVzIjthOjI6e3M6MTQ6ImlkX3RpcG9fZXhhbWVuIjtpOjE7czoxODoibm9tYnJlX3RpcG9fZXhhbWVuIjtzOjE0OiJleGFtZW4gcGFyY2lhbCI7fXM6MTE6IgAqAG9yaWdpbmFsIjthOjI6e3M6MTQ6ImlkX3RpcG9fZXhhbWVuIjtpOjE7czoxODoibm9tYnJlX3RpcG9fZXhhbWVuIjtzOjE0OiJleGFtZW4gcGFyY2lhbCI7fXM6MTA6IgAqAGNoYW5nZXMiO2E6MDp7fXM6ODoiACoAY2FzdHMiO2E6MDp7fXM6MTc6IgAqAGNsYXNzQ2FzdENhY2hlIjthOjA6e31zOjIxOiIAKgBhdHRyaWJ1dGVDYXN0Q2FjaGUiO2E6MDp7fXM6MTM6IgAqAGRhdGVGb3JtYXQiO047czoxMDoiACoAYXBwZW5kcyI7YTowOnt9czoxOToiACoAZGlzcGF0Y2hlc0V2ZW50cyI7YTowOnt9czoxNDoiACoAb2JzZXJ2YWJsZXMiO2E6MDp7fXM6MTI6IgAqAHJlbGF0aW9ucyI7YTowOnt9czoxMDoiACoAdG91Y2hlcyI7YTowOnt9czoxMDoidGltZXN0YW1wcyI7YjowO3M6MTM6InVzZXNVbmlxdWVJZHMiO2I6MDtzOjk6IgAqAGhpZGRlbiI7YTowOnt9czoxMDoiACoAdmlzaWJsZSI7YTowOnt9czoxMToiACoAZmlsbGFibGUiO2E6Mjp7aTowO3M6MTQ6ImlkX3RpcG9fZXhhbWVuIjtpOjE7czoxODoibm9tYnJlX3RpcG9fZXhhbWVuIjt9czoxMDoiACoAZ3VhcmRlZCI7YToxOntpOjA7czoxOiIqIjt9fX1zOjEwOiIAKgB0b3VjaGVzIjthOjA6e31zOjEwOiJ0aW1lc3RhbXBzIjtiOjA7czoxMzoidXNlc1VuaXF1ZUlkcyI7YjowO3M6OToiACoAaGlkZGVuIjthOjA6e31zOjEwOiIAKgB2aXNpYmxlIjthOjA6e31zOjExOiIAKgBmaWxsYWJsZSI7YTo3OntpOjA7czo5OiJpZF9leGFtZW4iO2k6MTtzOjEzOiJub21icmVfZXhhbWVuIjtpOjI7czo1OiJmZWNoYSI7aTozO3M6MTE6ImhvcmFfaW5pY2lvIjtpOjQ7czo4OiJkdXJhY2lvbiI7aTo1O3M6NzoiY3JlYWRvciI7aTo2O3M6MTE6InRpcG9fZXhhbWVuIjt9czoxMDoiACoAZ3VhcmRlZCI7YToxOntpOjA7czoxOiIqIjt9fXM6MTE6ImVzdHVkaWFudGVzIjtPOjI5OiJJbGx1bWluYXRlXFN1cHBvcnRcQ29sbGVjdGlvbiI6Mjp7czo4OiIAKgBpdGVtcyI7YTo1MDp7aTowO2E6MTE6e3M6Mzoic2lzIjtzOjk6IjIwMjAwMjEwNyI7czoxNDoiaWRfaW5zY3JpcGNpb24iO2k6ODU2O3M6Njoibm9tYnJlIjtzOjc6IkVybmVzdG8iO3M6ODoiYXBlbGxpZG8iO3M6NDoiVmVyYSI7czo0OiJhdWxhIjtzOjEzOiJMYWJvcmF0b3JpbyAxIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aToxO2E6MTE6e3M6Mzoic2lzIjtzOjg6IjIwMjEwMDAzIjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo4NTc7czo2OiJub21icmUiO3M6NToiTWFyaWEiO3M6ODoiYXBlbGxpZG8iO3M6NToiTG9wZXoiO3M6NDoiYXVsYSI7czoxMzoiTGFib3JhdG9yaW8gMSI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6MjthOjExOntzOjM6InNpcyI7czo5OiIyMDIxMDEwMjIiO3M6MTQ6ImlkX2luc2NyaXBjaW9uIjtpOjg1ODtzOjY6Im5vbWJyZSI7czo1OiJCcnVubyI7czo4OiJhcGVsbGlkbyI7czo1OiJEw61heiI7czo0OiJhdWxhIjtzOjEzOiJMYWJvcmF0b3JpbyAxIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aTozO2E6MTE6e3M6Mzoic2lzIjtzOjk6IjIwMjEwMTA3OCI7czoxNDoiaWRfaW5zY3JpcGNpb24iO2k6ODU5O3M6Njoibm9tYnJlIjtzOjc6IkdhYnJpZWwiO3M6ODoiYXBlbGxpZG8iO3M6NjoiTWFtYW5pIjtzOjQ6ImF1bGEiO3M6MTM6IkxhYm9yYXRvcmlvIDEiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjQ7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMTAxMDkwIjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo4NjA7czo2OiJub21icmUiO3M6NToiSXbDoW4iO3M6ODoiYXBlbGxpZG8iO3M6NjoiRmxvcmVzIjtzOjQ6ImF1bGEiO3M6MTM6IkxhYm9yYXRvcmlvIDEiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjU7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMTAxMTEyIjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo4NjE7czo2OiJub21icmUiO3M6NToiS2V2aW4iO3M6ODoiYXBlbGxpZG8iO3M6NjoiTMOzcGV6IjtzOjQ6ImF1bGEiO3M6MTM6IkxhYm9yYXRvcmlvIDEiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjY7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMTAxMTM0IjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo4NjI7czo2OiJub21icmUiO3M6NjoiTWlndWVsIjtzOjg6ImFwZWxsaWRvIjtzOjQ6IlNvdG8iO3M6NDoiYXVsYSI7czoxMzoiTGFib3JhdG9yaW8gMSI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6NzthOjExOntzOjM6InNpcyI7czo5OiIyMDIxMDExNTYiO3M6MTQ6ImlkX2luc2NyaXBjaW9uIjtpOjg2MztzOjY6Im5vbWJyZSI7czo2OiLDk3NjYXIiO3M6ODoiYXBlbGxpZG8iO3M6NjoiUXVpc3BlIjtzOjQ6ImF1bGEiO3M6MTM6IkxhYm9yYXRvcmlvIDEiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjg7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMTAxMTc4IjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo4NjQ7czo2OiJub21icmUiO3M6NToiUmHDumwiO3M6ODoiYXBlbGxpZG8iO3M6NjoiQ2hvcXVlIjtzOjQ6ImF1bGEiO3M6MTM6IkxhYm9yYXRvcmlvIDEiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjk7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMTAxMTkwIjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo4NjU7czo2OiJub21icmUiO3M6NjoiVG9tw6FzIjtzOjg6ImFwZWxsaWRvIjtzOjc6IkdhcmPDrWEiO3M6NDoiYXVsYSI7czoxMzoiTGFib3JhdG9yaW8gMSI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6MTA7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMTAxMjIzIjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo4NjY7czo2OiJub21icmUiO3M6NjoiWGF2aWVyIjtzOjg6ImFwZWxsaWRvIjtzOjY6IlZhcmdhcyI7czo0OiJhdWxhIjtzOjEzOiJMYWJvcmF0b3JpbyAxIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aToxMTthOjExOntzOjM6InNpcyI7czo5OiIyMDIxMDEyNDUiO3M6MTQ6ImlkX2luc2NyaXBjaW9uIjtpOjg2NztzOjY6Im5vbWJyZSI7czozOiJab2UiO3M6ODoiYXBlbGxpZG8iO3M6NToiU2lsZXMiO3M6NDoiYXVsYSI7czoxMzoiTGFib3JhdG9yaW8gMSI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6MTI7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMTAxMjY3IjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo4Njg7czo2OiJub21icmUiO3M6NjoiQmlhbmNhIjtzOjg6ImFwZWxsaWRvIjtzOjc6IlBhcmVkZXMiO3M6NDoiYXVsYSI7czoxMzoiTGFib3JhdG9yaW8gMSI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6MTM7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMTAxMjg5IjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo4Njk7czo2OiJub21icmUiO3M6NzoiRGFuaWVsYSI7czo4OiJhcGVsbGlkbyI7czo3OiJDYWJyZXJhIjtzOjQ6ImF1bGEiO3M6MTM6IkxhYm9yYXRvcmlvIDEiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjE0O2E6MTE6e3M6Mzoic2lzIjtzOjk6IjIwMjEwMTMwMSI7czoxNDoiaWRfaW5zY3JpcGNpb24iO2k6ODcwO3M6Njoibm9tYnJlIjtzOjg6IkZlcm5hbmRhIjtzOjg6ImFwZWxsaWRvIjtzOjQ6IlZlZ2EiO3M6NDoiYXVsYSI7czoxMzoiTGFib3JhdG9yaW8gMSI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6MTU7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMTAxMzIzIjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo4NzE7czo2OiJub21icmUiO3M6NDoiSHVnbyI7czo4OiJhcGVsbGlkbyI7czo3OiJDYW1hY2hvIjtzOjQ6ImF1bGEiO3M6MTM6IkxhYm9yYXRvcmlvIDEiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjE2O2E6MTE6e3M6Mzoic2lzIjtzOjk6IjIwMjEwMTM0NSI7czoxNDoiaWRfaW5zY3JpcGNpb24iO2k6ODcyO3M6Njoibm9tYnJlIjtzOjY6IkphdmllciI7czo4OiJhcGVsbGlkbyI7czo4OiJFc3Bpbm96YSI7czo0OiJhdWxhIjtzOjEzOiJMYWJvcmF0b3JpbyAxIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aToxNzthOjExOntzOjM6InNpcyI7czo5OiIyMDIxMDEzNjciO3M6MTQ6ImlkX2luc2NyaXBjaW9uIjtpOjg3MztzOjY6Im5vbWJyZSI7czo0OiJMdWlzIjtzOjg6ImFwZWxsaWRvIjtzOjEwOiJHdXRpw6lycmV6IjtzOjQ6ImF1bGEiO3M6MTM6IkxhYm9yYXRvcmlvIDEiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjE4O2E6MTE6e3M6Mzoic2lzIjtzOjk6IjIwMjEwMTM4OSI7czoxNDoiaWRfaW5zY3JpcGNpb24iO2k6ODc0O3M6Njoibm9tYnJlIjtzOjg6Ik5pY29sw6FzIjtzOjg6ImFwZWxsaWRvIjtzOjc6IklyaWFydGUiO3M6NDoiYXVsYSI7czoxMzoiTGFib3JhdG9yaW8gMSI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6MTk7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMTAxNDAxIjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo4NzU7czo2OiJub21icmUiO3M6NToiUGFibG8iO3M6ODoiYXBlbGxpZG8iO3M6ODoiS293YWxza2kiO3M6NDoiYXVsYSI7czoxMzoiTGFib3JhdG9yaW8gMSI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6MjA7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMTAxNDIzIjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo4NzY7czo2OiJub21icmUiO3M6NjoiU2VyZ2lvIjtzOjg6ImFwZWxsaWRvIjtzOjc6Ik1lbmRvemEiO3M6NDoiYXVsYSI7czoxMzoiTGFib3JhdG9yaW8gMSI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6MjE7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMTAxNDQ1IjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo4Nzc7czo2OiJub21icmUiO3M6NjoiVWxpc2VzIjtzOjg6ImFwZWxsaWRvIjtzOjg6Ik9yZWxsYW5hIjtzOjQ6ImF1bGEiO3M6MTM6IkxhYm9yYXRvcmlvIDEiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjIyO2E6MTE6e3M6Mzoic2lzIjtzOjk6IjIwMjEwMTQ2NyI7czoxNDoiaWRfaW5zY3JpcGNpb24iO2k6ODc4O3M6Njoibm9tYnJlIjtzOjY6IldhbHRlciI7czo4OiJhcGVsbGlkbyI7czo3OiJRdWlyb2dhIjtzOjQ6ImF1bGEiO3M6MTM6IkxhYm9yYXRvcmlvIDEiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjIzO2E6MTE6e3M6Mzoic2lzIjtzOjk6IjIwMjEwMTQ4OSI7czoxNDoiaWRfaW5zY3JpcGNpb24iO2k6ODc5O3M6Njoibm9tYnJlIjtzOjU6IllhbWlsIjtzOjg6ImFwZWxsaWRvIjtzOjg6IlPDoW5jaGV6IjtzOjQ6ImF1bGEiO3M6MTM6IkxhYm9yYXRvcmlvIDEiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjI0O2E6MTE6e3M6Mzoic2lzIjtzOjk6IjIwMjIwMTAxMyI7czoxNDoiaWRfaW5zY3JpcGNpb24iO2k6ODgwO3M6Njoibm9tYnJlIjtzOjM6IkFuYSI7czo4OiJhcGVsbGlkbyI7czo2OiJMw7NwZXoiO3M6NDoiYXVsYSI7czoxMzoiTGFib3JhdG9yaW8gMSI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6MjU7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMjAxMDMxIjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo4ODE7czo2OiJub21icmUiO3M6NToiQ2FybGEiO3M6ODoiYXBlbGxpZG8iO3M6NDoiUnVpeiI7czo0OiJhdWxhIjtzOjEzOiJMYWJvcmF0b3JpbyAxIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aToyNjthOjExOntzOjM6InNpcyI7czo5OiIyMDIyMDEwNTYiO3M6MTQ6ImlkX2luc2NyaXBjaW9uIjtpOjg4MjtzOjY6Im5vbWJyZSI7czo3OiJGw6F0aW1hIjtzOjg6ImFwZWxsaWRvIjtzOjY6IlF1aXNwZSI7czo0OiJhdWxhIjtzOjEzOiJMYWJvcmF0b3JpbyAxIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aToyNzthOjExOntzOjM6InNpcyI7czo5OiIyMDIyMDEwODkiO3M6MTQ6ImlkX2luc2NyaXBjaW9uIjtpOjg4MztzOjY6Im5vbWJyZSI7czo2OiJIZWxlbmEiO3M6ODoiYXBlbGxpZG8iO3M6NjoiQ2hvcXVlIjtzOjQ6ImF1bGEiO3M6MTM6IkxhYm9yYXRvcmlvIDEiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjI4O2E6MTE6e3M6Mzoic2lzIjtzOjk6IjIwMjIwMTEwMSI7czoxNDoiaWRfaW5zY3JpcGNpb24iO2k6ODg0O3M6Njoibm9tYnJlIjtzOjU6Ikp1bGlhIjtzOjg6ImFwZWxsaWRvIjtzOjc6IkdhcmPDrWEiO3M6NDoiYXVsYSI7czoxMzoiTGFib3JhdG9yaW8gMSI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6Mjk7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMjAxMTIzIjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo4ODU7czo2OiJub21icmUiO3M6NToiTGF1cmEiO3M6ODoiYXBlbGxpZG8iO3M6NToiRMOtYXoiO3M6NDoiYXVsYSI7czoxMzoiTGFib3JhdG9yaW8gMSI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6MzA7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMjAxMTQ1IjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo4ODY7czo2OiJub21icmUiO3M6NToiTmFkaWEiO3M6ODoiYXBlbGxpZG8iO3M6NDoiVmVyYSI7czo0OiJhdWxhIjtzOjEzOiJMYWJvcmF0b3JpbyAxIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aTozMTthOjExOntzOjM6InNpcyI7czo5OiIyMDIyMDExNjciO3M6MTQ6ImlkX2luc2NyaXBjaW9uIjtpOjg4NztzOjY6Im5vbWJyZSI7czo4OiJQYXRyaWNpYSI7czo4OiJhcGVsbGlkbyI7czo2OiJNYW1hbmkiO3M6NDoiYXVsYSI7czoxMzoiTGFib3JhdG9yaW8gMSI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6MzI7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMjAxMTg5IjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo4ODg7czo2OiJub21icmUiO3M6NjoiU29mw61hIjtzOjg6ImFwZWxsaWRvIjtzOjY6IkZsb3JlcyI7czo0OiJhdWxhIjtzOjEzOiJMYWJvcmF0b3JpbyAxIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aTozMzthOjExOntzOjM6InNpcyI7czo5OiIyMDIyMDEyMDEiO3M6MTQ6ImlkX2luc2NyaXBjaW9uIjtpOjg4OTtzOjY6Im5vbWJyZSI7czo3OiJWYWxlcmlhIjtzOjg6ImFwZWxsaWRvIjtzOjY6IkzDs3BleiI7czo0OiJhdWxhIjtzOjEzOiJMYWJvcmF0b3JpbyAxIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aTozNDthOjExOntzOjM6InNpcyI7czo5OiIyMDIyMDEyMTIiO3M6MTQ6ImlkX2luc2NyaXBjaW9uIjtpOjg5MDtzOjY6Im5vbWJyZSI7czo1OiJXZW5keSI7czo4OiJhcGVsbGlkbyI7czo2OiJaYXBhdGEiO3M6NDoiYXVsYSI7czoxMzoiTGFib3JhdG9yaW8gMSI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6MzU7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMjAxMjM0IjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo4OTE7czo2OiJub21icmUiO3M6NzoiWW9sYW5kYSI7czo4OiJhcGVsbGlkbyI7czo2OiJUaWNvbmEiO3M6NDoiYXVsYSI7czoxMzoiTGFib3JhdG9yaW8gMSI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6MzY7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMjAxMjU2IjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo4OTI7czo2OiJub21icmUiO3M6NzoiQW5kcsOpcyI7czo4OiJhcGVsbGlkbyI7czo1OiJSb2phcyI7czo0OiJhdWxhIjtzOjEzOiJMYWJvcmF0b3JpbyAxIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aTozNzthOjExOntzOjM6InNpcyI7czo5OiIyMDIyMDEyNzgiO3M6MTQ6ImlkX2luc2NyaXBjaW9uIjtpOjg5MztzOjY6Im5vbWJyZSI7czo4OiJDcmlzdGlhbiI7czo4OiJhcGVsbGlkbyI7czo2OiJNb2xpbmEiO3M6NDoiYXVsYSI7czoxMzoiTGFib3JhdG9yaW8gMSI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6Mzg7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMjAxMjkwIjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo4OTQ7czo2OiJub21icmUiO3M6NzoiRWR1YXJkbyI7czo4OiJhcGVsbGlkbyI7czo3OiJTYWxhemFyIjtzOjQ6ImF1bGEiO3M6MTM6IkxhYm9yYXRvcmlvIDEiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjM5O2E6MTE6e3M6Mzoic2lzIjtzOjk6IjIwMjIwMTMxMiI7czoxNDoiaWRfaW5zY3JpcGNpb24iO2k6ODk1O3M6Njoibm9tYnJlIjtzOjc6IkdvbnphbG8iO3M6ODoiYXBlbGxpZG8iO3M6NDoiQXJjZSI7czo0OiJhdWxhIjtzOjEzOiJMYWJvcmF0b3JpbyAxIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aTo0MDthOjExOntzOjM6InNpcyI7czo5OiIyMDIyMDEzMzQiO3M6MTQ6ImlkX2luc2NyaXBjaW9uIjtpOjg5NjtzOjY6Im5vbWJyZSI7czo1OiJJbsOpcyI7czo4OiJhcGVsbGlkbyI7czo3OiJEZWxnYWRvIjtzOjQ6ImF1bGEiO3M6MTM6IkxhYm9yYXRvcmlvIDEiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjQxO2E6MTE6e3M6Mzoic2lzIjtzOjk6IjIwMjIwMTM1NiI7czoxNDoiaWRfaW5zY3JpcGNpb24iO2k6ODk3O3M6Njoibm9tYnJlIjtzOjU6IkthcmVuIjtzOjg6ImFwZWxsaWRvIjtzOjc6IkZ1ZW50ZXMiO3M6NDoiYXVsYSI7czoxMzoiTGFib3JhdG9yaW8gMSI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6NDI7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMjAxMzc4IjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo4OTg7czo2OiJub21icmUiO3M6NjoiTWFyw61hIjtzOjg6ImFwZWxsaWRvIjtzOjc6IkhlcnJlcmEiO3M6NDoiYXVsYSI7czoxMzoiTGFib3JhdG9yaW8gMSI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6NDM7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMjAxMzkwIjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo4OTk7czo2OiJub21icmUiO3M6NDoiT2xnYSI7czo4OiJhcGVsbGlkbyI7czo4OiJKaW3DqW5leiI7czo0OiJhdWxhIjtzOjEzOiJMYWJvcmF0b3JpbyAxIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aTo0NDthOjExOntzOjM6InNpcyI7czo5OiIyMDIyMDE0MTIiO3M6MTQ6ImlkX2luc2NyaXBjaW9uIjtpOjkwMDtzOjY6Im5vbWJyZSI7czo0OiJSb3NhIjtzOjg6ImFwZWxsaWRvIjtzOjQ6Ikx1bmEiO3M6NDoiYXVsYSI7czoxMzoiTGFib3JhdG9yaW8gMSI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6NDU7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMjAxNDM0IjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo5MDE7czo2OiJub21icmUiO3M6NzoiVGF0aWFuYSI7czo4OiJhcGVsbGlkbyI7czo3OiJOw7rDsWV6IjtzOjQ6ImF1bGEiO3M6MTM6IkxhYm9yYXRvcmlvIDEiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjQ2O2E6MTE6e3M6Mzoic2lzIjtzOjk6IjIwMjIwMTQ1NiI7czoxNDoiaWRfaW5zY3JpcGNpb24iO2k6OTAyO3M6Njoibm9tYnJlIjtzOjk6IlZlcsOzbmljYSI7czo4OiJhcGVsbGlkbyI7czozOiJQYXoiO3M6NDoiYXVsYSI7czoxMzoiTGFib3JhdG9yaW8gMSI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6NDc7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMjAxNDc4IjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo5MDM7czo2OiJub21icmUiO3M6NjoiWGltZW5hIjtzOjg6ImFwZWxsaWRvIjtzOjg6IlJhbcOtcmV6IjtzOjQ6ImF1bGEiO3M6MTM6IkxhYm9yYXRvcmlvIDEiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjQ4O2E6MTE6e3M6Mzoic2lzIjtzOjk6IjIwMjIwMTQ5MCI7czoxNDoiaWRfaW5zY3JpcGNpb24iO2k6OTA0O3M6Njoibm9tYnJlIjtzOjU6IlphaXJhIjtzOjg6ImFwZWxsaWRvIjtzOjY6IlRvbGVkbyI7czo0OiJhdWxhIjtzOjEzOiJMYWJvcmF0b3JpbyAxIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aTo0OTthOjExOntzOjM6InNpcyI7czo5OiIyMDIyMDIwNDUiO3M6MTQ6ImlkX2luc2NyaXBjaW9uIjtpOjkwNTtzOjY6Im5vbWJyZSI7czo1OiJEaWVnbyI7czo4OiJhcGVsbGlkbyI7czo0OiJTb3RvIjtzOjQ6ImF1bGEiO3M6MTM6IkxhYm9yYXRvcmlvIDEiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO319czoyODoiACoAZXNjYXBlV2hlbkNhc3RpbmdUb1N0cmluZyI7YjowO319', 1794278874);
+INSERT INTO "cache" ("key", "value", "expiration") VALUES ('5c785c036466adea360111aa28563bfd556b5fba', 'i:4;', 1794273999);
+INSERT INTO "cache" ("key", "value", "expiration") VALUES ('central-riesgo:lista:v1:15:toda-la-institucion::0', 'TzoyOToiSWxsdW1pbmF0ZVxTdXBwb3J0XENvbGxlY3Rpb24iOjI6e3M6ODoiACoAaXRlbXMiO2E6MjE6e2k6MDthOjEzOntzOjI6ImlkIjtpOjMyO3M6MTE6ImlkX3JlZ2lzdHJvIjtpOjMyO3M6Njoibm9tYnJlIjtzOjc6IkRhbmllbGEiO3M6ODoiYXBlbGxpZG8iO3M6NzoiQ2FicmVyYSI7czoxMDoidmVyaWZpY2FkbyI7YjoxO3M6Mzoic2lzIjtzOjk6IjIwMjEwMTI4OSI7czoxNzoibnVtZXJvX2luY2lkZW5jaWEiO2k6MTtzOjU6ImN1cnNvIjtzOjE0OiJQcm9ncmFtYWNpb24gSSI7czo3OiJtYXRlcmlhIjtzOjE0OiJQcm9ncmFtYWNpb24gSSI7czo3OiJtb3Rpdm9zIjthOjE6e2k6MDtzOjMzOiJjb3BpYSBvIGludGVyY2FtYmlvIGRlIHJlc3B1ZXN0YXMiO31zOjE1OiJtb3Rpdm9fZXRpcXVldGEiO3M6MzM6IkNvcGlhIG8gaW50ZXJjYW1iaW8gZGUgcmVzcHVlc3RhcyI7czo2OiJlc3RhZG8iO3M6MTA6IkNvbmZpcm1hZG8iO3M6NToiZmVjaGEiO3M6MTk6IjIwMjYtMTAtMjcgMDc6MTg6MDkiO31pOjE7YToxMzp7czoyOiJpZCI7aToyODtzOjExOiJpZF9yZWdpc3RybyI7aToyODtzOjY6Im5vbWJyZSI7czo1OiJLYXJlbiI7czo4OiJhcGVsbGlkbyI7czo3OiJGdWVudGVzIjtzOjEwOiJ2ZXJpZmljYWRvIjtiOjE7czozOiJzaXMiO3M6OToiMjAyMjAxMzU2IjtzOjE3OiJudW1lcm9faW5jaWRlbmNpYSI7aToxO3M6NToiY3Vyc28iO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1hdGVyaWEiO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1vdGl2b3MiO2E6MTp7aTowO3M6MzI6ImludGVudG8gZGUgaW5ncmVzbyBubyBhdXRvcml6YWRvIjt9czoxNToibW90aXZvX2V0aXF1ZXRhIjtzOjM1OiJJbnRlbnRvIGRlIGluZ3Jlc28gc2luIGF1dG9yaXphY2lvbiI7czo2OiJlc3RhZG8iO3M6MTA6IkNvbmZpcm1hZG8iO3M6NToiZmVjaGEiO3M6MTk6IjIwMjYtMTAtMjcgMDY6Mjg6MDgiO31pOjI7YToxMzp7czoyOiJpZCI7aToyNztzOjExOiJpZF9yZWdpc3RybyI7aToyNztzOjY6Im5vbWJyZSI7czo1OiJQYWJsbyI7czo4OiJhcGVsbGlkbyI7czo4OiJLb3dhbHNraSI7czoxMDoidmVyaWZpY2FkbyI7YjoxO3M6Mzoic2lzIjtzOjk6IjIwMjEwMTQwMSI7czoxNzoibnVtZXJvX2luY2lkZW5jaWEiO2k6MTtzOjU6ImN1cnNvIjtzOjE0OiJQcm9ncmFtYWNpb24gSSI7czo3OiJtYXRlcmlhIjtzOjE0OiJQcm9ncmFtYWNpb24gSSI7czo3OiJtb3Rpdm9zIjthOjE6e2k6MDtzOjE1OiJhdWxhIGVxdWl2b2NhZGEiO31zOjE1OiJtb3Rpdm9fZXRpcXVldGEiO3M6MTU6IkF1bGEgZXF1aXZvY2FkYSI7czo2OiJlc3RhZG8iO3M6MTA6IkNvbmZpcm1hZG8iO3M6NToiZmVjaGEiO3M6MTk6IjIwMjYtMTAtMjcgMDY6MTM6MzIiO31pOjM7YToxMzp7czoyOiJpZCI7aToyNjtzOjExOiJpZF9yZWdpc3RybyI7aToyNjtzOjY6Im5vbWJyZSI7czo5OiJWZXLDs25pY2EiO3M6ODoiYXBlbGxpZG8iO3M6MzoiUGF6IjtzOjEwOiJ2ZXJpZmljYWRvIjtiOjE7czozOiJzaXMiO3M6OToiMjAyMjAxNDU2IjtzOjE3OiJudW1lcm9faW5jaWRlbmNpYSI7aToxO3M6NToiY3Vyc28iO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1hdGVyaWEiO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1vdGl2b3MiO2E6MTp7aTowO3M6MzI6ImludGVudG8gZGUgaW5ncmVzbyBubyBhdXRvcml6YWRvIjt9czoxNToibW90aXZvX2V0aXF1ZXRhIjtzOjM1OiJJbnRlbnRvIGRlIGluZ3Jlc28gc2luIGF1dG9yaXphY2lvbiI7czo2OiJlc3RhZG8iO3M6MTA6IkNvbmZpcm1hZG8iO3M6NToiZmVjaGEiO3M6MTk6IjIwMjYtMTAtMjcgMDY6MTI6NTQiO31pOjQ7YToxMzp7czoyOiJpZCI7aToyNTtzOjExOiJpZF9yZWdpc3RybyI7aToyNTtzOjY6Im5vbWJyZSI7czozOiJBbmEiO3M6ODoiYXBlbGxpZG8iO3M6NjoiTMOzcGV6IjtzOjEwOiJ2ZXJpZmljYWRvIjtiOjE7czozOiJzaXMiO3M6OToiMjAyMjAxMDEzIjtzOjE3OiJudW1lcm9faW5jaWRlbmNpYSI7aToyO3M6NToiY3Vyc28iO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1hdGVyaWEiO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1vdGl2b3MiO2E6MTp7aTowO3M6MzM6ImNvcGlhIG8gaW50ZXJjYW1iaW8gZGUgcmVzcHVlc3RhcyI7fXM6MTU6Im1vdGl2b19ldGlxdWV0YSI7czozMzoiQ29waWEgbyBpbnRlcmNhbWJpbyBkZSByZXNwdWVzdGFzIjtzOjY6ImVzdGFkbyI7czoxMDoiQ29uZmlybWFkbyI7czo1OiJmZWNoYSI7czoxOToiMjAyNi0xMC0yNyAwNToxMTo0NSI7fWk6NTthOjEzOntzOjI6ImlkIjtpOjI0O3M6MTE6ImlkX3JlZ2lzdHJvIjtpOjI0O3M6Njoibm9tYnJlIjtzOjU6IkRpZWdvIjtzOjg6ImFwZWxsaWRvIjtzOjQ6IlNvdG8iO3M6MTA6InZlcmlmaWNhZG8iO2I6MTtzOjM6InNpcyI7czo5OiIyMDIyMDIwNDUiO3M6MTc6Im51bWVyb19pbmNpZGVuY2lhIjtpOjE7czo1OiJjdXJzbyI7czoxNDoiUHJvZ3JhbWFjaW9uIEkiO3M6NzoibWF0ZXJpYSI7czoxNDoiUHJvZ3JhbWFjaW9uIEkiO3M6NzoibW90aXZvcyI7YToxOntpOjA7czozMjoidXNvIGRlIGRpc3Bvc2l0aXZvcyBlbGVjdHJvbmljb3MiO31zOjE1OiJtb3Rpdm9fZXRpcXVldGEiO3M6NDc6IlVzbyBkZSBkaXNwb3NpdGl2b3MgZWxlY3Ryb25pY29zIG5vIGF1dG9yaXphZG9zIjtzOjY6ImVzdGFkbyI7czoxMDoiQ29uZmlybWFkbyI7czo1OiJmZWNoYSI7czoxOToiMjAyNi0xMC0yNyAwNDo1NTowNiI7fWk6NjthOjEzOntzOjI6ImlkIjtpOjIzO3M6MTE6ImlkX3JlZ2lzdHJvIjtpOjIzO3M6Njoibm9tYnJlIjtzOjY6IlNlcmdpbyI7czo4OiJhcGVsbGlkbyI7czo3OiJNZW5kb3phIjtzOjEwOiJ2ZXJpZmljYWRvIjtiOjE7czozOiJzaXMiO3M6OToiMjAyMTAxNDIzIjtzOjE3OiJudW1lcm9faW5jaWRlbmNpYSI7aToxO3M6NToiY3Vyc28iO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1hdGVyaWEiO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1vdGl2b3MiO2E6MTp7aTowO3M6NDoib3RybyI7fXM6MTU6Im1vdGl2b19ldGlxdWV0YSI7czo0OiJPdHJvIjtzOjY6ImVzdGFkbyI7czoxMDoiQ29uZmlybWFkbyI7czo1OiJmZWNoYSI7czoxOToiMjAyNi0xMC0yNyAwNDoyNToxOSI7fWk6NzthOjEzOntzOjI6ImlkIjtpOjIyO3M6MTE6ImlkX3JlZ2lzdHJvIjtpOjIyO3M6Njoibm9tYnJlIjtzOjg6IkNyaXN0aWFuIjtzOjg6ImFwZWxsaWRvIjtzOjY6Ik1vbGluYSI7czoxMDoidmVyaWZpY2FkbyI7YjoxO3M6Mzoic2lzIjtzOjk6IjIwMjIwMTI3OCI7czoxNzoibnVtZXJvX2luY2lkZW5jaWEiO2k6MTtzOjU6ImN1cnNvIjtzOjE0OiJQcm9ncmFtYWNpb24gSSI7czo3OiJtYXRlcmlhIjtzOjE0OiJQcm9ncmFtYWNpb24gSSI7czo3OiJtb3Rpdm9zIjthOjE6e2k6MDtzOjQ0OiJpbnRlbnRvIGRlIGluZ3Jlc28gZGUgbWF0ZXJpYWwgbm8gYXV0b3JpemFkbyI7fXM6MTU6Im1vdGl2b19ldGlxdWV0YSI7czo0NToiSW50ZW50byBkZSBpbmdyZXNvIGNvbiBtYXRlcmlhbCBubyBhdXRvcml6YWRvIjtzOjY6ImVzdGFkbyI7czoxMDoiQ29uZmlybWFkbyI7czo1OiJmZWNoYSI7czoxOToiMjAyNi0xMC0yNSAxODozMjoyNSI7fWk6ODthOjEzOntzOjI6ImlkIjtpOjIxO3M6MTE6ImlkX3JlZ2lzdHJvIjtpOjIxO3M6Njoibm9tYnJlIjtzOjM6IkFuYSI7czo4OiJhcGVsbGlkbyI7czo2OiJMw7NwZXoiO3M6MTA6InZlcmlmaWNhZG8iO2I6MTtzOjM6InNpcyI7czo5OiIyMDIyMDEwMTMiO3M6MTc6Im51bWVyb19pbmNpZGVuY2lhIjtpOjE7czo1OiJjdXJzbyI7czoxNDoiUHJvZ3JhbWFjaW9uIEkiO3M6NzoibWF0ZXJpYSI7czoxNDoiUHJvZ3JhbWFjaW9uIEkiO3M6NzoibW90aXZvcyI7YToxOntpOjA7czo0NDoiaW50ZW50byBkZSBpbmdyZXNvIGRlIG1hdGVyaWFsIG5vIGF1dG9yaXphZG8iO31zOjE1OiJtb3Rpdm9fZXRpcXVldGEiO3M6NDU6IkludGVudG8gZGUgaW5ncmVzbyBjb24gbWF0ZXJpYWwgbm8gYXV0b3JpemFkbyI7czo2OiJlc3RhZG8iO3M6MTA6IkNvbmZpcm1hZG8iO3M6NToiZmVjaGEiO3M6MTk6IjIwMjYtMTAtMjUgMTg6MTE6NDMiO31pOjk7YToxMzp7czoyOiJpZCI7aTozMDtzOjExOiJpZF9yZWdpc3RybyI7aTozMDtzOjY6Im5vbWJyZSI7czo2OiJYYXZpZXIiO3M6ODoiYXBlbGxpZG8iO3M6NjoiVmFyZ2FzIjtzOjEwOiJ2ZXJpZmljYWRvIjtiOjE7czozOiJzaXMiO3M6OToiMjAyMTAxMjIzIjtzOjE3OiJudW1lcm9faW5jaWRlbmNpYSI7aToxO3M6NToiY3Vyc28iO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1hdGVyaWEiO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1vdGl2b3MiO2E6MTp7aTowO3M6NDoib3RybyI7fXM6MTU6Im1vdGl2b19ldGlxdWV0YSI7czo0OiJPdHJvIjtzOjY6ImVzdGFkbyI7czoxMDoiQ29uZmlybWFkbyI7czo1OiJmZWNoYSI7czoxOToiMjAyNi0xMC0yNSAwNjozNTozOSI7fWk6MTA7YToxMzp7czoyOiJpZCI7aToyOTtzOjExOiJpZF9yZWdpc3RybyI7aToyOTtzOjY6Im5vbWJyZSI7czo1OiJZYW1pbCI7czo4OiJhcGVsbGlkbyI7czo4OiJTw6FuY2hleiI7czoxMDoidmVyaWZpY2FkbyI7YjoxO3M6Mzoic2lzIjtzOjk6IjIwMjEwMTQ4OSI7czoxNzoibnVtZXJvX2luY2lkZW5jaWEiO2k6MTtzOjU6ImN1cnNvIjtzOjE0OiJQcm9ncmFtYWNpb24gSSI7czo3OiJtYXRlcmlhIjtzOjE0OiJQcm9ncmFtYWNpb24gSSI7czo3OiJtb3Rpdm9zIjthOjE6e2k6MDtzOjQ6Im90cm8iO31zOjE1OiJtb3Rpdm9fZXRpcXVldGEiO3M6NDoiT3RybyI7czo2OiJlc3RhZG8iO3M6MTA6IkNvbmZpcm1hZG8iO3M6NToiZmVjaGEiO3M6MTk6IjIwMjYtMTAtMjUgMDY6MzU6MzciO31pOjExO2E6MTM6e3M6MjoiaWQiO2k6MjA7czoxMToiaWRfcmVnaXN0cm8iO2k6MjA7czo2OiJub21icmUiO3M6NToiV2VuZHkiO3M6ODoiYXBlbGxpZG8iO3M6NjoiWmFwYXRhIjtzOjEwOiJ2ZXJpZmljYWRvIjtiOjE7czozOiJzaXMiO3M6OToiMjAyMjAxMjEyIjtzOjE3OiJudW1lcm9faW5jaWRlbmNpYSI7aToxO3M6NToiY3Vyc28iO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1hdGVyaWEiO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1vdGl2b3MiO2E6MTp7aTowO3M6MzI6InVzbyBkZSBkaXNwb3NpdGl2b3MgZWxlY3Ryb25pY29zIjt9czoxNToibW90aXZvX2V0aXF1ZXRhIjtzOjQ3OiJVc28gZGUgZGlzcG9zaXRpdm9zIGVsZWN0cm9uaWNvcyBubyBhdXRvcml6YWRvcyI7czo2OiJlc3RhZG8iO3M6MTA6IkNvbmZpcm1hZG8iO3M6NToiZmVjaGEiO3M6MTk6IjIwMjYtMTAtMTIgMTY6MzQ6NDQiO31pOjEyO2E6MTM6e3M6MjoiaWQiO2k6MTg7czoxMToiaWRfcmVnaXN0cm8iO2k6MTg7czo2OiJub21icmUiO3M6NToiUmHDumwiO3M6ODoiYXBlbGxpZG8iO3M6NjoiQ2hvcXVlIjtzOjEwOiJ2ZXJpZmljYWRvIjtiOjE7czozOiJzaXMiO3M6OToiMjAyMTAxMTc4IjtzOjE3OiJudW1lcm9faW5jaWRlbmNpYSI7aToxO3M6NToiY3Vyc28iO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1hdGVyaWEiO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1vdGl2b3MiO2E6MTp7aTowO3M6MjU6InN1cGxhbnRhY2lvbiBkZSBpZGVudGlkYWQiO31zOjE1OiJtb3Rpdm9fZXRpcXVldGEiO3M6MjU6IlN1cGxhbnRhY2lvbiBkZSBpZGVudGlkYWQiO3M6NjoiZXN0YWRvIjtzOjEwOiJDb25maXJtYWRvIjtzOjU6ImZlY2hhIjtzOjE5OiIyMDI2LTEwLTEyIDAzOjM0OjAxIjt9aToxMzthOjEzOntzOjI6ImlkIjtpOjE3O3M6MTE6ImlkX3JlZ2lzdHJvIjtpOjE3O3M6Njoibm9tYnJlIjtzOjY6IldhbHRlciI7czo4OiJhcGVsbGlkbyI7czo3OiJRdWlyb2dhIjtzOjEwOiJ2ZXJpZmljYWRvIjtiOjE7czozOiJzaXMiO3M6OToiMjAyMTAxNDY3IjtzOjE3OiJudW1lcm9faW5jaWRlbmNpYSI7aToxO3M6NToiY3Vyc28iO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1hdGVyaWEiO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1vdGl2b3MiO2E6MTp7aTowO3M6MzM6ImNvcGlhIG8gaW50ZXJjYW1iaW8gZGUgcmVzcHVlc3RhcyI7fXM6MTU6Im1vdGl2b19ldGlxdWV0YSI7czozMzoiQ29waWEgbyBpbnRlcmNhbWJpbyBkZSByZXNwdWVzdGFzIjtzOjY6ImVzdGFkbyI7czoxMDoiQ29uZmlybWFkbyI7czo1OiJmZWNoYSI7czoxOToiMjAyNi0xMC0xMiAwMTozMDo1MiI7fWk6MTQ7YToxMzp7czoyOiJpZCI7aToxOTtzOjExOiJpZF9yZWdpc3RybyI7aToxOTtzOjY6Im5vbWJyZSI7czo1OiJJdsOhbiI7czo4OiJhcGVsbGlkbyI7czo2OiJGbG9yZXMiO3M6MTA6InZlcmlmaWNhZG8iO2I6MTtzOjM6InNpcyI7czo5OiIyMDIxMDEwOTAiO3M6MTc6Im51bWVyb19pbmNpZGVuY2lhIjtpOjE7czo1OiJjdXJzbyI7czoxNDoiUHJvZ3JhbWFjaW9uIEkiO3M6NzoibWF0ZXJpYSI7czoxNDoiUHJvZ3JhbWFjaW9uIEkiO3M6NzoibW90aXZvcyI7YToxOntpOjA7czo0OiJvdHJvIjt9czoxNToibW90aXZvX2V0aXF1ZXRhIjtzOjQ6Ik90cm8iO3M6NjoiZXN0YWRvIjtzOjEwOiJDb25maXJtYWRvIjtzOjU6ImZlY2hhIjtzOjE5OiIyMDI2LTEwLTEyIDAwOjEzOjE3Ijt9aToxNTthOjEzOntzOjI6ImlkIjtpOjg7czoxMToiaWRfcmVnaXN0cm8iO2k6ODtzOjY6Im5vbWJyZSI7czo3OiJGw6F0aW1hIjtzOjg6ImFwZWxsaWRvIjtzOjY6IlF1aXNwZSI7czoxMDoidmVyaWZpY2FkbyI7YjoxO3M6Mzoic2lzIjtzOjk6IjIwMjIwMTA1NiI7czoxNzoibnVtZXJvX2luY2lkZW5jaWEiO2k6MTtzOjU6ImN1cnNvIjtzOjE0OiJQcm9ncmFtYWNpb24gSSI7czo3OiJtYXRlcmlhIjtzOjE0OiJQcm9ncmFtYWNpb24gSSI7czo3OiJtb3Rpdm9zIjthOjE6e2k6MDtzOjI5OiJ1c28gZGUgbWF0ZXJpYWwgbm8gYXV0b3JpemFkbyI7fXM6MTU6Im1vdGl2b19ldGlxdWV0YSI7czoyOToiVXNvIGRlIG1hdGVyaWFsIG5vIGF1dG9yaXphZG8iO3M6NjoiZXN0YWRvIjtzOjEwOiJDb25maXJtYWRvIjtzOjU6ImZlY2hhIjtzOjE5OiIyMDI2LTEwLTEwIDA4OjQwOjAwIjt9aToxNjthOjEzOntzOjI6ImlkIjtpOjc7czoxMToiaWRfcmVnaXN0cm8iO2k6NztzOjY6Im5vbWJyZSI7czo3OiJHYWJyaWVsIjtzOjg6ImFwZWxsaWRvIjtzOjY6Ik1hbWFuaSI7czoxMDoidmVyaWZpY2FkbyI7YjoxO3M6Mzoic2lzIjtzOjk6IjIwMjEwMTA3OCI7czoxNzoibnVtZXJvX2luY2lkZW5jaWEiO2k6MTtzOjU6ImN1cnNvIjtzOjE0OiJQcm9ncmFtYWNpb24gSSI7czo3OiJtYXRlcmlhIjtzOjE0OiJQcm9ncmFtYWNpb24gSSI7czo3OiJtb3Rpdm9zIjthOjE6e2k6MDtzOjMzOiJjb3BpYSBvIGludGVyY2FtYmlvIGRlIHJlc3B1ZXN0YXMiO31zOjE1OiJtb3Rpdm9fZXRpcXVldGEiO3M6MzM6IkNvcGlhIG8gaW50ZXJjYW1iaW8gZGUgcmVzcHVlc3RhcyI7czo2OiJlc3RhZG8iO3M6MTA6IkNvbmZpcm1hZG8iO3M6NToiZmVjaGEiO3M6MTk6IjIwMjYtMTAtMTAgMDg6NDA6MDAiO31pOjE3O2E6MTM6e3M6MjoiaWQiO2k6NjtzOjExOiJpZF9yZWdpc3RybyI7aTo2O3M6Njoibm9tYnJlIjtzOjY6IkhlbGVuYSI7czo4OiJhcGVsbGlkbyI7czo2OiJDaG9xdWUiO3M6MTA6InZlcmlmaWNhZG8iO2I6MTtzOjM6InNpcyI7czo5OiIyMDIyMDEwODkiO3M6MTc6Im51bWVyb19pbmNpZGVuY2lhIjtpOjE7czo1OiJjdXJzbyI7czoxNDoiUHJvZ3JhbWFjaW9uIEkiO3M6NzoibWF0ZXJpYSI7czoxNDoiUHJvZ3JhbWFjaW9uIEkiO3M6NzoibW90aXZvcyI7YToxOntpOjA7czozMjoidXNvIGRlIGRpc3Bvc2l0aXZvcyBlbGVjdHJvbmljb3MiO31zOjE1OiJtb3Rpdm9fZXRpcXVldGEiO3M6NDc6IlVzbyBkZSBkaXNwb3NpdGl2b3MgZWxlY3Ryb25pY29zIG5vIGF1dG9yaXphZG9zIjtzOjY6ImVzdGFkbyI7czoxMDoiQ29uZmlybWFkbyI7czo1OiJmZWNoYSI7czoxOToiMjAyNi0xMC0xMCAwODo0MDowMCI7fWk6MTg7YToxMzp7czoyOiJpZCI7aTo0O3M6MTE6ImlkX3JlZ2lzdHJvIjtpOjQ7czo2OiJub21icmUiO3M6NjoiQ2FybG9zIjtzOjg6ImFwZWxsaWRvIjtzOjU6IlJvamFzIjtzOjEwOiJ2ZXJpZmljYWRvIjtiOjE7czozOiJzaXMiO3M6ODoiMjAyMTAwMDQiO3M6MTc6Im51bWVyb19pbmNpZGVuY2lhIjtpOjE7czo1OiJjdXJzbyI7czoxNDoiQWxnZWJyYSBMaW5lYWwiO3M6NzoibWF0ZXJpYSI7czoxNDoiQWxnZWJyYSBMaW5lYWwiO3M6NzoibW90aXZvcyI7YToxOntpOjA7czoyOToidXNvIGRlIG1hdGVyaWFsIG5vIGF1dG9yaXphZG8iO31zOjE1OiJtb3Rpdm9fZXRpcXVldGEiO3M6Mjk6IlVzbyBkZSBtYXRlcmlhbCBubyBhdXRvcml6YWRvIjtzOjY6ImVzdGFkbyI7czoxMDoiQ29uZmlybWFkbyI7czo1OiJmZWNoYSI7czoxOToiMjAyNC0wNi0xMyAwODo0NTowMCI7fWk6MTk7YToxMzp7czoyOiJpZCI7aToyO3M6MTE6ImlkX3JlZ2lzdHJvIjtpOjI7czo2OiJub21icmUiO3M6NDoiTHVpcyI7czo4OiJhcGVsbGlkbyI7czo2OiJNYW1hbmkiO3M6MTA6InZlcmlmaWNhZG8iO2I6MTtzOjM6InNpcyI7czo4OiIyMDIxMDAwMiI7czoxNzoibnVtZXJvX2luY2lkZW5jaWEiO2k6MTtzOjU6ImN1cnNvIjtzOjg6IkZpc2ljYSBJIjtzOjc6Im1hdGVyaWEiO3M6ODoiRmlzaWNhIEkiO3M6NzoibW90aXZvcyI7YToxOntpOjA7czozMjoidXNvIGRlIGRpc3Bvc2l0aXZvcyBlbGVjdHJvbmljb3MiO31zOjE1OiJtb3Rpdm9fZXRpcXVldGEiO3M6NDc6IlVzbyBkZSBkaXNwb3NpdGl2b3MgZWxlY3Ryb25pY29zIG5vIGF1dG9yaXphZG9zIjtzOjY6ImVzdGFkbyI7czoxMDoiQ29uZmlybWFkbyI7czo1OiJmZWNoYSI7czoxOToiMjAyNC0wNi0xMSAxMDozMDowMCI7fWk6MjA7YToxMzp7czoyOiJpZCI7aToxO3M6MTE6ImlkX3JlZ2lzdHJvIjtpOjE7czo2OiJub21icmUiO3M6MzoiQW5hIjtzOjg6ImFwZWxsaWRvIjtzOjU6IlBlcmV6IjtzOjEwOiJ2ZXJpZmljYWRvIjtiOjE7czozOiJzaXMiO3M6ODoiMjAyMTAwMDEiO3M6MTc6Im51bWVyb19pbmNpZGVuY2lhIjtpOjE7czo1OiJjdXJzbyI7czo5OiJDYWxjdWxvIEkiO3M6NzoibWF0ZXJpYSI7czo5OiJDYWxjdWxvIEkiO3M6NzoibW90aXZvcyI7YToxOntpOjA7czo0OiJvdHJvIjt9czoxNToibW90aXZvX2V0aXF1ZXRhIjtzOjQ6Ik90cm8iO3M6NjoiZXN0YWRvIjtzOjEwOiJDb25maXJtYWRvIjtzOjU6ImZlY2hhIjtzOjE5OiIyMDI0LTA2LTEwIDA4OjMwOjAwIjt9fXM6Mjg6IgAqAGVzY2FwZVdoZW5DYXN0aW5nVG9TdHJpbmciO2I6MDt9', 1794277228);
+INSERT INTO "cache" ("key", "value", "expiration") VALUES ('central-riesgo:detalle:v1:31', 'a:15:{s:11:"id_registro";i:31;s:17:"estudiante_nombre";s:12:"Wendy Zapata";s:14:"sis_estudiante";s:9:"202201212";s:17:"numero_incidencia";N;s:21:"estudiante_verificado";b:1;s:6:"motivo";s:35:"Intento de ingreso sin autorizacion";s:7:"motivos";a:1:{i:0;s:35:"Intento de ingreso sin autorizacion";}s:5:"curso";s:14:"Programacion I";s:7:"materia";s:14:"Programacion I";s:5:"grupo";N;s:13:"reportado_por";s:13:"Roberto Silva";s:17:"reportado_por_rol";s:7:"docente";s:14:"fecha_registro";s:19:"2026-10-27 07:04:36";s:6:"estado";s:9:"Pendiente";s:11:"descripcion";N;}', 1794277694);
+INSERT INTO "cache" ("key", "value", "expiration") VALUES ('central-riesgo:lista:v1:1:toda-la-institucion::0', 'TzoyOToiSWxsdW1pbmF0ZVxTdXBwb3J0XENvbGxlY3Rpb24iOjI6e3M6ODoiACoAaXRlbXMiO2E6MjE6e2k6MDthOjEzOntzOjI6ImlkIjtpOjMyO3M6MTE6ImlkX3JlZ2lzdHJvIjtpOjMyO3M6Njoibm9tYnJlIjtzOjc6IkRhbmllbGEiO3M6ODoiYXBlbGxpZG8iO3M6NzoiQ2FicmVyYSI7czoxMDoidmVyaWZpY2FkbyI7YjoxO3M6Mzoic2lzIjtzOjk6IjIwMjEwMTI4OSI7czoxNzoibnVtZXJvX2luY2lkZW5jaWEiO2k6MTtzOjU6ImN1cnNvIjtzOjE0OiJQcm9ncmFtYWNpb24gSSI7czo3OiJtYXRlcmlhIjtzOjE0OiJQcm9ncmFtYWNpb24gSSI7czo3OiJtb3Rpdm9zIjthOjE6e2k6MDtzOjMzOiJjb3BpYSBvIGludGVyY2FtYmlvIGRlIHJlc3B1ZXN0YXMiO31zOjE1OiJtb3Rpdm9fZXRpcXVldGEiO3M6MzM6IkNvcGlhIG8gaW50ZXJjYW1iaW8gZGUgcmVzcHVlc3RhcyI7czo2OiJlc3RhZG8iO3M6MTA6IkNvbmZpcm1hZG8iO3M6NToiZmVjaGEiO3M6MTk6IjIwMjYtMTAtMjcgMDc6MTg6MDkiO31pOjE7YToxMzp7czoyOiJpZCI7aToyODtzOjExOiJpZF9yZWdpc3RybyI7aToyODtzOjY6Im5vbWJyZSI7czo1OiJLYXJlbiI7czo4OiJhcGVsbGlkbyI7czo3OiJGdWVudGVzIjtzOjEwOiJ2ZXJpZmljYWRvIjtiOjE7czozOiJzaXMiO3M6OToiMjAyMjAxMzU2IjtzOjE3OiJudW1lcm9faW5jaWRlbmNpYSI7aToxO3M6NToiY3Vyc28iO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1hdGVyaWEiO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1vdGl2b3MiO2E6MTp7aTowO3M6MzI6ImludGVudG8gZGUgaW5ncmVzbyBubyBhdXRvcml6YWRvIjt9czoxNToibW90aXZvX2V0aXF1ZXRhIjtzOjM1OiJJbnRlbnRvIGRlIGluZ3Jlc28gc2luIGF1dG9yaXphY2lvbiI7czo2OiJlc3RhZG8iO3M6MTA6IkNvbmZpcm1hZG8iO3M6NToiZmVjaGEiO3M6MTk6IjIwMjYtMTAtMjcgMDY6Mjg6MDgiO31pOjI7YToxMzp7czoyOiJpZCI7aToyNztzOjExOiJpZF9yZWdpc3RybyI7aToyNztzOjY6Im5vbWJyZSI7czo1OiJQYWJsbyI7czo4OiJhcGVsbGlkbyI7czo4OiJLb3dhbHNraSI7czoxMDoidmVyaWZpY2FkbyI7YjoxO3M6Mzoic2lzIjtzOjk6IjIwMjEwMTQwMSI7czoxNzoibnVtZXJvX2luY2lkZW5jaWEiO2k6MTtzOjU6ImN1cnNvIjtzOjE0OiJQcm9ncmFtYWNpb24gSSI7czo3OiJtYXRlcmlhIjtzOjE0OiJQcm9ncmFtYWNpb24gSSI7czo3OiJtb3Rpdm9zIjthOjE6e2k6MDtzOjE1OiJhdWxhIGVxdWl2b2NhZGEiO31zOjE1OiJtb3Rpdm9fZXRpcXVldGEiO3M6MTU6IkF1bGEgZXF1aXZvY2FkYSI7czo2OiJlc3RhZG8iO3M6MTA6IkNvbmZpcm1hZG8iO3M6NToiZmVjaGEiO3M6MTk6IjIwMjYtMTAtMjcgMDY6MTM6MzIiO31pOjM7YToxMzp7czoyOiJpZCI7aToyNjtzOjExOiJpZF9yZWdpc3RybyI7aToyNjtzOjY6Im5vbWJyZSI7czo5OiJWZXLDs25pY2EiO3M6ODoiYXBlbGxpZG8iO3M6MzoiUGF6IjtzOjEwOiJ2ZXJpZmljYWRvIjtiOjE7czozOiJzaXMiO3M6OToiMjAyMjAxNDU2IjtzOjE3OiJudW1lcm9faW5jaWRlbmNpYSI7aToxO3M6NToiY3Vyc28iO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1hdGVyaWEiO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1vdGl2b3MiO2E6MTp7aTowO3M6MzI6ImludGVudG8gZGUgaW5ncmVzbyBubyBhdXRvcml6YWRvIjt9czoxNToibW90aXZvX2V0aXF1ZXRhIjtzOjM1OiJJbnRlbnRvIGRlIGluZ3Jlc28gc2luIGF1dG9yaXphY2lvbiI7czo2OiJlc3RhZG8iO3M6MTA6IkNvbmZpcm1hZG8iO3M6NToiZmVjaGEiO3M6MTk6IjIwMjYtMTAtMjcgMDY6MTI6NTQiO31pOjQ7YToxMzp7czoyOiJpZCI7aToyNTtzOjExOiJpZF9yZWdpc3RybyI7aToyNTtzOjY6Im5vbWJyZSI7czozOiJBbmEiO3M6ODoiYXBlbGxpZG8iO3M6NjoiTMOzcGV6IjtzOjEwOiJ2ZXJpZmljYWRvIjtiOjE7czozOiJzaXMiO3M6OToiMjAyMjAxMDEzIjtzOjE3OiJudW1lcm9faW5jaWRlbmNpYSI7aToyO3M6NToiY3Vyc28iO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1hdGVyaWEiO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1vdGl2b3MiO2E6MTp7aTowO3M6MzM6ImNvcGlhIG8gaW50ZXJjYW1iaW8gZGUgcmVzcHVlc3RhcyI7fXM6MTU6Im1vdGl2b19ldGlxdWV0YSI7czozMzoiQ29waWEgbyBpbnRlcmNhbWJpbyBkZSByZXNwdWVzdGFzIjtzOjY6ImVzdGFkbyI7czoxMDoiQ29uZmlybWFkbyI7czo1OiJmZWNoYSI7czoxOToiMjAyNi0xMC0yNyAwNToxMTo0NSI7fWk6NTthOjEzOntzOjI6ImlkIjtpOjI0O3M6MTE6ImlkX3JlZ2lzdHJvIjtpOjI0O3M6Njoibm9tYnJlIjtzOjU6IkRpZWdvIjtzOjg6ImFwZWxsaWRvIjtzOjQ6IlNvdG8iO3M6MTA6InZlcmlmaWNhZG8iO2I6MTtzOjM6InNpcyI7czo5OiIyMDIyMDIwNDUiO3M6MTc6Im51bWVyb19pbmNpZGVuY2lhIjtpOjE7czo1OiJjdXJzbyI7czoxNDoiUHJvZ3JhbWFjaW9uIEkiO3M6NzoibWF0ZXJpYSI7czoxNDoiUHJvZ3JhbWFjaW9uIEkiO3M6NzoibW90aXZvcyI7YToxOntpOjA7czozMjoidXNvIGRlIGRpc3Bvc2l0aXZvcyBlbGVjdHJvbmljb3MiO31zOjE1OiJtb3Rpdm9fZXRpcXVldGEiO3M6NDc6IlVzbyBkZSBkaXNwb3NpdGl2b3MgZWxlY3Ryb25pY29zIG5vIGF1dG9yaXphZG9zIjtzOjY6ImVzdGFkbyI7czoxMDoiQ29uZmlybWFkbyI7czo1OiJmZWNoYSI7czoxOToiMjAyNi0xMC0yNyAwNDo1NTowNiI7fWk6NjthOjEzOntzOjI6ImlkIjtpOjIzO3M6MTE6ImlkX3JlZ2lzdHJvIjtpOjIzO3M6Njoibm9tYnJlIjtzOjY6IlNlcmdpbyI7czo4OiJhcGVsbGlkbyI7czo3OiJNZW5kb3phIjtzOjEwOiJ2ZXJpZmljYWRvIjtiOjE7czozOiJzaXMiO3M6OToiMjAyMTAxNDIzIjtzOjE3OiJudW1lcm9faW5jaWRlbmNpYSI7aToxO3M6NToiY3Vyc28iO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1hdGVyaWEiO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1vdGl2b3MiO2E6MTp7aTowO3M6NDoib3RybyI7fXM6MTU6Im1vdGl2b19ldGlxdWV0YSI7czo0OiJPdHJvIjtzOjY6ImVzdGFkbyI7czoxMDoiQ29uZmlybWFkbyI7czo1OiJmZWNoYSI7czoxOToiMjAyNi0xMC0yNyAwNDoyNToxOSI7fWk6NzthOjEzOntzOjI6ImlkIjtpOjIyO3M6MTE6ImlkX3JlZ2lzdHJvIjtpOjIyO3M6Njoibm9tYnJlIjtzOjg6IkNyaXN0aWFuIjtzOjg6ImFwZWxsaWRvIjtzOjY6Ik1vbGluYSI7czoxMDoidmVyaWZpY2FkbyI7YjoxO3M6Mzoic2lzIjtzOjk6IjIwMjIwMTI3OCI7czoxNzoibnVtZXJvX2luY2lkZW5jaWEiO2k6MTtzOjU6ImN1cnNvIjtzOjE0OiJQcm9ncmFtYWNpb24gSSI7czo3OiJtYXRlcmlhIjtzOjE0OiJQcm9ncmFtYWNpb24gSSI7czo3OiJtb3Rpdm9zIjthOjE6e2k6MDtzOjQ0OiJpbnRlbnRvIGRlIGluZ3Jlc28gZGUgbWF0ZXJpYWwgbm8gYXV0b3JpemFkbyI7fXM6MTU6Im1vdGl2b19ldGlxdWV0YSI7czo0NToiSW50ZW50byBkZSBpbmdyZXNvIGNvbiBtYXRlcmlhbCBubyBhdXRvcml6YWRvIjtzOjY6ImVzdGFkbyI7czoxMDoiQ29uZmlybWFkbyI7czo1OiJmZWNoYSI7czoxOToiMjAyNi0xMC0yNSAxODozMjoyNSI7fWk6ODthOjEzOntzOjI6ImlkIjtpOjIxO3M6MTE6ImlkX3JlZ2lzdHJvIjtpOjIxO3M6Njoibm9tYnJlIjtzOjM6IkFuYSI7czo4OiJhcGVsbGlkbyI7czo2OiJMw7NwZXoiO3M6MTA6InZlcmlmaWNhZG8iO2I6MTtzOjM6InNpcyI7czo5OiIyMDIyMDEwMTMiO3M6MTc6Im51bWVyb19pbmNpZGVuY2lhIjtpOjE7czo1OiJjdXJzbyI7czoxNDoiUHJvZ3JhbWFjaW9uIEkiO3M6NzoibWF0ZXJpYSI7czoxNDoiUHJvZ3JhbWFjaW9uIEkiO3M6NzoibW90aXZvcyI7YToxOntpOjA7czo0NDoiaW50ZW50byBkZSBpbmdyZXNvIGRlIG1hdGVyaWFsIG5vIGF1dG9yaXphZG8iO31zOjE1OiJtb3Rpdm9fZXRpcXVldGEiO3M6NDU6IkludGVudG8gZGUgaW5ncmVzbyBjb24gbWF0ZXJpYWwgbm8gYXV0b3JpemFkbyI7czo2OiJlc3RhZG8iO3M6MTA6IkNvbmZpcm1hZG8iO3M6NToiZmVjaGEiO3M6MTk6IjIwMjYtMTAtMjUgMTg6MTE6NDMiO31pOjk7YToxMzp7czoyOiJpZCI7aTozMDtzOjExOiJpZF9yZWdpc3RybyI7aTozMDtzOjY6Im5vbWJyZSI7czo2OiJYYXZpZXIiO3M6ODoiYXBlbGxpZG8iO3M6NjoiVmFyZ2FzIjtzOjEwOiJ2ZXJpZmljYWRvIjtiOjE7czozOiJzaXMiO3M6OToiMjAyMTAxMjIzIjtzOjE3OiJudW1lcm9faW5jaWRlbmNpYSI7aToxO3M6NToiY3Vyc28iO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1hdGVyaWEiO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1vdGl2b3MiO2E6MTp7aTowO3M6NDoib3RybyI7fXM6MTU6Im1vdGl2b19ldGlxdWV0YSI7czo0OiJPdHJvIjtzOjY6ImVzdGFkbyI7czoxMDoiQ29uZmlybWFkbyI7czo1OiJmZWNoYSI7czoxOToiMjAyNi0xMC0yNSAwNjozNTozOSI7fWk6MTA7YToxMzp7czoyOiJpZCI7aToyOTtzOjExOiJpZF9yZWdpc3RybyI7aToyOTtzOjY6Im5vbWJyZSI7czo1OiJZYW1pbCI7czo4OiJhcGVsbGlkbyI7czo4OiJTw6FuY2hleiI7czoxMDoidmVyaWZpY2FkbyI7YjoxO3M6Mzoic2lzIjtzOjk6IjIwMjEwMTQ4OSI7czoxNzoibnVtZXJvX2luY2lkZW5jaWEiO2k6MTtzOjU6ImN1cnNvIjtzOjE0OiJQcm9ncmFtYWNpb24gSSI7czo3OiJtYXRlcmlhIjtzOjE0OiJQcm9ncmFtYWNpb24gSSI7czo3OiJtb3Rpdm9zIjthOjE6e2k6MDtzOjQ6Im90cm8iO31zOjE1OiJtb3Rpdm9fZXRpcXVldGEiO3M6NDoiT3RybyI7czo2OiJlc3RhZG8iO3M6MTA6IkNvbmZpcm1hZG8iO3M6NToiZmVjaGEiO3M6MTk6IjIwMjYtMTAtMjUgMDY6MzU6MzciO31pOjExO2E6MTM6e3M6MjoiaWQiO2k6MjA7czoxMToiaWRfcmVnaXN0cm8iO2k6MjA7czo2OiJub21icmUiO3M6NToiV2VuZHkiO3M6ODoiYXBlbGxpZG8iO3M6NjoiWmFwYXRhIjtzOjEwOiJ2ZXJpZmljYWRvIjtiOjE7czozOiJzaXMiO3M6OToiMjAyMjAxMjEyIjtzOjE3OiJudW1lcm9faW5jaWRlbmNpYSI7aToxO3M6NToiY3Vyc28iO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1hdGVyaWEiO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1vdGl2b3MiO2E6MTp7aTowO3M6MzI6InVzbyBkZSBkaXNwb3NpdGl2b3MgZWxlY3Ryb25pY29zIjt9czoxNToibW90aXZvX2V0aXF1ZXRhIjtzOjQ3OiJVc28gZGUgZGlzcG9zaXRpdm9zIGVsZWN0cm9uaWNvcyBubyBhdXRvcml6YWRvcyI7czo2OiJlc3RhZG8iO3M6MTA6IkNvbmZpcm1hZG8iO3M6NToiZmVjaGEiO3M6MTk6IjIwMjYtMTAtMTIgMTY6MzQ6NDQiO31pOjEyO2E6MTM6e3M6MjoiaWQiO2k6MTg7czoxMToiaWRfcmVnaXN0cm8iO2k6MTg7czo2OiJub21icmUiO3M6NToiUmHDumwiO3M6ODoiYXBlbGxpZG8iO3M6NjoiQ2hvcXVlIjtzOjEwOiJ2ZXJpZmljYWRvIjtiOjE7czozOiJzaXMiO3M6OToiMjAyMTAxMTc4IjtzOjE3OiJudW1lcm9faW5jaWRlbmNpYSI7aToxO3M6NToiY3Vyc28iO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1hdGVyaWEiO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1vdGl2b3MiO2E6MTp7aTowO3M6MjU6InN1cGxhbnRhY2lvbiBkZSBpZGVudGlkYWQiO31zOjE1OiJtb3Rpdm9fZXRpcXVldGEiO3M6MjU6IlN1cGxhbnRhY2lvbiBkZSBpZGVudGlkYWQiO3M6NjoiZXN0YWRvIjtzOjEwOiJDb25maXJtYWRvIjtzOjU6ImZlY2hhIjtzOjE5OiIyMDI2LTEwLTEyIDAzOjM0OjAxIjt9aToxMzthOjEzOntzOjI6ImlkIjtpOjE3O3M6MTE6ImlkX3JlZ2lzdHJvIjtpOjE3O3M6Njoibm9tYnJlIjtzOjY6IldhbHRlciI7czo4OiJhcGVsbGlkbyI7czo3OiJRdWlyb2dhIjtzOjEwOiJ2ZXJpZmljYWRvIjtiOjE7czozOiJzaXMiO3M6OToiMjAyMTAxNDY3IjtzOjE3OiJudW1lcm9faW5jaWRlbmNpYSI7aToxO3M6NToiY3Vyc28iO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1hdGVyaWEiO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1vdGl2b3MiO2E6MTp7aTowO3M6MzM6ImNvcGlhIG8gaW50ZXJjYW1iaW8gZGUgcmVzcHVlc3RhcyI7fXM6MTU6Im1vdGl2b19ldGlxdWV0YSI7czozMzoiQ29waWEgbyBpbnRlcmNhbWJpbyBkZSByZXNwdWVzdGFzIjtzOjY6ImVzdGFkbyI7czoxMDoiQ29uZmlybWFkbyI7czo1OiJmZWNoYSI7czoxOToiMjAyNi0xMC0xMiAwMTozMDo1MiI7fWk6MTQ7YToxMzp7czoyOiJpZCI7aToxOTtzOjExOiJpZF9yZWdpc3RybyI7aToxOTtzOjY6Im5vbWJyZSI7czo1OiJJdsOhbiI7czo4OiJhcGVsbGlkbyI7czo2OiJGbG9yZXMiO3M6MTA6InZlcmlmaWNhZG8iO2I6MTtzOjM6InNpcyI7czo5OiIyMDIxMDEwOTAiO3M6MTc6Im51bWVyb19pbmNpZGVuY2lhIjtpOjE7czo1OiJjdXJzbyI7czoxNDoiUHJvZ3JhbWFjaW9uIEkiO3M6NzoibWF0ZXJpYSI7czoxNDoiUHJvZ3JhbWFjaW9uIEkiO3M6NzoibW90aXZvcyI7YToxOntpOjA7czo0OiJvdHJvIjt9czoxNToibW90aXZvX2V0aXF1ZXRhIjtzOjQ6Ik90cm8iO3M6NjoiZXN0YWRvIjtzOjEwOiJDb25maXJtYWRvIjtzOjU6ImZlY2hhIjtzOjE5OiIyMDI2LTEwLTEyIDAwOjEzOjE3Ijt9aToxNTthOjEzOntzOjI6ImlkIjtpOjg7czoxMToiaWRfcmVnaXN0cm8iO2k6ODtzOjY6Im5vbWJyZSI7czo3OiJGw6F0aW1hIjtzOjg6ImFwZWxsaWRvIjtzOjY6IlF1aXNwZSI7czoxMDoidmVyaWZpY2FkbyI7YjoxO3M6Mzoic2lzIjtzOjk6IjIwMjIwMTA1NiI7czoxNzoibnVtZXJvX2luY2lkZW5jaWEiO2k6MTtzOjU6ImN1cnNvIjtzOjE0OiJQcm9ncmFtYWNpb24gSSI7czo3OiJtYXRlcmlhIjtzOjE0OiJQcm9ncmFtYWNpb24gSSI7czo3OiJtb3Rpdm9zIjthOjE6e2k6MDtzOjI5OiJ1c28gZGUgbWF0ZXJpYWwgbm8gYXV0b3JpemFkbyI7fXM6MTU6Im1vdGl2b19ldGlxdWV0YSI7czoyOToiVXNvIGRlIG1hdGVyaWFsIG5vIGF1dG9yaXphZG8iO3M6NjoiZXN0YWRvIjtzOjEwOiJDb25maXJtYWRvIjtzOjU6ImZlY2hhIjtzOjE5OiIyMDI2LTEwLTEwIDA4OjQwOjAwIjt9aToxNjthOjEzOntzOjI6ImlkIjtpOjc7czoxMToiaWRfcmVnaXN0cm8iO2k6NztzOjY6Im5vbWJyZSI7czo3OiJHYWJyaWVsIjtzOjg6ImFwZWxsaWRvIjtzOjY6Ik1hbWFuaSI7czoxMDoidmVyaWZpY2FkbyI7YjoxO3M6Mzoic2lzIjtzOjk6IjIwMjEwMTA3OCI7czoxNzoibnVtZXJvX2luY2lkZW5jaWEiO2k6MTtzOjU6ImN1cnNvIjtzOjE0OiJQcm9ncmFtYWNpb24gSSI7czo3OiJtYXRlcmlhIjtzOjE0OiJQcm9ncmFtYWNpb24gSSI7czo3OiJtb3Rpdm9zIjthOjE6e2k6MDtzOjMzOiJjb3BpYSBvIGludGVyY2FtYmlvIGRlIHJlc3B1ZXN0YXMiO31zOjE1OiJtb3Rpdm9fZXRpcXVldGEiO3M6MzM6IkNvcGlhIG8gaW50ZXJjYW1iaW8gZGUgcmVzcHVlc3RhcyI7czo2OiJlc3RhZG8iO3M6MTA6IkNvbmZpcm1hZG8iO3M6NToiZmVjaGEiO3M6MTk6IjIwMjYtMTAtMTAgMDg6NDA6MDAiO31pOjE3O2E6MTM6e3M6MjoiaWQiO2k6NjtzOjExOiJpZF9yZWdpc3RybyI7aTo2O3M6Njoibm9tYnJlIjtzOjY6IkhlbGVuYSI7czo4OiJhcGVsbGlkbyI7czo2OiJDaG9xdWUiO3M6MTA6InZlcmlmaWNhZG8iO2I6MTtzOjM6InNpcyI7czo5OiIyMDIyMDEwODkiO3M6MTc6Im51bWVyb19pbmNpZGVuY2lhIjtpOjE7czo1OiJjdXJzbyI7czoxNDoiUHJvZ3JhbWFjaW9uIEkiO3M6NzoibWF0ZXJpYSI7czoxNDoiUHJvZ3JhbWFjaW9uIEkiO3M6NzoibW90aXZvcyI7YToxOntpOjA7czozMjoidXNvIGRlIGRpc3Bvc2l0aXZvcyBlbGVjdHJvbmljb3MiO31zOjE1OiJtb3Rpdm9fZXRpcXVldGEiO3M6NDc6IlVzbyBkZSBkaXNwb3NpdGl2b3MgZWxlY3Ryb25pY29zIG5vIGF1dG9yaXphZG9zIjtzOjY6ImVzdGFkbyI7czoxMDoiQ29uZmlybWFkbyI7czo1OiJmZWNoYSI7czoxOToiMjAyNi0xMC0xMCAwODo0MDowMCI7fWk6MTg7YToxMzp7czoyOiJpZCI7aTo0O3M6MTE6ImlkX3JlZ2lzdHJvIjtpOjQ7czo2OiJub21icmUiO3M6NjoiQ2FybG9zIjtzOjg6ImFwZWxsaWRvIjtzOjU6IlJvamFzIjtzOjEwOiJ2ZXJpZmljYWRvIjtiOjE7czozOiJzaXMiO3M6ODoiMjAyMTAwMDQiO3M6MTc6Im51bWVyb19pbmNpZGVuY2lhIjtpOjE7czo1OiJjdXJzbyI7czoxNDoiQWxnZWJyYSBMaW5lYWwiO3M6NzoibWF0ZXJpYSI7czoxNDoiQWxnZWJyYSBMaW5lYWwiO3M6NzoibW90aXZvcyI7YToxOntpOjA7czoyOToidXNvIGRlIG1hdGVyaWFsIG5vIGF1dG9yaXphZG8iO31zOjE1OiJtb3Rpdm9fZXRpcXVldGEiO3M6Mjk6IlVzbyBkZSBtYXRlcmlhbCBubyBhdXRvcml6YWRvIjtzOjY6ImVzdGFkbyI7czoxMDoiQ29uZmlybWFkbyI7czo1OiJmZWNoYSI7czoxOToiMjAyNC0wNi0xMyAwODo0NTowMCI7fWk6MTk7YToxMzp7czoyOiJpZCI7aToyO3M6MTE6ImlkX3JlZ2lzdHJvIjtpOjI7czo2OiJub21icmUiO3M6NDoiTHVpcyI7czo4OiJhcGVsbGlkbyI7czo2OiJNYW1hbmkiO3M6MTA6InZlcmlmaWNhZG8iO2I6MTtzOjM6InNpcyI7czo4OiIyMDIxMDAwMiI7czoxNzoibnVtZXJvX2luY2lkZW5jaWEiO2k6MTtzOjU6ImN1cnNvIjtzOjg6IkZpc2ljYSBJIjtzOjc6Im1hdGVyaWEiO3M6ODoiRmlzaWNhIEkiO3M6NzoibW90aXZvcyI7YToxOntpOjA7czozMjoidXNvIGRlIGRpc3Bvc2l0aXZvcyBlbGVjdHJvbmljb3MiO31zOjE1OiJtb3Rpdm9fZXRpcXVldGEiO3M6NDc6IlVzbyBkZSBkaXNwb3NpdGl2b3MgZWxlY3Ryb25pY29zIG5vIGF1dG9yaXphZG9zIjtzOjY6ImVzdGFkbyI7czoxMDoiQ29uZmlybWFkbyI7czo1OiJmZWNoYSI7czoxOToiMjAyNC0wNi0xMSAxMDozMDowMCI7fWk6MjA7YToxMzp7czoyOiJpZCI7aToxO3M6MTE6ImlkX3JlZ2lzdHJvIjtpOjE7czo2OiJub21icmUiO3M6MzoiQW5hIjtzOjg6ImFwZWxsaWRvIjtzOjU6IlBlcmV6IjtzOjEwOiJ2ZXJpZmljYWRvIjtiOjE7czozOiJzaXMiO3M6ODoiMjAyMTAwMDEiO3M6MTc6Im51bWVyb19pbmNpZGVuY2lhIjtpOjE7czo1OiJjdXJzbyI7czo5OiJDYWxjdWxvIEkiO3M6NzoibWF0ZXJpYSI7czo5OiJDYWxjdWxvIEkiO3M6NzoibW90aXZvcyI7YToxOntpOjA7czo0OiJvdHJvIjt9czoxNToibW90aXZvX2V0aXF1ZXRhIjtzOjQ6Ik90cm8iO3M6NjoiZXN0YWRvIjtzOjEwOiJDb25maXJtYWRvIjtzOjU6ImZlY2hhIjtzOjE5OiIyMDI0LTA2LTEwIDA4OjMwOjAwIjt9fXM6Mjg6IgAqAGVzY2FwZVdoZW5DYXN0aW5nVG9TdHJpbmciO2I6MDt9', 1794277888);
+INSERT INTO "cache" ("key", "value", "expiration") VALUES ('central-riesgo:detalle:v1:9', 'a:15:{s:11:"id_registro";i:9;s:17:"estudiante_nombre";s:15:"Daniela Cabrera";s:14:"sis_estudiante";s:9:"202101289";s:17:"numero_incidencia";N;s:21:"estudiante_verificado";b:1;s:6:"motivo";s:47:"Uso de dispositivos electronicos no autorizados";s:7:"motivos";a:1:{i:0;s:47:"Uso de dispositivos electronicos no autorizados";}s:5:"curso";s:14:"Programacion I";s:7:"materia";s:14:"Programacion I";s:5:"grupo";N;s:13:"reportado_por";s:13:"Roberto Silva";s:17:"reportado_por_rol";s:7:"docente";s:14:"fecha_registro";s:19:"2026-10-10 20:38:58";s:6:"estado";s:9:"Pendiente";s:11:"descripcion";N;}', 1794278247);
+INSERT INTO "cache" ("key", "value", "expiration") VALUES ('central-riesgo:detalle:v2:12', 'a:15:{s:11:"id_registro";i:12;s:17:"estudiante_nombre";s:13:"Andrés Rojas";s:14:"sis_estudiante";s:9:"202201256";s:17:"numero_incidencia";N;s:21:"estudiante_verificado";b:1;s:6:"motivo";s:35:"Intento de ingreso sin autorizacion";s:7:"motivos";a:1:{i:0;s:35:"Intento de ingreso sin autorizacion";}s:5:"curso";s:14:"Programacion I";s:7:"materia";s:14:"Programacion I";s:5:"grupo";N;s:13:"reportado_por";s:13:"Roberto Silva";s:17:"reportado_por_rol";s:7:"docente";s:14:"fecha_registro";s:19:"2026-10-10 22:30:46";s:6:"estado";s:9:"Pendiente";s:11:"descripcion";N;}', 1794278280);
+INSERT INTO "cache" ("key", "value", "expiration") VALUES ('central-riesgo:version', 'i:3;', 2109637777);
+INSERT INTO "cache" ("key", "value", "expiration") VALUES ('central-riesgo:lista:v3:1:toda-la-institucion::0', 'TzoyOToiSWxsdW1pbmF0ZVxTdXBwb3J0XENvbGxlY3Rpb24iOjI6e3M6ODoiACoAaXRlbXMiO2E6MjI6e2k6MDthOjEzOntzOjI6ImlkIjtpOjMyO3M6MTE6ImlkX3JlZ2lzdHJvIjtpOjMyO3M6Njoibm9tYnJlIjtzOjc6IkRhbmllbGEiO3M6ODoiYXBlbGxpZG8iO3M6NzoiQ2FicmVyYSI7czoxMDoidmVyaWZpY2FkbyI7YjoxO3M6Mzoic2lzIjtzOjk6IjIwMjEwMTI4OSI7czoxNzoibnVtZXJvX2luY2lkZW5jaWEiO2k6MTtzOjU6ImN1cnNvIjtzOjE0OiJQcm9ncmFtYWNpb24gSSI7czo3OiJtYXRlcmlhIjtzOjE0OiJQcm9ncmFtYWNpb24gSSI7czo3OiJtb3Rpdm9zIjthOjE6e2k6MDtzOjMzOiJjb3BpYSBvIGludGVyY2FtYmlvIGRlIHJlc3B1ZXN0YXMiO31zOjE1OiJtb3Rpdm9fZXRpcXVldGEiO3M6MzM6IkNvcGlhIG8gaW50ZXJjYW1iaW8gZGUgcmVzcHVlc3RhcyI7czo2OiJlc3RhZG8iO3M6MTA6IkNvbmZpcm1hZG8iO3M6NToiZmVjaGEiO3M6MTk6IjIwMjYtMTAtMjcgMDc6MTg6MDkiO31pOjE7YToxMzp7czoyOiJpZCI7aToyODtzOjExOiJpZF9yZWdpc3RybyI7aToyODtzOjY6Im5vbWJyZSI7czo1OiJLYXJlbiI7czo4OiJhcGVsbGlkbyI7czo3OiJGdWVudGVzIjtzOjEwOiJ2ZXJpZmljYWRvIjtiOjE7czozOiJzaXMiO3M6OToiMjAyMjAxMzU2IjtzOjE3OiJudW1lcm9faW5jaWRlbmNpYSI7aToxO3M6NToiY3Vyc28iO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1hdGVyaWEiO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1vdGl2b3MiO2E6MTp7aTowO3M6MzI6ImludGVudG8gZGUgaW5ncmVzbyBubyBhdXRvcml6YWRvIjt9czoxNToibW90aXZvX2V0aXF1ZXRhIjtzOjM1OiJJbnRlbnRvIGRlIGluZ3Jlc28gc2luIGF1dG9yaXphY2lvbiI7czo2OiJlc3RhZG8iO3M6MTA6IkNvbmZpcm1hZG8iO3M6NToiZmVjaGEiO3M6MTk6IjIwMjYtMTAtMjcgMDY6Mjg6MDgiO31pOjI7YToxMzp7czoyOiJpZCI7aToyNztzOjExOiJpZF9yZWdpc3RybyI7aToyNztzOjY6Im5vbWJyZSI7czo1OiJQYWJsbyI7czo4OiJhcGVsbGlkbyI7czo4OiJLb3dhbHNraSI7czoxMDoidmVyaWZpY2FkbyI7YjoxO3M6Mzoic2lzIjtzOjk6IjIwMjEwMTQwMSI7czoxNzoibnVtZXJvX2luY2lkZW5jaWEiO2k6MTtzOjU6ImN1cnNvIjtzOjE0OiJQcm9ncmFtYWNpb24gSSI7czo3OiJtYXRlcmlhIjtzOjE0OiJQcm9ncmFtYWNpb24gSSI7czo3OiJtb3Rpdm9zIjthOjE6e2k6MDtzOjE1OiJhdWxhIGVxdWl2b2NhZGEiO31zOjE1OiJtb3Rpdm9fZXRpcXVldGEiO3M6MTU6IkF1bGEgZXF1aXZvY2FkYSI7czo2OiJlc3RhZG8iO3M6MTA6IkNvbmZpcm1hZG8iO3M6NToiZmVjaGEiO3M6MTk6IjIwMjYtMTAtMjcgMDY6MTM6MzIiO31pOjM7YToxMzp7czoyOiJpZCI7aToyNjtzOjExOiJpZF9yZWdpc3RybyI7aToyNjtzOjY6Im5vbWJyZSI7czo5OiJWZXLDs25pY2EiO3M6ODoiYXBlbGxpZG8iO3M6MzoiUGF6IjtzOjEwOiJ2ZXJpZmljYWRvIjtiOjE7czozOiJzaXMiO3M6OToiMjAyMjAxNDU2IjtzOjE3OiJudW1lcm9faW5jaWRlbmNpYSI7aToxO3M6NToiY3Vyc28iO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1hdGVyaWEiO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1vdGl2b3MiO2E6MTp7aTowO3M6MzI6ImludGVudG8gZGUgaW5ncmVzbyBubyBhdXRvcml6YWRvIjt9czoxNToibW90aXZvX2V0aXF1ZXRhIjtzOjM1OiJJbnRlbnRvIGRlIGluZ3Jlc28gc2luIGF1dG9yaXphY2lvbiI7czo2OiJlc3RhZG8iO3M6MTA6IkNvbmZpcm1hZG8iO3M6NToiZmVjaGEiO3M6MTk6IjIwMjYtMTAtMjcgMDY6MTI6NTQiO31pOjQ7YToxMzp7czoyOiJpZCI7aToyNTtzOjExOiJpZF9yZWdpc3RybyI7aToyNTtzOjY6Im5vbWJyZSI7czozOiJBbmEiO3M6ODoiYXBlbGxpZG8iO3M6NjoiTMOzcGV6IjtzOjEwOiJ2ZXJpZmljYWRvIjtiOjE7czozOiJzaXMiO3M6OToiMjAyMjAxMDEzIjtzOjE3OiJudW1lcm9faW5jaWRlbmNpYSI7aToyO3M6NToiY3Vyc28iO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1hdGVyaWEiO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1vdGl2b3MiO2E6MTp7aTowO3M6MzM6ImNvcGlhIG8gaW50ZXJjYW1iaW8gZGUgcmVzcHVlc3RhcyI7fXM6MTU6Im1vdGl2b19ldGlxdWV0YSI7czozMzoiQ29waWEgbyBpbnRlcmNhbWJpbyBkZSByZXNwdWVzdGFzIjtzOjY6ImVzdGFkbyI7czoxMDoiQ29uZmlybWFkbyI7czo1OiJmZWNoYSI7czoxOToiMjAyNi0xMC0yNyAwNToxMTo0NSI7fWk6NTthOjEzOntzOjI6ImlkIjtpOjI0O3M6MTE6ImlkX3JlZ2lzdHJvIjtpOjI0O3M6Njoibm9tYnJlIjtzOjU6IkRpZWdvIjtzOjg6ImFwZWxsaWRvIjtzOjQ6IlNvdG8iO3M6MTA6InZlcmlmaWNhZG8iO2I6MTtzOjM6InNpcyI7czo5OiIyMDIyMDIwNDUiO3M6MTc6Im51bWVyb19pbmNpZGVuY2lhIjtpOjE7czo1OiJjdXJzbyI7czoxNDoiUHJvZ3JhbWFjaW9uIEkiO3M6NzoibWF0ZXJpYSI7czoxNDoiUHJvZ3JhbWFjaW9uIEkiO3M6NzoibW90aXZvcyI7YToxOntpOjA7czozMjoidXNvIGRlIGRpc3Bvc2l0aXZvcyBlbGVjdHJvbmljb3MiO31zOjE1OiJtb3Rpdm9fZXRpcXVldGEiO3M6NDc6IlVzbyBkZSBkaXNwb3NpdGl2b3MgZWxlY3Ryb25pY29zIG5vIGF1dG9yaXphZG9zIjtzOjY6ImVzdGFkbyI7czoxMDoiQ29uZmlybWFkbyI7czo1OiJmZWNoYSI7czoxOToiMjAyNi0xMC0yNyAwNDo1NTowNiI7fWk6NjthOjEzOntzOjI6ImlkIjtpOjIzO3M6MTE6ImlkX3JlZ2lzdHJvIjtpOjIzO3M6Njoibm9tYnJlIjtzOjY6IlNlcmdpbyI7czo4OiJhcGVsbGlkbyI7czo3OiJNZW5kb3phIjtzOjEwOiJ2ZXJpZmljYWRvIjtiOjE7czozOiJzaXMiO3M6OToiMjAyMTAxNDIzIjtzOjE3OiJudW1lcm9faW5jaWRlbmNpYSI7aToxO3M6NToiY3Vyc28iO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1hdGVyaWEiO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1vdGl2b3MiO2E6MTp7aTowO3M6NDoib3RybyI7fXM6MTU6Im1vdGl2b19ldGlxdWV0YSI7czo0OiJPdHJvIjtzOjY6ImVzdGFkbyI7czoxMDoiQ29uZmlybWFkbyI7czo1OiJmZWNoYSI7czoxOToiMjAyNi0xMC0yNyAwNDoyNToxOSI7fWk6NzthOjEzOntzOjI6ImlkIjtpOjIyO3M6MTE6ImlkX3JlZ2lzdHJvIjtpOjIyO3M6Njoibm9tYnJlIjtzOjg6IkNyaXN0aWFuIjtzOjg6ImFwZWxsaWRvIjtzOjY6Ik1vbGluYSI7czoxMDoidmVyaWZpY2FkbyI7YjoxO3M6Mzoic2lzIjtzOjk6IjIwMjIwMTI3OCI7czoxNzoibnVtZXJvX2luY2lkZW5jaWEiO2k6MTtzOjU6ImN1cnNvIjtzOjE0OiJQcm9ncmFtYWNpb24gSSI7czo3OiJtYXRlcmlhIjtzOjE0OiJQcm9ncmFtYWNpb24gSSI7czo3OiJtb3Rpdm9zIjthOjE6e2k6MDtzOjQ0OiJpbnRlbnRvIGRlIGluZ3Jlc28gZGUgbWF0ZXJpYWwgbm8gYXV0b3JpemFkbyI7fXM6MTU6Im1vdGl2b19ldGlxdWV0YSI7czo0NToiSW50ZW50byBkZSBpbmdyZXNvIGNvbiBtYXRlcmlhbCBubyBhdXRvcml6YWRvIjtzOjY6ImVzdGFkbyI7czoxMDoiQ29uZmlybWFkbyI7czo1OiJmZWNoYSI7czoxOToiMjAyNi0xMC0yNSAxODozMjoyNSI7fWk6ODthOjEzOntzOjI6ImlkIjtpOjIxO3M6MTE6ImlkX3JlZ2lzdHJvIjtpOjIxO3M6Njoibm9tYnJlIjtzOjM6IkFuYSI7czo4OiJhcGVsbGlkbyI7czo2OiJMw7NwZXoiO3M6MTA6InZlcmlmaWNhZG8iO2I6MTtzOjM6InNpcyI7czo5OiIyMDIyMDEwMTMiO3M6MTc6Im51bWVyb19pbmNpZGVuY2lhIjtpOjE7czo1OiJjdXJzbyI7czoxNDoiUHJvZ3JhbWFjaW9uIEkiO3M6NzoibWF0ZXJpYSI7czoxNDoiUHJvZ3JhbWFjaW9uIEkiO3M6NzoibW90aXZvcyI7YToxOntpOjA7czo0NDoiaW50ZW50byBkZSBpbmdyZXNvIGRlIG1hdGVyaWFsIG5vIGF1dG9yaXphZG8iO31zOjE1OiJtb3Rpdm9fZXRpcXVldGEiO3M6NDU6IkludGVudG8gZGUgaW5ncmVzbyBjb24gbWF0ZXJpYWwgbm8gYXV0b3JpemFkbyI7czo2OiJlc3RhZG8iO3M6MTA6IkNvbmZpcm1hZG8iO3M6NToiZmVjaGEiO3M6MTk6IjIwMjYtMTAtMjUgMTg6MTE6NDMiO31pOjk7YToxMzp7czoyOiJpZCI7aTozMDtzOjExOiJpZF9yZWdpc3RybyI7aTozMDtzOjY6Im5vbWJyZSI7czo2OiJYYXZpZXIiO3M6ODoiYXBlbGxpZG8iO3M6NjoiVmFyZ2FzIjtzOjEwOiJ2ZXJpZmljYWRvIjtiOjE7czozOiJzaXMiO3M6OToiMjAyMTAxMjIzIjtzOjE3OiJudW1lcm9faW5jaWRlbmNpYSI7aToxO3M6NToiY3Vyc28iO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1hdGVyaWEiO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1vdGl2b3MiO2E6MTp7aTowO3M6NDoib3RybyI7fXM6MTU6Im1vdGl2b19ldGlxdWV0YSI7czo0OiJPdHJvIjtzOjY6ImVzdGFkbyI7czoxMDoiQ29uZmlybWFkbyI7czo1OiJmZWNoYSI7czoxOToiMjAyNi0xMC0yNSAwNjozNTozOSI7fWk6MTA7YToxMzp7czoyOiJpZCI7aToyOTtzOjExOiJpZF9yZWdpc3RybyI7aToyOTtzOjY6Im5vbWJyZSI7czo1OiJZYW1pbCI7czo4OiJhcGVsbGlkbyI7czo4OiJTw6FuY2hleiI7czoxMDoidmVyaWZpY2FkbyI7YjoxO3M6Mzoic2lzIjtzOjk6IjIwMjEwMTQ4OSI7czoxNzoibnVtZXJvX2luY2lkZW5jaWEiO2k6MTtzOjU6ImN1cnNvIjtzOjE0OiJQcm9ncmFtYWNpb24gSSI7czo3OiJtYXRlcmlhIjtzOjE0OiJQcm9ncmFtYWNpb24gSSI7czo3OiJtb3Rpdm9zIjthOjE6e2k6MDtzOjQ6Im90cm8iO31zOjE1OiJtb3Rpdm9fZXRpcXVldGEiO3M6NDoiT3RybyI7czo2OiJlc3RhZG8iO3M6MTA6IkNvbmZpcm1hZG8iO3M6NToiZmVjaGEiO3M6MTk6IjIwMjYtMTAtMjUgMDY6MzU6MzciO31pOjExO2E6MTM6e3M6MjoiaWQiO2k6MjA7czoxMToiaWRfcmVnaXN0cm8iO2k6MjA7czo2OiJub21icmUiO3M6NToiV2VuZHkiO3M6ODoiYXBlbGxpZG8iO3M6NjoiWmFwYXRhIjtzOjEwOiJ2ZXJpZmljYWRvIjtiOjE7czozOiJzaXMiO3M6OToiMjAyMjAxMjEyIjtzOjE3OiJudW1lcm9faW5jaWRlbmNpYSI7aToxO3M6NToiY3Vyc28iO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1hdGVyaWEiO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1vdGl2b3MiO2E6MTp7aTowO3M6MzI6InVzbyBkZSBkaXNwb3NpdGl2b3MgZWxlY3Ryb25pY29zIjt9czoxNToibW90aXZvX2V0aXF1ZXRhIjtzOjQ3OiJVc28gZGUgZGlzcG9zaXRpdm9zIGVsZWN0cm9uaWNvcyBubyBhdXRvcml6YWRvcyI7czo2OiJlc3RhZG8iO3M6MTA6IkNvbmZpcm1hZG8iO3M6NToiZmVjaGEiO3M6MTk6IjIwMjYtMTAtMTIgMTY6MzQ6NDQiO31pOjEyO2E6MTM6e3M6MjoiaWQiO2k6MTg7czoxMToiaWRfcmVnaXN0cm8iO2k6MTg7czo2OiJub21icmUiO3M6NToiUmHDumwiO3M6ODoiYXBlbGxpZG8iO3M6NjoiQ2hvcXVlIjtzOjEwOiJ2ZXJpZmljYWRvIjtiOjE7czozOiJzaXMiO3M6OToiMjAyMTAxMTc4IjtzOjE3OiJudW1lcm9faW5jaWRlbmNpYSI7aToxO3M6NToiY3Vyc28iO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1hdGVyaWEiO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1vdGl2b3MiO2E6MTp7aTowO3M6MjU6InN1cGxhbnRhY2lvbiBkZSBpZGVudGlkYWQiO31zOjE1OiJtb3Rpdm9fZXRpcXVldGEiO3M6MjU6IlN1cGxhbnRhY2lvbiBkZSBpZGVudGlkYWQiO3M6NjoiZXN0YWRvIjtzOjEwOiJDb25maXJtYWRvIjtzOjU6ImZlY2hhIjtzOjE5OiIyMDI2LTEwLTEyIDAzOjM0OjAxIjt9aToxMzthOjEzOntzOjI6ImlkIjtpOjE3O3M6MTE6ImlkX3JlZ2lzdHJvIjtpOjE3O3M6Njoibm9tYnJlIjtzOjY6IldhbHRlciI7czo4OiJhcGVsbGlkbyI7czo3OiJRdWlyb2dhIjtzOjEwOiJ2ZXJpZmljYWRvIjtiOjE7czozOiJzaXMiO3M6OToiMjAyMTAxNDY3IjtzOjE3OiJudW1lcm9faW5jaWRlbmNpYSI7aToxO3M6NToiY3Vyc28iO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1hdGVyaWEiO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1vdGl2b3MiO2E6MTp7aTowO3M6MzM6ImNvcGlhIG8gaW50ZXJjYW1iaW8gZGUgcmVzcHVlc3RhcyI7fXM6MTU6Im1vdGl2b19ldGlxdWV0YSI7czozMzoiQ29waWEgbyBpbnRlcmNhbWJpbyBkZSByZXNwdWVzdGFzIjtzOjY6ImVzdGFkbyI7czoxMDoiQ29uZmlybWFkbyI7czo1OiJmZWNoYSI7czoxOToiMjAyNi0xMC0xMiAwMTozMDo1MiI7fWk6MTQ7YToxMzp7czoyOiJpZCI7aToxOTtzOjExOiJpZF9yZWdpc3RybyI7aToxOTtzOjY6Im5vbWJyZSI7czo1OiJJdsOhbiI7czo4OiJhcGVsbGlkbyI7czo2OiJGbG9yZXMiO3M6MTA6InZlcmlmaWNhZG8iO2I6MTtzOjM6InNpcyI7czo5OiIyMDIxMDEwOTAiO3M6MTc6Im51bWVyb19pbmNpZGVuY2lhIjtpOjE7czo1OiJjdXJzbyI7czoxNDoiUHJvZ3JhbWFjaW9uIEkiO3M6NzoibWF0ZXJpYSI7czoxNDoiUHJvZ3JhbWFjaW9uIEkiO3M6NzoibW90aXZvcyI7YToxOntpOjA7czo0OiJvdHJvIjt9czoxNToibW90aXZvX2V0aXF1ZXRhIjtzOjQ6Ik90cm8iO3M6NjoiZXN0YWRvIjtzOjEwOiJDb25maXJtYWRvIjtzOjU6ImZlY2hhIjtzOjE5OiIyMDI2LTEwLTEyIDAwOjEzOjE3Ijt9aToxNTthOjEzOntzOjI6ImlkIjtpOjEyO3M6MTE6ImlkX3JlZ2lzdHJvIjtpOjEyO3M6Njoibm9tYnJlIjtzOjc6IkFuZHLDqXMiO3M6ODoiYXBlbGxpZG8iO3M6NToiUm9qYXMiO3M6MTA6InZlcmlmaWNhZG8iO2I6MTtzOjM6InNpcyI7czo5OiIyMDIyMDEyNTYiO3M6MTc6Im51bWVyb19pbmNpZGVuY2lhIjtpOjE7czo1OiJjdXJzbyI7czoxNDoiUHJvZ3JhbWFjaW9uIEkiO3M6NzoibWF0ZXJpYSI7czoxNDoiUHJvZ3JhbWFjaW9uIEkiO3M6NzoibW90aXZvcyI7YToxOntpOjA7czozMjoiaW50ZW50byBkZSBpbmdyZXNvIG5vIGF1dG9yaXphZG8iO31zOjE1OiJtb3Rpdm9fZXRpcXVldGEiO3M6MzU6IkludGVudG8gZGUgaW5ncmVzbyBzaW4gYXV0b3JpemFjaW9uIjtzOjY6ImVzdGFkbyI7czoxMDoiQ29uZmlybWFkbyI7czo1OiJmZWNoYSI7czoxOToiMjAyNi0xMC0xMCAyMjozMDo0NiI7fWk6MTY7YToxMzp7czoyOiJpZCI7aTo4O3M6MTE6ImlkX3JlZ2lzdHJvIjtpOjg7czo2OiJub21icmUiO3M6NzoiRsOhdGltYSI7czo4OiJhcGVsbGlkbyI7czo2OiJRdWlzcGUiO3M6MTA6InZlcmlmaWNhZG8iO2I6MTtzOjM6InNpcyI7czo5OiIyMDIyMDEwNTYiO3M6MTc6Im51bWVyb19pbmNpZGVuY2lhIjtpOjE7czo1OiJjdXJzbyI7czoxNDoiUHJvZ3JhbWFjaW9uIEkiO3M6NzoibWF0ZXJpYSI7czoxNDoiUHJvZ3JhbWFjaW9uIEkiO3M6NzoibW90aXZvcyI7YToxOntpOjA7czoyOToidXNvIGRlIG1hdGVyaWFsIG5vIGF1dG9yaXphZG8iO31zOjE1OiJtb3Rpdm9fZXRpcXVldGEiO3M6Mjk6IlVzbyBkZSBtYXRlcmlhbCBubyBhdXRvcml6YWRvIjtzOjY6ImVzdGFkbyI7czoxMDoiQ29uZmlybWFkbyI7czo1OiJmZWNoYSI7czoxOToiMjAyNi0xMC0xMCAwODo0MDowMCI7fWk6MTc7YToxMzp7czoyOiJpZCI7aTo3O3M6MTE6ImlkX3JlZ2lzdHJvIjtpOjc7czo2OiJub21icmUiO3M6NzoiR2FicmllbCI7czo4OiJhcGVsbGlkbyI7czo2OiJNYW1hbmkiO3M6MTA6InZlcmlmaWNhZG8iO2I6MTtzOjM6InNpcyI7czo5OiIyMDIxMDEwNzgiO3M6MTc6Im51bWVyb19pbmNpZGVuY2lhIjtpOjE7czo1OiJjdXJzbyI7czoxNDoiUHJvZ3JhbWFjaW9uIEkiO3M6NzoibWF0ZXJpYSI7czoxNDoiUHJvZ3JhbWFjaW9uIEkiO3M6NzoibW90aXZvcyI7YToxOntpOjA7czozMzoiY29waWEgbyBpbnRlcmNhbWJpbyBkZSByZXNwdWVzdGFzIjt9czoxNToibW90aXZvX2V0aXF1ZXRhIjtzOjMzOiJDb3BpYSBvIGludGVyY2FtYmlvIGRlIHJlc3B1ZXN0YXMiO3M6NjoiZXN0YWRvIjtzOjEwOiJDb25maXJtYWRvIjtzOjU6ImZlY2hhIjtzOjE5OiIyMDI2LTEwLTEwIDA4OjQwOjAwIjt9aToxODthOjEzOntzOjI6ImlkIjtpOjY7czoxMToiaWRfcmVnaXN0cm8iO2k6NjtzOjY6Im5vbWJyZSI7czo2OiJIZWxlbmEiO3M6ODoiYXBlbGxpZG8iO3M6NjoiQ2hvcXVlIjtzOjEwOiJ2ZXJpZmljYWRvIjtiOjE7czozOiJzaXMiO3M6OToiMjAyMjAxMDg5IjtzOjE3OiJudW1lcm9faW5jaWRlbmNpYSI7aToxO3M6NToiY3Vyc28iO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1hdGVyaWEiO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1vdGl2b3MiO2E6MTp7aTowO3M6MzI6InVzbyBkZSBkaXNwb3NpdGl2b3MgZWxlY3Ryb25pY29zIjt9czoxNToibW90aXZvX2V0aXF1ZXRhIjtzOjQ3OiJVc28gZGUgZGlzcG9zaXRpdm9zIGVsZWN0cm9uaWNvcyBubyBhdXRvcml6YWRvcyI7czo2OiJlc3RhZG8iO3M6MTA6IkNvbmZpcm1hZG8iO3M6NToiZmVjaGEiO3M6MTk6IjIwMjYtMTAtMTAgMDg6NDA6MDAiO31pOjE5O2E6MTM6e3M6MjoiaWQiO2k6NDtzOjExOiJpZF9yZWdpc3RybyI7aTo0O3M6Njoibm9tYnJlIjtzOjY6IkNhcmxvcyI7czo4OiJhcGVsbGlkbyI7czo1OiJSb2phcyI7czoxMDoidmVyaWZpY2FkbyI7YjoxO3M6Mzoic2lzIjtzOjg6IjIwMjEwMDA0IjtzOjE3OiJudW1lcm9faW5jaWRlbmNpYSI7aToxO3M6NToiY3Vyc28iO3M6MTQ6IkFsZ2VicmEgTGluZWFsIjtzOjc6Im1hdGVyaWEiO3M6MTQ6IkFsZ2VicmEgTGluZWFsIjtzOjc6Im1vdGl2b3MiO2E6MTp7aTowO3M6Mjk6InVzbyBkZSBtYXRlcmlhbCBubyBhdXRvcml6YWRvIjt9czoxNToibW90aXZvX2V0aXF1ZXRhIjtzOjI5OiJVc28gZGUgbWF0ZXJpYWwgbm8gYXV0b3JpemFkbyI7czo2OiJlc3RhZG8iO3M6MTA6IkNvbmZpcm1hZG8iO3M6NToiZmVjaGEiO3M6MTk6IjIwMjQtMDYtMTMgMDg6NDU6MDAiO31pOjIwO2E6MTM6e3M6MjoiaWQiO2k6MjtzOjExOiJpZF9yZWdpc3RybyI7aToyO3M6Njoibm9tYnJlIjtzOjQ6Ikx1aXMiO3M6ODoiYXBlbGxpZG8iO3M6NjoiTWFtYW5pIjtzOjEwOiJ2ZXJpZmljYWRvIjtiOjE7czozOiJzaXMiO3M6ODoiMjAyMTAwMDIiO3M6MTc6Im51bWVyb19pbmNpZGVuY2lhIjtpOjE7czo1OiJjdXJzbyI7czo4OiJGaXNpY2EgSSI7czo3OiJtYXRlcmlhIjtzOjg6IkZpc2ljYSBJIjtzOjc6Im1vdGl2b3MiO2E6MTp7aTowO3M6MzI6InVzbyBkZSBkaXNwb3NpdGl2b3MgZWxlY3Ryb25pY29zIjt9czoxNToibW90aXZvX2V0aXF1ZXRhIjtzOjQ3OiJVc28gZGUgZGlzcG9zaXRpdm9zIGVsZWN0cm9uaWNvcyBubyBhdXRvcml6YWRvcyI7czo2OiJlc3RhZG8iO3M6MTA6IkNvbmZpcm1hZG8iO3M6NToiZmVjaGEiO3M6MTk6IjIwMjQtMDYtMTEgMTA6MzA6MDAiO31pOjIxO2E6MTM6e3M6MjoiaWQiO2k6MTtzOjExOiJpZF9yZWdpc3RybyI7aToxO3M6Njoibm9tYnJlIjtzOjM6IkFuYSI7czo4OiJhcGVsbGlkbyI7czo1OiJQZXJleiI7czoxMDoidmVyaWZpY2FkbyI7YjoxO3M6Mzoic2lzIjtzOjg6IjIwMjEwMDAxIjtzOjE3OiJudW1lcm9faW5jaWRlbmNpYSI7aToxO3M6NToiY3Vyc28iO3M6OToiQ2FsY3VsbyBJIjtzOjc6Im1hdGVyaWEiO3M6OToiQ2FsY3VsbyBJIjtzOjc6Im1vdGl2b3MiO2E6MTp7aTowO3M6NDoib3RybyI7fXM6MTU6Im1vdGl2b19ldGlxdWV0YSI7czo0OiJPdHJvIjtzOjY6ImVzdGFkbyI7czoxMDoiQ29uZmlybWFkbyI7czo1OiJmZWNoYSI7czoxOToiMjAyNC0wNi0xMCAwODozMDowMCI7fX1zOjI4OiIAKgBlc2NhcGVXaGVuQ2FzdGluZ1RvU3RyaW5nIjtiOjA7fQ==', 1794278101);
+INSERT INTO "cache" ("key", "value", "expiration") VALUES ('central-riesgo:lista:v3:1:mis-materias::0', 'TzoyOToiSWxsdW1pbmF0ZVxTdXBwb3J0XENvbGxlY3Rpb24iOjI6e3M6ODoiACoAaXRlbXMiO2E6MjE6e2k6MDthOjEzOntzOjI6ImlkIjtpOjMyO3M6MTE6ImlkX3JlZ2lzdHJvIjtpOjMyO3M6Njoibm9tYnJlIjtzOjc6IkRhbmllbGEiO3M6ODoiYXBlbGxpZG8iO3M6NzoiQ2FicmVyYSI7czoxMDoidmVyaWZpY2FkbyI7YjoxO3M6Mzoic2lzIjtzOjk6IjIwMjEwMTI4OSI7czoxNzoibnVtZXJvX2luY2lkZW5jaWEiO2k6MTtzOjU6ImN1cnNvIjtzOjE0OiJQcm9ncmFtYWNpb24gSSI7czo3OiJtYXRlcmlhIjtzOjE0OiJQcm9ncmFtYWNpb24gSSI7czo3OiJtb3Rpdm9zIjthOjE6e2k6MDtzOjMzOiJjb3BpYSBvIGludGVyY2FtYmlvIGRlIHJlc3B1ZXN0YXMiO31zOjE1OiJtb3Rpdm9fZXRpcXVldGEiO3M6MzM6IkNvcGlhIG8gaW50ZXJjYW1iaW8gZGUgcmVzcHVlc3RhcyI7czo2OiJlc3RhZG8iO3M6MTA6IkNvbmZpcm1hZG8iO3M6NToiZmVjaGEiO3M6MTk6IjIwMjYtMTAtMjcgMDc6MTg6MDkiO31pOjE7YToxMzp7czoyOiJpZCI7aToyODtzOjExOiJpZF9yZWdpc3RybyI7aToyODtzOjY6Im5vbWJyZSI7czo1OiJLYXJlbiI7czo4OiJhcGVsbGlkbyI7czo3OiJGdWVudGVzIjtzOjEwOiJ2ZXJpZmljYWRvIjtiOjE7czozOiJzaXMiO3M6OToiMjAyMjAxMzU2IjtzOjE3OiJudW1lcm9faW5jaWRlbmNpYSI7aToxO3M6NToiY3Vyc28iO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1hdGVyaWEiO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1vdGl2b3MiO2E6MTp7aTowO3M6MzI6ImludGVudG8gZGUgaW5ncmVzbyBubyBhdXRvcml6YWRvIjt9czoxNToibW90aXZvX2V0aXF1ZXRhIjtzOjM1OiJJbnRlbnRvIGRlIGluZ3Jlc28gc2luIGF1dG9yaXphY2lvbiI7czo2OiJlc3RhZG8iO3M6MTA6IkNvbmZpcm1hZG8iO3M6NToiZmVjaGEiO3M6MTk6IjIwMjYtMTAtMjcgMDY6Mjg6MDgiO31pOjI7YToxMzp7czoyOiJpZCI7aToyNztzOjExOiJpZF9yZWdpc3RybyI7aToyNztzOjY6Im5vbWJyZSI7czo1OiJQYWJsbyI7czo4OiJhcGVsbGlkbyI7czo4OiJLb3dhbHNraSI7czoxMDoidmVyaWZpY2FkbyI7YjoxO3M6Mzoic2lzIjtzOjk6IjIwMjEwMTQwMSI7czoxNzoibnVtZXJvX2luY2lkZW5jaWEiO2k6MTtzOjU6ImN1cnNvIjtzOjE0OiJQcm9ncmFtYWNpb24gSSI7czo3OiJtYXRlcmlhIjtzOjE0OiJQcm9ncmFtYWNpb24gSSI7czo3OiJtb3Rpdm9zIjthOjE6e2k6MDtzOjE1OiJhdWxhIGVxdWl2b2NhZGEiO31zOjE1OiJtb3Rpdm9fZXRpcXVldGEiO3M6MTU6IkF1bGEgZXF1aXZvY2FkYSI7czo2OiJlc3RhZG8iO3M6MTA6IkNvbmZpcm1hZG8iO3M6NToiZmVjaGEiO3M6MTk6IjIwMjYtMTAtMjcgMDY6MTM6MzIiO31pOjM7YToxMzp7czoyOiJpZCI7aToyNjtzOjExOiJpZF9yZWdpc3RybyI7aToyNjtzOjY6Im5vbWJyZSI7czo5OiJWZXLDs25pY2EiO3M6ODoiYXBlbGxpZG8iO3M6MzoiUGF6IjtzOjEwOiJ2ZXJpZmljYWRvIjtiOjE7czozOiJzaXMiO3M6OToiMjAyMjAxNDU2IjtzOjE3OiJudW1lcm9faW5jaWRlbmNpYSI7aToxO3M6NToiY3Vyc28iO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1hdGVyaWEiO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1vdGl2b3MiO2E6MTp7aTowO3M6MzI6ImludGVudG8gZGUgaW5ncmVzbyBubyBhdXRvcml6YWRvIjt9czoxNToibW90aXZvX2V0aXF1ZXRhIjtzOjM1OiJJbnRlbnRvIGRlIGluZ3Jlc28gc2luIGF1dG9yaXphY2lvbiI7czo2OiJlc3RhZG8iO3M6MTA6IkNvbmZpcm1hZG8iO3M6NToiZmVjaGEiO3M6MTk6IjIwMjYtMTAtMjcgMDY6MTI6NTQiO31pOjQ7YToxMzp7czoyOiJpZCI7aToyNTtzOjExOiJpZF9yZWdpc3RybyI7aToyNTtzOjY6Im5vbWJyZSI7czozOiJBbmEiO3M6ODoiYXBlbGxpZG8iO3M6NjoiTMOzcGV6IjtzOjEwOiJ2ZXJpZmljYWRvIjtiOjE7czozOiJzaXMiO3M6OToiMjAyMjAxMDEzIjtzOjE3OiJudW1lcm9faW5jaWRlbmNpYSI7aToyO3M6NToiY3Vyc28iO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1hdGVyaWEiO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1vdGl2b3MiO2E6MTp7aTowO3M6MzM6ImNvcGlhIG8gaW50ZXJjYW1iaW8gZGUgcmVzcHVlc3RhcyI7fXM6MTU6Im1vdGl2b19ldGlxdWV0YSI7czozMzoiQ29waWEgbyBpbnRlcmNhbWJpbyBkZSByZXNwdWVzdGFzIjtzOjY6ImVzdGFkbyI7czoxMDoiQ29uZmlybWFkbyI7czo1OiJmZWNoYSI7czoxOToiMjAyNi0xMC0yNyAwNToxMTo0NSI7fWk6NTthOjEzOntzOjI6ImlkIjtpOjI0O3M6MTE6ImlkX3JlZ2lzdHJvIjtpOjI0O3M6Njoibm9tYnJlIjtzOjU6IkRpZWdvIjtzOjg6ImFwZWxsaWRvIjtzOjQ6IlNvdG8iO3M6MTA6InZlcmlmaWNhZG8iO2I6MTtzOjM6InNpcyI7czo5OiIyMDIyMDIwNDUiO3M6MTc6Im51bWVyb19pbmNpZGVuY2lhIjtpOjE7czo1OiJjdXJzbyI7czoxNDoiUHJvZ3JhbWFjaW9uIEkiO3M6NzoibWF0ZXJpYSI7czoxNDoiUHJvZ3JhbWFjaW9uIEkiO3M6NzoibW90aXZvcyI7YToxOntpOjA7czozMjoidXNvIGRlIGRpc3Bvc2l0aXZvcyBlbGVjdHJvbmljb3MiO31zOjE1OiJtb3Rpdm9fZXRpcXVldGEiO3M6NDc6IlVzbyBkZSBkaXNwb3NpdGl2b3MgZWxlY3Ryb25pY29zIG5vIGF1dG9yaXphZG9zIjtzOjY6ImVzdGFkbyI7czoxMDoiQ29uZmlybWFkbyI7czo1OiJmZWNoYSI7czoxOToiMjAyNi0xMC0yNyAwNDo1NTowNiI7fWk6NjthOjEzOntzOjI6ImlkIjtpOjIzO3M6MTE6ImlkX3JlZ2lzdHJvIjtpOjIzO3M6Njoibm9tYnJlIjtzOjY6IlNlcmdpbyI7czo4OiJhcGVsbGlkbyI7czo3OiJNZW5kb3phIjtzOjEwOiJ2ZXJpZmljYWRvIjtiOjE7czozOiJzaXMiO3M6OToiMjAyMTAxNDIzIjtzOjE3OiJudW1lcm9faW5jaWRlbmNpYSI7aToxO3M6NToiY3Vyc28iO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1hdGVyaWEiO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1vdGl2b3MiO2E6MTp7aTowO3M6NDoib3RybyI7fXM6MTU6Im1vdGl2b19ldGlxdWV0YSI7czo0OiJPdHJvIjtzOjY6ImVzdGFkbyI7czoxMDoiQ29uZmlybWFkbyI7czo1OiJmZWNoYSI7czoxOToiMjAyNi0xMC0yNyAwNDoyNToxOSI7fWk6NzthOjEzOntzOjI6ImlkIjtpOjIyO3M6MTE6ImlkX3JlZ2lzdHJvIjtpOjIyO3M6Njoibm9tYnJlIjtzOjg6IkNyaXN0aWFuIjtzOjg6ImFwZWxsaWRvIjtzOjY6Ik1vbGluYSI7czoxMDoidmVyaWZpY2FkbyI7YjoxO3M6Mzoic2lzIjtzOjk6IjIwMjIwMTI3OCI7czoxNzoibnVtZXJvX2luY2lkZW5jaWEiO2k6MTtzOjU6ImN1cnNvIjtzOjE0OiJQcm9ncmFtYWNpb24gSSI7czo3OiJtYXRlcmlhIjtzOjE0OiJQcm9ncmFtYWNpb24gSSI7czo3OiJtb3Rpdm9zIjthOjE6e2k6MDtzOjQ0OiJpbnRlbnRvIGRlIGluZ3Jlc28gZGUgbWF0ZXJpYWwgbm8gYXV0b3JpemFkbyI7fXM6MTU6Im1vdGl2b19ldGlxdWV0YSI7czo0NToiSW50ZW50byBkZSBpbmdyZXNvIGNvbiBtYXRlcmlhbCBubyBhdXRvcml6YWRvIjtzOjY6ImVzdGFkbyI7czoxMDoiQ29uZmlybWFkbyI7czo1OiJmZWNoYSI7czoxOToiMjAyNi0xMC0yNSAxODozMjoyNSI7fWk6ODthOjEzOntzOjI6ImlkIjtpOjIxO3M6MTE6ImlkX3JlZ2lzdHJvIjtpOjIxO3M6Njoibm9tYnJlIjtzOjM6IkFuYSI7czo4OiJhcGVsbGlkbyI7czo2OiJMw7NwZXoiO3M6MTA6InZlcmlmaWNhZG8iO2I6MTtzOjM6InNpcyI7czo5OiIyMDIyMDEwMTMiO3M6MTc6Im51bWVyb19pbmNpZGVuY2lhIjtpOjE7czo1OiJjdXJzbyI7czoxNDoiUHJvZ3JhbWFjaW9uIEkiO3M6NzoibWF0ZXJpYSI7czoxNDoiUHJvZ3JhbWFjaW9uIEkiO3M6NzoibW90aXZvcyI7YToxOntpOjA7czo0NDoiaW50ZW50byBkZSBpbmdyZXNvIGRlIG1hdGVyaWFsIG5vIGF1dG9yaXphZG8iO31zOjE1OiJtb3Rpdm9fZXRpcXVldGEiO3M6NDU6IkludGVudG8gZGUgaW5ncmVzbyBjb24gbWF0ZXJpYWwgbm8gYXV0b3JpemFkbyI7czo2OiJlc3RhZG8iO3M6MTA6IkNvbmZpcm1hZG8iO3M6NToiZmVjaGEiO3M6MTk6IjIwMjYtMTAtMjUgMTg6MTE6NDMiO31pOjk7YToxMzp7czoyOiJpZCI7aTozMDtzOjExOiJpZF9yZWdpc3RybyI7aTozMDtzOjY6Im5vbWJyZSI7czo2OiJYYXZpZXIiO3M6ODoiYXBlbGxpZG8iO3M6NjoiVmFyZ2FzIjtzOjEwOiJ2ZXJpZmljYWRvIjtiOjE7czozOiJzaXMiO3M6OToiMjAyMTAxMjIzIjtzOjE3OiJudW1lcm9faW5jaWRlbmNpYSI7aToxO3M6NToiY3Vyc28iO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1hdGVyaWEiO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1vdGl2b3MiO2E6MTp7aTowO3M6NDoib3RybyI7fXM6MTU6Im1vdGl2b19ldGlxdWV0YSI7czo0OiJPdHJvIjtzOjY6ImVzdGFkbyI7czoxMDoiQ29uZmlybWFkbyI7czo1OiJmZWNoYSI7czoxOToiMjAyNi0xMC0yNSAwNjozNTozOSI7fWk6MTA7YToxMzp7czoyOiJpZCI7aToyOTtzOjExOiJpZF9yZWdpc3RybyI7aToyOTtzOjY6Im5vbWJyZSI7czo1OiJZYW1pbCI7czo4OiJhcGVsbGlkbyI7czo4OiJTw6FuY2hleiI7czoxMDoidmVyaWZpY2FkbyI7YjoxO3M6Mzoic2lzIjtzOjk6IjIwMjEwMTQ4OSI7czoxNzoibnVtZXJvX2luY2lkZW5jaWEiO2k6MTtzOjU6ImN1cnNvIjtzOjE0OiJQcm9ncmFtYWNpb24gSSI7czo3OiJtYXRlcmlhIjtzOjE0OiJQcm9ncmFtYWNpb24gSSI7czo3OiJtb3Rpdm9zIjthOjE6e2k6MDtzOjQ6Im90cm8iO31zOjE1OiJtb3Rpdm9fZXRpcXVldGEiO3M6NDoiT3RybyI7czo2OiJlc3RhZG8iO3M6MTA6IkNvbmZpcm1hZG8iO3M6NToiZmVjaGEiO3M6MTk6IjIwMjYtMTAtMjUgMDY6MzU6MzciO31pOjExO2E6MTM6e3M6MjoiaWQiO2k6MjA7czoxMToiaWRfcmVnaXN0cm8iO2k6MjA7czo2OiJub21icmUiO3M6NToiV2VuZHkiO3M6ODoiYXBlbGxpZG8iO3M6NjoiWmFwYXRhIjtzOjEwOiJ2ZXJpZmljYWRvIjtiOjE7czozOiJzaXMiO3M6OToiMjAyMjAxMjEyIjtzOjE3OiJudW1lcm9faW5jaWRlbmNpYSI7aToxO3M6NToiY3Vyc28iO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1hdGVyaWEiO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1vdGl2b3MiO2E6MTp7aTowO3M6MzI6InVzbyBkZSBkaXNwb3NpdGl2b3MgZWxlY3Ryb25pY29zIjt9czoxNToibW90aXZvX2V0aXF1ZXRhIjtzOjQ3OiJVc28gZGUgZGlzcG9zaXRpdm9zIGVsZWN0cm9uaWNvcyBubyBhdXRvcml6YWRvcyI7czo2OiJlc3RhZG8iO3M6MTA6IkNvbmZpcm1hZG8iO3M6NToiZmVjaGEiO3M6MTk6IjIwMjYtMTAtMTIgMTY6MzQ6NDQiO31pOjEyO2E6MTM6e3M6MjoiaWQiO2k6MTg7czoxMToiaWRfcmVnaXN0cm8iO2k6MTg7czo2OiJub21icmUiO3M6NToiUmHDumwiO3M6ODoiYXBlbGxpZG8iO3M6NjoiQ2hvcXVlIjtzOjEwOiJ2ZXJpZmljYWRvIjtiOjE7czozOiJzaXMiO3M6OToiMjAyMTAxMTc4IjtzOjE3OiJudW1lcm9faW5jaWRlbmNpYSI7aToxO3M6NToiY3Vyc28iO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1hdGVyaWEiO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1vdGl2b3MiO2E6MTp7aTowO3M6MjU6InN1cGxhbnRhY2lvbiBkZSBpZGVudGlkYWQiO31zOjE1OiJtb3Rpdm9fZXRpcXVldGEiO3M6MjU6IlN1cGxhbnRhY2lvbiBkZSBpZGVudGlkYWQiO3M6NjoiZXN0YWRvIjtzOjEwOiJDb25maXJtYWRvIjtzOjU6ImZlY2hhIjtzOjE5OiIyMDI2LTEwLTEyIDAzOjM0OjAxIjt9aToxMzthOjEzOntzOjI6ImlkIjtpOjE3O3M6MTE6ImlkX3JlZ2lzdHJvIjtpOjE3O3M6Njoibm9tYnJlIjtzOjY6IldhbHRlciI7czo4OiJhcGVsbGlkbyI7czo3OiJRdWlyb2dhIjtzOjEwOiJ2ZXJpZmljYWRvIjtiOjE7czozOiJzaXMiO3M6OToiMjAyMTAxNDY3IjtzOjE3OiJudW1lcm9faW5jaWRlbmNpYSI7aToxO3M6NToiY3Vyc28iO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1hdGVyaWEiO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1vdGl2b3MiO2E6MTp7aTowO3M6MzM6ImNvcGlhIG8gaW50ZXJjYW1iaW8gZGUgcmVzcHVlc3RhcyI7fXM6MTU6Im1vdGl2b19ldGlxdWV0YSI7czozMzoiQ29waWEgbyBpbnRlcmNhbWJpbyBkZSByZXNwdWVzdGFzIjtzOjY6ImVzdGFkbyI7czoxMDoiQ29uZmlybWFkbyI7czo1OiJmZWNoYSI7czoxOToiMjAyNi0xMC0xMiAwMTozMDo1MiI7fWk6MTQ7YToxMzp7czoyOiJpZCI7aToxOTtzOjExOiJpZF9yZWdpc3RybyI7aToxOTtzOjY6Im5vbWJyZSI7czo1OiJJdsOhbiI7czo4OiJhcGVsbGlkbyI7czo2OiJGbG9yZXMiO3M6MTA6InZlcmlmaWNhZG8iO2I6MTtzOjM6InNpcyI7czo5OiIyMDIxMDEwOTAiO3M6MTc6Im51bWVyb19pbmNpZGVuY2lhIjtpOjE7czo1OiJjdXJzbyI7czoxNDoiUHJvZ3JhbWFjaW9uIEkiO3M6NzoibWF0ZXJpYSI7czoxNDoiUHJvZ3JhbWFjaW9uIEkiO3M6NzoibW90aXZvcyI7YToxOntpOjA7czo0OiJvdHJvIjt9czoxNToibW90aXZvX2V0aXF1ZXRhIjtzOjQ6Ik90cm8iO3M6NjoiZXN0YWRvIjtzOjEwOiJDb25maXJtYWRvIjtzOjU6ImZlY2hhIjtzOjE5OiIyMDI2LTEwLTEyIDAwOjEzOjE3Ijt9aToxNTthOjEzOntzOjI6ImlkIjtpOjEyO3M6MTE6ImlkX3JlZ2lzdHJvIjtpOjEyO3M6Njoibm9tYnJlIjtzOjc6IkFuZHLDqXMiO3M6ODoiYXBlbGxpZG8iO3M6NToiUm9qYXMiO3M6MTA6InZlcmlmaWNhZG8iO2I6MTtzOjM6InNpcyI7czo5OiIyMDIyMDEyNTYiO3M6MTc6Im51bWVyb19pbmNpZGVuY2lhIjtpOjE7czo1OiJjdXJzbyI7czoxNDoiUHJvZ3JhbWFjaW9uIEkiO3M6NzoibWF0ZXJpYSI7czoxNDoiUHJvZ3JhbWFjaW9uIEkiO3M6NzoibW90aXZvcyI7YToxOntpOjA7czozMjoiaW50ZW50byBkZSBpbmdyZXNvIG5vIGF1dG9yaXphZG8iO31zOjE1OiJtb3Rpdm9fZXRpcXVldGEiO3M6MzU6IkludGVudG8gZGUgaW5ncmVzbyBzaW4gYXV0b3JpemFjaW9uIjtzOjY6ImVzdGFkbyI7czoxMDoiQ29uZmlybWFkbyI7czo1OiJmZWNoYSI7czoxOToiMjAyNi0xMC0xMCAyMjozMDo0NiI7fWk6MTY7YToxMzp7czoyOiJpZCI7aTo4O3M6MTE6ImlkX3JlZ2lzdHJvIjtpOjg7czo2OiJub21icmUiO3M6NzoiRsOhdGltYSI7czo4OiJhcGVsbGlkbyI7czo2OiJRdWlzcGUiO3M6MTA6InZlcmlmaWNhZG8iO2I6MTtzOjM6InNpcyI7czo5OiIyMDIyMDEwNTYiO3M6MTc6Im51bWVyb19pbmNpZGVuY2lhIjtpOjE7czo1OiJjdXJzbyI7czoxNDoiUHJvZ3JhbWFjaW9uIEkiO3M6NzoibWF0ZXJpYSI7czoxNDoiUHJvZ3JhbWFjaW9uIEkiO3M6NzoibW90aXZvcyI7YToxOntpOjA7czoyOToidXNvIGRlIG1hdGVyaWFsIG5vIGF1dG9yaXphZG8iO31zOjE1OiJtb3Rpdm9fZXRpcXVldGEiO3M6Mjk6IlVzbyBkZSBtYXRlcmlhbCBubyBhdXRvcml6YWRvIjtzOjY6ImVzdGFkbyI7czoxMDoiQ29uZmlybWFkbyI7czo1OiJmZWNoYSI7czoxOToiMjAyNi0xMC0xMCAwODo0MDowMCI7fWk6MTc7YToxMzp7czoyOiJpZCI7aTo3O3M6MTE6ImlkX3JlZ2lzdHJvIjtpOjc7czo2OiJub21icmUiO3M6NzoiR2FicmllbCI7czo4OiJhcGVsbGlkbyI7czo2OiJNYW1hbmkiO3M6MTA6InZlcmlmaWNhZG8iO2I6MTtzOjM6InNpcyI7czo5OiIyMDIxMDEwNzgiO3M6MTc6Im51bWVyb19pbmNpZGVuY2lhIjtpOjE7czo1OiJjdXJzbyI7czoxNDoiUHJvZ3JhbWFjaW9uIEkiO3M6NzoibWF0ZXJpYSI7czoxNDoiUHJvZ3JhbWFjaW9uIEkiO3M6NzoibW90aXZvcyI7YToxOntpOjA7czozMzoiY29waWEgbyBpbnRlcmNhbWJpbyBkZSByZXNwdWVzdGFzIjt9czoxNToibW90aXZvX2V0aXF1ZXRhIjtzOjMzOiJDb3BpYSBvIGludGVyY2FtYmlvIGRlIHJlc3B1ZXN0YXMiO3M6NjoiZXN0YWRvIjtzOjEwOiJDb25maXJtYWRvIjtzOjU6ImZlY2hhIjtzOjE5OiIyMDI2LTEwLTEwIDA4OjQwOjAwIjt9aToxODthOjEzOntzOjI6ImlkIjtpOjY7czoxMToiaWRfcmVnaXN0cm8iO2k6NjtzOjY6Im5vbWJyZSI7czo2OiJIZWxlbmEiO3M6ODoiYXBlbGxpZG8iO3M6NjoiQ2hvcXVlIjtzOjEwOiJ2ZXJpZmljYWRvIjtiOjE7czozOiJzaXMiO3M6OToiMjAyMjAxMDg5IjtzOjE3OiJudW1lcm9faW5jaWRlbmNpYSI7aToxO3M6NToiY3Vyc28iO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1hdGVyaWEiO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1vdGl2b3MiO2E6MTp7aTowO3M6MzI6InVzbyBkZSBkaXNwb3NpdGl2b3MgZWxlY3Ryb25pY29zIjt9czoxNToibW90aXZvX2V0aXF1ZXRhIjtzOjQ3OiJVc28gZGUgZGlzcG9zaXRpdm9zIGVsZWN0cm9uaWNvcyBubyBhdXRvcml6YWRvcyI7czo2OiJlc3RhZG8iO3M6MTA6IkNvbmZpcm1hZG8iO3M6NToiZmVjaGEiO3M6MTk6IjIwMjYtMTAtMTAgMDg6NDA6MDAiO31pOjE5O2E6MTM6e3M6MjoiaWQiO2k6NDtzOjExOiJpZF9yZWdpc3RybyI7aTo0O3M6Njoibm9tYnJlIjtzOjY6IkNhcmxvcyI7czo4OiJhcGVsbGlkbyI7czo1OiJSb2phcyI7czoxMDoidmVyaWZpY2FkbyI7YjoxO3M6Mzoic2lzIjtzOjg6IjIwMjEwMDA0IjtzOjE3OiJudW1lcm9faW5jaWRlbmNpYSI7aToxO3M6NToiY3Vyc28iO3M6MTQ6IkFsZ2VicmEgTGluZWFsIjtzOjc6Im1hdGVyaWEiO3M6MTQ6IkFsZ2VicmEgTGluZWFsIjtzOjc6Im1vdGl2b3MiO2E6MTp7aTowO3M6Mjk6InVzbyBkZSBtYXRlcmlhbCBubyBhdXRvcml6YWRvIjt9czoxNToibW90aXZvX2V0aXF1ZXRhIjtzOjI5OiJVc28gZGUgbWF0ZXJpYWwgbm8gYXV0b3JpemFkbyI7czo2OiJlc3RhZG8iO3M6MTA6IkNvbmZpcm1hZG8iO3M6NToiZmVjaGEiO3M6MTk6IjIwMjQtMDYtMTMgMDg6NDU6MDAiO31pOjIwO2E6MTM6e3M6MjoiaWQiO2k6MTtzOjExOiJpZF9yZWdpc3RybyI7aToxO3M6Njoibm9tYnJlIjtzOjM6IkFuYSI7czo4OiJhcGVsbGlkbyI7czo1OiJQZXJleiI7czoxMDoidmVyaWZpY2FkbyI7YjoxO3M6Mzoic2lzIjtzOjg6IjIwMjEwMDAxIjtzOjE3OiJudW1lcm9faW5jaWRlbmNpYSI7aToxO3M6NToiY3Vyc28iO3M6OToiQ2FsY3VsbyBJIjtzOjc6Im1hdGVyaWEiO3M6OToiQ2FsY3VsbyBJIjtzOjc6Im1vdGl2b3MiO2E6MTp7aTowO3M6NDoib3RybyI7fXM6MTU6Im1vdGl2b19ldGlxdWV0YSI7czo0OiJPdHJvIjtzOjY6ImVzdGFkbyI7czoxMDoiQ29uZmlybWFkbyI7czo1OiJmZWNoYSI7czoxOToiMjAyNC0wNi0xMCAwODozMDowMCI7fX1zOjI4OiIAKgBlc2NhcGVXaGVuQ2FzdGluZ1RvU3RyaW5nIjtiOjA7fQ==', 1794278107);
+INSERT INTO "cache" ("key", "value", "expiration") VALUES ('central-riesgo:lista:v3:1:mis-materias:andre:0', 'TzozOToiSWxsdW1pbmF0ZVxEYXRhYmFzZVxFbG9xdWVudFxDb2xsZWN0aW9uIjoyOntzOjg6IgAqAGl0ZW1zIjthOjA6e31zOjI4OiIAKgBlc2NhcGVXaGVuQ2FzdGluZ1RvU3RyaW5nIjtiOjA7fQ==', 1794278114);
+INSERT INTO "cache" ("key", "value", "expiration") VALUES ('central-riesgo:lista:v3:1:mis-materias:andres r:0', 'TzozOToiSWxsdW1pbmF0ZVxEYXRhYmFzZVxFbG9xdWVudFxDb2xsZWN0aW9uIjoyOntzOjg6IgAqAGl0ZW1zIjthOjA6e31zOjI4OiIAKgBlc2NhcGVXaGVuQ2FzdGluZ1RvU3RyaW5nIjtiOjA7fQ==', 1794278120);
+INSERT INTO "cache" ("key", "value", "expiration") VALUES ('monitoreo.informe.27.docente.1', 'YToyOntzOjY6ImV4YW1lbiI7TzoxNzoiQXBwXE1vZGVsc1xFeGFtZW4iOjMwOntzOjEzOiIAKgBjb25uZWN0aW9uIjtzOjU6InBnc3FsIjtzOjg6IgAqAHRhYmxlIjtzOjY6ImV4YW1lbiI7czoxMzoiACoAcHJpbWFyeUtleSI7czo5OiJpZF9leGFtZW4iO3M6MTA6IgAqAGtleVR5cGUiO3M6MzoiaW50IjtzOjEyOiJpbmNyZW1lbnRpbmciO2I6MDtzOjc6IgAqAHdpdGgiO2E6MDp7fXM6MTI6IgAqAHdpdGhDb3VudCI7YTowOnt9czoxOToicHJldmVudHNMYXp5TG9hZGluZyI7YjowO3M6MTA6IgAqAHBlclBhZ2UiO2k6MTU7czo2OiJleGlzdHMiO2I6MTtzOjE4OiJ3YXNSZWNlbnRseUNyZWF0ZWQiO2I6MDtzOjI4OiIAKgBlc2NhcGVXaGVuQ2FzdGluZ1RvU3RyaW5nIjtiOjA7czoxMzoiACoAYXR0cmlidXRlcyI7YTo3OntzOjk6ImlkX2V4YW1lbiI7aToyNztzOjU6ImZlY2hhIjtzOjEwOiIyMDI2LTEwLTI3IjtzOjExOiJob3JhX2luaWNpbyI7czo4OiIwMToxMjoxNiI7czo4OiJkdXJhY2lvbiI7aTo5MDtzOjc6ImNyZWFkb3IiO2k6MTtzOjExOiJ0aXBvX2V4YW1lbiI7aToyO3M6MTM6Im5vbWJyZV9leGFtZW4iO047fXM6MTE6IgAqAG9yaWdpbmFsIjthOjc6e3M6OToiaWRfZXhhbWVuIjtpOjI3O3M6NToiZmVjaGEiO3M6MTA6IjIwMjYtMTAtMjciO3M6MTE6ImhvcmFfaW5pY2lvIjtzOjg6IjAxOjEyOjE2IjtzOjg6ImR1cmFjaW9uIjtpOjkwO3M6NzoiY3JlYWRvciI7aToxO3M6MTE6InRpcG9fZXhhbWVuIjtpOjI7czoxMzoibm9tYnJlX2V4YW1lbiI7Tjt9czoxMDoiACoAY2hhbmdlcyI7YTowOnt9czo4OiIAKgBjYXN0cyI7YTowOnt9czoxNzoiACoAY2xhc3NDYXN0Q2FjaGUiO2E6MDp7fXM6MjE6IgAqAGF0dHJpYnV0ZUNhc3RDYWNoZSI7YTowOnt9czoxMzoiACoAZGF0ZUZvcm1hdCI7TjtzOjEwOiIAKgBhcHBlbmRzIjthOjA6e31zOjE5OiIAKgBkaXNwYXRjaGVzRXZlbnRzIjthOjA6e31zOjE0OiIAKgBvYnNlcnZhYmxlcyI7YTowOnt9czoxMjoiACoAcmVsYXRpb25zIjthOjc6e3M6NjoiY3Vyc29zIjtPOjM5OiJJbGx1bWluYXRlXERhdGFiYXNlXEVsb3F1ZW50XENvbGxlY3Rpb24iOjI6e3M6ODoiACoAaXRlbXMiO2E6MTp7aTowO086MTY6IkFwcFxNb2RlbHNcQ3Vyc28iOjMwOntzOjEzOiIAKgBjb25uZWN0aW9uIjtzOjU6InBnc3FsIjtzOjg6IgAqAHRhYmxlIjtzOjU6ImN1cnNvIjtzOjEzOiIAKgBwcmltYXJ5S2V5IjtzOjg6ImlkX2N1cnNvIjtzOjEwOiIAKgBrZXlUeXBlIjtzOjM6ImludCI7czoxMjoiaW5jcmVtZW50aW5nIjtiOjA7czo3OiIAKgB3aXRoIjthOjA6e31zOjEyOiIAKgB3aXRoQ291bnQiO2E6MDp7fXM6MTk6InByZXZlbnRzTGF6eUxvYWRpbmciO2I6MDtzOjEwOiIAKgBwZXJQYWdlIjtpOjE1O3M6NjoiZXhpc3RzIjtiOjE7czoxODoid2FzUmVjZW50bHlDcmVhdGVkIjtiOjA7czoyODoiACoAZXNjYXBlV2hlbkNhc3RpbmdUb1N0cmluZyI7YjowO3M6MTM6IgAqAGF0dHJpYnV0ZXMiO2E6Njp7czo4OiJpZF9jdXJzbyI7aTozO3M6MTI6Im5vbWJyZV9jdXJzbyI7czoxNDoiUHJvZ3JhbWFjaW9uIEkiO3M6Nzoic2lzX2RvYyI7aToxO3M6MTQ6ImZlY2hhX2NyZWFjaW9uIjtzOjEwOiIyMDI0LTAyLTAyIjtzOjY6ImVzdGFkbyI7czo3OiJFbkN1cnNvIjtzOjExOiJpZF9hbWJpZW50ZSI7Tjt9czoxMToiACoAb3JpZ2luYWwiO2E6ODp7czo4OiJpZF9jdXJzbyI7aTozO3M6MTI6Im5vbWJyZV9jdXJzbyI7czoxNDoiUHJvZ3JhbWFjaW9uIEkiO3M6Nzoic2lzX2RvYyI7aToxO3M6MTQ6ImZlY2hhX2NyZWFjaW9uIjtzOjEwOiIyMDI0LTAyLTAyIjtzOjY6ImVzdGFkbyI7czo3OiJFbkN1cnNvIjtzOjExOiJpZF9hbWJpZW50ZSI7TjtzOjE1OiJwaXZvdF9pZF9leGFtZW4iO2k6Mjc7czoxNDoicGl2b3RfaWRfY3Vyc28iO2k6Mzt9czoxMDoiACoAY2hhbmdlcyI7YTowOnt9czo4OiIAKgBjYXN0cyI7YTowOnt9czoxNzoiACoAY2xhc3NDYXN0Q2FjaGUiO2E6MDp7fXM6MjE6IgAqAGF0dHJpYnV0ZUNhc3RDYWNoZSI7YTowOnt9czoxMzoiACoAZGF0ZUZvcm1hdCI7TjtzOjEwOiIAKgBhcHBlbmRzIjthOjA6e31zOjE5OiIAKgBkaXNwYXRjaGVzRXZlbnRzIjthOjA6e31zOjE0OiIAKgBvYnNlcnZhYmxlcyI7YTowOnt9czoxMjoiACoAcmVsYXRpb25zIjthOjE6e3M6NToicGl2b3QiO086NDQ6IklsbHVtaW5hdGVcRGF0YWJhc2VcRWxvcXVlbnRcUmVsYXRpb25zXFBpdm90IjozNDp7czoxMzoiACoAY29ubmVjdGlvbiI7TjtzOjg6IgAqAHRhYmxlIjtzOjEyOiJleGFtZW5fY3Vyc28iO3M6MTM6IgAqAHByaW1hcnlLZXkiO3M6MjoiaWQiO3M6MTA6IgAqAGtleVR5cGUiO3M6MzoiaW50IjtzOjEyOiJpbmNyZW1lbnRpbmciO2I6MDtzOjc6IgAqAHdpdGgiO2E6MDp7fXM6MTI6IgAqAHdpdGhDb3VudCI7YTowOnt9czoxOToicHJldmVudHNMYXp5TG9hZGluZyI7YjowO3M6MTA6IgAqAHBlclBhZ2UiO2k6MTU7czo2OiJleGlzdHMiO2I6MTtzOjE4OiJ3YXNSZWNlbnRseUNyZWF0ZWQiO2I6MDtzOjI4OiIAKgBlc2NhcGVXaGVuQ2FzdGluZ1RvU3RyaW5nIjtiOjA7czoxMzoiACoAYXR0cmlidXRlcyI7YToyOntzOjk6ImlkX2V4YW1lbiI7aToyNztzOjg6ImlkX2N1cnNvIjtpOjM7fXM6MTE6IgAqAG9yaWdpbmFsIjthOjI6e3M6OToiaWRfZXhhbWVuIjtpOjI3O3M6ODoiaWRfY3Vyc28iO2k6Mzt9czoxMDoiACoAY2hhbmdlcyI7YTowOnt9czo4OiIAKgBjYXN0cyI7YTowOnt9czoxNzoiACoAY2xhc3NDYXN0Q2FjaGUiO2E6MDp7fXM6MjE6IgAqAGF0dHJpYnV0ZUNhc3RDYWNoZSI7YTowOnt9czoxMzoiACoAZGF0ZUZvcm1hdCI7TjtzOjEwOiIAKgBhcHBlbmRzIjthOjA6e31zOjE5OiIAKgBkaXNwYXRjaGVzRXZlbnRzIjthOjA6e31zOjE0OiIAKgBvYnNlcnZhYmxlcyI7YTowOnt9czoxMjoiACoAcmVsYXRpb25zIjthOjA6e31zOjEwOiIAKgB0b3VjaGVzIjthOjA6e31zOjEwOiJ0aW1lc3RhbXBzIjtiOjA7czoxMzoidXNlc1VuaXF1ZUlkcyI7YjowO3M6OToiACoAaGlkZGVuIjthOjA6e31zOjEwOiIAKgB2aXNpYmxlIjthOjA6e31zOjExOiIAKgBmaWxsYWJsZSI7YTowOnt9czoxMDoiACoAZ3VhcmRlZCI7YTowOnt9czoxMToicGl2b3RQYXJlbnQiO086MTc6IkFwcFxNb2RlbHNcRXhhbWVuIjozMDp7czoxMzoiACoAY29ubmVjdGlvbiI7TjtzOjg6IgAqAHRhYmxlIjtzOjY6ImV4YW1lbiI7czoxMzoiACoAcHJpbWFyeUtleSI7czo5OiJpZF9leGFtZW4iO3M6MTA6IgAqAGtleVR5cGUiO3M6MzoiaW50IjtzOjEyOiJpbmNyZW1lbnRpbmciO2I6MDtzOjc6IgAqAHdpdGgiO2E6MDp7fXM6MTI6IgAqAHdpdGhDb3VudCI7YTowOnt9czoxOToicHJldmVudHNMYXp5TG9hZGluZyI7YjowO3M6MTA6IgAqAHBlclBhZ2UiO2k6MTU7czo2OiJleGlzdHMiO2I6MDtzOjE4OiJ3YXNSZWNlbnRseUNyZWF0ZWQiO2I6MDtzOjI4OiIAKgBlc2NhcGVXaGVuQ2FzdGluZ1RvU3RyaW5nIjtiOjA7czoxMzoiACoAYXR0cmlidXRlcyI7YTowOnt9czoxMToiACoAb3JpZ2luYWwiO2E6MDp7fXM6MTA6IgAqAGNoYW5nZXMiO2E6MDp7fXM6ODoiACoAY2FzdHMiO2E6MDp7fXM6MTc6IgAqAGNsYXNzQ2FzdENhY2hlIjthOjA6e31zOjIxOiIAKgBhdHRyaWJ1dGVDYXN0Q2FjaGUiO2E6MDp7fXM6MTM6IgAqAGRhdGVGb3JtYXQiO047czoxMDoiACoAYXBwZW5kcyI7YTowOnt9czoxOToiACoAZGlzcGF0Y2hlc0V2ZW50cyI7YTowOnt9czoxNDoiACoAb2JzZXJ2YWJsZXMiO2E6MDp7fXM6MTI6IgAqAHJlbGF0aW9ucyI7YTowOnt9czoxMDoiACoAdG91Y2hlcyI7YTowOnt9czoxMDoidGltZXN0YW1wcyI7YjowO3M6MTM6InVzZXNVbmlxdWVJZHMiO2I6MDtzOjk6IgAqAGhpZGRlbiI7YTowOnt9czoxMDoiACoAdmlzaWJsZSI7YTowOnt9czoxMToiACoAZmlsbGFibGUiO2E6Nzp7aTowO3M6OToiaWRfZXhhbWVuIjtpOjE7czoxMzoibm9tYnJlX2V4YW1lbiI7aToyO3M6NToiZmVjaGEiO2k6MztzOjExOiJob3JhX2luaWNpbyI7aTo0O3M6ODoiZHVyYWNpb24iO2k6NTtzOjc6ImNyZWFkb3IiO2k6NjtzOjExOiJ0aXBvX2V4YW1lbiI7fXM6MTA6IgAqAGd1YXJkZWQiO2E6MTp7aTowO3M6MToiKiI7fX1zOjEyOiJwaXZvdFJlbGF0ZWQiO086MTY6IkFwcFxNb2RlbHNcQ3Vyc28iOjMwOntzOjEzOiIAKgBjb25uZWN0aW9uIjtOO3M6ODoiACoAdGFibGUiO3M6NToiY3Vyc28iO3M6MTM6IgAqAHByaW1hcnlLZXkiO3M6ODoiaWRfY3Vyc28iO3M6MTA6IgAqAGtleVR5cGUiO3M6MzoiaW50IjtzOjEyOiJpbmNyZW1lbnRpbmciO2I6MDtzOjc6IgAqAHdpdGgiO2E6MDp7fXM6MTI6IgAqAHdpdGhDb3VudCI7YTowOnt9czoxOToicHJldmVudHNMYXp5TG9hZGluZyI7YjowO3M6MTA6IgAqAHBlclBhZ2UiO2k6MTU7czo2OiJleGlzdHMiO2I6MDtzOjE4OiJ3YXNSZWNlbnRseUNyZWF0ZWQiO2I6MDtzOjI4OiIAKgBlc2NhcGVXaGVuQ2FzdGluZ1RvU3RyaW5nIjtiOjA7czoxMzoiACoAYXR0cmlidXRlcyI7YTowOnt9czoxMToiACoAb3JpZ2luYWwiO2E6MDp7fXM6MTA6IgAqAGNoYW5nZXMiO2E6MDp7fXM6ODoiACoAY2FzdHMiO2E6MDp7fXM6MTc6IgAqAGNsYXNzQ2FzdENhY2hlIjthOjA6e31zOjIxOiIAKgBhdHRyaWJ1dGVDYXN0Q2FjaGUiO2E6MDp7fXM6MTM6IgAqAGRhdGVGb3JtYXQiO047czoxMDoiACoAYXBwZW5kcyI7YTowOnt9czoxOToiACoAZGlzcGF0Y2hlc0V2ZW50cyI7YTowOnt9czoxNDoiACoAb2JzZXJ2YWJsZXMiO2E6MDp7fXM6MTI6IgAqAHJlbGF0aW9ucyI7YTowOnt9czoxMDoiACoAdG91Y2hlcyI7YTowOnt9czoxMDoidGltZXN0YW1wcyI7YjowO3M6MTM6InVzZXNVbmlxdWVJZHMiO2I6MDtzOjk6IgAqAGhpZGRlbiI7YTowOnt9czoxMDoiACoAdmlzaWJsZSI7YTowOnt9czoxMToiACoAZmlsbGFibGUiO2E6Njp7aTowO3M6ODoiaWRfY3Vyc28iO2k6MTtzOjEyOiJub21icmVfY3Vyc28iO2k6MjtzOjc6InNpc19kb2MiO2k6MztzOjExOiJpZF9hbWJpZW50ZSI7aTo0O3M6MTQ6ImZlY2hhX2NyZWFjaW9uIjtpOjU7czo2OiJlc3RhZG8iO31zOjEwOiIAKgBndWFyZGVkIjthOjE6e2k6MDtzOjE6IioiO319czoxMzoiACoAZm9yZWlnbktleSI7czo5OiJpZF9leGFtZW4iO3M6MTM6IgAqAHJlbGF0ZWRLZXkiO3M6ODoiaWRfY3Vyc28iO319czoxMDoiACoAdG91Y2hlcyI7YTowOnt9czoxMDoidGltZXN0YW1wcyI7YjowO3M6MTM6InVzZXNVbmlxdWVJZHMiO2I6MDtzOjk6IgAqAGhpZGRlbiI7YTowOnt9czoxMDoiACoAdmlzaWJsZSI7YTowOnt9czoxMToiACoAZmlsbGFibGUiO2E6Njp7aTowO3M6ODoiaWRfY3Vyc28iO2k6MTtzOjEyOiJub21icmVfY3Vyc28iO2k6MjtzOjc6InNpc19kb2MiO2k6MztzOjExOiJpZF9hbWJpZW50ZSI7aTo0O3M6MTQ6ImZlY2hhX2NyZWFjaW9uIjtpOjU7czo2OiJlc3RhZG8iO31zOjEwOiIAKgBndWFyZGVkIjthOjE6e2k6MDtzOjE6IioiO319fXM6Mjg6IgAqAGVzY2FwZVdoZW5DYXN0aW5nVG9TdHJpbmciO2I6MDt9czo5OiJhbWJpZW50ZXMiO086Mzk6IklsbHVtaW5hdGVcRGF0YWJhc2VcRWxvcXVlbnRcQ29sbGVjdGlvbiI6Mjp7czo4OiIAKgBpdGVtcyI7YToxOntpOjA7TzoxOToiQXBwXE1vZGVsc1xBbWJpZW50ZSI6MzA6e3M6MTM6IgAqAGNvbm5lY3Rpb24iO3M6NToicGdzcWwiO3M6ODoiACoAdGFibGUiO3M6ODoiYW1iaWVudGUiO3M6MTM6IgAqAHByaW1hcnlLZXkiO3M6MTE6ImlkX2FtYmllbnRlIjtzOjEwOiIAKgBrZXlUeXBlIjtzOjM6ImludCI7czoxMjoiaW5jcmVtZW50aW5nIjtiOjA7czo3OiIAKgB3aXRoIjthOjA6e31zOjEyOiIAKgB3aXRoQ291bnQiO2E6MDp7fXM6MTk6InByZXZlbnRzTGF6eUxvYWRpbmciO2I6MDtzOjEwOiIAKgBwZXJQYWdlIjtpOjE1O3M6NjoiZXhpc3RzIjtiOjE7czoxODoid2FzUmVjZW50bHlDcmVhdGVkIjtiOjA7czoyODoiACoAZXNjYXBlV2hlbkNhc3RpbmdUb1N0cmluZyI7YjowO3M6MTM6IgAqAGF0dHJpYnV0ZXMiO2E6Mjp7czoxMToiaWRfYW1iaWVudGUiO2k6MjtzOjE1OiJub21icmVfYW1iaWVudGUiO3M6OToiQXVsYSA2OTJBIjt9czoxMToiACoAb3JpZ2luYWwiO2E6NDp7czoxMToiaWRfYW1iaWVudGUiO2k6MjtzOjE1OiJub21icmVfYW1iaWVudGUiO3M6OToiQXVsYSA2OTJBIjtzOjE1OiJwaXZvdF9pZF9leGFtZW4iO2k6Mjc7czoxNzoicGl2b3RfaWRfYW1iaWVudGUiO2k6Mjt9czoxMDoiACoAY2hhbmdlcyI7YTowOnt9czo4OiIAKgBjYXN0cyI7YTowOnt9czoxNzoiACoAY2xhc3NDYXN0Q2FjaGUiO2E6MDp7fXM6MjE6IgAqAGF0dHJpYnV0ZUNhc3RDYWNoZSI7YTowOnt9czoxMzoiACoAZGF0ZUZvcm1hdCI7TjtzOjEwOiIAKgBhcHBlbmRzIjthOjA6e31zOjE5OiIAKgBkaXNwYXRjaGVzRXZlbnRzIjthOjA6e31zOjE0OiIAKgBvYnNlcnZhYmxlcyI7YTowOnt9czoxMjoiACoAcmVsYXRpb25zIjthOjE6e3M6NToicGl2b3QiO086NDQ6IklsbHVtaW5hdGVcRGF0YWJhc2VcRWxvcXVlbnRcUmVsYXRpb25zXFBpdm90IjozNDp7czoxMzoiACoAY29ubmVjdGlvbiI7TjtzOjg6IgAqAHRhYmxlIjtzOjE1OiJleGFtZW5fYW1iaWVudGUiO3M6MTM6IgAqAHByaW1hcnlLZXkiO3M6MjoiaWQiO3M6MTA6IgAqAGtleVR5cGUiO3M6MzoiaW50IjtzOjEyOiJpbmNyZW1lbnRpbmciO2I6MDtzOjc6IgAqAHdpdGgiO2E6MDp7fXM6MTI6IgAqAHdpdGhDb3VudCI7YTowOnt9czoxOToicHJldmVudHNMYXp5TG9hZGluZyI7YjowO3M6MTA6IgAqAHBlclBhZ2UiO2k6MTU7czo2OiJleGlzdHMiO2I6MTtzOjE4OiJ3YXNSZWNlbnRseUNyZWF0ZWQiO2I6MDtzOjI4OiIAKgBlc2NhcGVXaGVuQ2FzdGluZ1RvU3RyaW5nIjtiOjA7czoxMzoiACoAYXR0cmlidXRlcyI7YToyOntzOjk6ImlkX2V4YW1lbiI7aToyNztzOjExOiJpZF9hbWJpZW50ZSI7aToyO31zOjExOiIAKgBvcmlnaW5hbCI7YToyOntzOjk6ImlkX2V4YW1lbiI7aToyNztzOjExOiJpZF9hbWJpZW50ZSI7aToyO31zOjEwOiIAKgBjaGFuZ2VzIjthOjA6e31zOjg6IgAqAGNhc3RzIjthOjA6e31zOjE3OiIAKgBjbGFzc0Nhc3RDYWNoZSI7YTowOnt9czoyMToiACoAYXR0cmlidXRlQ2FzdENhY2hlIjthOjA6e31zOjEzOiIAKgBkYXRlRm9ybWF0IjtOO3M6MTA6IgAqAGFwcGVuZHMiO2E6MDp7fXM6MTk6IgAqAGRpc3BhdGNoZXNFdmVudHMiO2E6MDp7fXM6MTQ6IgAqAG9ic2VydmFibGVzIjthOjA6e31zOjEyOiIAKgByZWxhdGlvbnMiO2E6MDp7fXM6MTA6IgAqAHRvdWNoZXMiO2E6MDp7fXM6MTA6InRpbWVzdGFtcHMiO2I6MDtzOjEzOiJ1c2VzVW5pcXVlSWRzIjtiOjA7czo5OiIAKgBoaWRkZW4iO2E6MDp7fXM6MTA6IgAqAHZpc2libGUiO2E6MDp7fXM6MTE6IgAqAGZpbGxhYmxlIjthOjA6e31zOjEwOiIAKgBndWFyZGVkIjthOjA6e31zOjExOiJwaXZvdFBhcmVudCI7TzoxNzoiQXBwXE1vZGVsc1xFeGFtZW4iOjMwOntzOjEzOiIAKgBjb25uZWN0aW9uIjtOO3M6ODoiACoAdGFibGUiO3M6NjoiZXhhbWVuIjtzOjEzOiIAKgBwcmltYXJ5S2V5IjtzOjk6ImlkX2V4YW1lbiI7czoxMDoiACoAa2V5VHlwZSI7czozOiJpbnQiO3M6MTI6ImluY3JlbWVudGluZyI7YjowO3M6NzoiACoAd2l0aCI7YTowOnt9czoxMjoiACoAd2l0aENvdW50IjthOjA6e31zOjE5OiJwcmV2ZW50c0xhenlMb2FkaW5nIjtiOjA7czoxMDoiACoAcGVyUGFnZSI7aToxNTtzOjY6ImV4aXN0cyI7YjowO3M6MTg6Indhc1JlY2VudGx5Q3JlYXRlZCI7YjowO3M6Mjg6IgAqAGVzY2FwZVdoZW5DYXN0aW5nVG9TdHJpbmciO2I6MDtzOjEzOiIAKgBhdHRyaWJ1dGVzIjthOjA6e31zOjExOiIAKgBvcmlnaW5hbCI7YTowOnt9czoxMDoiACoAY2hhbmdlcyI7YTowOnt9czo4OiIAKgBjYXN0cyI7YTowOnt9czoxNzoiACoAY2xhc3NDYXN0Q2FjaGUiO2E6MDp7fXM6MjE6IgAqAGF0dHJpYnV0ZUNhc3RDYWNoZSI7YTowOnt9czoxMzoiACoAZGF0ZUZvcm1hdCI7TjtzOjEwOiIAKgBhcHBlbmRzIjthOjA6e31zOjE5OiIAKgBkaXNwYXRjaGVzRXZlbnRzIjthOjA6e31zOjE0OiIAKgBvYnNlcnZhYmxlcyI7YTowOnt9czoxMjoiACoAcmVsYXRpb25zIjthOjA6e31zOjEwOiIAKgB0b3VjaGVzIjthOjA6e31zOjEwOiJ0aW1lc3RhbXBzIjtiOjA7czoxMzoidXNlc1VuaXF1ZUlkcyI7YjowO3M6OToiACoAaGlkZGVuIjthOjA6e31zOjEwOiIAKgB2aXNpYmxlIjthOjA6e31zOjExOiIAKgBmaWxsYWJsZSI7YTo3OntpOjA7czo5OiJpZF9leGFtZW4iO2k6MTtzOjEzOiJub21icmVfZXhhbWVuIjtpOjI7czo1OiJmZWNoYSI7aTozO3M6MTE6ImhvcmFfaW5pY2lvIjtpOjQ7czo4OiJkdXJhY2lvbiI7aTo1O3M6NzoiY3JlYWRvciI7aTo2O3M6MTE6InRpcG9fZXhhbWVuIjt9czoxMDoiACoAZ3VhcmRlZCI7YToxOntpOjA7czoxOiIqIjt9fXM6MTI6InBpdm90UmVsYXRlZCI7TzoxOToiQXBwXE1vZGVsc1xBbWJpZW50ZSI6MzA6e3M6MTM6IgAqAGNvbm5lY3Rpb24iO047czo4OiIAKgB0YWJsZSI7czo4OiJhbWJpZW50ZSI7czoxMzoiACoAcHJpbWFyeUtleSI7czoxMToiaWRfYW1iaWVudGUiO3M6MTA6IgAqAGtleVR5cGUiO3M6MzoiaW50IjtzOjEyOiJpbmNyZW1lbnRpbmciO2I6MDtzOjc6IgAqAHdpdGgiO2E6MDp7fXM6MTI6IgAqAHdpdGhDb3VudCI7YTowOnt9czoxOToicHJldmVudHNMYXp5TG9hZGluZyI7YjowO3M6MTA6IgAqAHBlclBhZ2UiO2k6MTU7czo2OiJleGlzdHMiO2I6MDtzOjE4OiJ3YXNSZWNlbnRseUNyZWF0ZWQiO2I6MDtzOjI4OiIAKgBlc2NhcGVXaGVuQ2FzdGluZ1RvU3RyaW5nIjtiOjA7czoxMzoiACoAYXR0cmlidXRlcyI7YTowOnt9czoxMToiACoAb3JpZ2luYWwiO2E6MDp7fXM6MTA6IgAqAGNoYW5nZXMiO2E6MDp7fXM6ODoiACoAY2FzdHMiO2E6MDp7fXM6MTc6IgAqAGNsYXNzQ2FzdENhY2hlIjthOjA6e31zOjIxOiIAKgBhdHRyaWJ1dGVDYXN0Q2FjaGUiO2E6MDp7fXM6MTM6IgAqAGRhdGVGb3JtYXQiO047czoxMDoiACoAYXBwZW5kcyI7YTowOnt9czoxOToiACoAZGlzcGF0Y2hlc0V2ZW50cyI7YTowOnt9czoxNDoiACoAb2JzZXJ2YWJsZXMiO2E6MDp7fXM6MTI6IgAqAHJlbGF0aW9ucyI7YTowOnt9czoxMDoiACoAdG91Y2hlcyI7YTowOnt9czoxMDoidGltZXN0YW1wcyI7YjowO3M6MTM6InVzZXNVbmlxdWVJZHMiO2I6MDtzOjk6IgAqAGhpZGRlbiI7YTowOnt9czoxMDoiACoAdmlzaWJsZSI7YTowOnt9czoxMToiACoAZmlsbGFibGUiO2E6Mjp7aTowO3M6MTE6ImlkX2FtYmllbnRlIjtpOjE7czoxNToibm9tYnJlX2FtYmllbnRlIjt9czoxMDoiACoAZ3VhcmRlZCI7YToxOntpOjA7czoxOiIqIjt9fXM6MTM6IgAqAGZvcmVpZ25LZXkiO3M6OToiaWRfZXhhbWVuIjtzOjEzOiIAKgByZWxhdGVkS2V5IjtzOjExOiJpZF9hbWJpZW50ZSI7fX1zOjEwOiIAKgB0b3VjaGVzIjthOjA6e31zOjEwOiJ0aW1lc3RhbXBzIjtiOjA7czoxMzoidXNlc1VuaXF1ZUlkcyI7YjowO3M6OToiACoAaGlkZGVuIjthOjA6e31zOjEwOiIAKgB2aXNpYmxlIjthOjA6e31zOjExOiIAKgBmaWxsYWJsZSI7YToyOntpOjA7czoxMToiaWRfYW1iaWVudGUiO2k6MTtzOjE1OiJub21icmVfYW1iaWVudGUiO31zOjEwOiIAKgBndWFyZGVkIjthOjE6e2k6MDtzOjE6IioiO319fXM6Mjg6IgAqAGVzY2FwZVdoZW5DYXN0aW5nVG9TdHJpbmciO2I6MDt9czoyMDoibWF0ZXJpYWxlc1Blcm1pdGlkb3MiO086Mzk6IklsbHVtaW5hdGVcRGF0YWJhc2VcRWxvcXVlbnRcQ29sbGVjdGlvbiI6Mjp7czo4OiIAKgBpdGVtcyI7YToyOntpOjA7TzoxOToiQXBwXE1vZGVsc1xNYXRlcmlhbCI6MzA6e3M6MTM6IgAqAGNvbm5lY3Rpb24iO3M6NToicGdzcWwiO3M6ODoiACoAdGFibGUiO3M6ODoibWF0ZXJpYWwiO3M6MTM6IgAqAHByaW1hcnlLZXkiO3M6MTE6ImlkX21hdGVyaWFsIjtzOjEwOiIAKgBrZXlUeXBlIjtzOjM6ImludCI7czoxMjoiaW5jcmVtZW50aW5nIjtiOjA7czo3OiIAKgB3aXRoIjthOjA6e31zOjEyOiIAKgB3aXRoQ291bnQiO2E6MDp7fXM6MTk6InByZXZlbnRzTGF6eUxvYWRpbmciO2I6MDtzOjEwOiIAKgBwZXJQYWdlIjtpOjE1O3M6NjoiZXhpc3RzIjtiOjE7czoxODoid2FzUmVjZW50bHlDcmVhdGVkIjtiOjA7czoyODoiACoAZXNjYXBlV2hlbkNhc3RpbmdUb1N0cmluZyI7YjowO3M6MTM6IgAqAGF0dHJpYnV0ZXMiO2E6Mjp7czoxMToiaWRfbWF0ZXJpYWwiO2k6MjtzOjExOiJkZXNjcmlwY2lvbiI7czoxMzoiQ29tcHV0YWRvcmENCiI7fXM6MTE6IgAqAG9yaWdpbmFsIjthOjQ6e3M6MTE6ImlkX21hdGVyaWFsIjtpOjI7czoxMToiZGVzY3JpcGNpb24iO3M6MTM6IkNvbXB1dGFkb3JhDQoiO3M6Mjk6InBpdm90X2lkX2NvbmZpZ3VyYWNpb25fZXhhbWVuIjtpOjQ2O3M6MTc6InBpdm90X2lkX21hdGVyaWFsIjtpOjI7fXM6MTA6IgAqAGNoYW5nZXMiO2E6MDp7fXM6ODoiACoAY2FzdHMiO2E6MDp7fXM6MTc6IgAqAGNsYXNzQ2FzdENhY2hlIjthOjA6e31zOjIxOiIAKgBhdHRyaWJ1dGVDYXN0Q2FjaGUiO2E6MDp7fXM6MTM6IgAqAGRhdGVGb3JtYXQiO047czoxMDoiACoAYXBwZW5kcyI7YTowOnt9czoxOToiACoAZGlzcGF0Y2hlc0V2ZW50cyI7YTowOnt9czoxNDoiACoAb2JzZXJ2YWJsZXMiO2E6MDp7fXM6MTI6IgAqAHJlbGF0aW9ucyI7YToxOntzOjU6InBpdm90IjtPOjQ0OiJJbGx1bWluYXRlXERhdGFiYXNlXEVsb3F1ZW50XFJlbGF0aW9uc1xQaXZvdCI6MzQ6e3M6MTM6IgAqAGNvbm5lY3Rpb24iO047czo4OiIAKgB0YWJsZSI7czoyOToiY29uZmlndXJhY2lvbl9leGFtZW5fbWF0ZXJpYWwiO3M6MTM6IgAqAHByaW1hcnlLZXkiO3M6MjoiaWQiO3M6MTA6IgAqAGtleVR5cGUiO3M6MzoiaW50IjtzOjEyOiJpbmNyZW1lbnRpbmciO2I6MDtzOjc6IgAqAHdpdGgiO2E6MDp7fXM6MTI6IgAqAHdpdGhDb3VudCI7YTowOnt9czoxOToicHJldmVudHNMYXp5TG9hZGluZyI7YjowO3M6MTA6IgAqAHBlclBhZ2UiO2k6MTU7czo2OiJleGlzdHMiO2I6MTtzOjE4OiJ3YXNSZWNlbnRseUNyZWF0ZWQiO2I6MDtzOjI4OiIAKgBlc2NhcGVXaGVuQ2FzdGluZ1RvU3RyaW5nIjtiOjA7czoxMzoiACoAYXR0cmlidXRlcyI7YToyOntzOjIzOiJpZF9jb25maWd1cmFjaW9uX2V4YW1lbiI7aTo0NjtzOjExOiJpZF9tYXRlcmlhbCI7aToyO31zOjExOiIAKgBvcmlnaW5hbCI7YToyOntzOjIzOiJpZF9jb25maWd1cmFjaW9uX2V4YW1lbiI7aTo0NjtzOjExOiJpZF9tYXRlcmlhbCI7aToyO31zOjEwOiIAKgBjaGFuZ2VzIjthOjA6e31zOjg6IgAqAGNhc3RzIjthOjA6e31zOjE3OiIAKgBjbGFzc0Nhc3RDYWNoZSI7YTowOnt9czoyMToiACoAYXR0cmlidXRlQ2FzdENhY2hlIjthOjA6e31zOjEzOiIAKgBkYXRlRm9ybWF0IjtOO3M6MTA6IgAqAGFwcGVuZHMiO2E6MDp7fXM6MTk6IgAqAGRpc3BhdGNoZXNFdmVudHMiO2E6MDp7fXM6MTQ6IgAqAG9ic2VydmFibGVzIjthOjA6e31zOjEyOiIAKgByZWxhdGlvbnMiO2E6MDp7fXM6MTA6IgAqAHRvdWNoZXMiO2E6MDp7fXM6MTA6InRpbWVzdGFtcHMiO2I6MDtzOjEzOiJ1c2VzVW5pcXVlSWRzIjtiOjA7czo5OiIAKgBoaWRkZW4iO2E6MDp7fXM6MTA6IgAqAHZpc2libGUiO2E6MDp7fXM6MTE6IgAqAGZpbGxhYmxlIjthOjA6e31zOjEwOiIAKgBndWFyZGVkIjthOjA6e31zOjExOiJwaXZvdFBhcmVudCI7TzozNzoiQXBwXE1vZGVsc1xDb25maWd1cmFjaW9uRXhhbWVuRG9jZW50ZSI6MzA6e3M6MTM6IgAqAGNvbm5lY3Rpb24iO047czo4OiIAKgB0YWJsZSI7czoyODoiY29uZmlndXJhY2lvbl9leGFtZW5fZG9jZW50ZSI7czoxMzoiACoAcHJpbWFyeUtleSI7czoyMzoiaWRfY29uZmlndXJhY2lvbl9leGFtZW4iO3M6MTA6IgAqAGtleVR5cGUiO3M6MzoiaW50IjtzOjEyOiJpbmNyZW1lbnRpbmciO2I6MTtzOjc6IgAqAHdpdGgiO2E6MDp7fXM6MTI6IgAqAHdpdGhDb3VudCI7YTowOnt9czoxOToicHJldmVudHNMYXp5TG9hZGluZyI7YjowO3M6MTA6IgAqAHBlclBhZ2UiO2k6MTU7czo2OiJleGlzdHMiO2I6MDtzOjE4OiJ3YXNSZWNlbnRseUNyZWF0ZWQiO2I6MDtzOjI4OiIAKgBlc2NhcGVXaGVuQ2FzdGluZ1RvU3RyaW5nIjtiOjA7czoxMzoiACoAYXR0cmlidXRlcyI7YTowOnt9czoxMToiACoAb3JpZ2luYWwiO2E6MDp7fXM6MTA6IgAqAGNoYW5nZXMiO2E6MDp7fXM6ODoiACoAY2FzdHMiO2E6MDp7fXM6MTc6IgAqAGNsYXNzQ2FzdENhY2hlIjthOjA6e31zOjIxOiIAKgBhdHRyaWJ1dGVDYXN0Q2FjaGUiO2E6MDp7fXM6MTM6IgAqAGRhdGVGb3JtYXQiO047czoxMDoiACoAYXBwZW5kcyI7YTowOnt9czoxOToiACoAZGlzcGF0Y2hlc0V2ZW50cyI7YTowOnt9czoxNDoiACoAb2JzZXJ2YWJsZXMiO2E6MDp7fXM6MTI6IgAqAHJlbGF0aW9ucyI7YTowOnt9czoxMDoiACoAdG91Y2hlcyI7YTowOnt9czoxMDoidGltZXN0YW1wcyI7YjoxO3M6MTM6InVzZXNVbmlxdWVJZHMiO2I6MDtzOjk6IgAqAGhpZGRlbiI7YTowOnt9czoxMDoiACoAdmlzaWJsZSI7YTowOnt9czoxMToiACoAZmlsbGFibGUiO2E6Mjp7aTowO3M6OToiaWRfZXhhbWVuIjtpOjE7czoxMDoiaWRfZG9jZW50ZSI7fXM6MTA6IgAqAGd1YXJkZWQiO2E6MTp7aTowO3M6MToiKiI7fX1zOjEyOiJwaXZvdFJlbGF0ZWQiO086MTk6IkFwcFxNb2RlbHNcTWF0ZXJpYWwiOjMwOntzOjEzOiIAKgBjb25uZWN0aW9uIjtOO3M6ODoiACoAdGFibGUiO3M6ODoibWF0ZXJpYWwiO3M6MTM6IgAqAHByaW1hcnlLZXkiO3M6MTE6ImlkX21hdGVyaWFsIjtzOjEwOiIAKgBrZXlUeXBlIjtzOjM6ImludCI7czoxMjoiaW5jcmVtZW50aW5nIjtiOjA7czo3OiIAKgB3aXRoIjthOjA6e31zOjEyOiIAKgB3aXRoQ291bnQiO2E6MDp7fXM6MTk6InByZXZlbnRzTGF6eUxvYWRpbmciO2I6MDtzOjEwOiIAKgBwZXJQYWdlIjtpOjE1O3M6NjoiZXhpc3RzIjtiOjA7czoxODoid2FzUmVjZW50bHlDcmVhdGVkIjtiOjA7czoyODoiACoAZXNjYXBlV2hlbkNhc3RpbmdUb1N0cmluZyI7YjowO3M6MTM6IgAqAGF0dHJpYnV0ZXMiO2E6MDp7fXM6MTE6IgAqAG9yaWdpbmFsIjthOjA6e31zOjEwOiIAKgBjaGFuZ2VzIjthOjA6e31zOjg6IgAqAGNhc3RzIjthOjA6e31zOjE3OiIAKgBjbGFzc0Nhc3RDYWNoZSI7YTowOnt9czoyMToiACoAYXR0cmlidXRlQ2FzdENhY2hlIjthOjA6e31zOjEzOiIAKgBkYXRlRm9ybWF0IjtOO3M6MTA6IgAqAGFwcGVuZHMiO2E6MDp7fXM6MTk6IgAqAGRpc3BhdGNoZXNFdmVudHMiO2E6MDp7fXM6MTQ6IgAqAG9ic2VydmFibGVzIjthOjA6e31zOjEyOiIAKgByZWxhdGlvbnMiO2E6MDp7fXM6MTA6IgAqAHRvdWNoZXMiO2E6MDp7fXM6MTA6InRpbWVzdGFtcHMiO2I6MDtzOjEzOiJ1c2VzVW5pcXVlSWRzIjtiOjA7czo5OiIAKgBoaWRkZW4iO2E6MDp7fXM6MTA6IgAqAHZpc2libGUiO2E6MDp7fXM6MTE6IgAqAGZpbGxhYmxlIjthOjI6e2k6MDtzOjExOiJpZF9tYXRlcmlhbCI7aToxO3M6MTE6ImRlc2NyaXBjaW9uIjt9czoxMDoiACoAZ3VhcmRlZCI7YToxOntpOjA7czoxOiIqIjt9fXM6MTM6IgAqAGZvcmVpZ25LZXkiO3M6MjM6ImlkX2NvbmZpZ3VyYWNpb25fZXhhbWVuIjtzOjEzOiIAKgByZWxhdGVkS2V5IjtzOjExOiJpZF9tYXRlcmlhbCI7fX1zOjEwOiIAKgB0b3VjaGVzIjthOjA6e31zOjEwOiJ0aW1lc3RhbXBzIjtiOjA7czoxMzoidXNlc1VuaXF1ZUlkcyI7YjowO3M6OToiACoAaGlkZGVuIjthOjA6e31zOjEwOiIAKgB2aXNpYmxlIjthOjA6e31zOjExOiIAKgBmaWxsYWJsZSI7YToyOntpOjA7czoxMToiaWRfbWF0ZXJpYWwiO2k6MTtzOjExOiJkZXNjcmlwY2lvbiI7fXM6MTA6IgAqAGd1YXJkZWQiO2E6MTp7aTowO3M6MToiKiI7fX1pOjE7TzoxOToiQXBwXE1vZGVsc1xNYXRlcmlhbCI6MzA6e3M6MTM6IgAqAGNvbm5lY3Rpb24iO3M6NToicGdzcWwiO3M6ODoiACoAdGFibGUiO3M6ODoibWF0ZXJpYWwiO3M6MTM6IgAqAHByaW1hcnlLZXkiO3M6MTE6ImlkX21hdGVyaWFsIjtzOjEwOiIAKgBrZXlUeXBlIjtzOjM6ImludCI7czoxMjoiaW5jcmVtZW50aW5nIjtiOjA7czo3OiIAKgB3aXRoIjthOjA6e31zOjEyOiIAKgB3aXRoQ291bnQiO2E6MDp7fXM6MTk6InByZXZlbnRzTGF6eUxvYWRpbmciO2I6MDtzOjEwOiIAKgBwZXJQYWdlIjtpOjE1O3M6NjoiZXhpc3RzIjtiOjE7czoxODoid2FzUmVjZW50bHlDcmVhdGVkIjtiOjA7czoyODoiACoAZXNjYXBlV2hlbkNhc3RpbmdUb1N0cmluZyI7YjowO3M6MTM6IgAqAGF0dHJpYnV0ZXMiO2E6Mjp7czoxMToiaWRfbWF0ZXJpYWwiO2k6NDtzOjExOiJkZXNjcmlwY2lvbiI7czoyMToiQXB1bnRlcyBkZSBsYSBtYXRlcmlhIjt9czoxMToiACoAb3JpZ2luYWwiO2E6NDp7czoxMToiaWRfbWF0ZXJpYWwiO2k6NDtzOjExOiJkZXNjcmlwY2lvbiI7czoyMToiQXB1bnRlcyBkZSBsYSBtYXRlcmlhIjtzOjI5OiJwaXZvdF9pZF9jb25maWd1cmFjaW9uX2V4YW1lbiI7aTo0NjtzOjE3OiJwaXZvdF9pZF9tYXRlcmlhbCI7aTo0O31zOjEwOiIAKgBjaGFuZ2VzIjthOjA6e31zOjg6IgAqAGNhc3RzIjthOjA6e31zOjE3OiIAKgBjbGFzc0Nhc3RDYWNoZSI7YTowOnt9czoyMToiACoAYXR0cmlidXRlQ2FzdENhY2hlIjthOjA6e31zOjEzOiIAKgBkYXRlRm9ybWF0IjtOO3M6MTA6IgAqAGFwcGVuZHMiO2E6MDp7fXM6MTk6IgAqAGRpc3BhdGNoZXNFdmVudHMiO2E6MDp7fXM6MTQ6IgAqAG9ic2VydmFibGVzIjthOjA6e31zOjEyOiIAKgByZWxhdGlvbnMiO2E6MTp7czo1OiJwaXZvdCI7Tzo0NDoiSWxsdW1pbmF0ZVxEYXRhYmFzZVxFbG9xdWVudFxSZWxhdGlvbnNcUGl2b3QiOjM0OntzOjEzOiIAKgBjb25uZWN0aW9uIjtOO3M6ODoiACoAdGFibGUiO3M6Mjk6ImNvbmZpZ3VyYWNpb25fZXhhbWVuX21hdGVyaWFsIjtzOjEzOiIAKgBwcmltYXJ5S2V5IjtzOjI6ImlkIjtzOjEwOiIAKgBrZXlUeXBlIjtzOjM6ImludCI7czoxMjoiaW5jcmVtZW50aW5nIjtiOjA7czo3OiIAKgB3aXRoIjthOjA6e31zOjEyOiIAKgB3aXRoQ291bnQiO2E6MDp7fXM6MTk6InByZXZlbnRzTGF6eUxvYWRpbmciO2I6MDtzOjEwOiIAKgBwZXJQYWdlIjtpOjE1O3M6NjoiZXhpc3RzIjtiOjE7czoxODoid2FzUmVjZW50bHlDcmVhdGVkIjtiOjA7czoyODoiACoAZXNjYXBlV2hlbkNhc3RpbmdUb1N0cmluZyI7YjowO3M6MTM6IgAqAGF0dHJpYnV0ZXMiO2E6Mjp7czoyMzoiaWRfY29uZmlndXJhY2lvbl9leGFtZW4iO2k6NDY7czoxMToiaWRfbWF0ZXJpYWwiO2k6NDt9czoxMToiACoAb3JpZ2luYWwiO2E6Mjp7czoyMzoiaWRfY29uZmlndXJhY2lvbl9leGFtZW4iO2k6NDY7czoxMToiaWRfbWF0ZXJpYWwiO2k6NDt9czoxMDoiACoAY2hhbmdlcyI7YTowOnt9czo4OiIAKgBjYXN0cyI7YTowOnt9czoxNzoiACoAY2xhc3NDYXN0Q2FjaGUiO2E6MDp7fXM6MjE6IgAqAGF0dHJpYnV0ZUNhc3RDYWNoZSI7YTowOnt9czoxMzoiACoAZGF0ZUZvcm1hdCI7TjtzOjEwOiIAKgBhcHBlbmRzIjthOjA6e31zOjE5OiIAKgBkaXNwYXRjaGVzRXZlbnRzIjthOjA6e31zOjE0OiIAKgBvYnNlcnZhYmxlcyI7YTowOnt9czoxMjoiACoAcmVsYXRpb25zIjthOjA6e31zOjEwOiIAKgB0b3VjaGVzIjthOjA6e31zOjEwOiJ0aW1lc3RhbXBzIjtiOjA7czoxMzoidXNlc1VuaXF1ZUlkcyI7YjowO3M6OToiACoAaGlkZGVuIjthOjA6e31zOjEwOiIAKgB2aXNpYmxlIjthOjA6e31zOjExOiIAKgBmaWxsYWJsZSI7YTowOnt9czoxMDoiACoAZ3VhcmRlZCI7YTowOnt9czoxMToicGl2b3RQYXJlbnQiO3I6NDI5O3M6MTI6InBpdm90UmVsYXRlZCI7cjo0NjM7czoxMzoiACoAZm9yZWlnbktleSI7czoyMzoiaWRfY29uZmlndXJhY2lvbl9leGFtZW4iO3M6MTM6IgAqAHJlbGF0ZWRLZXkiO3M6MTE6ImlkX21hdGVyaWFsIjt9fXM6MTA6IgAqAHRvdWNoZXMiO2E6MDp7fXM6MTA6InRpbWVzdGFtcHMiO2I6MDtzOjEzOiJ1c2VzVW5pcXVlSWRzIjtiOjA7czo5OiIAKgBoaWRkZW4iO2E6MDp7fXM6MTA6IgAqAHZpc2libGUiO2E6MDp7fXM6MTE6IgAqAGZpbGxhYmxlIjthOjI6e2k6MDtzOjExOiJpZF9tYXRlcmlhbCI7aToxO3M6MTE6ImRlc2NyaXBjaW9uIjt9czoxMDoiACoAZ3VhcmRlZCI7YToxOntpOjA7czoxOiIqIjt9fX1zOjI4OiIAKgBlc2NhcGVXaGVuQ2FzdGluZ1RvU3RyaW5nIjtiOjA7fXM6Njoibm9ybWFzIjtPOjM5OiJJbGx1bWluYXRlXERhdGFiYXNlXEVsb3F1ZW50XENvbGxlY3Rpb24iOjI6e3M6ODoiACoAaXRlbXMiO2E6MTp7aTowO086MTY6IkFwcFxNb2RlbHNcTm9ybWEiOjMwOntzOjEzOiIAKgBjb25uZWN0aW9uIjtzOjU6InBnc3FsIjtzOjg6IgAqAHRhYmxlIjtzOjU6Im5vcm1hIjtzOjEzOiIAKgBwcmltYXJ5S2V5IjtzOjg6ImlkX25vcm1hIjtzOjEwOiIAKgBrZXlUeXBlIjtzOjM6ImludCI7czoxMjoiaW5jcmVtZW50aW5nIjtiOjA7czo3OiIAKgB3aXRoIjthOjA6e31zOjEyOiIAKgB3aXRoQ291bnQiO2E6MDp7fXM6MTk6InByZXZlbnRzTGF6eUxvYWRpbmciO2I6MDtzOjEwOiIAKgBwZXJQYWdlIjtpOjE1O3M6NjoiZXhpc3RzIjtiOjE7czoxODoid2FzUmVjZW50bHlDcmVhdGVkIjtiOjA7czoyODoiACoAZXNjYXBlV2hlbkNhc3RpbmdUb1N0cmluZyI7YjowO3M6MTM6IgAqAGF0dHJpYnV0ZXMiO2E6Mjp7czo4OiJpZF9ub3JtYSI7aToxO3M6MTM6ImRldGFsbGVfbm9ybWEiO3M6Mzc6IlBvcnRhciBDSSBkdXJhbnRlIHRvZGEgbGEgZXZhbHVhY2nDs24iO31zOjExOiIAKgBvcmlnaW5hbCI7YTo0OntzOjg6ImlkX25vcm1hIjtpOjE7czoxMzoiZGV0YWxsZV9ub3JtYSI7czozNzoiUG9ydGFyIENJIGR1cmFudGUgdG9kYSBsYSBldmFsdWFjacOzbiI7czoyOToicGl2b3RfaWRfY29uZmlndXJhY2lvbl9leGFtZW4iO2k6NDY7czoxNDoicGl2b3RfaWRfbm9ybWEiO2k6MTt9czoxMDoiACoAY2hhbmdlcyI7YTowOnt9czo4OiIAKgBjYXN0cyI7YTowOnt9czoxNzoiACoAY2xhc3NDYXN0Q2FjaGUiO2E6MDp7fXM6MjE6IgAqAGF0dHJpYnV0ZUNhc3RDYWNoZSI7YTowOnt9czoxMzoiACoAZGF0ZUZvcm1hdCI7TjtzOjEwOiIAKgBhcHBlbmRzIjthOjA6e31zOjE5OiIAKgBkaXNwYXRjaGVzRXZlbnRzIjthOjA6e31zOjE0OiIAKgBvYnNlcnZhYmxlcyI7YTowOnt9czoxMjoiACoAcmVsYXRpb25zIjthOjE6e3M6NToicGl2b3QiO086NDQ6IklsbHVtaW5hdGVcRGF0YWJhc2VcRWxvcXVlbnRcUmVsYXRpb25zXFBpdm90IjozNDp7czoxMzoiACoAY29ubmVjdGlvbiI7TjtzOjg6IgAqAHRhYmxlIjtzOjI2OiJjb25maWd1cmFjaW9uX2V4YW1lbl9ub3JtYSI7czoxMzoiACoAcHJpbWFyeUtleSI7czoyOiJpZCI7czoxMDoiACoAa2V5VHlwZSI7czozOiJpbnQiO3M6MTI6ImluY3JlbWVudGluZyI7YjowO3M6NzoiACoAd2l0aCI7YTowOnt9czoxMjoiACoAd2l0aENvdW50IjthOjA6e31zOjE5OiJwcmV2ZW50c0xhenlMb2FkaW5nIjtiOjA7czoxMDoiACoAcGVyUGFnZSI7aToxNTtzOjY6ImV4aXN0cyI7YjoxO3M6MTg6Indhc1JlY2VudGx5Q3JlYXRlZCI7YjowO3M6Mjg6IgAqAGVzY2FwZVdoZW5DYXN0aW5nVG9TdHJpbmciO2I6MDtzOjEzOiIAKgBhdHRyaWJ1dGVzIjthOjI6e3M6MjM6ImlkX2NvbmZpZ3VyYWNpb25fZXhhbWVuIjtpOjQ2O3M6ODoiaWRfbm9ybWEiO2k6MTt9czoxMToiACoAb3JpZ2luYWwiO2E6Mjp7czoyMzoiaWRfY29uZmlndXJhY2lvbl9leGFtZW4iO2k6NDY7czo4OiJpZF9ub3JtYSI7aToxO31zOjEwOiIAKgBjaGFuZ2VzIjthOjA6e31zOjg6IgAqAGNhc3RzIjthOjA6e31zOjE3OiIAKgBjbGFzc0Nhc3RDYWNoZSI7YTowOnt9czoyMToiACoAYXR0cmlidXRlQ2FzdENhY2hlIjthOjA6e31zOjEzOiIAKgBkYXRlRm9ybWF0IjtOO3M6MTA6IgAqAGFwcGVuZHMiO2E6MDp7fXM6MTk6IgAqAGRpc3BhdGNoZXNFdmVudHMiO2E6MDp7fXM6MTQ6IgAqAG9ic2VydmFibGVzIjthOjA6e31zOjEyOiIAKgByZWxhdGlvbnMiO2E6MDp7fXM6MTA6IgAqAHRvdWNoZXMiO2E6MDp7fXM6MTA6InRpbWVzdGFtcHMiO2I6MDtzOjEzOiJ1c2VzVW5pcXVlSWRzIjtiOjA7czo5OiIAKgBoaWRkZW4iO2E6MDp7fXM6MTA6IgAqAHZpc2libGUiO2E6MDp7fXM6MTE6IgAqAGZpbGxhYmxlIjthOjA6e31zOjEwOiIAKgBndWFyZGVkIjthOjA6e31zOjExOiJwaXZvdFBhcmVudCI7TzozNzoiQXBwXE1vZGVsc1xDb25maWd1cmFjaW9uRXhhbWVuRG9jZW50ZSI6MzA6e3M6MTM6IgAqAGNvbm5lY3Rpb24iO047czo4OiIAKgB0YWJsZSI7czoyODoiY29uZmlndXJhY2lvbl9leGFtZW5fZG9jZW50ZSI7czoxMzoiACoAcHJpbWFyeUtleSI7czoyMzoiaWRfY29uZmlndXJhY2lvbl9leGFtZW4iO3M6MTA6IgAqAGtleVR5cGUiO3M6MzoiaW50IjtzOjEyOiJpbmNyZW1lbnRpbmciO2I6MTtzOjc6IgAqAHdpdGgiO2E6MDp7fXM6MTI6IgAqAHdpdGhDb3VudCI7YTowOnt9czoxOToicHJldmVudHNMYXp5TG9hZGluZyI7YjowO3M6MTA6IgAqAHBlclBhZ2UiO2k6MTU7czo2OiJleGlzdHMiO2I6MDtzOjE4OiJ3YXNSZWNlbnRseUNyZWF0ZWQiO2I6MDtzOjI4OiIAKgBlc2NhcGVXaGVuQ2FzdGluZ1RvU3RyaW5nIjtiOjA7czoxMzoiACoAYXR0cmlidXRlcyI7YTowOnt9czoxMToiACoAb3JpZ2luYWwiO2E6MDp7fXM6MTA6IgAqAGNoYW5nZXMiO2E6MDp7fXM6ODoiACoAY2FzdHMiO2E6MDp7fXM6MTc6IgAqAGNsYXNzQ2FzdENhY2hlIjthOjA6e31zOjIxOiIAKgBhdHRyaWJ1dGVDYXN0Q2FjaGUiO2E6MDp7fXM6MTM6IgAqAGRhdGVGb3JtYXQiO047czoxMDoiACoAYXBwZW5kcyI7YTowOnt9czoxOToiACoAZGlzcGF0Y2hlc0V2ZW50cyI7YTowOnt9czoxNDoiACoAb2JzZXJ2YWJsZXMiO2E6MDp7fXM6MTI6IgAqAHJlbGF0aW9ucyI7YTowOnt9czoxMDoiACoAdG91Y2hlcyI7YTowOnt9czoxMDoidGltZXN0YW1wcyI7YjoxO3M6MTM6InVzZXNVbmlxdWVJZHMiO2I6MDtzOjk6IgAqAGhpZGRlbiI7YTowOnt9czoxMDoiACoAdmlzaWJsZSI7YTowOnt9czoxMToiACoAZmlsbGFibGUiO2E6Mjp7aTowO3M6OToiaWRfZXhhbWVuIjtpOjE7czoxMDoiaWRfZG9jZW50ZSI7fXM6MTA6IgAqAGd1YXJkZWQiO2E6MTp7aTowO3M6MToiKiI7fX1zOjEyOiJwaXZvdFJlbGF0ZWQiO086MTY6IkFwcFxNb2RlbHNcTm9ybWEiOjMwOntzOjEzOiIAKgBjb25uZWN0aW9uIjtOO3M6ODoiACoAdGFibGUiO3M6NToibm9ybWEiO3M6MTM6IgAqAHByaW1hcnlLZXkiO3M6ODoiaWRfbm9ybWEiO3M6MTA6IgAqAGtleVR5cGUiO3M6MzoiaW50IjtzOjEyOiJpbmNyZW1lbnRpbmciO2I6MDtzOjc6IgAqAHdpdGgiO2E6MDp7fXM6MTI6IgAqAHdpdGhDb3VudCI7YTowOnt9czoxOToicHJldmVudHNMYXp5TG9hZGluZyI7YjowO3M6MTA6IgAqAHBlclBhZ2UiO2k6MTU7czo2OiJleGlzdHMiO2I6MDtzOjE4OiJ3YXNSZWNlbnRseUNyZWF0ZWQiO2I6MDtzOjI4OiIAKgBlc2NhcGVXaGVuQ2FzdGluZ1RvU3RyaW5nIjtiOjA7czoxMzoiACoAYXR0cmlidXRlcyI7YTowOnt9czoxMToiACoAb3JpZ2luYWwiO2E6MDp7fXM6MTA6IgAqAGNoYW5nZXMiO2E6MDp7fXM6ODoiACoAY2FzdHMiO2E6MDp7fXM6MTc6IgAqAGNsYXNzQ2FzdENhY2hlIjthOjA6e31zOjIxOiIAKgBhdHRyaWJ1dGVDYXN0Q2FjaGUiO2E6MDp7fXM6MTM6IgAqAGRhdGVGb3JtYXQiO047czoxMDoiACoAYXBwZW5kcyI7YTowOnt9czoxOToiACoAZGlzcGF0Y2hlc0V2ZW50cyI7YTowOnt9czoxNDoiACoAb2JzZXJ2YWJsZXMiO2E6MDp7fXM6MTI6IgAqAHJlbGF0aW9ucyI7YTowOnt9czoxMDoiACoAdG91Y2hlcyI7YTowOnt9czoxMDoidGltZXN0YW1wcyI7YjowO3M6MTM6InVzZXNVbmlxdWVJZHMiO2I6MDtzOjk6IgAqAGhpZGRlbiI7YTowOnt9czoxMDoiACoAdmlzaWJsZSI7YTowOnt9czoxMToiACoAZmlsbGFibGUiO2E6Mjp7aTowO3M6ODoiaWRfbm9ybWEiO2k6MTtzOjEzOiJkZXRhbGxlX25vcm1hIjt9czoxMDoiACoAZ3VhcmRlZCI7YToxOntpOjA7czoxOiIqIjt9fXM6MTM6IgAqAGZvcmVpZ25LZXkiO3M6MjM6ImlkX2NvbmZpZ3VyYWNpb25fZXhhbWVuIjtzOjEzOiIAKgByZWxhdGVkS2V5IjtzOjg6ImlkX25vcm1hIjt9fXM6MTA6IgAqAHRvdWNoZXMiO2E6MDp7fXM6MTA6InRpbWVzdGFtcHMiO2I6MDtzOjEzOiJ1c2VzVW5pcXVlSWRzIjtiOjA7czo5OiIAKgBoaWRkZW4iO2E6MDp7fXM6MTA6IgAqAHZpc2libGUiO2E6MDp7fXM6MTE6IgAqAGZpbGxhYmxlIjthOjI6e2k6MDtzOjg6ImlkX25vcm1hIjtpOjE7czoxMzoiZGV0YWxsZV9ub3JtYSI7fXM6MTA6IgAqAGd1YXJkZWQiO2E6MTp7aTowO3M6MToiKiI7fX19czoyODoiACoAZXNjYXBlV2hlbkNhc3RpbmdUb1N0cmluZyI7YjowO31zOjI0OiJtYXRlcmlhbGVzUGVyc29uYWxpemFkb3MiO086Mzk6IklsbHVtaW5hdGVcRGF0YWJhc2VcRWxvcXVlbnRcQ29sbGVjdGlvbiI6Mjp7czo4OiIAKgBpdGVtcyI7YTowOnt9czoyODoiACoAZXNjYXBlV2hlbkNhc3RpbmdUb1N0cmluZyI7YjowO31zOjIwOiJub3JtYXNQZXJzb25hbGl6YWRhcyI7TzozOToiSWxsdW1pbmF0ZVxEYXRhYmFzZVxFbG9xdWVudFxDb2xsZWN0aW9uIjoyOntzOjg6IgAqAGl0ZW1zIjthOjA6e31zOjI4OiIAKgBlc2NhcGVXaGVuQ2FzdGluZ1RvU3RyaW5nIjtiOjA7fXM6MTA6InRpcG9FeGFtZW4iO086MjE6IkFwcFxNb2RlbHNcVGlwb0V4YW1lbiI6MzA6e3M6MTM6IgAqAGNvbm5lY3Rpb24iO3M6NToicGdzcWwiO3M6ODoiACoAdGFibGUiO3M6MTE6InRpcG9fZXhhbWVuIjtzOjEzOiIAKgBwcmltYXJ5S2V5IjtzOjE0OiJpZF90aXBvX2V4YW1lbiI7czoxMDoiACoAa2V5VHlwZSI7czozOiJpbnQiO3M6MTI6ImluY3JlbWVudGluZyI7YjowO3M6NzoiACoAd2l0aCI7YTowOnt9czoxMjoiACoAd2l0aENvdW50IjthOjA6e31zOjE5OiJwcmV2ZW50c0xhenlMb2FkaW5nIjtiOjA7czoxMDoiACoAcGVyUGFnZSI7aToxNTtzOjY6ImV4aXN0cyI7YjoxO3M6MTg6Indhc1JlY2VudGx5Q3JlYXRlZCI7YjowO3M6Mjg6IgAqAGVzY2FwZVdoZW5DYXN0aW5nVG9TdHJpbmciO2I6MDtzOjEzOiIAKgBhdHRyaWJ1dGVzIjthOjI6e3M6MTQ6ImlkX3RpcG9fZXhhbWVuIjtpOjI7czoxODoibm9tYnJlX3RpcG9fZXhhbWVuIjtzOjEyOiJleGFtZW4gZmluYWwiO31zOjExOiIAKgBvcmlnaW5hbCI7YToyOntzOjE0OiJpZF90aXBvX2V4YW1lbiI7aToyO3M6MTg6Im5vbWJyZV90aXBvX2V4YW1lbiI7czoxMjoiZXhhbWVuIGZpbmFsIjt9czoxMDoiACoAY2hhbmdlcyI7YTowOnt9czo4OiIAKgBjYXN0cyI7YTowOnt9czoxNzoiACoAY2xhc3NDYXN0Q2FjaGUiO2E6MDp7fXM6MjE6IgAqAGF0dHJpYnV0ZUNhc3RDYWNoZSI7YTowOnt9czoxMzoiACoAZGF0ZUZvcm1hdCI7TjtzOjEwOiIAKgBhcHBlbmRzIjthOjA6e31zOjE5OiIAKgBkaXNwYXRjaGVzRXZlbnRzIjthOjA6e31zOjE0OiIAKgBvYnNlcnZhYmxlcyI7YTowOnt9czoxMjoiACoAcmVsYXRpb25zIjthOjA6e31zOjEwOiIAKgB0b3VjaGVzIjthOjA6e31zOjEwOiJ0aW1lc3RhbXBzIjtiOjA7czoxMzoidXNlc1VuaXF1ZUlkcyI7YjowO3M6OToiACoAaGlkZGVuIjthOjA6e31zOjEwOiIAKgB2aXNpYmxlIjthOjA6e31zOjExOiIAKgBmaWxsYWJsZSI7YToyOntpOjA7czoxNDoiaWRfdGlwb19leGFtZW4iO2k6MTtzOjE4OiJub21icmVfdGlwb19leGFtZW4iO31zOjEwOiIAKgBndWFyZGVkIjthOjE6e2k6MDtzOjE6IioiO319fXM6MTA6IgAqAHRvdWNoZXMiO2E6MDp7fXM6MTA6InRpbWVzdGFtcHMiO2I6MDtzOjEzOiJ1c2VzVW5pcXVlSWRzIjtiOjA7czo5OiIAKgBoaWRkZW4iO2E6MDp7fXM6MTA6IgAqAHZpc2libGUiO2E6MDp7fXM6MTE6IgAqAGZpbGxhYmxlIjthOjc6e2k6MDtzOjk6ImlkX2V4YW1lbiI7aToxO3M6MTM6Im5vbWJyZV9leGFtZW4iO2k6MjtzOjU6ImZlY2hhIjtpOjM7czoxMToiaG9yYV9pbmljaW8iO2k6NDtzOjg6ImR1cmFjaW9uIjtpOjU7czo3OiJjcmVhZG9yIjtpOjY7czoxMToidGlwb19leGFtZW4iO31zOjEwOiIAKgBndWFyZGVkIjthOjE6e2k6MDtzOjE6IioiO319czoxMToiZXN0dWRpYW50ZXMiO086Mjk6IklsbHVtaW5hdGVcU3VwcG9ydFxDb2xsZWN0aW9uIjoyOntzOjg6IgAqAGl0ZW1zIjthOjUwOntpOjA7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMDAyMTA3IjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo2MDE7czo2OiJub21icmUiO3M6NzoiRXJuZXN0byI7czo4OiJhcGVsbGlkbyI7czo0OiJWZXJhIjtzOjQ6ImF1bGEiO3M6OToiQXVsYSA2OTJBIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aToxO2E6MTE6e3M6Mzoic2lzIjtzOjg6IjIwMjEwMDAzIjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo2MDI7czo2OiJub21icmUiO3M6NToiTWFyaWEiO3M6ODoiYXBlbGxpZG8iO3M6NToiTG9wZXoiO3M6NDoiYXVsYSI7czo5OiJBdWxhIDY5MkEiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjI7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMTAxMDIyIjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo2MDM7czo2OiJub21icmUiO3M6NToiQnJ1bm8iO3M6ODoiYXBlbGxpZG8iO3M6NToiRMOtYXoiO3M6NDoiYXVsYSI7czo5OiJBdWxhIDY5MkEiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjM7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMTAxMDc4IjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo2MDQ7czo2OiJub21icmUiO3M6NzoiR2FicmllbCI7czo4OiJhcGVsbGlkbyI7czo2OiJNYW1hbmkiO3M6NDoiYXVsYSI7czo5OiJBdWxhIDY5MkEiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjQ7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMTAxMDkwIjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo2MDU7czo2OiJub21icmUiO3M6NToiSXbDoW4iO3M6ODoiYXBlbGxpZG8iO3M6NjoiRmxvcmVzIjtzOjQ6ImF1bGEiO3M6OToiQXVsYSA2OTJBIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aTo1O2E6MTE6e3M6Mzoic2lzIjtzOjk6IjIwMjEwMTExMiI7czoxNDoiaWRfaW5zY3JpcGNpb24iO2k6NjA2O3M6Njoibm9tYnJlIjtzOjU6IktldmluIjtzOjg6ImFwZWxsaWRvIjtzOjY6IkzDs3BleiI7czo0OiJhdWxhIjtzOjk6IkF1bGEgNjkyQSI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6NjthOjExOntzOjM6InNpcyI7czo5OiIyMDIxMDExMzQiO3M6MTQ6ImlkX2luc2NyaXBjaW9uIjtpOjYwNztzOjY6Im5vbWJyZSI7czo2OiJNaWd1ZWwiO3M6ODoiYXBlbGxpZG8iO3M6NDoiU290byI7czo0OiJhdWxhIjtzOjk6IkF1bGEgNjkyQSI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6NzthOjExOntzOjM6InNpcyI7czo5OiIyMDIxMDExNTYiO3M6MTQ6ImlkX2luc2NyaXBjaW9uIjtpOjYwODtzOjY6Im5vbWJyZSI7czo2OiLDk3NjYXIiO3M6ODoiYXBlbGxpZG8iO3M6NjoiUXVpc3BlIjtzOjQ6ImF1bGEiO3M6OToiQXVsYSA2OTJBIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aTo4O2E6MTE6e3M6Mzoic2lzIjtzOjk6IjIwMjEwMTE3OCI7czoxNDoiaWRfaW5zY3JpcGNpb24iO2k6NjA5O3M6Njoibm9tYnJlIjtzOjU6IlJhw7psIjtzOjg6ImFwZWxsaWRvIjtzOjY6IkNob3F1ZSI7czo0OiJhdWxhIjtzOjk6IkF1bGEgNjkyQSI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6OTthOjExOntzOjM6InNpcyI7czo5OiIyMDIxMDExOTAiO3M6MTQ6ImlkX2luc2NyaXBjaW9uIjtpOjYxMDtzOjY6Im5vbWJyZSI7czo2OiJUb23DoXMiO3M6ODoiYXBlbGxpZG8iO3M6NzoiR2FyY8OtYSI7czo0OiJhdWxhIjtzOjk6IkF1bGEgNjkyQSI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6MTA7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMTAxMjIzIjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo2MTE7czo2OiJub21icmUiO3M6NjoiWGF2aWVyIjtzOjg6ImFwZWxsaWRvIjtzOjY6IlZhcmdhcyI7czo0OiJhdWxhIjtzOjk6IkF1bGEgNjkyQSI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6MTE7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMTAxMjQ1IjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo2MTI7czo2OiJub21icmUiO3M6MzoiWm9lIjtzOjg6ImFwZWxsaWRvIjtzOjU6IlNpbGVzIjtzOjQ6ImF1bGEiO3M6OToiQXVsYSA2OTJBIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aToxMjthOjExOntzOjM6InNpcyI7czo5OiIyMDIxMDEyNjciO3M6MTQ6ImlkX2luc2NyaXBjaW9uIjtpOjYxMztzOjY6Im5vbWJyZSI7czo2OiJCaWFuY2EiO3M6ODoiYXBlbGxpZG8iO3M6NzoiUGFyZWRlcyI7czo0OiJhdWxhIjtzOjk6IkF1bGEgNjkyQSI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6MTM7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMTAxMjg5IjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo2MTQ7czo2OiJub21icmUiO3M6NzoiRGFuaWVsYSI7czo4OiJhcGVsbGlkbyI7czo3OiJDYWJyZXJhIjtzOjQ6ImF1bGEiO3M6OToiQXVsYSA2OTJBIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aToxNDthOjExOntzOjM6InNpcyI7czo5OiIyMDIxMDEzMDEiO3M6MTQ6ImlkX2luc2NyaXBjaW9uIjtpOjYxNTtzOjY6Im5vbWJyZSI7czo4OiJGZXJuYW5kYSI7czo4OiJhcGVsbGlkbyI7czo0OiJWZWdhIjtzOjQ6ImF1bGEiO3M6OToiQXVsYSA2OTJBIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aToxNTthOjExOntzOjM6InNpcyI7czo5OiIyMDIxMDEzMjMiO3M6MTQ6ImlkX2luc2NyaXBjaW9uIjtpOjYxNjtzOjY6Im5vbWJyZSI7czo0OiJIdWdvIjtzOjg6ImFwZWxsaWRvIjtzOjc6IkNhbWFjaG8iO3M6NDoiYXVsYSI7czo5OiJBdWxhIDY5MkEiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjE2O2E6MTE6e3M6Mzoic2lzIjtzOjk6IjIwMjEwMTM0NSI7czoxNDoiaWRfaW5zY3JpcGNpb24iO2k6NjE3O3M6Njoibm9tYnJlIjtzOjY6IkphdmllciI7czo4OiJhcGVsbGlkbyI7czo4OiJFc3Bpbm96YSI7czo0OiJhdWxhIjtzOjk6IkF1bGEgNjkyQSI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6MTc7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMTAxMzY3IjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo2MTg7czo2OiJub21icmUiO3M6NDoiTHVpcyI7czo4OiJhcGVsbGlkbyI7czoxMDoiR3V0acOpcnJleiI7czo0OiJhdWxhIjtzOjk6IkF1bGEgNjkyQSI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6MTg7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMTAxMzg5IjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo2MTk7czo2OiJub21icmUiO3M6ODoiTmljb2zDoXMiO3M6ODoiYXBlbGxpZG8iO3M6NzoiSXJpYXJ0ZSI7czo0OiJhdWxhIjtzOjk6IkF1bGEgNjkyQSI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6MTk7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMTAxNDAxIjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo2MjA7czo2OiJub21icmUiO3M6NToiUGFibG8iO3M6ODoiYXBlbGxpZG8iO3M6ODoiS293YWxza2kiO3M6NDoiYXVsYSI7czo5OiJBdWxhIDY5MkEiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjIwO2E6MTE6e3M6Mzoic2lzIjtzOjk6IjIwMjEwMTQyMyI7czoxNDoiaWRfaW5zY3JpcGNpb24iO2k6NjIxO3M6Njoibm9tYnJlIjtzOjY6IlNlcmdpbyI7czo4OiJhcGVsbGlkbyI7czo3OiJNZW5kb3phIjtzOjQ6ImF1bGEiO3M6OToiQXVsYSA2OTJBIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aToyMTthOjExOntzOjM6InNpcyI7czo5OiIyMDIxMDE0NDUiO3M6MTQ6ImlkX2luc2NyaXBjaW9uIjtpOjYyMjtzOjY6Im5vbWJyZSI7czo2OiJVbGlzZXMiO3M6ODoiYXBlbGxpZG8iO3M6ODoiT3JlbGxhbmEiO3M6NDoiYXVsYSI7czo5OiJBdWxhIDY5MkEiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjIyO2E6MTE6e3M6Mzoic2lzIjtzOjk6IjIwMjEwMTQ2NyI7czoxNDoiaWRfaW5zY3JpcGNpb24iO2k6NjIzO3M6Njoibm9tYnJlIjtzOjY6IldhbHRlciI7czo4OiJhcGVsbGlkbyI7czo3OiJRdWlyb2dhIjtzOjQ6ImF1bGEiO3M6OToiQXVsYSA2OTJBIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aToyMzthOjExOntzOjM6InNpcyI7czo5OiIyMDIxMDE0ODkiO3M6MTQ6ImlkX2luc2NyaXBjaW9uIjtpOjYyNDtzOjY6Im5vbWJyZSI7czo1OiJZYW1pbCI7czo4OiJhcGVsbGlkbyI7czo4OiJTw6FuY2hleiI7czo0OiJhdWxhIjtzOjk6IkF1bGEgNjkyQSI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6MjQ7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMjAxMDEzIjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo2MjU7czo2OiJub21icmUiO3M6MzoiQW5hIjtzOjg6ImFwZWxsaWRvIjtzOjY6IkzDs3BleiI7czo0OiJhdWxhIjtzOjk6IkF1bGEgNjkyQSI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEyOiJob3JhX2luZ3Jlc28iO3M6ODoiMDE6MTM6MzMiO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6ODoicHJlc2VudGUiO31pOjI1O2E6MTE6e3M6Mzoic2lzIjtzOjk6IjIwMjIwMTAzMSI7czoxNDoiaWRfaW5zY3JpcGNpb24iO2k6NjI2O3M6Njoibm9tYnJlIjtzOjU6IkNhcmxhIjtzOjg6ImFwZWxsaWRvIjtzOjQ6IlJ1aXoiO3M6NDoiYXVsYSI7czo5OiJBdWxhIDY5MkEiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjI2O2E6MTE6e3M6Mzoic2lzIjtzOjk6IjIwMjIwMTA1NiI7czoxNDoiaWRfaW5zY3JpcGNpb24iO2k6NjI3O3M6Njoibm9tYnJlIjtzOjc6IkbDoXRpbWEiO3M6ODoiYXBlbGxpZG8iO3M6NjoiUXVpc3BlIjtzOjQ6ImF1bGEiO3M6OToiQXVsYSA2OTJBIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aToyNzthOjExOntzOjM6InNpcyI7czo5OiIyMDIyMDEwODkiO3M6MTQ6ImlkX2luc2NyaXBjaW9uIjtpOjYyODtzOjY6Im5vbWJyZSI7czo2OiJIZWxlbmEiO3M6ODoiYXBlbGxpZG8iO3M6NjoiQ2hvcXVlIjtzOjQ6ImF1bGEiO3M6OToiQXVsYSA2OTJBIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aToyODthOjExOntzOjM6InNpcyI7czo5OiIyMDIyMDExMDEiO3M6MTQ6ImlkX2luc2NyaXBjaW9uIjtpOjYyOTtzOjY6Im5vbWJyZSI7czo1OiJKdWxpYSI7czo4OiJhcGVsbGlkbyI7czo3OiJHYXJjw61hIjtzOjQ6ImF1bGEiO3M6OToiQXVsYSA2OTJBIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aToyOTthOjExOntzOjM6InNpcyI7czo5OiIyMDIyMDExMjMiO3M6MTQ6ImlkX2luc2NyaXBjaW9uIjtpOjYzMDtzOjY6Im5vbWJyZSI7czo1OiJMYXVyYSI7czo4OiJhcGVsbGlkbyI7czo1OiJEw61heiI7czo0OiJhdWxhIjtzOjk6IkF1bGEgNjkyQSI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6MzA7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMjAxMTQ1IjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo2MzE7czo2OiJub21icmUiO3M6NToiTmFkaWEiO3M6ODoiYXBlbGxpZG8iO3M6NDoiVmVyYSI7czo0OiJhdWxhIjtzOjk6IkF1bGEgNjkyQSI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6MzE7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMjAxMTY3IjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo2MzI7czo2OiJub21icmUiO3M6ODoiUGF0cmljaWEiO3M6ODoiYXBlbGxpZG8iO3M6NjoiTWFtYW5pIjtzOjQ6ImF1bGEiO3M6OToiQXVsYSA2OTJBIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aTozMjthOjExOntzOjM6InNpcyI7czo5OiIyMDIyMDExODkiO3M6MTQ6ImlkX2luc2NyaXBjaW9uIjtpOjYzMztzOjY6Im5vbWJyZSI7czo2OiJTb2bDrWEiO3M6ODoiYXBlbGxpZG8iO3M6NjoiRmxvcmVzIjtzOjQ6ImF1bGEiO3M6OToiQXVsYSA2OTJBIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aTozMzthOjExOntzOjM6InNpcyI7czo5OiIyMDIyMDEyMDEiO3M6MTQ6ImlkX2luc2NyaXBjaW9uIjtpOjYzNDtzOjY6Im5vbWJyZSI7czo3OiJWYWxlcmlhIjtzOjg6ImFwZWxsaWRvIjtzOjY6IkzDs3BleiI7czo0OiJhdWxhIjtzOjk6IkF1bGEgNjkyQSI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6MzQ7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMjAxMjEyIjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo2MzU7czo2OiJub21icmUiO3M6NToiV2VuZHkiO3M6ODoiYXBlbGxpZG8iO3M6NjoiWmFwYXRhIjtzOjQ6ImF1bGEiO3M6OToiQXVsYSA2OTJBIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aTozNTthOjExOntzOjM6InNpcyI7czo5OiIyMDIyMDEyMzQiO3M6MTQ6ImlkX2luc2NyaXBjaW9uIjtpOjYzNjtzOjY6Im5vbWJyZSI7czo3OiJZb2xhbmRhIjtzOjg6ImFwZWxsaWRvIjtzOjY6IlRpY29uYSI7czo0OiJhdWxhIjtzOjk6IkF1bGEgNjkyQSI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6MzY7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMjAxMjU2IjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo2Mzc7czo2OiJub21icmUiO3M6NzoiQW5kcsOpcyI7czo4OiJhcGVsbGlkbyI7czo1OiJSb2phcyI7czo0OiJhdWxhIjtzOjk6IkF1bGEgNjkyQSI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6Mzc7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMjAxMjc4IjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo2Mzg7czo2OiJub21icmUiO3M6ODoiQ3Jpc3RpYW4iO3M6ODoiYXBlbGxpZG8iO3M6NjoiTW9saW5hIjtzOjQ6ImF1bGEiO3M6OToiQXVsYSA2OTJBIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aTozODthOjExOntzOjM6InNpcyI7czo5OiIyMDIyMDEyOTAiO3M6MTQ6ImlkX2luc2NyaXBjaW9uIjtpOjYzOTtzOjY6Im5vbWJyZSI7czo3OiJFZHVhcmRvIjtzOjg6ImFwZWxsaWRvIjtzOjc6IlNhbGF6YXIiO3M6NDoiYXVsYSI7czo5OiJBdWxhIDY5MkEiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjM5O2E6MTE6e3M6Mzoic2lzIjtzOjk6IjIwMjIwMTMxMiI7czoxNDoiaWRfaW5zY3JpcGNpb24iO2k6NjQwO3M6Njoibm9tYnJlIjtzOjc6IkdvbnphbG8iO3M6ODoiYXBlbGxpZG8iO3M6NDoiQXJjZSI7czo0OiJhdWxhIjtzOjk6IkF1bGEgNjkyQSI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6NDA7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMjAxMzM0IjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo2NDE7czo2OiJub21icmUiO3M6NToiSW7DqXMiO3M6ODoiYXBlbGxpZG8iO3M6NzoiRGVsZ2FkbyI7czo0OiJhdWxhIjtzOjk6IkF1bGEgNjkyQSI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6NDE7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMjAxMzU2IjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo2NDI7czo2OiJub21icmUiO3M6NToiS2FyZW4iO3M6ODoiYXBlbGxpZG8iO3M6NzoiRnVlbnRlcyI7czo0OiJhdWxhIjtzOjk6IkF1bGEgNjkyQSI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6NDI7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMjAxMzc4IjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo2NDM7czo2OiJub21icmUiO3M6NjoiTWFyw61hIjtzOjg6ImFwZWxsaWRvIjtzOjc6IkhlcnJlcmEiO3M6NDoiYXVsYSI7czo5OiJBdWxhIDY5MkEiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjQzO2E6MTE6e3M6Mzoic2lzIjtzOjk6IjIwMjIwMTM5MCI7czoxNDoiaWRfaW5zY3JpcGNpb24iO2k6NjQ0O3M6Njoibm9tYnJlIjtzOjQ6Ik9sZ2EiO3M6ODoiYXBlbGxpZG8iO3M6ODoiSmltw6luZXoiO3M6NDoiYXVsYSI7czo5OiJBdWxhIDY5MkEiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjQ0O2E6MTE6e3M6Mzoic2lzIjtzOjk6IjIwMjIwMTQxMiI7czoxNDoiaWRfaW5zY3JpcGNpb24iO2k6NjQ1O3M6Njoibm9tYnJlIjtzOjQ6IlJvc2EiO3M6ODoiYXBlbGxpZG8iO3M6NDoiTHVuYSI7czo0OiJhdWxhIjtzOjk6IkF1bGEgNjkyQSI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6NDU7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMjAxNDM0IjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo2NDY7czo2OiJub21icmUiO3M6NzoiVGF0aWFuYSI7czo4OiJhcGVsbGlkbyI7czo3OiJOw7rDsWV6IjtzOjQ6ImF1bGEiO3M6OToiQXVsYSA2OTJBIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aTo0NjthOjExOntzOjM6InNpcyI7czo5OiIyMDIyMDE0NTYiO3M6MTQ6ImlkX2luc2NyaXBjaW9uIjtpOjY0NztzOjY6Im5vbWJyZSI7czo5OiJWZXLDs25pY2EiO3M6ODoiYXBlbGxpZG8iO3M6MzoiUGF6IjtzOjQ6ImF1bGEiO3M6OToiQXVsYSA2OTJBIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aTo0NzthOjExOntzOjM6InNpcyI7czo5OiIyMDIyMDE0NzgiO3M6MTQ6ImlkX2luc2NyaXBjaW9uIjtpOjY0ODtzOjY6Im5vbWJyZSI7czo2OiJYaW1lbmEiO3M6ODoiYXBlbGxpZG8iO3M6ODoiUmFtw61yZXoiO3M6NDoiYXVsYSI7czo5OiJBdWxhIDY5MkEiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjQ4O2E6MTE6e3M6Mzoic2lzIjtzOjk6IjIwMjIwMTQ5MCI7czoxNDoiaWRfaW5zY3JpcGNpb24iO2k6NjQ5O3M6Njoibm9tYnJlIjtzOjU6IlphaXJhIjtzOjg6ImFwZWxsaWRvIjtzOjY6IlRvbGVkbyI7czo0OiJhdWxhIjtzOjk6IkF1bGEgNjkyQSI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6NDk7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMjAyMDQ1IjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo2NTA7czo2OiJub21icmUiO3M6NToiRGllZ28iO3M6ODoiYXBlbGxpZG8iO3M6NDoiU290byI7czo0OiJhdWxhIjtzOjk6IkF1bGEgNjkyQSI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fX1zOjI4OiIAKgBlc2NhcGVXaGVuQ2FzdGluZ1RvU3RyaW5nIjtiOjA7fX0=', 1793067379);
+INSERT INTO "cache" ("key", "value", "expiration") VALUES ('central-riesgo:detalle:v3:13', 'a:15:{s:11:"id_registro";i:13;s:17:"estudiante_nombre";s:12:"Carlos Rojas";s:14:"sis_estudiante";s:8:"20210004";s:17:"numero_incidencia";N;s:21:"estudiante_verificado";b:1;s:6:"motivo";s:35:"Intento de ingreso sin autorizacion";s:7:"motivos";a:1:{i:0;s:35:"Intento de ingreso sin autorizacion";}s:5:"curso";s:14:"Programacion I";s:7:"materia";s:14:"Programacion I";s:5:"grupo";N;s:13:"reportado_por";s:13:"Roberto Silva";s:17:"reportado_por_rol";s:7:"docente";s:14:"fecha_registro";s:19:"2026-10-10 19:30:17";s:6:"estado";s:9:"Pendiente";s:11:"descripcion";N;}', 1794279041);
+INSERT INTO "cache" ("key", "value", "expiration") VALUES ('monitoreo.informe.16.docente.2', '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Ont9czoyODoiACoAZXNjYXBlV2hlbkNhc3RpbmdUb1N0cmluZyI7YjowO31zOjI0OiJtYXRlcmlhbGVzUGVyc29uYWxpemFkb3MiO086Mzk6IklsbHVtaW5hdGVcRGF0YWJhc2VcRWxvcXVlbnRcQ29sbGVjdGlvbiI6Mjp7czo4OiIAKgBpdGVtcyI7YTowOnt9czoyODoiACoAZXNjYXBlV2hlbkNhc3RpbmdUb1N0cmluZyI7YjowO31zOjIwOiJub3JtYXNQZXJzb25hbGl6YWRhcyI7TzozOToiSWxsdW1pbmF0ZVxEYXRhYmFzZVxFbG9xdWVudFxDb2xsZWN0aW9uIjoyOntzOjg6IgAqAGl0ZW1zIjthOjA6e31zOjI4OiIAKgBlc2NhcGVXaGVuQ2FzdGluZ1RvU3RyaW5nIjtiOjA7fXM6MTA6InRpcG9FeGFtZW4iO086MjE6IkFwcFxNb2RlbHNcVGlwb0V4YW1lbiI6MzA6e3M6MTM6IgAqAGNvbm5lY3Rpb24iO3M6NToicGdzcWwiO3M6ODoiACoAdGFibGUiO3M6MTE6InRpcG9fZXhhbWVuIjtzOjEzOiIAKgBwcmltYXJ5S2V5IjtzOjE0OiJpZF90aXBvX2V4YW1lbiI7czoxMDoiACoAa2V5VHlwZSI7czozOiJpbnQiO3M6MTI6ImluY3JlbWVudGluZyI7YjowO3M6NzoiACoAd2l0aCI7YTowOnt9czoxMjoiACoAd2l0aENvdW50IjthOjA6e31zOjE5OiJwcmV2ZW50c0xhenlMb2FkaW5nIjtiOjA7czoxMDoiACoAcGVyUGFnZSI7aToxNTtzOjY6ImV4aXN0cyI7YjoxO3M6MTg6Indhc1JlY2VudGx5Q3JlYXRlZCI7YjowO3M6Mjg6IgAqAGVzY2FwZVdoZW5DYXN0aW5nVG9TdHJpbmciO2I6MDtzOjEzOiIAKgBhdHRyaWJ1dGVzIjthOjI6e3M6MTQ6ImlkX3RpcG9fZXhhbWVuIjtpOjE7czoxODoibm9tYnJlX3RpcG9fZXhhbWVuIjtzOjE0OiJleGFtZW4gcGFyY2lhbCI7fXM6MTE6IgAqAG9yaWdpbmFsIjthOjI6e3M6MTQ6ImlkX3RpcG9fZXhhbWVuIjtpOjE7czoxODoibm9tYnJlX3RpcG9fZXhhbWVuIjtzOjE0OiJleGFtZW4gcGFyY2lhbCI7fXM6MTA6IgAqAGNoYW5nZXMiO2E6MDp7fXM6ODoiACoAY2FzdHMiO2E6MDp7fXM6MTc6IgAqAGNsYXNzQ2FzdENhY2hlIjthOjA6e31zOjIxOiIAKgBhdHRyaWJ1dGVDYXN0Q2FjaGUiO2E6MDp7fXM6MTM6IgAqAGRhdGVGb3JtYXQiO047czoxMDoiACoAYXBwZW5kcyI7YTowOnt9czoxOToiACoAZGlzcGF0Y2hlc0V2ZW50cyI7YTowOnt9czoxNDoiACoAb2JzZXJ2YWJsZXMiO2E6MDp7fXM6MTI6IgAqAHJlbGF0aW9ucyI7YTowOnt9czoxMDoiACoAdG91Y2hlcyI7YTowOnt9czoxMDoidGltZXN0YW1wcyI7YjowO3M6MTM6InVzZXNVbmlxdWVJZHMiO2I6MDtzOjk6IgAqAGhpZGRlbiI7YTowOnt9czoxMDoiACoAdmlzaWJsZSI7YTowOnt9czoxMToiACoAZmlsbGFibGUiO2E6Mjp7aTowO3M6MTQ6ImlkX3RpcG9fZXhhbWVuIjtpOjE7czoxODoibm9tYnJlX3RpcG9fZXhhbWVuIjt9czoxMDoiACoAZ3VhcmRlZCI7YToxOntpOjA7czoxOiIqIjt9fX1zOjEwOiIAKgB0b3VjaGVzIjthOjA6e31zOjEwOiJ0aW1lc3RhbXBzIjtiOjA7czoxMzoidXNlc1VuaXF1ZUlkcyI7YjowO3M6OToiACoAaGlkZGVuIjthOjA6e31zOjEwOiIAKgB2aXNpYmxlIjthOjA6e31zOjExOiIAKgBmaWxsYWJsZSI7YTo3OntpOjA7czo5OiJpZF9leGFtZW4iO2k6MTtzOjEzOiJub21icmVfZXhhbWVuIjtpOjI7czo1OiJmZWNoYSI7aTozO3M6MTE6ImhvcmFfaW5pY2lvIjtpOjQ7czo4OiJkdXJhY2lvbiI7aTo1O3M6NzoiY3JlYWRvciI7aTo2O3M6MTE6InRpcG9fZXhhbWVuIjt9czoxMDoiACoAZ3VhcmRlZCI7YToxOntpOjA7czoxOiIqIjt9fXM6MTE6ImVzdHVkaWFudGVzIjtPOjM5OiJJbGx1bWluYXRlXERhdGFiYXNlXEVsb3F1ZW50XENvbGxlY3Rpb24iOjI6e3M6ODoiACoAaXRlbXMiO2E6MDp7fXM6Mjg6IgAqAGVzY2FwZVdoZW5DYXN0aW5nVG9TdHJpbmciO2I6MDt9fQ==', 1794278714);
+INSERT INTO "cache" ("key", "value", "expiration") VALUES ('catalogos.examen.tipo.segunda instancia', 'i:3;', 1794279844);
+INSERT INTO "cache" ("key", "value", "expiration") VALUES ('monitoreo.informe.29.docente.1', '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cmlhbGVzUGVyc29uYWxpemFkb3MiO086Mzk6IklsbHVtaW5hdGVcRGF0YWJhc2VcRWxvcXVlbnRcQ29sbGVjdGlvbiI6Mjp7czo4OiIAKgBpdGVtcyI7YTowOnt9czoyODoiACoAZXNjYXBlV2hlbkNhc3RpbmdUb1N0cmluZyI7YjowO31zOjIwOiJub3JtYXNQZXJzb25hbGl6YWRhcyI7TzozOToiSWxsdW1pbmF0ZVxEYXRhYmFzZVxFbG9xdWVudFxDb2xsZWN0aW9uIjoyOntzOjg6IgAqAGl0ZW1zIjthOjA6e31zOjI4OiIAKgBlc2NhcGVXaGVuQ2FzdGluZ1RvU3RyaW5nIjtiOjA7fXM6MTA6InRpcG9FeGFtZW4iO086MjE6IkFwcFxNb2RlbHNcVGlwb0V4YW1lbiI6MzA6e3M6MTM6IgAqAGNvbm5lY3Rpb24iO3M6NToicGdzcWwiO3M6ODoiACoAdGFibGUiO3M6MTE6InRpcG9fZXhhbWVuIjtzOjEzOiIAKgBwcmltYXJ5S2V5IjtzOjE0OiJpZF90aXBvX2V4YW1lbiI7czoxMDoiACoAa2V5VHlwZSI7czozOiJpbnQiO3M6MTI6ImluY3JlbWVudGluZyI7YjowO3M6NzoiACoAd2l0aCI7YTowOnt9czoxMjoiACoAd2l0aENvdW50IjthOjA6e31zOjE5OiJwcmV2ZW50c0xhenlMb2FkaW5nIjtiOjA7czoxMDoiACoAcGVyUGFnZSI7aToxNTtzOjY6ImV4aXN0cyI7YjoxO3M6MTg6Indhc1JlY2VudGx5Q3JlYXRlZCI7YjowO3M6Mjg6IgAqAGVzY2FwZVdoZW5DYXN0aW5nVG9TdHJpbmciO2I6MDtzOjEzOiIAKgBhdHRyaWJ1dGVzIjthOjI6e3M6MTQ6ImlkX3RpcG9fZXhhbWVuIjtpOjE7czoxODoibm9tYnJlX3RpcG9fZXhhbWVuIjtzOjE0OiJleGFtZW4gcGFyY2lhbCI7fXM6MTE6IgAqAG9yaWdpbmFsIjthOjI6e3M6MTQ6ImlkX3RpcG9fZXhhbWVuIjtpOjE7czoxODoibm9tYnJlX3RpcG9fZXhhbWVuIjtzOjE0OiJleGFtZW4gcGFyY2lhbCI7fXM6MTA6IgAqAGNoYW5nZXMiO2E6MDp7fXM6ODoiACoAY2FzdHMiO2E6MDp7fXM6MTc6IgAqAGNsYXNzQ2FzdENhY2hlIjthOjA6e31zOjIxOiIAKgBhdHRyaWJ1dGVDYXN0Q2FjaGUiO2E6MDp7fXM6MTM6IgAqAGRhdGVGb3JtYXQiO047czoxMDoiACoAYXBwZW5kcyI7YTowOnt9czoxOToiACoAZGlzcGF0Y2hlc0V2ZW50cyI7YTowOnt9czoxNDoiACoAb2JzZXJ2YWJsZXMiO2E6MDp7fXM6MTI6IgAqAHJlbGF0aW9ucyI7YTowOnt9czoxMDoiACoAdG91Y2hlcyI7YTowOnt9czoxMDoidGltZXN0YW1wcyI7YjowO3M6MTM6InVzZXNVbmlxdWVJZHMiO2I6MDtzOjk6IgAqAGhpZGRlbiI7YTowOnt9czoxMDoiACoAdmlzaWJsZSI7YTowOnt9czoxMToiACoAZmlsbGFibGUiO2E6Mjp7aTowO3M6MTQ6ImlkX3RpcG9fZXhhbWVuIjtpOjE7czoxODoibm9tYnJlX3RpcG9fZXhhbWVuIjt9czoxMDoiACoAZ3VhcmRlZCI7YToxOntpOjA7czoxOiIqIjt9fX1zOjEwOiIAKgB0b3VjaGVzIjthOjA6e31zOjEwOiJ0aW1lc3RhbXBzIjtiOjA7czoxMzoidXNlc1VuaXF1ZUlkcyI7YjowO3M6OToiACoAaGlkZGVuIjthOjA6e31zOjEwOiIAKgB2aXNpYmxlIjthOjA6e31zOjExOiIAKgBmaWxsYWJsZSI7YTo3OntpOjA7czo5OiJpZF9leGFtZW4iO2k6MTtzOjEzOiJub21icmVfZXhhbWVuIjtpOjI7czo1OiJmZWNoYSI7aTozO3M6MTE6ImhvcmFfaW5pY2lvIjtpOjQ7czo4OiJkdXJhY2lvbiI7aTo1O3M6NzoiY3JlYWRvciI7aTo2O3M6MTE6InRpcG9fZXhhbWVuIjt9czoxMDoiACoAZ3VhcmRlZCI7YToxOntpOjA7czoxOiIqIjt9fXM6MTE6ImVzdHVkaWFudGVzIjtPOjI5OiJJbGx1bWluYXRlXFN1cHBvcnRcQ29sbGVjdGlvbiI6Mjp7czo4OiIAKgBpdGVtcyI7YTo1MDp7aTowO2E6MTE6e3M6Mzoic2lzIjtzOjk6IjIwMjAwMjEwNyI7czoxNDoiaWRfaW5zY3JpcGNpb24iO2k6NjUyO3M6Njoibm9tYnJlIjtzOjc6IkVybmVzdG8iO3M6ODoiYXBlbGxpZG8iO3M6NDoiVmVyYSI7czo0OiJhdWxhIjtzOjg6IkF1bGEgNjIzIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aToxO2E6MTE6e3M6Mzoic2lzIjtzOjg6IjIwMjEwMDAzIjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo2NTM7czo2OiJub21icmUiO3M6NToiTWFyaWEiO3M6ODoiYXBlbGxpZG8iO3M6NToiTG9wZXoiO3M6NDoiYXVsYSI7czo4OiJBdWxhIDYyMyI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6MjthOjExOntzOjM6InNpcyI7czo5OiIyMDIxMDEwMjIiO3M6MTQ6ImlkX2luc2NyaXBjaW9uIjtpOjY1NDtzOjY6Im5vbWJyZSI7czo1OiJCcnVubyI7czo4OiJhcGVsbGlkbyI7czo1OiJEw61heiI7czo0OiJhdWxhIjtzOjg6IkF1bGEgNjIzIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aTozO2E6MTE6e3M6Mzoic2lzIjtzOjk6IjIwMjEwMTA3OCI7czoxNDoiaWRfaW5zY3JpcGNpb24iO2k6NjU1O3M6Njoibm9tYnJlIjtzOjc6IkdhYnJpZWwiO3M6ODoiYXBlbGxpZG8iO3M6NjoiTWFtYW5pIjtzOjQ6ImF1bGEiO3M6ODoiQXVsYSA2MjMiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjQ7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMTAxMDkwIjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo2NTY7czo2OiJub21icmUiO3M6NToiSXbDoW4iO3M6ODoiYXBlbGxpZG8iO3M6NjoiRmxvcmVzIjtzOjQ6ImF1bGEiO3M6ODoiQXVsYSA2MjMiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjU7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMTAxMTEyIjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo2NTc7czo2OiJub21icmUiO3M6NToiS2V2aW4iO3M6ODoiYXBlbGxpZG8iO3M6NjoiTMOzcGV6IjtzOjQ6ImF1bGEiO3M6ODoiQXVsYSA2MjMiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjY7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMTAxMTM0IjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo2NTg7czo2OiJub21icmUiO3M6NjoiTWlndWVsIjtzOjg6ImFwZWxsaWRvIjtzOjQ6IlNvdG8iO3M6NDoiYXVsYSI7czo4OiJBdWxhIDYyMyI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6NzthOjExOntzOjM6InNpcyI7czo5OiIyMDIxMDExNTYiO3M6MTQ6ImlkX2luc2NyaXBjaW9uIjtpOjY1OTtzOjY6Im5vbWJyZSI7czo2OiLDk3NjYXIiO3M6ODoiYXBlbGxpZG8iO3M6NjoiUXVpc3BlIjtzOjQ6ImF1bGEiO3M6ODoiQXVsYSA2MjMiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjg7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMTAxMTc4IjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo2NjA7czo2OiJub21icmUiO3M6NToiUmHDumwiO3M6ODoiYXBlbGxpZG8iO3M6NjoiQ2hvcXVlIjtzOjQ6ImF1bGEiO3M6ODoiQXVsYSA2MjMiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjk7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMTAxMTkwIjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo2NjE7czo2OiJub21icmUiO3M6NjoiVG9tw6FzIjtzOjg6ImFwZWxsaWRvIjtzOjc6IkdhcmPDrWEiO3M6NDoiYXVsYSI7czo4OiJBdWxhIDYyMyI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6MTA7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMTAxMjIzIjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo2NjI7czo2OiJub21icmUiO3M6NjoiWGF2aWVyIjtzOjg6ImFwZWxsaWRvIjtzOjY6IlZhcmdhcyI7czo0OiJhdWxhIjtzOjg6IkF1bGEgNjIzIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aToxMTthOjExOntzOjM6InNpcyI7czo5OiIyMDIxMDEyNDUiO3M6MTQ6ImlkX2luc2NyaXBjaW9uIjtpOjY2MztzOjY6Im5vbWJyZSI7czozOiJab2UiO3M6ODoiYXBlbGxpZG8iO3M6NToiU2lsZXMiO3M6NDoiYXVsYSI7czo4OiJBdWxhIDYyMyI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6MTI7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMTAxMjY3IjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo2NjQ7czo2OiJub21icmUiO3M6NjoiQmlhbmNhIjtzOjg6ImFwZWxsaWRvIjtzOjc6IlBhcmVkZXMiO3M6NDoiYXVsYSI7czo4OiJBdWxhIDYyMyI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6MTM7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMTAxMjg5IjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo2NjU7czo2OiJub21icmUiO3M6NzoiRGFuaWVsYSI7czo4OiJhcGVsbGlkbyI7czo3OiJDYWJyZXJhIjtzOjQ6ImF1bGEiO3M6ODoiQXVsYSA2MjMiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjE0O2E6MTE6e3M6Mzoic2lzIjtzOjk6IjIwMjEwMTMwMSI7czoxNDoiaWRfaW5zY3JpcGNpb24iO2k6NjY2O3M6Njoibm9tYnJlIjtzOjg6IkZlcm5hbmRhIjtzOjg6ImFwZWxsaWRvIjtzOjQ6IlZlZ2EiO3M6NDoiYXVsYSI7czo4OiJBdWxhIDYyMyI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6MTU7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMTAxMzIzIjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo2Njc7czo2OiJub21icmUiO3M6NDoiSHVnbyI7czo4OiJhcGVsbGlkbyI7czo3OiJDYW1hY2hvIjtzOjQ6ImF1bGEiO3M6ODoiQXVsYSA2MjMiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjE2O2E6MTE6e3M6Mzoic2lzIjtzOjk6IjIwMjEwMTM0NSI7czoxNDoiaWRfaW5zY3JpcGNpb24iO2k6NjY4O3M6Njoibm9tYnJlIjtzOjY6IkphdmllciI7czo4OiJhcGVsbGlkbyI7czo4OiJFc3Bpbm96YSI7czo0OiJhdWxhIjtzOjg6IkF1bGEgNjIzIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aToxNzthOjExOntzOjM6InNpcyI7czo5OiIyMDIxMDEzNjciO3M6MTQ6ImlkX2luc2NyaXBjaW9uIjtpOjY2OTtzOjY6Im5vbWJyZSI7czo0OiJMdWlzIjtzOjg6ImFwZWxsaWRvIjtzOjEwOiJHdXRpw6lycmV6IjtzOjQ6ImF1bGEiO3M6ODoiQXVsYSA2MjMiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjE4O2E6MTE6e3M6Mzoic2lzIjtzOjk6IjIwMjEwMTM4OSI7czoxNDoiaWRfaW5zY3JpcGNpb24iO2k6NjcwO3M6Njoibm9tYnJlIjtzOjg6Ik5pY29sw6FzIjtzOjg6ImFwZWxsaWRvIjtzOjc6IklyaWFydGUiO3M6NDoiYXVsYSI7czo4OiJBdWxhIDYyMyI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6MTk7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMTAxNDAxIjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo2NzE7czo2OiJub21icmUiO3M6NToiUGFibG8iO3M6ODoiYXBlbGxpZG8iO3M6ODoiS293YWxza2kiO3M6NDoiYXVsYSI7czo4OiJBdWxhIDYyMyI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6MjA7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMTAxNDIzIjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo2NzI7czo2OiJub21icmUiO3M6NjoiU2VyZ2lvIjtzOjg6ImFwZWxsaWRvIjtzOjc6Ik1lbmRvemEiO3M6NDoiYXVsYSI7czo4OiJBdWxhIDYyMyI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6MjE7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMTAxNDQ1IjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo2NzM7czo2OiJub21icmUiO3M6NjoiVWxpc2VzIjtzOjg6ImFwZWxsaWRvIjtzOjg6Ik9yZWxsYW5hIjtzOjQ6ImF1bGEiO3M6ODoiQXVsYSA2MjMiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjIyO2E6MTE6e3M6Mzoic2lzIjtzOjk6IjIwMjEwMTQ2NyI7czoxNDoiaWRfaW5zY3JpcGNpb24iO2k6Njc0O3M6Njoibm9tYnJlIjtzOjY6IldhbHRlciI7czo4OiJhcGVsbGlkbyI7czo3OiJRdWlyb2dhIjtzOjQ6ImF1bGEiO3M6ODoiQXVsYSA2MjMiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjIzO2E6MTE6e3M6Mzoic2lzIjtzOjk6IjIwMjEwMTQ4OSI7czoxNDoiaWRfaW5zY3JpcGNpb24iO2k6Njc1O3M6Njoibm9tYnJlIjtzOjU6IllhbWlsIjtzOjg6ImFwZWxsaWRvIjtzOjg6IlPDoW5jaGV6IjtzOjQ6ImF1bGEiO3M6ODoiQXVsYSA2MjMiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjI0O2E6MTE6e3M6Mzoic2lzIjtzOjk6IjIwMjIwMTAxMyI7czoxNDoiaWRfaW5zY3JpcGNpb24iO2k6Njc2O3M6Njoibm9tYnJlIjtzOjM6IkFuYSI7czo4OiJhcGVsbGlkbyI7czo2OiJMw7NwZXoiO3M6NDoiYXVsYSI7czo4OiJBdWxhIDYyMyI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6MjU7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMjAxMDMxIjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo2Nzc7czo2OiJub21icmUiO3M6NToiQ2FybGEiO3M6ODoiYXBlbGxpZG8iO3M6NDoiUnVpeiI7czo0OiJhdWxhIjtzOjg6IkF1bGEgNjIzIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aToyNjthOjExOntzOjM6InNpcyI7czo5OiIyMDIyMDEwNTYiO3M6MTQ6ImlkX2luc2NyaXBjaW9uIjtpOjY3ODtzOjY6Im5vbWJyZSI7czo3OiJGw6F0aW1hIjtzOjg6ImFwZWxsaWRvIjtzOjY6IlF1aXNwZSI7czo0OiJhdWxhIjtzOjg6IkF1bGEgNjIzIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aToyNzthOjExOntzOjM6InNpcyI7czo5OiIyMDIyMDEwODkiO3M6MTQ6ImlkX2luc2NyaXBjaW9uIjtpOjY3OTtzOjY6Im5vbWJyZSI7czo2OiJIZWxlbmEiO3M6ODoiYXBlbGxpZG8iO3M6NjoiQ2hvcXVlIjtzOjQ6ImF1bGEiO3M6ODoiQXVsYSA2MjMiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjI4O2E6MTE6e3M6Mzoic2lzIjtzOjk6IjIwMjIwMTEwMSI7czoxNDoiaWRfaW5zY3JpcGNpb24iO2k6NjgwO3M6Njoibm9tYnJlIjtzOjU6Ikp1bGlhIjtzOjg6ImFwZWxsaWRvIjtzOjc6IkdhcmPDrWEiO3M6NDoiYXVsYSI7czo4OiJBdWxhIDYyMyI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6Mjk7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMjAxMTIzIjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo2ODE7czo2OiJub21icmUiO3M6NToiTGF1cmEiO3M6ODoiYXBlbGxpZG8iO3M6NToiRMOtYXoiO3M6NDoiYXVsYSI7czo4OiJBdWxhIDYyMyI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6MzA7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMjAxMTQ1IjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo2ODI7czo2OiJub21icmUiO3M6NToiTmFkaWEiO3M6ODoiYXBlbGxpZG8iO3M6NDoiVmVyYSI7czo0OiJhdWxhIjtzOjg6IkF1bGEgNjIzIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aTozMTthOjExOntzOjM6InNpcyI7czo5OiIyMDIyMDExNjciO3M6MTQ6ImlkX2luc2NyaXBjaW9uIjtpOjY4MztzOjY6Im5vbWJyZSI7czo4OiJQYXRyaWNpYSI7czo4OiJhcGVsbGlkbyI7czo2OiJNYW1hbmkiO3M6NDoiYXVsYSI7czo4OiJBdWxhIDYyMyI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6MzI7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMjAxMTg5IjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo2ODQ7czo2OiJub21icmUiO3M6NjoiU29mw61hIjtzOjg6ImFwZWxsaWRvIjtzOjY6IkZsb3JlcyI7czo0OiJhdWxhIjtzOjg6IkF1bGEgNjIzIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aTozMzthOjExOntzOjM6InNpcyI7czo5OiIyMDIyMDEyMDEiO3M6MTQ6ImlkX2luc2NyaXBjaW9uIjtpOjY4NTtzOjY6Im5vbWJyZSI7czo3OiJWYWxlcmlhIjtzOjg6ImFwZWxsaWRvIjtzOjY6IkzDs3BleiI7czo0OiJhdWxhIjtzOjg6IkF1bGEgNjIzIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aTozNDthOjExOntzOjM6InNpcyI7czo5OiIyMDIyMDEyMTIiO3M6MTQ6ImlkX2luc2NyaXBjaW9uIjtpOjY4NjtzOjY6Im5vbWJyZSI7czo1OiJXZW5keSI7czo4OiJhcGVsbGlkbyI7czo2OiJaYXBhdGEiO3M6NDoiYXVsYSI7czo4OiJBdWxhIDYyMyI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6MzU7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMjAxMjM0IjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo2ODc7czo2OiJub21icmUiO3M6NzoiWW9sYW5kYSI7czo4OiJhcGVsbGlkbyI7czo2OiJUaWNvbmEiO3M6NDoiYXVsYSI7czo4OiJBdWxhIDYyMyI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6MzY7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMjAxMjU2IjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo2ODg7czo2OiJub21icmUiO3M6NzoiQW5kcsOpcyI7czo4OiJhcGVsbGlkbyI7czo1OiJSb2phcyI7czo0OiJhdWxhIjtzOjg6IkF1bGEgNjIzIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTI6ImhvcmFfaW5ncmVzbyI7czo4OiIxMDo1NjoyNSI7czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo4OiJwcmVzZW50ZSI7fWk6Mzc7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMjAxMjc4IjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo2ODk7czo2OiJub21icmUiO3M6ODoiQ3Jpc3RpYW4iO3M6ODoiYXBlbGxpZG8iO3M6NjoiTW9saW5hIjtzOjQ6ImF1bGEiO3M6ODoiQXVsYSA2MjMiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjM4O2E6MTE6e3M6Mzoic2lzIjtzOjk6IjIwMjIwMTI5MCI7czoxNDoiaWRfaW5zY3JpcGNpb24iO2k6NjkwO3M6Njoibm9tYnJlIjtzOjc6IkVkdWFyZG8iO3M6ODoiYXBlbGxpZG8iO3M6NzoiU2FsYXphciI7czo0OiJhdWxhIjtzOjg6IkF1bGEgNjIzIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aTozOTthOjExOntzOjM6InNpcyI7czo5OiIyMDIyMDEzMTIiO3M6MTQ6ImlkX2luc2NyaXBjaW9uIjtpOjY5MTtzOjY6Im5vbWJyZSI7czo3OiJHb256YWxvIjtzOjg6ImFwZWxsaWRvIjtzOjQ6IkFyY2UiO3M6NDoiYXVsYSI7czo4OiJBdWxhIDYyMyI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6NDA7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMjAxMzM0IjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo2OTI7czo2OiJub21icmUiO3M6NToiSW7DqXMiO3M6ODoiYXBlbGxpZG8iO3M6NzoiRGVsZ2FkbyI7czo0OiJhdWxhIjtzOjg6IkF1bGEgNjIzIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aTo0MTthOjExOntzOjM6InNpcyI7czo5OiIyMDIyMDEzNTYiO3M6MTQ6ImlkX2luc2NyaXBjaW9uIjtpOjY5MztzOjY6Im5vbWJyZSI7czo1OiJLYXJlbiI7czo4OiJhcGVsbGlkbyI7czo3OiJGdWVudGVzIjtzOjQ6ImF1bGEiO3M6ODoiQXVsYSA2MjMiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjQyO2E6MTE6e3M6Mzoic2lzIjtzOjk6IjIwMjIwMTM3OCI7czoxNDoiaWRfaW5zY3JpcGNpb24iO2k6Njk0O3M6Njoibm9tYnJlIjtzOjY6Ik1hcsOtYSI7czo4OiJhcGVsbGlkbyI7czo3OiJIZXJyZXJhIjtzOjQ6ImF1bGEiO3M6ODoiQXVsYSA2MjMiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjQzO2E6MTE6e3M6Mzoic2lzIjtzOjk6IjIwMjIwMTM5MCI7czoxNDoiaWRfaW5zY3JpcGNpb24iO2k6Njk1O3M6Njoibm9tYnJlIjtzOjQ6Ik9sZ2EiO3M6ODoiYXBlbGxpZG8iO3M6ODoiSmltw6luZXoiO3M6NDoiYXVsYSI7czo4OiJBdWxhIDYyMyI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6NDQ7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMjAxNDEyIjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo2OTY7czo2OiJub21icmUiO3M6NDoiUm9zYSI7czo4OiJhcGVsbGlkbyI7czo0OiJMdW5hIjtzOjQ6ImF1bGEiO3M6ODoiQXVsYSA2MjMiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjQ1O2E6MTE6e3M6Mzoic2lzIjtzOjk6IjIwMjIwMTQzNCI7czoxNDoiaWRfaW5zY3JpcGNpb24iO2k6Njk3O3M6Njoibm9tYnJlIjtzOjc6IlRhdGlhbmEiO3M6ODoiYXBlbGxpZG8iO3M6NzoiTsO6w7FleiI7czo0OiJhdWxhIjtzOjg6IkF1bGEgNjIzIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aTo0NjthOjExOntzOjM6InNpcyI7czo5OiIyMDIyMDE0NTYiO3M6MTQ6ImlkX2luc2NyaXBjaW9uIjtpOjY5ODtzOjY6Im5vbWJyZSI7czo5OiJWZXLDs25pY2EiO3M6ODoiYXBlbGxpZG8iO3M6MzoiUGF6IjtzOjQ6ImF1bGEiO3M6ODoiQXVsYSA2MjMiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjQ3O2E6MTE6e3M6Mzoic2lzIjtzOjk6IjIwMjIwMTQ3OCI7czoxNDoiaWRfaW5zY3JpcGNpb24iO2k6Njk5O3M6Njoibm9tYnJlIjtzOjY6IlhpbWVuYSI7czo4OiJhcGVsbGlkbyI7czo4OiJSYW3DrXJleiI7czo0OiJhdWxhIjtzOjg6IkF1bGEgNjIzIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aTo0ODthOjExOntzOjM6InNpcyI7czo5OiIyMDIyMDE0OTAiO3M6MTQ6ImlkX2luc2NyaXBjaW9uIjtpOjcwMDtzOjY6Im5vbWJyZSI7czo1OiJaYWlyYSI7czo4OiJhcGVsbGlkbyI7czo2OiJUb2xlZG8iO3M6NDoiYXVsYSI7czo4OiJBdWxhIDYyMyI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6NDk7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMjAyMDQ1IjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo3MDE7czo2OiJub21icmUiO3M6NToiRGllZ28iO3M6ODoiYXBlbGxpZG8iO3M6NDoiU290byI7czo0OiJhdWxhIjtzOjg6IkF1bGEgNjIzIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9fXM6Mjg6IgAqAGVzY2FwZVdoZW5DYXN0aW5nVG9TdHJpbmciO2I6MDt9fQ==', 1793098647);
+INSERT INTO "cache" ("key", "value", "expiration") VALUES ('catalogos.examen.ambientes', 'a:5:{i:0;a:3:{s:2:"id";i:1;s:6:"nombre";s:8:"Aula 623";s:7:"termino";s:8:"aula 623";}i:1;a:3:{s:2:"id";i:5;s:6:"nombre";s:9:"Aula 690B";s:7:"termino";s:9:"aula 690b";}i:2;a:3:{s:2:"id";i:2;s:6:"nombre";s:9:"Aula 692A";s:7:"termino";s:9:"aula 692a";}i:3;a:3:{s:2:"id";i:3;s:6:"nombre";s:13:"Laboratorio 1";s:7:"termino";s:13:"laboratorio 1";}i:4;a:3:{s:2:"id";i:4;s:6:"nombre";s:13:"Laboratorio 2";s:7:"termino";s:13:"laboratorio 2";}}', 1794280162);
+INSERT INTO "cache" ("key", "value", "expiration") VALUES ('catalogos.examen.materiales', 'a:5:{i:0;a:2:{s:2:"id";i:4;s:11:"descripcion";s:21:"Apuntes de la materia";}i:1;a:2:{s:2:"id";i:1;s:11:"descripcion";s:22:"Calculadora cientifica";}i:2;a:2:{s:2:"id";i:2;s:11:"descripcion";s:13:"Computadora
+
+";}i:3;a:2:{s:2:"id";i:3;s:11:"descripcion";s:10:"Formulario";}i:4;a:2:{s:2:"id";i:5;s:11:"descripcion";s:25:"Hojas de examen en blanco";}}', 1794280165);
+INSERT INTO "cache" ("key", "value", "expiration") VALUES ('catalogos.examen.normas', 'a:5:{i:0;a:2:{s:2:"id";i:2;s:7:"detalle";s:45:"Mantener dispositivos electrónicos guardados";}i:1;a:2:{s:2:"id";i:5;s:7:"detalle";s:34:"No utilizar material no autorizado";}i:2;a:2:{s:2:"id";i:1;s:7:"detalle";s:37:"Portar CI durante toda la evaluación";}i:3;a:2:{s:2:"id";i:4;s:7:"detalle";s:46:"Prohibido hablar, consultar levantando la mano";}i:4;a:2:{s:2:"id";i:3;s:7:"detalle";s:41:"Tolerancia máxima de ingreso: 15 minutos";}}', 1794280167);
+INSERT INTO "cache" ("key", "value", "expiration") VALUES ('monitoreo.informe.39.docente.1', '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YXN0aW5nVG9TdHJpbmciO2I6MDt9czoyNDoibWF0ZXJpYWxlc1BlcnNvbmFsaXphZG9zIjtPOjM5OiJJbGx1bWluYXRlXERhdGFiYXNlXEVsb3F1ZW50XENvbGxlY3Rpb24iOjI6e3M6ODoiACoAaXRlbXMiO2E6MDp7fXM6Mjg6IgAqAGVzY2FwZVdoZW5DYXN0aW5nVG9TdHJpbmciO2I6MDt9czoyMDoibm9ybWFzUGVyc29uYWxpemFkYXMiO086Mzk6IklsbHVtaW5hdGVcRGF0YWJhc2VcRWxvcXVlbnRcQ29sbGVjdGlvbiI6Mjp7czo4OiIAKgBpdGVtcyI7YTowOnt9czoyODoiACoAZXNjYXBlV2hlbkNhc3RpbmdUb1N0cmluZyI7YjowO31zOjEwOiJ0aXBvRXhhbWVuIjtPOjIxOiJBcHBcTW9kZWxzXFRpcG9FeGFtZW4iOjMwOntzOjEzOiIAKgBjb25uZWN0aW9uIjtzOjU6InBnc3FsIjtzOjg6IgAqAHRhYmxlIjtzOjExOiJ0aXBvX2V4YW1lbiI7czoxMzoiACoAcHJpbWFyeUtleSI7czoxNDoiaWRfdGlwb19leGFtZW4iO3M6MTA6IgAqAGtleVR5cGUiO3M6MzoiaW50IjtzOjEyOiJpbmNyZW1lbnRpbmciO2I6MDtzOjc6IgAqAHdpdGgiO2E6MDp7fXM6MTI6IgAqAHdpdGhDb3VudCI7YTowOnt9czoxOToicHJldmVudHNMYXp5TG9hZGluZyI7YjowO3M6MTA6IgAqAHBlclBhZ2UiO2k6MTU7czo2OiJleGlzdHMiO2I6MTtzOjE4OiJ3YXNSZWNlbnRseUNyZWF0ZWQiO2I6MDtzOjI4OiIAKgBlc2NhcGVXaGVuQ2FzdGluZ1RvU3RyaW5nIjtiOjA7czoxMzoiACoAYXR0cmlidXRlcyI7YToyOntzOjE0OiJpZF90aXBvX2V4YW1lbiI7aTozO3M6MTg6Im5vbWJyZV90aXBvX2V4YW1lbiI7czoxNzoic2VndW5kYSBpbnN0YW5jaWEiO31zOjExOiIAKgBvcmlnaW5hbCI7YToyOntzOjE0OiJpZF90aXBvX2V4YW1lbiI7aTozO3M6MTg6Im5vbWJyZV90aXBvX2V4YW1lbiI7czoxNzoic2VndW5kYSBpbnN0YW5jaWEiO31zOjEwOiIAKgBjaGFuZ2VzIjthOjA6e31zOjg6IgAqAGNhc3RzIjthOjA6e31zOjE3OiIAKgBjbGFzc0Nhc3RDYWNoZSI7YTowOnt9czoyMToiACoAYXR0cmlidXRlQ2FzdENhY2hlIjthOjA6e31zOjEzOiIAKgBkYXRlRm9ybWF0IjtOO3M6MTA6IgAqAGFwcGVuZHMiO2E6MDp7fXM6MTk6IgAqAGRpc3BhdGNoZXNFdmVudHMiO2E6MDp7fXM6MTQ6IgAqAG9ic2VydmFibGVzIjthOjA6e31zOjEyOiIAKgByZWxhdGlvbnMiO2E6MDp7fXM6MTA6IgAqAHRvdWNoZXMiO2E6MDp7fXM6MTA6InRpbWVzdGFtcHMiO2I6MDtzOjEzOiJ1c2VzVW5pcXVlSWRzIjtiOjA7czo5OiIAKgBoaWRkZW4iO2E6MDp7fXM6MTA6IgAqAHZpc2libGUiO2E6MDp7fXM6MTE6IgAqAGZpbGxhYmxlIjthOjI6e2k6MDtzOjE0OiJpZF90aXBvX2V4YW1lbiI7aToxO3M6MTg6Im5vbWJyZV90aXBvX2V4YW1lbiI7fXM6MTA6IgAqAGd1YXJkZWQiO2E6MTp7aTowO3M6MToiKiI7fX19czoxMDoiACoAdG91Y2hlcyI7YTowOnt9czoxMDoidGltZXN0YW1wcyI7YjowO3M6MTM6InVzZXNVbmlxdWVJZHMiO2I6MDtzOjk6IgAqAGhpZGRlbiI7YTowOnt9czoxMDoiACoAdmlzaWJsZSI7YTowOnt9czoxMToiACoAZmlsbGFibGUiO2E6Nzp7aTowO3M6OToiaWRfZXhhbWVuIjtpOjE7czoxMzoibm9tYnJlX2V4YW1lbiI7aToyO3M6NToiZmVjaGEiO2k6MztzOjExOiJob3JhX2luaWNpbyI7aTo0O3M6ODoiZHVyYWNpb24iO2k6NTtzOjc6ImNyZWFkb3IiO2k6NjtzOjExOiJ0aXBvX2V4YW1lbiI7fXM6MTA6IgAqAGd1YXJkZWQiO2E6MTp7aTowO3M6MToiKiI7fX1zOjExOiJlc3R1ZGlhbnRlcyI7TzozOToiSWxsdW1pbmF0ZVxEYXRhYmFzZVxFbG9xdWVudFxDb2xsZWN0aW9uIjoyOntzOjg6IgAqAGl0ZW1zIjthOjA6e31zOjI4OiIAKgBlc2NhcGVXaGVuQ2FzdGluZ1RvU3RyaW5nIjtiOjA7fX0=', 1794279968);
+INSERT INTO "cache" ("key", "value", "expiration") VALUES ('docentes.solicitudes_pendientes', 'i:0;', 1794280225);
+INSERT INTO "cache" ("key", "value", "expiration") VALUES ('central-riesgo:lista:v1:12:toda-la-institucion::0', 'TzoyOToiSWxsdW1pbmF0ZVxTdXBwb3J0XENvbGxlY3Rpb24iOjI6e3M6ODoiACoAaXRlbXMiO2E6MjE6e2k6MDthOjEzOntzOjI6ImlkIjtpOjMyO3M6MTE6ImlkX3JlZ2lzdHJvIjtpOjMyO3M6Njoibm9tYnJlIjtzOjc6IkRhbmllbGEiO3M6ODoiYXBlbGxpZG8iO3M6NzoiQ2FicmVyYSI7czoxMDoidmVyaWZpY2FkbyI7YjoxO3M6Mzoic2lzIjtzOjk6IjIwMjEwMTI4OSI7czoxNzoibnVtZXJvX2luY2lkZW5jaWEiO2k6MTtzOjU6ImN1cnNvIjtzOjE0OiJQcm9ncmFtYWNpb24gSSI7czo3OiJtYXRlcmlhIjtzOjE0OiJQcm9ncmFtYWNpb24gSSI7czo3OiJtb3Rpdm9zIjthOjE6e2k6MDtzOjMzOiJjb3BpYSBvIGludGVyY2FtYmlvIGRlIHJlc3B1ZXN0YXMiO31zOjE1OiJtb3Rpdm9fZXRpcXVldGEiO3M6MzM6IkNvcGlhIG8gaW50ZXJjYW1iaW8gZGUgcmVzcHVlc3RhcyI7czo2OiJlc3RhZG8iO3M6MTA6IkNvbmZpcm1hZG8iO3M6NToiZmVjaGEiO3M6MTk6IjIwMjYtMTAtMjcgMDc6MTg6MDkiO31pOjE7YToxMzp7czoyOiJpZCI7aToyODtzOjExOiJpZF9yZWdpc3RybyI7aToyODtzOjY6Im5vbWJyZSI7czo1OiJLYXJlbiI7czo4OiJhcGVsbGlkbyI7czo3OiJGdWVudGVzIjtzOjEwOiJ2ZXJpZmljYWRvIjtiOjE7czozOiJzaXMiO3M6OToiMjAyMjAxMzU2IjtzOjE3OiJudW1lcm9faW5jaWRlbmNpYSI7aToxO3M6NToiY3Vyc28iO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1hdGVyaWEiO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1vdGl2b3MiO2E6MTp7aTowO3M6MzI6ImludGVudG8gZGUgaW5ncmVzbyBubyBhdXRvcml6YWRvIjt9czoxNToibW90aXZvX2V0aXF1ZXRhIjtzOjM1OiJJbnRlbnRvIGRlIGluZ3Jlc28gc2luIGF1dG9yaXphY2lvbiI7czo2OiJlc3RhZG8iO3M6MTA6IkNvbmZpcm1hZG8iO3M6NToiZmVjaGEiO3M6MTk6IjIwMjYtMTAtMjcgMDY6Mjg6MDgiO31pOjI7YToxMzp7czoyOiJpZCI7aToyNztzOjExOiJpZF9yZWdpc3RybyI7aToyNztzOjY6Im5vbWJyZSI7czo1OiJQYWJsbyI7czo4OiJhcGVsbGlkbyI7czo4OiJLb3dhbHNraSI7czoxMDoidmVyaWZpY2FkbyI7YjoxO3M6Mzoic2lzIjtzOjk6IjIwMjEwMTQwMSI7czoxNzoibnVtZXJvX2luY2lkZW5jaWEiO2k6MTtzOjU6ImN1cnNvIjtzOjE0OiJQcm9ncmFtYWNpb24gSSI7czo3OiJtYXRlcmlhIjtzOjE0OiJQcm9ncmFtYWNpb24gSSI7czo3OiJtb3Rpdm9zIjthOjE6e2k6MDtzOjE1OiJhdWxhIGVxdWl2b2NhZGEiO31zOjE1OiJtb3Rpdm9fZXRpcXVldGEiO3M6MTU6IkF1bGEgZXF1aXZvY2FkYSI7czo2OiJlc3RhZG8iO3M6MTA6IkNvbmZpcm1hZG8iO3M6NToiZmVjaGEiO3M6MTk6IjIwMjYtMTAtMjcgMDY6MTM6MzIiO31pOjM7YToxMzp7czoyOiJpZCI7aToyNjtzOjExOiJpZF9yZWdpc3RybyI7aToyNjtzOjY6Im5vbWJyZSI7czo5OiJWZXLDs25pY2EiO3M6ODoiYXBlbGxpZG8iO3M6MzoiUGF6IjtzOjEwOiJ2ZXJpZmljYWRvIjtiOjE7czozOiJzaXMiO3M6OToiMjAyMjAxNDU2IjtzOjE3OiJudW1lcm9faW5jaWRlbmNpYSI7aToxO3M6NToiY3Vyc28iO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1hdGVyaWEiO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1vdGl2b3MiO2E6MTp7aTowO3M6MzI6ImludGVudG8gZGUgaW5ncmVzbyBubyBhdXRvcml6YWRvIjt9czoxNToibW90aXZvX2V0aXF1ZXRhIjtzOjM1OiJJbnRlbnRvIGRlIGluZ3Jlc28gc2luIGF1dG9yaXphY2lvbiI7czo2OiJlc3RhZG8iO3M6MTA6IkNvbmZpcm1hZG8iO3M6NToiZmVjaGEiO3M6MTk6IjIwMjYtMTAtMjcgMDY6MTI6NTQiO31pOjQ7YToxMzp7czoyOiJpZCI7aToyNTtzOjExOiJpZF9yZWdpc3RybyI7aToyNTtzOjY6Im5vbWJyZSI7czozOiJBbmEiO3M6ODoiYXBlbGxpZG8iO3M6NjoiTMOzcGV6IjtzOjEwOiJ2ZXJpZmljYWRvIjtiOjE7czozOiJzaXMiO3M6OToiMjAyMjAxMDEzIjtzOjE3OiJudW1lcm9faW5jaWRlbmNpYSI7aToyO3M6NToiY3Vyc28iO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1hdGVyaWEiO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1vdGl2b3MiO2E6MTp7aTowO3M6MzM6ImNvcGlhIG8gaW50ZXJjYW1iaW8gZGUgcmVzcHVlc3RhcyI7fXM6MTU6Im1vdGl2b19ldGlxdWV0YSI7czozMzoiQ29waWEgbyBpbnRlcmNhbWJpbyBkZSByZXNwdWVzdGFzIjtzOjY6ImVzdGFkbyI7czoxMDoiQ29uZmlybWFkbyI7czo1OiJmZWNoYSI7czoxOToiMjAyNi0xMC0yNyAwNToxMTo0NSI7fWk6NTthOjEzOntzOjI6ImlkIjtpOjI0O3M6MTE6ImlkX3JlZ2lzdHJvIjtpOjI0O3M6Njoibm9tYnJlIjtzOjU6IkRpZWdvIjtzOjg6ImFwZWxsaWRvIjtzOjQ6IlNvdG8iO3M6MTA6InZlcmlmaWNhZG8iO2I6MTtzOjM6InNpcyI7czo5OiIyMDIyMDIwNDUiO3M6MTc6Im51bWVyb19pbmNpZGVuY2lhIjtpOjE7czo1OiJjdXJzbyI7czoxNDoiUHJvZ3JhbWFjaW9uIEkiO3M6NzoibWF0ZXJpYSI7czoxNDoiUHJvZ3JhbWFjaW9uIEkiO3M6NzoibW90aXZvcyI7YToxOntpOjA7czozMjoidXNvIGRlIGRpc3Bvc2l0aXZvcyBlbGVjdHJvbmljb3MiO31zOjE1OiJtb3Rpdm9fZXRpcXVldGEiO3M6NDc6IlVzbyBkZSBkaXNwb3NpdGl2b3MgZWxlY3Ryb25pY29zIG5vIGF1dG9yaXphZG9zIjtzOjY6ImVzdGFkbyI7czoxMDoiQ29uZmlybWFkbyI7czo1OiJmZWNoYSI7czoxOToiMjAyNi0xMC0yNyAwNDo1NTowNiI7fWk6NjthOjEzOntzOjI6ImlkIjtpOjIzO3M6MTE6ImlkX3JlZ2lzdHJvIjtpOjIzO3M6Njoibm9tYnJlIjtzOjY6IlNlcmdpbyI7czo4OiJhcGVsbGlkbyI7czo3OiJNZW5kb3phIjtzOjEwOiJ2ZXJpZmljYWRvIjtiOjE7czozOiJzaXMiO3M6OToiMjAyMTAxNDIzIjtzOjE3OiJudW1lcm9faW5jaWRlbmNpYSI7aToxO3M6NToiY3Vyc28iO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1hdGVyaWEiO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1vdGl2b3MiO2E6MTp7aTowO3M6NDoib3RybyI7fXM6MTU6Im1vdGl2b19ldGlxdWV0YSI7czo0OiJPdHJvIjtzOjY6ImVzdGFkbyI7czoxMDoiQ29uZmlybWFkbyI7czo1OiJmZWNoYSI7czoxOToiMjAyNi0xMC0yNyAwNDoyNToxOSI7fWk6NzthOjEzOntzOjI6ImlkIjtpOjIyO3M6MTE6ImlkX3JlZ2lzdHJvIjtpOjIyO3M6Njoibm9tYnJlIjtzOjg6IkNyaXN0aWFuIjtzOjg6ImFwZWxsaWRvIjtzOjY6Ik1vbGluYSI7czoxMDoidmVyaWZpY2FkbyI7YjoxO3M6Mzoic2lzIjtzOjk6IjIwMjIwMTI3OCI7czoxNzoibnVtZXJvX2luY2lkZW5jaWEiO2k6MTtzOjU6ImN1cnNvIjtzOjE0OiJQcm9ncmFtYWNpb24gSSI7czo3OiJtYXRlcmlhIjtzOjE0OiJQcm9ncmFtYWNpb24gSSI7czo3OiJtb3Rpdm9zIjthOjE6e2k6MDtzOjQ0OiJpbnRlbnRvIGRlIGluZ3Jlc28gZGUgbWF0ZXJpYWwgbm8gYXV0b3JpemFkbyI7fXM6MTU6Im1vdGl2b19ldGlxdWV0YSI7czo0NToiSW50ZW50byBkZSBpbmdyZXNvIGNvbiBtYXRlcmlhbCBubyBhdXRvcml6YWRvIjtzOjY6ImVzdGFkbyI7czoxMDoiQ29uZmlybWFkbyI7czo1OiJmZWNoYSI7czoxOToiMjAyNi0xMC0yNSAxODozMjoyNSI7fWk6ODthOjEzOntzOjI6ImlkIjtpOjIxO3M6MTE6ImlkX3JlZ2lzdHJvIjtpOjIxO3M6Njoibm9tYnJlIjtzOjM6IkFuYSI7czo4OiJhcGVsbGlkbyI7czo2OiJMw7NwZXoiO3M6MTA6InZlcmlmaWNhZG8iO2I6MTtzOjM6InNpcyI7czo5OiIyMDIyMDEwMTMiO3M6MTc6Im51bWVyb19pbmNpZGVuY2lhIjtpOjE7czo1OiJjdXJzbyI7czoxNDoiUHJvZ3JhbWFjaW9uIEkiO3M6NzoibWF0ZXJpYSI7czoxNDoiUHJvZ3JhbWFjaW9uIEkiO3M6NzoibW90aXZvcyI7YToxOntpOjA7czo0NDoiaW50ZW50byBkZSBpbmdyZXNvIGRlIG1hdGVyaWFsIG5vIGF1dG9yaXphZG8iO31zOjE1OiJtb3Rpdm9fZXRpcXVldGEiO3M6NDU6IkludGVudG8gZGUgaW5ncmVzbyBjb24gbWF0ZXJpYWwgbm8gYXV0b3JpemFkbyI7czo2OiJlc3RhZG8iO3M6MTA6IkNvbmZpcm1hZG8iO3M6NToiZmVjaGEiO3M6MTk6IjIwMjYtMTAtMjUgMTg6MTE6NDMiO31pOjk7YToxMzp7czoyOiJpZCI7aTozMDtzOjExOiJpZF9yZWdpc3RybyI7aTozMDtzOjY6Im5vbWJyZSI7czo2OiJYYXZpZXIiO3M6ODoiYXBlbGxpZG8iO3M6NjoiVmFyZ2FzIjtzOjEwOiJ2ZXJpZmljYWRvIjtiOjE7czozOiJzaXMiO3M6OToiMjAyMTAxMjIzIjtzOjE3OiJudW1lcm9faW5jaWRlbmNpYSI7aToxO3M6NToiY3Vyc28iO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1hdGVyaWEiO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1vdGl2b3MiO2E6MTp7aTowO3M6NDoib3RybyI7fXM6MTU6Im1vdGl2b19ldGlxdWV0YSI7czo0OiJPdHJvIjtzOjY6ImVzdGFkbyI7czoxMDoiQ29uZmlybWFkbyI7czo1OiJmZWNoYSI7czoxOToiMjAyNi0xMC0yNSAwNjozNTozOSI7fWk6MTA7YToxMzp7czoyOiJpZCI7aToyOTtzOjExOiJpZF9yZWdpc3RybyI7aToyOTtzOjY6Im5vbWJyZSI7czo1OiJZYW1pbCI7czo4OiJhcGVsbGlkbyI7czo4OiJTw6FuY2hleiI7czoxMDoidmVyaWZpY2FkbyI7YjoxO3M6Mzoic2lzIjtzOjk6IjIwMjEwMTQ4OSI7czoxNzoibnVtZXJvX2luY2lkZW5jaWEiO2k6MTtzOjU6ImN1cnNvIjtzOjE0OiJQcm9ncmFtYWNpb24gSSI7czo3OiJtYXRlcmlhIjtzOjE0OiJQcm9ncmFtYWNpb24gSSI7czo3OiJtb3Rpdm9zIjthOjE6e2k6MDtzOjQ6Im90cm8iO31zOjE1OiJtb3Rpdm9fZXRpcXVldGEiO3M6NDoiT3RybyI7czo2OiJlc3RhZG8iO3M6MTA6IkNvbmZpcm1hZG8iO3M6NToiZmVjaGEiO3M6MTk6IjIwMjYtMTAtMjUgMDY6MzU6MzciO31pOjExO2E6MTM6e3M6MjoiaWQiO2k6MjA7czoxMToiaWRfcmVnaXN0cm8iO2k6MjA7czo2OiJub21icmUiO3M6NToiV2VuZHkiO3M6ODoiYXBlbGxpZG8iO3M6NjoiWmFwYXRhIjtzOjEwOiJ2ZXJpZmljYWRvIjtiOjE7czozOiJzaXMiO3M6OToiMjAyMjAxMjEyIjtzOjE3OiJudW1lcm9faW5jaWRlbmNpYSI7aToxO3M6NToiY3Vyc28iO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1hdGVyaWEiO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1vdGl2b3MiO2E6MTp7aTowO3M6MzI6InVzbyBkZSBkaXNwb3NpdGl2b3MgZWxlY3Ryb25pY29zIjt9czoxNToibW90aXZvX2V0aXF1ZXRhIjtzOjQ3OiJVc28gZGUgZGlzcG9zaXRpdm9zIGVsZWN0cm9uaWNvcyBubyBhdXRvcml6YWRvcyI7czo2OiJlc3RhZG8iO3M6MTA6IkNvbmZpcm1hZG8iO3M6NToiZmVjaGEiO3M6MTk6IjIwMjYtMTAtMTIgMTY6MzQ6NDQiO31pOjEyO2E6MTM6e3M6MjoiaWQiO2k6MTg7czoxMToiaWRfcmVnaXN0cm8iO2k6MTg7czo2OiJub21icmUiO3M6NToiUmHDumwiO3M6ODoiYXBlbGxpZG8iO3M6NjoiQ2hvcXVlIjtzOjEwOiJ2ZXJpZmljYWRvIjtiOjE7czozOiJzaXMiO3M6OToiMjAyMTAxMTc4IjtzOjE3OiJudW1lcm9faW5jaWRlbmNpYSI7aToxO3M6NToiY3Vyc28iO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1hdGVyaWEiO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1vdGl2b3MiO2E6MTp7aTowO3M6MjU6InN1cGxhbnRhY2lvbiBkZSBpZGVudGlkYWQiO31zOjE1OiJtb3Rpdm9fZXRpcXVldGEiO3M6MjU6IlN1cGxhbnRhY2lvbiBkZSBpZGVudGlkYWQiO3M6NjoiZXN0YWRvIjtzOjEwOiJDb25maXJtYWRvIjtzOjU6ImZlY2hhIjtzOjE5OiIyMDI2LTEwLTEyIDAzOjM0OjAxIjt9aToxMzthOjEzOntzOjI6ImlkIjtpOjE3O3M6MTE6ImlkX3JlZ2lzdHJvIjtpOjE3O3M6Njoibm9tYnJlIjtzOjY6IldhbHRlciI7czo4OiJhcGVsbGlkbyI7czo3OiJRdWlyb2dhIjtzOjEwOiJ2ZXJpZmljYWRvIjtiOjE7czozOiJzaXMiO3M6OToiMjAyMTAxNDY3IjtzOjE3OiJudW1lcm9faW5jaWRlbmNpYSI7aToxO3M6NToiY3Vyc28iO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1hdGVyaWEiO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1vdGl2b3MiO2E6MTp7aTowO3M6MzM6ImNvcGlhIG8gaW50ZXJjYW1iaW8gZGUgcmVzcHVlc3RhcyI7fXM6MTU6Im1vdGl2b19ldGlxdWV0YSI7czozMzoiQ29waWEgbyBpbnRlcmNhbWJpbyBkZSByZXNwdWVzdGFzIjtzOjY6ImVzdGFkbyI7czoxMDoiQ29uZmlybWFkbyI7czo1OiJmZWNoYSI7czoxOToiMjAyNi0xMC0xMiAwMTozMDo1MiI7fWk6MTQ7YToxMzp7czoyOiJpZCI7aToxOTtzOjExOiJpZF9yZWdpc3RybyI7aToxOTtzOjY6Im5vbWJyZSI7czo1OiJJdsOhbiI7czo4OiJhcGVsbGlkbyI7czo2OiJGbG9yZXMiO3M6MTA6InZlcmlmaWNhZG8iO2I6MTtzOjM6InNpcyI7czo5OiIyMDIxMDEwOTAiO3M6MTc6Im51bWVyb19pbmNpZGVuY2lhIjtpOjE7czo1OiJjdXJzbyI7czoxNDoiUHJvZ3JhbWFjaW9uIEkiO3M6NzoibWF0ZXJpYSI7czoxNDoiUHJvZ3JhbWFjaW9uIEkiO3M6NzoibW90aXZvcyI7YToxOntpOjA7czo0OiJvdHJvIjt9czoxNToibW90aXZvX2V0aXF1ZXRhIjtzOjQ6Ik90cm8iO3M6NjoiZXN0YWRvIjtzOjEwOiJDb25maXJtYWRvIjtzOjU6ImZlY2hhIjtzOjE5OiIyMDI2LTEwLTEyIDAwOjEzOjE3Ijt9aToxNTthOjEzOntzOjI6ImlkIjtpOjg7czoxMToiaWRfcmVnaXN0cm8iO2k6ODtzOjY6Im5vbWJyZSI7czo3OiJGw6F0aW1hIjtzOjg6ImFwZWxsaWRvIjtzOjY6IlF1aXNwZSI7czoxMDoidmVyaWZpY2FkbyI7YjoxO3M6Mzoic2lzIjtzOjk6IjIwMjIwMTA1NiI7czoxNzoibnVtZXJvX2luY2lkZW5jaWEiO2k6MTtzOjU6ImN1cnNvIjtzOjE0OiJQcm9ncmFtYWNpb24gSSI7czo3OiJtYXRlcmlhIjtzOjE0OiJQcm9ncmFtYWNpb24gSSI7czo3OiJtb3Rpdm9zIjthOjE6e2k6MDtzOjI5OiJ1c28gZGUgbWF0ZXJpYWwgbm8gYXV0b3JpemFkbyI7fXM6MTU6Im1vdGl2b19ldGlxdWV0YSI7czoyOToiVXNvIGRlIG1hdGVyaWFsIG5vIGF1dG9yaXphZG8iO3M6NjoiZXN0YWRvIjtzOjEwOiJDb25maXJtYWRvIjtzOjU6ImZlY2hhIjtzOjE5OiIyMDI2LTEwLTEwIDA4OjQwOjAwIjt9aToxNjthOjEzOntzOjI6ImlkIjtpOjc7czoxMToiaWRfcmVnaXN0cm8iO2k6NztzOjY6Im5vbWJyZSI7czo3OiJHYWJyaWVsIjtzOjg6ImFwZWxsaWRvIjtzOjY6Ik1hbWFuaSI7czoxMDoidmVyaWZpY2FkbyI7YjoxO3M6Mzoic2lzIjtzOjk6IjIwMjEwMTA3OCI7czoxNzoibnVtZXJvX2luY2lkZW5jaWEiO2k6MTtzOjU6ImN1cnNvIjtzOjE0OiJQcm9ncmFtYWNpb24gSSI7czo3OiJtYXRlcmlhIjtzOjE0OiJQcm9ncmFtYWNpb24gSSI7czo3OiJtb3Rpdm9zIjthOjE6e2k6MDtzOjMzOiJjb3BpYSBvIGludGVyY2FtYmlvIGRlIHJlc3B1ZXN0YXMiO31zOjE1OiJtb3Rpdm9fZXRpcXVldGEiO3M6MzM6IkNvcGlhIG8gaW50ZXJjYW1iaW8gZGUgcmVzcHVlc3RhcyI7czo2OiJlc3RhZG8iO3M6MTA6IkNvbmZpcm1hZG8iO3M6NToiZmVjaGEiO3M6MTk6IjIwMjYtMTAtMTAgMDg6NDA6MDAiO31pOjE3O2E6MTM6e3M6MjoiaWQiO2k6NjtzOjExOiJpZF9yZWdpc3RybyI7aTo2O3M6Njoibm9tYnJlIjtzOjY6IkhlbGVuYSI7czo4OiJhcGVsbGlkbyI7czo2OiJDaG9xdWUiO3M6MTA6InZlcmlmaWNhZG8iO2I6MTtzOjM6InNpcyI7czo5OiIyMDIyMDEwODkiO3M6MTc6Im51bWVyb19pbmNpZGVuY2lhIjtpOjE7czo1OiJjdXJzbyI7czoxNDoiUHJvZ3JhbWFjaW9uIEkiO3M6NzoibWF0ZXJpYSI7czoxNDoiUHJvZ3JhbWFjaW9uIEkiO3M6NzoibW90aXZvcyI7YToxOntpOjA7czozMjoidXNvIGRlIGRpc3Bvc2l0aXZvcyBlbGVjdHJvbmljb3MiO31zOjE1OiJtb3Rpdm9fZXRpcXVldGEiO3M6NDc6IlVzbyBkZSBkaXNwb3NpdGl2b3MgZWxlY3Ryb25pY29zIG5vIGF1dG9yaXphZG9zIjtzOjY6ImVzdGFkbyI7czoxMDoiQ29uZmlybWFkbyI7czo1OiJmZWNoYSI7czoxOToiMjAyNi0xMC0xMCAwODo0MDowMCI7fWk6MTg7YToxMzp7czoyOiJpZCI7aTo0O3M6MTE6ImlkX3JlZ2lzdHJvIjtpOjQ7czo2OiJub21icmUiO3M6NjoiQ2FybG9zIjtzOjg6ImFwZWxsaWRvIjtzOjU6IlJvamFzIjtzOjEwOiJ2ZXJpZmljYWRvIjtiOjE7czozOiJzaXMiO3M6ODoiMjAyMTAwMDQiO3M6MTc6Im51bWVyb19pbmNpZGVuY2lhIjtpOjE7czo1OiJjdXJzbyI7czoxNDoiQWxnZWJyYSBMaW5lYWwiO3M6NzoibWF0ZXJpYSI7czoxNDoiQWxnZWJyYSBMaW5lYWwiO3M6NzoibW90aXZvcyI7YToxOntpOjA7czoyOToidXNvIGRlIG1hdGVyaWFsIG5vIGF1dG9yaXphZG8iO31zOjE1OiJtb3Rpdm9fZXRpcXVldGEiO3M6Mjk6IlVzbyBkZSBtYXRlcmlhbCBubyBhdXRvcml6YWRvIjtzOjY6ImVzdGFkbyI7czoxMDoiQ29uZmlybWFkbyI7czo1OiJmZWNoYSI7czoxOToiMjAyNC0wNi0xMyAwODo0NTowMCI7fWk6MTk7YToxMzp7czoyOiJpZCI7aToyO3M6MTE6ImlkX3JlZ2lzdHJvIjtpOjI7czo2OiJub21icmUiO3M6NDoiTHVpcyI7czo4OiJhcGVsbGlkbyI7czo2OiJNYW1hbmkiO3M6MTA6InZlcmlmaWNhZG8iO2I6MTtzOjM6InNpcyI7czo4OiIyMDIxMDAwMiI7czoxNzoibnVtZXJvX2luY2lkZW5jaWEiO2k6MTtzOjU6ImN1cnNvIjtzOjg6IkZpc2ljYSBJIjtzOjc6Im1hdGVyaWEiO3M6ODoiRmlzaWNhIEkiO3M6NzoibW90aXZvcyI7YToxOntpOjA7czozMjoidXNvIGRlIGRpc3Bvc2l0aXZvcyBlbGVjdHJvbmljb3MiO31zOjE1OiJtb3Rpdm9fZXRpcXVldGEiO3M6NDc6IlVzbyBkZSBkaXNwb3NpdGl2b3MgZWxlY3Ryb25pY29zIG5vIGF1dG9yaXphZG9zIjtzOjY6ImVzdGFkbyI7czoxMDoiQ29uZmlybWFkbyI7czo1OiJmZWNoYSI7czoxOToiMjAyNC0wNi0xMSAxMDozMDowMCI7fWk6MjA7YToxMzp7czoyOiJpZCI7aToxO3M6MTE6ImlkX3JlZ2lzdHJvIjtpOjE7czo2OiJub21icmUiO3M6MzoiQW5hIjtzOjg6ImFwZWxsaWRvIjtzOjU6IlBlcmV6IjtzOjEwOiJ2ZXJpZmljYWRvIjtiOjE7czozOiJzaXMiO3M6ODoiMjAyMTAwMDEiO3M6MTc6Im51bWVyb19pbmNpZGVuY2lhIjtpOjE7czo1OiJjdXJzbyI7czo5OiJDYWxjdWxvIEkiO3M6NzoibWF0ZXJpYSI7czo5OiJDYWxjdWxvIEkiO3M6NzoibW90aXZvcyI7YToxOntpOjA7czo0OiJvdHJvIjt9czoxNToibW90aXZvX2V0aXF1ZXRhIjtzOjQ6Ik90cm8iO3M6NjoiZXN0YWRvIjtzOjEwOiJDb25maXJtYWRvIjtzOjU6ImZlY2hhIjtzOjE5OiIyMDI0LTA2LTEwIDA4OjMwOjAwIjt9fXM6Mjg6IgAqAGVzY2FwZVdoZW5DYXN0aW5nVG9TdHJpbmciO2I6MDt9', 1794236533);
+INSERT INTO "cache" ("key", "value", "expiration") VALUES ('monitoreo.informe.25.docente.1', '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OToiACoAaGlkZGVuIjthOjA6e31zOjEwOiIAKgB2aXNpYmxlIjthOjA6e31zOjExOiIAKgBmaWxsYWJsZSI7YToyOntpOjA7czoxMToiaWRfbWF0ZXJpYWwiO2k6MTtzOjExOiJkZXNjcmlwY2lvbiI7fXM6MTA6IgAqAGd1YXJkZWQiO2E6MTp7aTowO3M6MToiKiI7fX19czoyODoiACoAZXNjYXBlV2hlbkNhc3RpbmdUb1N0cmluZyI7YjowO31zOjY6Im5vcm1hcyI7TzozOToiSWxsdW1pbmF0ZVxEYXRhYmFzZVxFbG9xdWVudFxDb2xsZWN0aW9uIjoyOntzOjg6IgAqAGl0ZW1zIjthOjA6e31zOjI4OiIAKgBlc2NhcGVXaGVuQ2FzdGluZ1RvU3RyaW5nIjtiOjA7fXM6MjQ6Im1hdGVyaWFsZXNQZXJzb25hbGl6YWRvcyI7TzozOToiSWxsdW1pbmF0ZVxEYXRhYmFzZVxFbG9xdWVudFxDb2xsZWN0aW9uIjoyOntzOjg6IgAqAGl0ZW1zIjthOjE6e2k6MDtPOjQ1OiJBcHBcTW9kZWxzXENvbmZpZ3VyYWNpb25NYXRlcmlhbFBlcnNvbmFsaXphZG8iOjMwOntzOjEzOiIAKgBjb25uZWN0aW9uIjtzOjU6InBnc3FsIjtzOjg6IgAqAHRhYmxlIjtzOjM2OiJjb25maWd1cmFjaW9uX21hdGVyaWFsX3BlcnNvbmFsaXphZG8iO3M6MTM6IgAqAHByaW1hcnlLZXkiO3M6MjU6ImlkX2NvbmZpZ3VyYWNpb25fbWF0ZXJpYWwiO3M6MTA6IgAqAGtleVR5cGUiO3M6MzoiaW50IjtzOjEyOiJpbmNyZW1lbnRpbmciO2I6MTtzOjc6IgAqAHdpdGgiO2E6MDp7fXM6MTI6IgAqAHdpdGhDb3VudCI7YTowOnt9czoxOToicHJldmVudHNMYXp5TG9hZGluZyI7YjowO3M6MTA6IgAqAHBlclBhZ2UiO2k6MTU7czo2OiJleGlzdHMiO2I6MTtzOjE4OiJ3YXNSZWNlbnRseUNyZWF0ZWQiO2I6MDtzOjI4OiIAKgBlc2NhcGVXaGVuQ2FzdGluZ1RvU3RyaW5nIjtiOjA7czoxMzoiACoAYXR0cmlidXRlcyI7YTo0OntzOjI1OiJpZF9jb25maWd1cmFjaW9uX21hdGVyaWFsIjtpOjExO3M6MjM6ImlkX2NvbmZpZ3VyYWNpb25fZXhhbWVuIjtpOjQyO3M6MTU6Im51bWVyb19tYXRlcmlhbCI7aToxO3M6MjA6ImRlc2NyaXBjaW9uX21hdGVyaWFsIjtzOjU6ImFkYXNkIjt9czoxMToiACoAb3JpZ2luYWwiO2E6NDp7czoyNToiaWRfY29uZmlndXJhY2lvbl9tYXRlcmlhbCI7aToxMTtzOjIzOiJpZF9jb25maWd1cmFjaW9uX2V4YW1lbiI7aTo0MjtzOjE1OiJudW1lcm9fbWF0ZXJpYWwiO2k6MTtzOjIwOiJkZXNjcmlwY2lvbl9tYXRlcmlhbCI7czo1OiJhZGFzZCI7fXM6MTA6IgAqAGNoYW5nZXMiO2E6MDp7fXM6ODoiACoAY2FzdHMiO2E6MDp7fXM6MTc6IgAqAGNsYXNzQ2FzdENhY2hlIjthOjA6e31zOjIxOiIAKgBhdHRyaWJ1dGVDYXN0Q2FjaGUiO2E6MDp7fXM6MTM6IgAqAGRhdGVGb3JtYXQiO047czoxMDoiACoAYXBwZW5kcyI7YTowOnt9czoxOToiACoAZGlzcGF0Y2hlc0V2ZW50cyI7YTowOnt9czoxNDoiACoAb2JzZXJ2YWJsZXMiO2E6MDp7fXM6MTI6IgAqAHJlbGF0aW9ucyI7YTowOnt9czoxMDoiACoAdG91Y2hlcyI7YTowOnt9czoxMDoidGltZXN0YW1wcyI7YjowO3M6MTM6InVzZXNVbmlxdWVJZHMiO2I6MDtzOjk6IgAqAGhpZGRlbiI7YTowOnt9czoxMDoiACoAdmlzaWJsZSI7YTowOnt9czoxMToiACoAZmlsbGFibGUiO2E6Mzp7aTowO3M6MjM6ImlkX2NvbmZpZ3VyYWNpb25fZXhhbWVuIjtpOjE7czoxNToibnVtZXJvX21hdGVyaWFsIjtpOjI7czoyMDoiZGVzY3JpcGNpb25fbWF0ZXJpYWwiO31zOjEwOiIAKgBndWFyZGVkIjthOjE6e2k6MDtzOjE6IioiO319fXM6Mjg6IgAqAGVzY2FwZVdoZW5DYXN0aW5nVG9TdHJpbmciO2I6MDt9czoyMDoibm9ybWFzUGVyc29uYWxpemFkYXMiO086Mzk6IklsbHVtaW5hdGVcRGF0YWJhc2VcRWxvcXVlbnRcQ29sbGVjdGlvbiI6Mjp7czo4OiIAKgBpdGVtcyI7YToxOntpOjA7Tzo0MjoiQXBwXE1vZGVsc1xDb25maWd1cmFjaW9uTm9ybWFQZXJzb25hbGl6YWRhIjozMDp7czoxMzoiACoAY29ubmVjdGlvbiI7czo1OiJwZ3NxbCI7czo4OiIAKgB0YWJsZSI7czozMzoiY29uZmlndXJhY2lvbl9ub3JtYV9wZXJzb25hbGl6YWRhIjtzOjEzOiIAKgBwcmltYXJ5S2V5IjtzOjIyOiJpZF9jb25maWd1cmFjaW9uX25vcm1hIjtzOjEwOiIAKgBrZXlUeXBlIjtzOjM6ImludCI7czoxMjoiaW5jcmVtZW50aW5nIjtiOjE7czo3OiIAKgB3aXRoIjthOjA6e31zOjEyOiIAKgB3aXRoQ291bnQiO2E6MDp7fXM6MTk6InByZXZlbnRzTGF6eUxvYWRpbmciO2I6MDtzOjEwOiIAKgBwZXJQYWdlIjtpOjE1O3M6NjoiZXhpc3RzIjtiOjE7czoxODoid2FzUmVjZW50bHlDcmVhdGVkIjtiOjA7czoyODoiACoAZXNjYXBlV2hlbkNhc3RpbmdUb1N0cmluZyI7YjowO3M6MTM6IgAqAGF0dHJpYnV0ZXMiO2E6NDp7czoyMjoiaWRfY29uZmlndXJhY2lvbl9ub3JtYSI7aToyMDtzOjIzOiJpZF9jb25maWd1cmFjaW9uX2V4YW1lbiI7aTo0MjtzOjEyOiJudW1lcm9fbm9ybWEiO2k6MTtzOjE3OiJkZXNjcmlwY2lvbl9ub3JtYSI7czo4OiJhZHNhc2RzYSI7fXM6MTE6IgAqAG9yaWdpbmFsIjthOjQ6e3M6MjI6ImlkX2NvbmZpZ3VyYWNpb25fbm9ybWEiO2k6MjA7czoyMzoiaWRfY29uZmlndXJhY2lvbl9leGFtZW4iO2k6NDI7czoxMjoibnVtZXJvX25vcm1hIjtpOjE7czoxNzoiZGVzY3JpcGNpb25fbm9ybWEiO3M6ODoiYWRzYXNkc2EiO31zOjEwOiIAKgBjaGFuZ2VzIjthOjA6e31zOjg6IgAqAGNhc3RzIjthOjA6e31zOjE3OiIAKgBjbGFzc0Nhc3RDYWNoZSI7YTowOnt9czoyMToi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O3M6NzoiY3JlYWRvciI7aTo2O3M6MTE6InRpcG9fZXhhbWVuIjt9czoxMDoiACoAZ3VhcmRlZCI7YToxOntpOjA7czoxOiIqIjt9fXM6MTE6ImVzdHVkaWFudGVzIjtPOjI5OiJJbGx1bWluYXRlXFN1cHBvcnRcQ29sbGVjdGlvbiI6Mjp7czo4OiIAKgBpdGVtcyI7YTo1MDp7aTowO2E6MTE6e3M6Mzoic2lzIjtzOjk6IjIwMjAwMjEwNyI7czoxNDoiaWRfaW5zY3JpcGNpb24iO2k6NTUwO3M6Njoibm9tYnJlIjtzOjc6IkVybmVzdG8iO3M6ODoiYXBlbGxpZG8iO3M6NDoiVmVyYSI7czo0OiJhdWxhIjtzOjk6IkF1bGEgNjkwQiI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6MTthOjExOntzOjM6InNpcyI7czo4OiIyMDIxMDAwMyI7czoxNDoiaWRfaW5zY3JpcGNpb24iO2k6NTUxO3M6Njoibm9tYnJlIjtzOjU6Ik1hcmlhIjtzOjg6ImFwZWxsaWRvIjtzOjU6IkxvcGV6IjtzOjQ6ImF1bGEiO3M6OToiQXVsYSA2OTBCIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aToyO2E6MTE6e3M6Mzoic2lzIjtzOjk6IjIwMjEwMTAyMiI7czoxNDoiaWRfaW5zY3JpcGNpb24iO2k6NTUyO3M6Njoibm9tYnJlIjtzOjU6IkJydW5vIjtzOjg6ImFwZWxsaWRvIjtzOjU6IkTDrWF6IjtzOjQ6ImF1bGEiO3M6OToiQXVsYSA2OTJBIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aTozO2E6MTE6e3M6Mzoic2lzIjtzOjk6IjIwMjEwMTA3OCI7czoxNDoiaWRfaW5zY3JpcGNpb24iO2k6NTUzO3M6Njoibm9tYnJlIjtzOjc6IkdhYnJpZWwiO3M6ODoiYXBlbGxpZG8iO3M6NjoiTWFtYW5pIjtzOjQ6ImF1bGEiO3M6OToiQXVsYSA2OTJBIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aTo0O2E6MTE6e3M6Mzoic2lzIjtzOjk6IjIwMjEwMTA5MCI7czoxNDoiaWRfaW5zY3JpcGNpb24iO2k6NTU0O3M6Njoibm9tYnJlIjtzOjU6Ikl2w6FuIjtzOjg6ImFwZWxsaWRvIjtzOjY6IkZsb3JlcyI7czo0OiJhdWxhIjtzOjk6IkF1bGEgNjkwQiI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6NTthOjExOntzOjM6InNpcyI7czo5OiIyMDIxMDExMTIiO3M6MTQ6ImlkX2luc2NyaXBjaW9uIjtpOjU1NTtzOjY6Im5vbWJyZSI7czo1OiJLZXZpbiI7czo4OiJhcGVsbGlkbyI7czo2OiJMw7NwZXoiO3M6NDoiYXVsYSI7czo5OiJBdWxhIDY5MkEiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjY7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMTAxMTM0IjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo1NTY7czo2OiJub21icmUiO3M6NjoiTWlndWVsIjtzOjg6ImFwZWxsaWRvIjtzOjQ6IlNvdG8iO3M6NDoiYXVsYSI7czo5OiJBdWxhIDY5MEIiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjc7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMTAxMTU2IjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo1NTc7czo2OiJub21icmUiO3M6Njoiw5NzY2FyIjtzOjg6ImFwZWxsaWRvIjtzOjY6IlF1aXNwZSI7czo0OiJhdWxhIjtzOjk6IkF1bGEgNjkyQSI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6ODthOjExOntzOjM6InNpcyI7czo5OiIyMDIxMDExNzgiO3M6MTQ6ImlkX2luc2NyaXBjaW9uIjtpOjU1ODtzOjY6Im5vbWJyZSI7czo1OiJSYcO6bCI7czo4OiJhcGVsbGlkbyI7czo2OiJDaG9xdWUiO3M6NDoiYXVsYSI7czo5OiJBdWxhIDY5MkEiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjk7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMTAxMTkwIjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo1NTk7czo2OiJub21icmUiO3M6NjoiVG9tw6FzIjtzOjg6ImFwZWxsaWRvIjtzOjc6IkdhcmPDrWEiO3M6NDoiYXVsYSI7czo5OiJBdWxhIDY5MEIiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjEwO2E6MTE6e3M6Mzoic2lzIjtzOjk6IjIwMjEwMTIyMyI7czoxNDoiaWRfaW5zY3JpcGNpb24iO2k6NTYwO3M6Njoibm9tYnJlIjtzOjY6IlhhdmllciI7czo4OiJhcGVsbGlkbyI7czo2OiJWYXJnYXMiO3M6NDoiYXVsYSI7czo5OiJBdWxhIDY5MEIiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjExO2E6MTE6e3M6Mzoic2lzIjtzOjk6IjIwMjEwMTI0NSI7czoxNDoiaWRfaW5zY3JpcGNpb24iO2k6NTYxO3M6Njoibm9tYnJlIjtzOjM6IlpvZSI7czo4OiJhcGVsbGlkbyI7czo1OiJTaWxlcyI7czo0OiJhdWxhIjtzOjk6IkF1bGEgNjkwQiI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6MTI7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMTAxMjY3IjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo1NjI7czo2OiJub21icmUiO3M6NjoiQmlhbmNhIjtzOjg6ImFwZWxsaWRvIjtzOjc6IlBhcmVkZXMiO3M6NDoiYXVsYSI7czo5OiJBdWxhIDY5MkEiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjEzO2E6MTE6e3M6Mzoic2lzIjtzOjk6IjIwMjEwMTI4OSI7czoxNDoiaWRfaW5zY3JpcGNpb24iO2k6NTYzO3M6Njoibm9tYnJlIjtzOjc6IkRhbmllbGEiO3M6ODoiYXBlbGxpZG8iO3M6NzoiQ2FicmVyYSI7czo0OiJhdWxhIjtzOjk6IkF1bGEgNjkwQiI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6MTQ7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMTAxMzAxIjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo1NjQ7czo2OiJub21icmUiO3M6ODoiRmVybmFuZGEiO3M6ODoiYXBlbGxpZG8iO3M6NDoiVmVnYSI7czo0OiJhdWxhIjtzOjk6IkF1bGEgNjkyQSI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6MTU7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMTAxMzIzIjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo1NjU7czo2OiJub21icmUiO3M6NDoiSHVnbyI7czo4OiJhcGVsbGlkbyI7czo3OiJDYW1hY2hvIjtzOjQ6ImF1bGEiO3M6OToiQXVsYSA2OTJBIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aToxNjthOjExOntzOjM6InNpcyI7czo5OiIyMDIxMDEzNDUiO3M6MTQ6ImlkX2luc2NyaXBjaW9uIjtpOjU2NjtzOjY6Im5vbWJyZSI7czo2OiJKYXZpZXIiO3M6ODoiYXBlbGxpZG8iO3M6ODoiRXNwaW5vemEiO3M6NDoiYXVsYSI7czo5OiJBdWxhIDY5MkEiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjE3O2E6MTE6e3M6Mzoic2lzIjtzOjk6IjIwMjEwMTM2NyI7czoxNDoiaWRfaW5zY3JpcGNpb24iO2k6NTY3O3M6Njoibm9tYnJlIjtzOjQ6Ikx1aXMiO3M6ODoiYXBlbGxpZG8iO3M6MTA6Ikd1dGnDqXJyZXoiO3M6NDoiYXVsYSI7czo5OiJBdWxhIDY5MkEiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjE4O2E6MTE6e3M6Mzoic2lzIjtzOjk6IjIwMjEwMTM4OSI7czoxNDoiaWRfaW5zY3JpcGNpb24iO2k6NTY4O3M6Njoibm9tYnJlIjtzOjg6Ik5pY29sw6FzIjtzOjg6ImFwZWxsaWRvIjtzOjc6IklyaWFydGUiO3M6NDoiYXVsYSI7czo5OiJBdWxhIDY5MkEiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjE5O2E6MTE6e3M6Mzoic2lzIjtzOjk6IjIwMjEwMTQwMSI7czoxNDoiaWRfaW5zY3JpcGNpb24iO2k6NTY5O3M6Njoibm9tYnJlIjtzOjU6IlBhYmxvIjtzOjg6ImFwZWxsaWRvIjtzOjg6Iktvd2Fsc2tpIjtzOjQ6ImF1bGEiO3M6OToiQXVsYSA2OTJBIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aToyMDthOjExOntzOjM6InNpcyI7czo5OiIyMDIxMDE0MjMiO3M6MTQ6ImlkX2luc2NyaXBjaW9uIjtpOjU3MDtzOjY6Im5vbWJyZSI7czo2OiJTZXJnaW8iO3M6ODoiYXBlbGxpZG8iO3M6NzoiTWVuZG96YSI7czo0OiJhdWxhIjtzOjk6IkF1bGEgNjkyQSI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6MjE7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMTAxNDQ1IjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo1NzE7czo2OiJub21icmUiO3M6NjoiVWxpc2VzIjtzOjg6ImFwZWxsaWRvIjtzOjg6Ik9yZWxsYW5hIjtzOjQ6ImF1bGEiO3M6OToiQXVsYSA2OTBCIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aToyMjthOjExOntzOjM6InNpcyI7czo5OiIyMDIxMDE0NjciO3M6MTQ6ImlkX2luc2NyaXBjaW9uIjtpOjU3MjtzOjY6Im5vbWJyZSI7czo2OiJXYWx0ZXIiO3M6ODoiYXBlbGxpZG8iO3M6NzoiUXVpcm9nYSI7czo0OiJhdWxhIjtzOjk6IkF1bGEgNjkyQSI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6MjM7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMTAxNDg5IjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo1NzM7czo2OiJub21icmUiO3M6NToiWWFtaWwiO3M6ODoiYXBlbGxpZG8iO3M6ODoiU8OhbmNoZXoiO3M6NDoiYXVsYSI7czo5OiJBdWxhIDY5MkEiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjI0O2E6MTE6e3M6Mzoic2lzIjtzOjk6IjIwMjIwMTAxMyI7czoxNDoiaWRfaW5zY3JpcGNpb24iO2k6NTc0O3M6Njoibm9tYnJlIjtzOjM6IkFuYSI7czo4OiJhcGVsbGlkbyI7czo2OiJMw7NwZXoiO3M6NDoiYXVsYSI7czo5OiJBdWxhIDY5MEIiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjI1O2E6MTE6e3M6Mzoic2lzIjtzOjk6IjIwMjIwMTAzMSI7czoxNDoiaWRfaW5zY3JpcGNpb24iO2k6NTc1O3M6Njoibm9tYnJlIjtzOjU6IkNhcmxhIjtzOjg6ImFwZWxsaWRvIjtzOjQ6IlJ1aXoiO3M6NDoiYXVsYSI7czo5OiJBdWxhIDY5MEIiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjI2O2E6MTE6e3M6Mzoic2lzIjtzOjk6IjIwMjIwMTA1NiI7czoxNDoiaWRfaW5zY3JpcGNpb24iO2k6NTc2O3M6Njoibm9tYnJlIjtzOjc6IkbDoXRpbWEiO3M6ODoiYXBlbGxpZG8iO3M6NjoiUXVpc3BlIjtzOjQ6ImF1bGEiO3M6OToiQXVsYSA2OTBCIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aToyNzthOjExOntzOjM6InNpcyI7czo5OiIyMDIyMDEwODkiO3M6MTQ6ImlkX2luc2NyaXBjaW9uIjtpOjU3NztzOjY6Im5vbWJyZSI7czo2OiJIZWxlbmEiO3M6ODoiYXBlbGxpZG8iO3M6NjoiQ2hvcXVlIjtzOjQ6ImF1bGEiO3M6OToiQXVsYSA2OTBCIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aToyODthOjExOntzOjM6InNpcyI7czo5OiIyMDIyMDExMDEiO3M6MTQ6ImlkX2luc2NyaXBjaW9uIjtpOjU3ODtzOjY6Im5vbWJyZSI7czo1OiJKdWxpYSI7czo4OiJhcGVsbGlkbyI7czo3OiJHYXJjw61hIjtzOjQ6ImF1bGEiO3M6OToiQXVsYSA2OTJBIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aToyOTthOjExOntzOjM6InNpcyI7czo5OiIyMDIyMDExMjMiO3M6MTQ6ImlkX2luc2NyaXBjaW9uIjtpOjU3OTtzOjY6Im5vbWJyZSI7czo1OiJMYXVyYSI7czo4OiJhcGVsbGlkbyI7czo1OiJEw61heiI7czo0OiJhdWxhIjtzOjk6IkF1bGEgNjkwQiI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6MzA7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMjAxMTQ1IjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo1ODA7czo2OiJub21icmUiO3M6NToiTmFkaWEiO3M6ODoiYXBlbGxpZG8iO3M6NDoiVmVyYSI7czo0OiJhdWxhIjtzOjk6IkF1bGEgNjkyQSI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6MzE7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMjAxMTY3IjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo1ODE7czo2OiJub21icmUiO3M6ODoiUGF0cmljaWEiO3M6ODoiYXBlbGxpZG8iO3M6NjoiTWFtYW5pIjtzOjQ6ImF1bGEiO3M6OToiQXVsYSA2OTBCIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aTozMjthOjExOntzOjM6InNpcyI7czo5OiIyMDIyMDExODkiO3M6MTQ6ImlkX2luc2NyaXBjaW9uIjtpOjU4MjtzOjY6Im5vbWJyZSI7czo2OiJTb2bDrWEiO3M6ODoiYXBlbGxpZG8iO3M6NjoiRmxvcmVzIjtzOjQ6ImF1bGEiO3M6OToiQXVsYSA2OTJBIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aTozMzthOjExOntzOjM6InNpcyI7czo5OiIyMDIyMDEyMDEiO3M6MTQ6ImlkX2luc2NyaXBjaW9uIjtpOjU4MztzOjY6Im5vbWJyZSI7czo3OiJWYWxlcmlhIjtzOjg6ImFwZWxsaWRvIjtzOjY6IkzDs3BleiI7czo0OiJhdWxhIjtzOjk6IkF1bGEgNjkwQiI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6MzQ7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMjAxMjEyIjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo1ODQ7czo2OiJub21icmUiO3M6NToiV2VuZHkiO3M6ODoiYXBlbGxpZG8iO3M6NjoiWmFwYXRhIjtzOjQ6ImF1bGEiO3M6OToiQXVsYSA2OTBCIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aTozNTthOjExOntzOjM6InNpcyI7czo5OiIyMDIyMDEyMzQiO3M6MTQ6ImlkX2luc2NyaXBjaW9uIjtpOjU4NTtzOjY6Im5vbWJyZSI7czo3OiJZb2xhbmRhIjtzOjg6ImFwZWxsaWRvIjtzOjY6IlRpY29uYSI7czo0OiJhdWxhIjtzOjk6IkF1bGEgNjkwQiI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6MzY7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMjAxMjU2IjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo1ODY7czo2OiJub21icmUiO3M6NzoiQW5kcsOpcyI7czo4OiJhcGVsbGlkbyI7czo1OiJSb2phcyI7czo0OiJhdWxhIjtzOjk6IkF1bGEgNjkyQSI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6Mzc7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMjAxMjc4IjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo1ODc7czo2OiJub21icmUiO3M6ODoiQ3Jpc3RpYW4iO3M6ODoiYXBlbGxpZG8iO3M6NjoiTW9saW5hIjtzOjQ6ImF1bGEiO3M6OToiQXVsYSA2OTBCIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aTozODthOjExOntzOjM6InNpcyI7czo5OiIyMDIyMDEyOTAiO3M6MTQ6ImlkX2luc2NyaXBjaW9uIjtpOjU4ODtzOjY6Im5vbWJyZSI7czo3OiJFZHVhcmRvIjtzOjg6ImFwZWxsaWRvIjtzOjc6IlNhbGF6YXIiO3M6NDoiYXVsYSI7czo5OiJBdWxhIDY5MkEiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjM5O2E6MTE6e3M6Mzoic2lzIjtzOjk6IjIwMjIwMTMxMiI7czoxNDoiaWRfaW5zY3JpcGNpb24iO2k6NTg5O3M6Njoibm9tYnJlIjtzOjc6IkdvbnphbG8iO3M6ODoiYXBlbGxpZG8iO3M6NDoiQXJjZSI7czo0OiJhdWxhIjtzOjk6IkF1bGEgNjkyQSI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6NDA7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMjAxMzM0IjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo1OTA7czo2OiJub21icmUiO3M6NToiSW7DqXMiO3M6ODoiYXBlbGxpZG8iO3M6NzoiRGVsZ2FkbyI7czo0OiJhdWxhIjtzOjk6IkF1bGEgNjkwQiI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6NDE7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMjAxMzU2IjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo1OTE7czo2OiJub21icmUiO3M6NToiS2FyZW4iO3M6ODoiYXBlbGxpZG8iO3M6NzoiRnVlbnRlcyI7czo0OiJhdWxhIjtzOjk6IkF1bGEgNjkwQiI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6NDI7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMjAxMzc4IjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo1OTI7czo2OiJub21icmUiO3M6NjoiTWFyw61hIjtzOjg6ImFwZWxsaWRvIjtzOjc6IkhlcnJlcmEiO3M6NDoiYXVsYSI7czo5OiJBdWxhIDY5MEIiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjQzO2E6MTE6e3M6Mzoic2lzIjtzOjk6IjIwMjIwMTM5MCI7czoxNDoiaWRfaW5zY3JpcGNpb24iO2k6NTkzO3M6Njoibm9tYnJlIjtzOjQ6Ik9sZ2EiO3M6ODoiYXBlbGxpZG8iO3M6ODoiSmltw6luZXoiO3M6NDoiYXVsYSI7czo5OiJBdWxhIDY5MEIiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjQ0O2E6MTE6e3M6Mzoic2lzIjtzOjk6IjIwMjIwMTQxMiI7czoxNDoiaWRfaW5zY3JpcGNpb24iO2k6NTk0O3M6Njoibm9tYnJlIjtzOjQ6IlJvc2EiO3M6ODoiYXBlbGxpZG8iO3M6NDoiTHVuYSI7czo0OiJhdWxhIjtzOjk6IkF1bGEgNjkyQSI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6NDU7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMjAxNDM0IjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo1OTU7czo2OiJub21icmUiO3M6NzoiVGF0aWFuYSI7czo4OiJhcGVsbGlkbyI7czo3OiJOw7rDsWV6IjtzOjQ6ImF1bGEiO3M6OToiQXVsYSA2OTJBIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aTo0NjthOjExOntzOjM6InNpcyI7czo5OiIyMDIyMDE0NTYiO3M6MTQ6ImlkX2luc2NyaXBjaW9uIjtpOjU5NjtzOjY6Im5vbWJyZSI7czo5OiJWZXLDs25pY2EiO3M6ODoiYXBlbGxpZG8iO3M6MzoiUGF6IjtzOjQ6ImF1bGEiO3M6OToiQXVsYSA2OTBCIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aTo0NzthOjExOntzOjM6InNpcyI7czo5OiIyMDIyMDE0NzgiO3M6MTQ6ImlkX2luc2NyaXBjaW9uIjtpOjU5NztzOjY6Im5vbWJyZSI7czo2OiJYaW1lbmEiO3M6ODoiYXBlbGxpZG8iO3M6ODoiUmFtw61yZXoiO3M6NDoiYXVsYSI7czo5OiJBdWxhIDY5MEIiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjQ4O2E6MTE6e3M6Mzoic2lzIjtzOjk6IjIwMjIwMTQ5MCI7czoxNDoiaWRfaW5zY3JpcGNpb24iO2k6NTk4O3M6Njoibm9tYnJlIjtzOjU6IlphaXJhIjtzOjg6ImFwZWxsaWRvIjtzOjY6IlRvbGVkbyI7czo0OiJhdWxhIjtzOjk6IkF1bGEgNjkyQSI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6NDk7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMjAyMDQ1IjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo1OTk7czo2OiJub21icmUiO3M6NToiRGllZ28iO3M6ODoiYXBlbGxpZG8iO3M6NDoiU290byI7czo0OiJhdWxhIjtzOjk6IkF1bGEgNjkyQSI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fX1zOjI4OiIAKgBlc2NhcGVXaGVuQ2FzdGluZ1RvU3RyaW5nIjtiOjA7fX0=', 1793045877);
+INSERT INTO "cache" ("key", "value", "expiration") VALUES ('catalogos.examen.tipo.examen parcial', 'i:1;', 1793847766);
+INSERT INTO "cache" ("key", "value", "expiration") VALUES ('monitoreo.informe.32.docente.1', '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cmlhbGVzUGVyc29uYWxpemFkb3MiO086Mzk6IklsbHVtaW5hdGVcRGF0YWJhc2VcRWxvcXVlbnRcQ29sbGVjdGlvbiI6Mjp7czo4OiIAKgBpdGVtcyI7YTowOnt9czoyODoiACoAZXNjYXBlV2hlbkNhc3RpbmdUb1N0cmluZyI7YjowO31zOjIwOiJub3JtYXNQZXJzb25hbGl6YWRhcyI7TzozOToiSWxsdW1pbmF0ZVxEYXRhYmFzZVxFbG9xdWVudFxDb2xsZWN0aW9uIjoyOntzOjg6IgAqAGl0ZW1zIjthOjA6e31zOjI4OiIAKgBlc2NhcGVXaGVuQ2FzdGluZ1RvU3RyaW5nIjtiOjA7fXM6MTA6InRpcG9FeGFtZW4iO086MjE6IkFwcFxNb2RlbHNcVGlwb0V4YW1lbiI6MzA6e3M6MTM6IgAqAGNvbm5lY3Rpb24iO3M6NToicGdzcWwiO3M6ODoiACoAdGFibGUiO3M6MTE6InRpcG9fZXhhbWVuIjtzOjEzOiIAKgBwcmltYXJ5S2V5IjtzOjE0OiJpZF90aXBvX2V4YW1lbiI7czoxMDoiACoAa2V5VHlwZSI7czozOiJpbnQiO3M6MTI6ImluY3JlbWVudGluZyI7YjowO3M6NzoiACoAd2l0aCI7YTowOnt9czoxMjoiACoAd2l0aENvdW50IjthOjA6e31zOjE5OiJwcmV2ZW50c0xhenlMb2FkaW5nIjtiOjA7czoxMDoiACoAcGVyUGFnZSI7aToxNTtzOjY6ImV4aXN0cyI7YjoxO3M6MTg6Indhc1JlY2VudGx5Q3JlYXRlZCI7YjowO3M6Mjg6IgAqAGVzY2FwZVdoZW5DYXN0aW5nVG9TdHJpbmciO2I6MDtzOjEzOiIAKgBhdHRyaWJ1dGVzIjthOjI6e3M6MTQ6ImlkX3RpcG9fZXhhbWVuIjtpOjE7czoxODoibm9tYnJlX3RpcG9fZXhhbWVuIjtzOjE0OiJleGFtZW4gcGFyY2lhbCI7fXM6MTE6IgAqAG9yaWdpbmFsIjthOjI6e3M6MTQ6ImlkX3RpcG9fZXhhbWVuIjtpOjE7czoxODoibm9tYnJlX3RpcG9fZXhhbWVuIjtzOjE0OiJleGFtZW4gcGFyY2lhbCI7fXM6MTA6IgAqAGNoYW5nZXMiO2E6MDp7fXM6ODoiACoAY2FzdHMiO2E6MDp7fXM6MTc6IgAqAGNsYXNzQ2FzdENhY2hlIjthOjA6e31zOjIxOiIAKgBhdHRyaWJ1dGVDYXN0Q2FjaGUiO2E6MDp7fXM6MTM6IgAqAGRhdGVGb3JtYXQiO047czoxMDoiACoAYXBwZW5kcyI7YTowOnt9czoxOToiACoAZGlzcGF0Y2hlc0V2ZW50cyI7YTowOnt9czoxNDoiACoAb2JzZXJ2YWJsZXMiO2E6MDp7fXM6MTI6IgAqAHJlbGF0aW9ucyI7YTowOnt9czoxMDoiACoAdG91Y2hlcyI7YTowOnt9czoxMDoidGltZXN0YW1wcyI7YjowO3M6MTM6InVzZXNVbmlxdWVJZHMiO2I6MDtzOjk6IgAqAGhpZGRlbiI7YTowOnt9czoxMDoiACoAdmlzaWJsZSI7YTowOnt9czoxMToiACoAZmlsbGFibGUiO2E6Mjp7aTowO3M6MTQ6ImlkX3RpcG9fZXhhbWVuIjtpOjE7czoxODoibm9tYnJlX3RpcG9fZXhhbWVuIjt9czoxMDoiACoAZ3VhcmRlZCI7YToxOntpOjA7czoxOiIqIjt9fX1zOjEwOiIAKgB0b3VjaGVzIjthOjA6e31zOjEwOiJ0aW1lc3RhbXBzIjtiOjA7czoxMzoidXNlc1VuaXF1ZUlkcyI7YjowO3M6OToiACoAaGlkZGVuIjthOjA6e31zOjEwOiIAKgB2aXNpYmxlIjthOjA6e31zOjExOiIAKgBmaWxsYWJsZSI7YTo3OntpOjA7czo5OiJpZF9leGFtZW4iO2k6MTtzOjEzOiJub21icmVfZXhhbWVuIjtpOjI7czo1OiJmZWNoYSI7aTozO3M6MTE6ImhvcmFfaW5pY2lvIjtpOjQ7czo4OiJkdXJhY2lvbiI7aTo1O3M6NzoiY3JlYWRvciI7aTo2O3M6MTE6InRpcG9fZXhhbWVuIjt9czoxMDoiACoAZ3VhcmRlZCI7YToxOntpOjA7czoxOiIqIjt9fXM6MTE6ImVzdHVkaWFudGVzIjtPOjI5OiJJbGx1bWluYXRlXFN1cHBvcnRcQ29sbGVjdGlvbiI6Mjp7czo4OiIAKgBpdGVtcyI7YTo1MDp7aTowO2E6MTE6e3M6Mzoic2lzIjtzOjk6IjIwMjAwMjEwNyI7czoxNDoiaWRfaW5zY3JpcGNpb24iO2k6NzA0O3M6Njoibm9tYnJlIjtzOjc6IkVybmVzdG8iO3M6ODoiYXBlbGxpZG8iO3M6NDoiVmVyYSI7czo0OiJhdWxhIjtzOjg6IkF1bGEgNjIzIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aToxO2E6MTE6e3M6Mzoic2lzIjtzOjg6IjIwMjEwMDAzIjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo3MDU7czo2OiJub21icmUiO3M6NToiTWFyaWEiO3M6ODoiYXBlbGxpZG8iO3M6NToiTG9wZXoiO3M6NDoiYXVsYSI7czo4OiJBdWxhIDYyMyI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6MjthOjExOntzOjM6InNpcyI7czo5OiIyMDIxMDEwMjIiO3M6MTQ6ImlkX2luc2NyaXBjaW9uIjtpOjcwNjtzOjY6Im5vbWJyZSI7czo1OiJCcnVubyI7czo4OiJhcGVsbGlkbyI7czo1OiJEw61heiI7czo0OiJhdWxhIjtzOjg6IkF1bGEgNjIzIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aTozO2E6MTE6e3M6Mzoic2lzIjtzOjk6IjIwMjEwMTA3OCI7czoxNDoiaWRfaW5zY3JpcGNpb24iO2k6NzA3O3M6Njoibm9tYnJlIjtzOjc6IkdhYnJpZWwiO3M6ODoiYXBlbGxpZG8iO3M6NjoiTWFtYW5pIjtzOjQ6ImF1bGEiO3M6ODoiQXVsYSA2MjMiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjQ7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMTAxMDkwIjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo3MDg7czo2OiJub21icmUiO3M6NToiSXbDoW4iO3M6ODoiYXBlbGxpZG8iO3M6NjoiRmxvcmVzIjtzOjQ6ImF1bGEiO3M6ODoiQXVsYSA2MjMiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MDtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJyZWNoYXphZG8iO31pOjU7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMTAxMTEyIjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo3MDk7czo2OiJub21icmUiO3M6NToiS2V2aW4iO3M6ODoiYXBlbGxpZG8iO3M6NjoiTMOzcGV6IjtzOjQ6ImF1bGEiO3M6ODoiQXVsYSA2MjMiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjY7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMTAxMTM0IjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo3MTA7czo2OiJub21icmUiO3M6NjoiTWlndWVsIjtzOjg6ImFwZWxsaWRvIjtzOjQ6IlNvdG8iO3M6NDoiYXVsYSI7czo4OiJBdWxhIDYyMyI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6NzthOjExOntzOjM6InNpcyI7czo5OiIyMDIxMDExNTYiO3M6MTQ6ImlkX2luc2NyaXBjaW9uIjtpOjcxMTtzOjY6Im5vbWJyZSI7czo2OiLDk3NjYXIiO3M6ODoiYXBlbGxpZG8iO3M6NjoiUXVpc3BlIjtzOjQ6ImF1bGEiO3M6ODoiQXVsYSA2MjMiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjg7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMTAxMTc4IjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo3MTI7czo2OiJub21icmUiO3M6NToiUmHDumwiO3M6ODoiYXBlbGxpZG8iO3M6NjoiQ2hvcXVlIjtzOjQ6ImF1bGEiO3M6ODoiQXVsYSA2MjMiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjk7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMTAxMTkwIjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo3MTM7czo2OiJub21icmUiO3M6NjoiVG9tw6FzIjtzOjg6ImFwZWxsaWRvIjtzOjc6IkdhcmPDrWEiO3M6NDoiYXVsYSI7czo4OiJBdWxhIDYyMyI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6MTA7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMTAxMjIzIjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo3MTQ7czo2OiJub21icmUiO3M6NjoiWGF2aWVyIjtzOjg6ImFwZWxsaWRvIjtzOjY6IlZhcmdhcyI7czo0OiJhdWxhIjtzOjg6IkF1bGEgNjIzIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aToxMTthOjExOntzOjM6InNpcyI7czo5OiIyMDIxMDEyNDUiO3M6MTQ6ImlkX2luc2NyaXBjaW9uIjtpOjcxNTtzOjY6Im5vbWJyZSI7czozOiJab2UiO3M6ODoiYXBlbGxpZG8iO3M6NToiU2lsZXMiO3M6NDoiYXVsYSI7czo4OiJBdWxhIDYyMyI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6MTI7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMTAxMjY3IjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo3MTY7czo2OiJub21icmUiO3M6NjoiQmlhbmNhIjtzOjg6ImFwZWxsaWRvIjtzOjc6IlBhcmVkZXMiO3M6NDoiYXVsYSI7czo4OiJBdWxhIDYyMyI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6MTM7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMTAxMjg5IjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo3MTc7czo2OiJub21icmUiO3M6NzoiRGFuaWVsYSI7czo4OiJhcGVsbGlkbyI7czo3OiJDYWJyZXJhIjtzOjQ6ImF1bGEiO3M6ODoiQXVsYSA2MjMiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjE0O2E6MTE6e3M6Mzoic2lzIjtzOjk6IjIwMjEwMTMwMSI7czoxNDoiaWRfaW5zY3JpcGNpb24iO2k6NzE4O3M6Njoibm9tYnJlIjtzOjg6IkZlcm5hbmRhIjtzOjg6ImFwZWxsaWRvIjtzOjQ6IlZlZ2EiO3M6NDoiYXVsYSI7czo4OiJBdWxhIDYyMyI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6MTU7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMTAxMzIzIjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo3MTk7czo2OiJub21icmUiO3M6NDoiSHVnbyI7czo4OiJhcGVsbGlkbyI7czo3OiJDYW1hY2hvIjtzOjQ6ImF1bGEiO3M6ODoiQXVsYSA2MjMiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjE2O2E6MTE6e3M6Mzoic2lzIjtzOjk6IjIwMjEwMTM0NSI7czoxNDoiaWRfaW5zY3JpcGNpb24iO2k6NzIwO3M6Njoibm9tYnJlIjtzOjY6IkphdmllciI7czo4OiJhcGVsbGlkbyI7czo4OiJFc3Bpbm96YSI7czo0OiJhdWxhIjtzOjg6IkF1bGEgNjIzIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aToxNzthOjExOntzOjM6InNpcyI7czo5OiIyMDIxMDEzNjciO3M6MTQ6ImlkX2luc2NyaXBjaW9uIjtpOjcyMTtzOjY6Im5vbWJyZSI7czo0OiJMdWlzIjtzOjg6ImFwZWxsaWRvIjtzOjEwOiJHdXRpw6lycmV6IjtzOjQ6ImF1bGEiO3M6ODoiQXVsYSA2MjMiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjE4O2E6MTE6e3M6Mzoic2lzIjtzOjk6IjIwMjEwMTM4OSI7czoxNDoiaWRfaW5zY3JpcGNpb24iO2k6NzIyO3M6Njoibm9tYnJlIjtzOjg6Ik5pY29sw6FzIjtzOjg6ImFwZWxsaWRvIjtzOjc6IklyaWFydGUiO3M6NDoiYXVsYSI7czo4OiJBdWxhIDYyMyI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6MTk7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMTAxNDAxIjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo3MjM7czo2OiJub21icmUiO3M6NToiUGFibG8iO3M6ODoiYXBlbGxpZG8iO3M6ODoiS293YWxza2kiO3M6NDoiYXVsYSI7czo4OiJBdWxhIDYyMyI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6MjA7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMTAxNDIzIjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo3MjQ7czo2OiJub21icmUiO3M6NjoiU2VyZ2lvIjtzOjg6ImFwZWxsaWRvIjtzOjc6Ik1lbmRvemEiO3M6NDoiYXVsYSI7czo4OiJBdWxhIDYyMyI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6MjE7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMTAxNDQ1IjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo3MjU7czo2OiJub21icmUiO3M6NjoiVWxpc2VzIjtzOjg6ImFwZWxsaWRvIjtzOjg6Ik9yZWxsYW5hIjtzOjQ6ImF1bGEiO3M6ODoiQXVsYSA2MjMiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjIyO2E6MTE6e3M6Mzoic2lzIjtzOjk6IjIwMjEwMTQ2NyI7czoxNDoiaWRfaW5zY3JpcGNpb24iO2k6NzI2O3M6Njoibm9tYnJlIjtzOjY6IldhbHRlciI7czo4OiJhcGVsbGlkbyI7czo3OiJRdWlyb2dhIjtzOjQ6ImF1bGEiO3M6ODoiQXVsYSA2MjMiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjIzO2E6MTE6e3M6Mzoic2lzIjtzOjk6IjIwMjEwMTQ4OSI7czoxNDoiaWRfaW5zY3JpcGNpb24iO2k6NzI3O3M6Njoibm9tYnJlIjtzOjU6IllhbWlsIjtzOjg6ImFwZWxsaWRvIjtzOjg6IlPDoW5jaGV6IjtzOjQ6ImF1bGEiO3M6ODoiQXVsYSA2MjMiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjI0O2E6MTE6e3M6Mzoic2lzIjtzOjk6IjIwMjIwMTAxMyI7czoxNDoiaWRfaW5zY3JpcGNpb24iO2k6NzI4O3M6Njoibm9tYnJlIjtzOjM6IkFuYSI7czo4OiJhcGVsbGlkbyI7czo2OiJMw7NwZXoiO3M6NDoiYXVsYSI7czo4OiJBdWxhIDYyMyI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6MjU7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMjAxMDMxIjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo3Mjk7czo2OiJub21icmUiO3M6NToiQ2FybGEiO3M6ODoiYXBlbGxpZG8iO3M6NDoiUnVpeiI7czo0OiJhdWxhIjtzOjg6IkF1bGEgNjIzIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aToyNjthOjExOntzOjM6InNpcyI7czo5OiIyMDIyMDEwNTYiO3M6MTQ6ImlkX2luc2NyaXBjaW9uIjtpOjczMDtzOjY6Im5vbWJyZSI7czo3OiJGw6F0aW1hIjtzOjg6ImFwZWxsaWRvIjtzOjY6IlF1aXNwZSI7czo0OiJhdWxhIjtzOjg6IkF1bGEgNjIzIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aToyNzthOjExOntzOjM6InNpcyI7czo5OiIyMDIyMDEwODkiO3M6MTQ6ImlkX2luc2NyaXBjaW9uIjtpOjczMTtzOjY6Im5vbWJyZSI7czo2OiJIZWxlbmEiO3M6ODoiYXBlbGxpZG8iO3M6NjoiQ2hvcXVlIjtzOjQ6ImF1bGEiO3M6ODoiQXVsYSA2MjMiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjI4O2E6MTE6e3M6Mzoic2lzIjtzOjk6IjIwMjIwMTEwMSI7czoxNDoiaWRfaW5zY3JpcGNpb24iO2k6NzMyO3M6Njoibm9tYnJlIjtzOjU6Ikp1bGlhIjtzOjg6ImFwZWxsaWRvIjtzOjc6IkdhcmPDrWEiO3M6NDoiYXVsYSI7czo4OiJBdWxhIDYyMyI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6Mjk7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMjAxMTIzIjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo3MzM7czo2OiJub21icmUiO3M6NToiTGF1cmEiO3M6ODoiYXBlbGxpZG8iO3M6NToiRMOtYXoiO3M6NDoiYXVsYSI7czo4OiJBdWxhIDYyMyI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6MzA7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMjAxMTQ1IjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo3MzQ7czo2OiJub21icmUiO3M6NToiTmFkaWEiO3M6ODoiYXBlbGxpZG8iO3M6NDoiVmVyYSI7czo0OiJhdWxhIjtzOjg6IkF1bGEgNjIzIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aTozMTthOjExOntzOjM6InNpcyI7czo5OiIyMDIyMDExNjciO3M6MTQ6ImlkX2luc2NyaXBjaW9uIjtpOjczNTtzOjY6Im5vbWJyZSI7czo4OiJQYXRyaWNpYSI7czo4OiJhcGVsbGlkbyI7czo2OiJNYW1hbmkiO3M6NDoiYXVsYSI7czo4OiJBdWxhIDYyMyI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6MzI7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMjAxMTg5IjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo3MzY7czo2OiJub21icmUiO3M6NjoiU29mw61hIjtzOjg6ImFwZWxsaWRvIjtzOjY6IkZsb3JlcyI7czo0OiJhdWxhIjtzOjg6IkF1bGEgNjIzIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aTozMzthOjExOntzOjM6InNpcyI7czo5OiIyMDIyMDEyMDEiO3M6MTQ6ImlkX2luc2NyaXBjaW9uIjtpOjczNztzOjY6Im5vbWJyZSI7czo3OiJWYWxlcmlhIjtzOjg6ImFwZWxsaWRvIjtzOjY6IkzDs3BleiI7czo0OiJhdWxhIjtzOjg6IkF1bGEgNjIzIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aTozNDthOjExOntzOjM6InNpcyI7czo5OiIyMDIyMDEyMTIiO3M6MTQ6ImlkX2luc2NyaXBjaW9uIjtpOjczODtzOjY6Im5vbWJyZSI7czo1OiJXZW5keSI7czo4OiJhcGVsbGlkbyI7czo2OiJaYXBhdGEiO3M6NDoiYXVsYSI7czo4OiJBdWxhIDYyMyI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6MzU7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMjAxMjM0IjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo3Mzk7czo2OiJub21icmUiO3M6NzoiWW9sYW5kYSI7czo4OiJhcGVsbGlkbyI7czo2OiJUaWNvbmEiO3M6NDoiYXVsYSI7czo4OiJBdWxhIDYyMyI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6MzY7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMjAxMjU2IjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo3NDA7czo2OiJub21icmUiO3M6NzoiQW5kcsOpcyI7czo4OiJhcGVsbGlkbyI7czo1OiJSb2phcyI7czo0OiJhdWxhIjtzOjg6IkF1bGEgNjIzIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aTozNzthOjExOntzOjM6InNpcyI7czo5OiIyMDIyMDEyNzgiO3M6MTQ6ImlkX2luc2NyaXBjaW9uIjtpOjc0MTtzOjY6Im5vbWJyZSI7czo4OiJDcmlzdGlhbiI7czo4OiJhcGVsbGlkbyI7czo2OiJNb2xpbmEiO3M6NDoiYXVsYSI7czo4OiJBdWxhIDYyMyI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6Mzg7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMjAxMjkwIjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo3NDI7czo2OiJub21icmUiO3M6NzoiRWR1YXJkbyI7czo4OiJhcGVsbGlkbyI7czo3OiJTYWxhemFyIjtzOjQ6ImF1bGEiO3M6ODoiQXVsYSA2MjMiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjM5O2E6MTE6e3M6Mzoic2lzIjtzOjk6IjIwMjIwMTMxMiI7czoxNDoiaWRfaW5zY3JpcGNpb24iO2k6NzQzO3M6Njoibm9tYnJlIjtzOjc6IkdvbnphbG8iO3M6ODoiYXBlbGxpZG8iO3M6NDoiQXJjZSI7czo0OiJhdWxhIjtzOjg6IkF1bGEgNjIzIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aTo0MDthOjExOntzOjM6InNpcyI7czo5OiIyMDIyMDEzMzQiO3M6MTQ6ImlkX2luc2NyaXBjaW9uIjtpOjc0NDtzOjY6Im5vbWJyZSI7czo1OiJJbsOpcyI7czo4OiJhcGVsbGlkbyI7czo3OiJEZWxnYWRvIjtzOjQ6ImF1bGEiO3M6ODoiQXVsYSA2MjMiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjQxO2E6MTE6e3M6Mzoic2lzIjtzOjk6IjIwMjIwMTM1NiI7czoxNDoiaWRfaW5zY3JpcGNpb24iO2k6NzQ1O3M6Njoibm9tYnJlIjtzOjU6IkthcmVuIjtzOjg6ImFwZWxsaWRvIjtzOjc6IkZ1ZW50ZXMiO3M6NDoiYXVsYSI7czo4OiJBdWxhIDYyMyI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6NDI7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMjAxMzc4IjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo3NDY7czo2OiJub21icmUiO3M6NjoiTWFyw61hIjtzOjg6ImFwZWxsaWRvIjtzOjc6IkhlcnJlcmEiO3M6NDoiYXVsYSI7czo4OiJBdWxhIDYyMyI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6NDM7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMjAxMzkwIjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo3NDc7czo2OiJub21icmUiO3M6NDoiT2xnYSI7czo4OiJhcGVsbGlkbyI7czo4OiJKaW3DqW5leiI7czo0OiJhdWxhIjtzOjg6IkF1bGEgNjIzIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aTo0NDthOjExOntzOjM6InNpcyI7czo5OiIyMDIyMDE0MTIiO3M6MTQ6ImlkX2luc2NyaXBjaW9uIjtpOjc0ODtzOjY6Im5vbWJyZSI7czo0OiJSb3NhIjtzOjg6ImFwZWxsaWRvIjtzOjQ6Ikx1bmEiO3M6NDoiYXVsYSI7czo4OiJBdWxhIDYyMyI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjoxO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InBlbmRpZW50ZSI7fWk6NDU7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMjAxNDM0IjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo3NDk7czo2OiJub21icmUiO3M6NzoiVGF0aWFuYSI7czo4OiJhcGVsbGlkbyI7czo3OiJOw7rDsWV6IjtzOjQ6ImF1bGEiO3M6ODoiQXVsYSA2MjMiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjQ2O2E6MTE6e3M6Mzoic2lzIjtzOjk6IjIwMjIwMTQ1NiI7czoxNDoiaWRfaW5zY3JpcGNpb24iO2k6NzUwO3M6Njoibm9tYnJlIjtzOjk6IlZlcsOzbmljYSI7czo4OiJhcGVsbGlkbyI7czozOiJQYXoiO3M6NDoiYXVsYSI7czo4OiJBdWxhIDYyMyI7czoxMzoiZG9jZW50ZV9jYXJnbyI7czoxMzoiUm9iZXJ0byBTaWx2YSI7czoxMDoiaGFiaWxpdGFkbyI7YjowO3M6MTE6InJlZ2lzdHJhZG9yIjtOO3M6MTI6ImhvcmFfaW5ncmVzbyI7TjtzOjEwOiJpbmNpZGVuY2lhIjtOO3M6MTc6ImVzdGFkb19hc2lzdGVuY2lhIjtzOjk6InJlY2hhemFkbyI7fWk6NDc7YToxMTp7czozOiJzaXMiO3M6OToiMjAyMjAxNDc4IjtzOjE0OiJpZF9pbnNjcmlwY2lvbiI7aTo3NTE7czo2OiJub21icmUiO3M6NjoiWGltZW5hIjtzOjg6ImFwZWxsaWRvIjtzOjg6IlJhbcOtcmV6IjtzOjQ6ImF1bGEiO3M6ODoiQXVsYSA2MjMiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO31pOjQ4O2E6MTE6e3M6Mzoic2lzIjtzOjk6IjIwMjIwMTQ5MCI7czoxNDoiaWRfaW5zY3JpcGNpb24iO2k6NzUyO3M6Njoibm9tYnJlIjtzOjU6IlphaXJhIjtzOjg6ImFwZWxsaWRvIjtzOjY6IlRvbGVkbyI7czo0OiJhdWxhIjtzOjg6IkF1bGEgNjIzIjtzOjEzOiJkb2NlbnRlX2NhcmdvIjtzOjEzOiJSb2JlcnRvIFNpbHZhIjtzOjEwOiJoYWJpbGl0YWRvIjtiOjE7czoxMToicmVnaXN0cmFkb3IiO047czoxMjoiaG9yYV9pbmdyZXNvIjtOO3M6MTA6ImluY2lkZW5jaWEiO047czoxNzoiZXN0YWRvX2FzaXN0ZW5jaWEiO3M6OToicGVuZGllbnRlIjt9aTo0OTthOjExOntzOjM6InNpcyI7czo5OiIyMDIyMDIwNDUiO3M6MTQ6ImlkX2luc2NyaXBjaW9uIjtpOjc1MztzOjY6Im5vbWJyZSI7czo1OiJEaWVnbyI7czo4OiJhcGVsbGlkbyI7czo0OiJTb3RvIjtzOjQ6ImF1bGEiO3M6ODoiQXVsYSA2MjMiO3M6MTM6ImRvY2VudGVfY2FyZ28iO3M6MTM6IlJvYmVydG8gU2lsdmEiO3M6MTA6ImhhYmlsaXRhZG8iO2I6MTtzOjExOiJyZWdpc3RyYWRvciI7TjtzOjEyOiJob3JhX2luZ3Jlc28iO047czoxMDoiaW5jaWRlbmNpYSI7TjtzOjE3OiJlc3RhZG9fYXNpc3RlbmNpYSI7czo5OiJwZW5kaWVudGUiO319czoyODoiACoAZXNjYXBlV2hlbkNhc3RpbmdUb1N0cmluZyI7YjowO319', 1793925163);
+INSERT INTO "cache" ("key", "value", "expiration") VALUES ('catalogos.examen.tipo.examen final', 'i:2;', 1794271469);
+INSERT INTO "cache" ("key", "value", "expiration") VALUES ('central-riesgo:lista:v3:1:mis-materias:an:0', 'TzoyOToiSWxsdW1pbmF0ZVxTdXBwb3J0XENvbGxlY3Rpb24iOjI6e3M6ODoiACoAaXRlbXMiO2E6Nzp7aTowO2E6MTM6e3M6MjoiaWQiO2k6MzI7czoxMToiaWRfcmVnaXN0cm8iO2k6MzI7czo2OiJub21icmUiO3M6NzoiRGFuaWVsYSI7czo4OiJhcGVsbGlkbyI7czo3OiJDYWJyZXJhIjtzOjEwOiJ2ZXJpZmljYWRvIjtiOjE7czozOiJzaXMiO3M6OToiMjAyMTAxMjg5IjtzOjE3OiJudW1lcm9faW5jaWRlbmNpYSI7aToxO3M6NToiY3Vyc28iO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1hdGVyaWEiO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1vdGl2b3MiO2E6MTp7aTowO3M6MzM6ImNvcGlhIG8gaW50ZXJjYW1iaW8gZGUgcmVzcHVlc3RhcyI7fXM6MTU6Im1vdGl2b19ldGlxdWV0YSI7czozMzoiQ29waWEgbyBpbnRlcmNhbWJpbyBkZSByZXNwdWVzdGFzIjtzOjY6ImVzdGFkbyI7czoxMDoiQ29uZmlybWFkbyI7czo1OiJmZWNoYSI7czoxOToiMjAyNi0xMC0yNyAwNzoxODowOSI7fWk6MTthOjEzOntzOjI6ImlkIjtpOjI1O3M6MTE6ImlkX3JlZ2lzdHJvIjtpOjI1O3M6Njoibm9tYnJlIjtzOjM6IkFuYSI7czo4OiJhcGVsbGlkbyI7czo2OiJMw7NwZXoiO3M6MTA6InZlcmlmaWNhZG8iO2I6MTtzOjM6InNpcyI7czo5OiIyMDIyMDEwMTMiO3M6MTc6Im51bWVyb19pbmNpZGVuY2lhIjtpOjI7czo1OiJjdXJzbyI7czoxNDoiUHJvZ3JhbWFjaW9uIEkiO3M6NzoibWF0ZXJpYSI7czoxNDoiUHJvZ3JhbWFjaW9uIEkiO3M6NzoibW90aXZvcyI7YToxOntpOjA7czozMzoiY29waWEgbyBpbnRlcmNhbWJpbyBkZSByZXNwdWVzdGFzIjt9czoxNToibW90aXZvX2V0aXF1ZXRhIjtzOjMzOiJDb3BpYSBvIGludGVyY2FtYmlvIGRlIHJlc3B1ZXN0YXMiO3M6NjoiZXN0YWRvIjtzOjEwOiJDb25maXJtYWRvIjtzOjU6ImZlY2hhIjtzOjE5OiIyMDI2LTEwLTI3IDA1OjExOjQ1Ijt9aToyO2E6MTM6e3M6MjoiaWQiO2k6MjI7czoxMToiaWRfcmVnaXN0cm8iO2k6MjI7czo2OiJub21icmUiO3M6ODoiQ3Jpc3RpYW4iO3M6ODoiYXBlbGxpZG8iO3M6NjoiTW9saW5hIjtzOjEwOiJ2ZXJpZmljYWRvIjtiOjE7czozOiJzaXMiO3M6OToiMjAyMjAxMjc4IjtzOjE3OiJudW1lcm9faW5jaWRlbmNpYSI7aToxO3M6NToiY3Vyc28iO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1hdGVyaWEiO3M6MTQ6IlByb2dyYW1hY2lvbiBJIjtzOjc6Im1vdGl2b3MiO2E6MTp7aTowO3M6NDQ6ImludGVudG8gZGUgaW5ncmVzbyBkZSBtYXRlcmlhbCBubyBhdXRvcml6YWRvIjt9czoxNToibW90aXZvX2V0aXF1ZXRhIjtzOjQ1OiJJbnRlbnRvIGRlIGluZ3Jlc28gY29uIG1hdGVyaWFsIG5vIGF1dG9yaXphZG8iO3M6NjoiZXN0YWRvIjtzOjEwOiJDb25maXJtYWRvIjtzOjU6ImZlY2hhIjtzOjE5OiIyMDI2LTEwLTI1IDE4OjMyOjI1Ijt9aTozO2E6MTM6e3M6MjoiaWQiO2k6MjE7czoxMToiaWRfcmVnaXN0cm8iO2k6MjE7czo2OiJub21icmUiO3M6MzoiQW5hIjtzOjg6ImFwZWxsaWRvIjtzOjY6IkzDs3BleiI7czoxMDoidmVyaWZpY2FkbyI7YjoxO3M6Mzoic2lzIjtzOjk6IjIwMjIwMTAxMyI7czoxNzoibnVtZXJvX2luY2lkZW5jaWEiO2k6MTtzOjU6ImN1cnNvIjtzOjE0OiJQcm9ncmFtYWNpb24gSSI7czo3OiJtYXRlcmlhIjtzOjE0OiJQcm9ncmFtYWNpb24gSSI7czo3OiJtb3Rpdm9zIjthOjE6e2k6MDtzOjQ0OiJpbnRlbnRvIGRlIGluZ3Jlc28gZGUgbWF0ZXJpYWwgbm8gYXV0b3JpemFkbyI7fXM6MTU6Im1vdGl2b19ldGlxdWV0YSI7czo0NToiSW50ZW50byBkZSBpbmdyZXNvIGNvbiBtYXRlcmlhbCBubyBhdXRvcml6YWRvIjtzOjY6ImVzdGFkbyI7czoxMDoiQ29uZmlybWFkbyI7czo1OiJmZWNoYSI7czoxOToiMjAyNi0xMC0yNSAxODoxMTo0MyI7fWk6NDthOjEzOntzOjI6ImlkIjtpOjEyO3M6MTE6ImlkX3JlZ2lzdHJvIjtpOjEyO3M6Njoibm9tYnJlIjtzOjc6IkFuZHLDqXMiO3M6ODoiYXBlbGxpZG8iO3M6NToiUm9qYXMiO3M6MTA6InZlcmlmaWNhZG8iO2I6MTtzOjM6InNpcyI7czo5OiIyMDIyMDEyNTYiO3M6MTc6Im51bWVyb19pbmNpZGVuY2lhIjtpOjE7czo1OiJjdXJzbyI7czoxNDoiUHJvZ3JhbWFjaW9uIEkiO3M6NzoibWF0ZXJpYSI7czoxNDoiUHJvZ3JhbWFjaW9uIEkiO3M6NzoibW90aXZvcyI7YToxOntpOjA7czozMjoiaW50ZW50byBkZSBpbmdyZXNvIG5vIGF1dG9yaXphZG8iO31zOjE1OiJtb3Rpdm9fZXRpcXVldGEiO3M6MzU6IkludGVudG8gZGUgaW5ncmVzbyBzaW4gYXV0b3JpemFjaW9uIjtzOjY6ImVzdGFkbyI7czoxMDoiQ29uZmlybWFkbyI7czo1OiJmZWNoYSI7czoxOToiMjAyNi0xMC0xMCAyMjozMDo0NiI7fWk6NTthOjEzOntzOjI6ImlkIjtpOjc7czoxMToiaWRfcmVnaXN0cm8iO2k6NztzOjY6Im5vbWJyZSI7czo3OiJHYWJyaWVsIjtzOjg6ImFwZWxsaWRvIjtzOjY6Ik1hbWFuaSI7czoxMDoidmVyaWZpY2FkbyI7YjoxO3M6Mzoic2lzIjtzOjk6IjIwMjEwMTA3OCI7czoxNzoibnVtZXJvX2luY2lkZW5jaWEiO2k6MTtzOjU6ImN1cnNvIjtzOjE0OiJQcm9ncmFtYWNpb24gSSI7czo3OiJtYXRlcmlhIjtzOjE0OiJQcm9ncmFtYWNpb24gSSI7czo3OiJtb3Rpdm9zIjthOjE6e2k6MDtzOjMzOiJjb3BpYSBvIGludGVyY2FtYmlvIGRlIHJlc3B1ZXN0YXMiO31zOjE1OiJtb3Rpdm9fZXRpcXVldGEiO3M6MzM6IkNvcGlhIG8gaW50ZXJjYW1iaW8gZGUgcmVzcHVlc3RhcyI7czo2OiJlc3RhZG8iO3M6MTA6IkNvbmZpcm1hZG8iO3M6NToiZmVjaGEiO3M6MTk6IjIwMjYtMTAtMTAgMDg6NDA6MDAiO31pOjY7YToxMzp7czoyOiJpZCI7aToxO3M6MTE6ImlkX3JlZ2lzdHJvIjtpOjE7czo2OiJub21icmUiO3M6MzoiQW5hIjtzOjg6ImFwZWxsaWRvIjtzOjU6IlBlcmV6IjtzOjEwOiJ2ZXJpZmljYWRvIjtiOjE7czozOiJzaXMiO3M6ODoiMjAyMTAwMDEiO3M6MTc6Im51bWVyb19pbmNpZGVuY2lhIjtpOjE7czo1OiJjdXJzbyI7czo5OiJDYWxjdWxvIEkiO3M6NzoibWF0ZXJpYSI7czo5OiJDYWxjdWxvIEkiO3M6NzoibW90aXZvcyI7YToxOntpOjA7czo0OiJvdHJvIjt9czoxNToibW90aXZvX2V0aXF1ZXRhIjtzOjQ6Ik90cm8iO3M6NjoiZXN0YWRvIjtzOjEwOiJDb25maXJtYWRvIjtzOjU6ImZlY2hhIjtzOjE5OiIyMDI0LTA2LTEwIDA4OjMwOjAwIjt9fXM6Mjg6IgAqAGVzY2FwZVdoZW5DYXN0aW5nVG9TdHJpbmciO2I6MDt9', 1794278125);
+INSERT INTO "cache" ("key", "value", "expiration") VALUES ('central-riesgo:lista:v3:1:toda-la-institucion:rojas:0', 'TzoyOToiSWxsdW1pbmF0ZVxTdXBwb3J0XENvbGxlY3Rpb24iOjI6e3M6ODoiACoAaXRlbXMiO2E6Mjp7aTowO2E6MTM6e3M6MjoiaWQiO2k6MTI7czoxMToiaWRfcmVnaXN0cm8iO2k6MTI7czo2OiJub21icmUiO3M6NzoiQW5kcsOpcyI7czo4OiJhcGVsbGlkbyI7czo1OiJSb2phcyI7czoxMDoidmVyaWZpY2FkbyI7YjoxO3M6Mzoic2lzIjtzOjk6IjIwMjIwMTI1NiI7czoxNzoibnVtZXJvX2luY2lkZW5jaWEiO2k6MTtzOjU6ImN1cnNvIjtzOjE0OiJQcm9ncmFtYWNpb24gSSI7czo3OiJtYXRlcmlhIjtzOjE0OiJQcm9ncmFtYWNpb24gSSI7czo3OiJtb3Rpdm9zIjthOjE6e2k6MDtzOjMyOiJpbnRlbnRvIGRlIGluZ3Jlc28gbm8gYXV0b3JpemFkbyI7fXM6MTU6Im1vdGl2b19ldGlxdWV0YSI7czozNToiSW50ZW50byBkZSBpbmdyZXNvIHNpbiBhdXRvcml6YWNpb24iO3M6NjoiZXN0YWRvIjtzOjEwOiJDb25maXJtYWRvIjtzOjU6ImZlY2hhIjtzOjE5OiIyMDI2LTEwLTEwIDIyOjMwOjQ2Ijt9aToxO2E6MTM6e3M6MjoiaWQiO2k6NDtzOjExOiJpZF9yZWdpc3RybyI7aTo0O3M6Njoibm9tYnJlIjtzOjY6IkNhcmxvcyI7czo4OiJhcGVsbGlkbyI7czo1OiJSb2phcyI7czoxMDoidmVyaWZpY2FkbyI7YjoxO3M6Mzoic2lzIjtzOjg6IjIwMjEwMDA0IjtzOjE3OiJudW1lcm9faW5jaWRlbmNpYSI7aToxO3M6NToiY3Vyc28iO3M6MTQ6IkFsZ2VicmEgTGluZWFsIjtzOjc6Im1hdGVyaWEiO3M6MTQ6IkFsZ2VicmEgTGluZWFsIjtzOjc6Im1vdGl2b3MiO2E6MTp7aTowO3M6Mjk6InVzbyBkZSBtYXRlcmlhbCBubyBhdXRvcml6YWRvIjt9czoxNToibW90aXZvX2V0aXF1ZXRhIjtzOjI5OiJVc28gZGUgbWF0ZXJpYWwgbm8gYXV0b3JpemFkbyI7czo2OiJlc3RhZG8iO3M6MTA6IkNvbmZpcm1hZG8iO3M6NToiZmVjaGEiO3M6MTk6IjIwMjQtMDYtMTMgMDg6NDU6MDAiO319czoyODoiACoAZXNjYXBlV2hlbkNhc3RpbmdUb1N0cmluZyI7YjowO30=', 1794278139);
+
+-- central_riesgo: 31 filas
+INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (21, 1, NULL, '2026-10-25T18:11:43'::timestamp, 'tramposo', 17, '202201013', 3, 223);
+INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (25, 1, NULL, '2026-10-27T05:11:45'::timestamp, 'tramposo', 27, '202201013', 3, 625);
+INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (23, 3, 'Prueba central de riesgos', '2026-10-27T04:25:19'::timestamp, 'tramposo', 27, '202101423', 3, 621);
+INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (28, 1, NULL, '2026-10-27T06:28:08'::timestamp, 'tramposo', 27, '202201356', 3, 642);
+INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (31, 1, NULL, '2026-10-27T07:04:36'::timestamp, 'sospechoso', 35, '202201212', 3, 790);
+INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (1, 3, 'Estudiante mirando hacia otro lado', '2024-06-10T08:30:00'::timestamp, 'tramposo', 1, '20210001', 1, 1);
+INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (13, 1, NULL, '2026-10-10T19:30:17'::timestamp, 'sospechoso', 14, '20210004', 3, NULL);
+INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (12, 1, NULL, '2026-10-10T22:30:46'::timestamp, 'tramposo', 14, '202201256', 3, 174);
+INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (2, 4, 'Uso de celular durante el examen', '2024-06-11T10:30:00'::timestamp, 'tramposo', 2, '20210002', 2, 2);
+INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (3, 3, 'Posible intento de ingreso no autorizado', '2024-06-12T14:30:00'::timestamp, 'sospechoso', 3, '20210003', 3, 3);
+INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (4, 4, 'Uso de material no autorizado', '2024-06-13T08:45:00'::timestamp, 'tramposo', 4, '20210004', 4, 4);
+INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (5, 3, 'Comportamiento sospechoso', '2024-06-14T16:30:00'::timestamp, 'sospechoso', 5, '20210005', 5, 5);
+INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (6, 3, 'Uso de celular durante el examen', '2026-10-10T08:40:00'::timestamp, 'tramposo', 14, '202201089', 3, 157);
+INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (7, 3, 'Intercambio de respuestas con el compañero de al lado', '2026-10-10T08:40:00'::timestamp, 'tramposo', 14, '202101078', 3, 156);
+INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (8, 3, 'Material no autorizado sobre la mesa', '2026-10-10T08:40:00'::timestamp, 'tramposo', 14, '202201056', 3, 155);
+INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (10, 1, NULL, '2026-10-10T21:50:57'::timestamp, 'sospechoso', 14, '202201013', 3, 150);
+INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (11, 1, NULL, '2026-10-10T22:23:21'::timestamp, 'sospechoso', 14, '202201123', 3, 161);
+INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (15, 1, NULL, '2026-10-11T01:43:49'::timestamp, 'sospechoso', 14, '202202045', 3, 153);
+INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (16, 1, NULL, '2026-10-11T02:13:20'::timestamp, 'sospechoso', 14, '202201201', 3, 169);
+INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (18, 1, NULL, '2026-10-12T03:34:01'::timestamp, 'tramposo', 14, '202101178', 3, 166);
+INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (19, 1, 'tramposo', '2026-10-12T00:13:17'::timestamp, 'tramposo', 14, '202101090', 3, 158);
+INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (22, 1, NULL, '2026-10-25T18:32:25'::timestamp, 'tramposo', 19, '202201278', 3, 336);
+INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (24, 1, NULL, '2026-10-27T04:55:06'::timestamp, 'tramposo', 27, '202202045', 3, 650);
+INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (26, 1, NULL, '2026-10-27T06:12:54'::timestamp, 'tramposo', 27, '202201456', 3, 647);
+INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (27, 1, NULL, '2026-10-27T06:13:32'::timestamp, 'tramposo', 27, '202101401', 3, 620);
+INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (29, 5, 'Prueba central de riesgos (examen pasado)', '2026-10-25T06:35:37'::timestamp, 'tramposo', 17, '202101489', 3, 222);
+INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (30, 5, 'Prueba central de riesgos (examen pasado)', '2026-10-25T06:35:39'::timestamp, 'tramposo', 17, '202101223', 3, 209);
+INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (32, 1, NULL, '2026-10-27T07:18:09'::timestamp, 'tramposo', 35, '202101289', 3, 769);
+INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (14, 1, NULL, '2026-10-11T01:15:50'::timestamp, 'sospechoso', 1, '20210001', 1, 1);
+INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (17, 1, NULL, '2026-10-12T01:30:52'::timestamp, 'tramposo', 14, '202101467', 3, 195);
+INSERT INTO "central_riesgo" ("id_registro", "id_registrador", "detalle_motivo", "fecha_registro", "tipo_infraccion", "id_examen", "sis_estudiante", "id_curso", "id_estudiante_examen") VALUES (20, 1, 'Se la vio sacando su celular', '2026-10-12T16:34:44'::timestamp, 'tramposo', 14, '202201212', 3, 170);
+
+-- central_riesgo_motivo: 31 filas
+INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (21, 'intento de ingreso de material no autorizado');
+INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (25, 'copia o intercambio de respuestas');
+INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (23, 'otro');
+INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (28, 'intento de ingreso no autorizado');
+INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (31, 'intento de ingreso no autorizado');
+INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (1, 'otro');
+INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (13, 'intento de ingreso no autorizado');
+INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (2, 'uso de dispositivos electronicos');
+INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (3, 'intento de ingreso no autorizado');
+INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (4, 'uso de material no autorizado');
+INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (5, 'otro');
+INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (6, 'uso de dispositivos electronicos');
+INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (7, 'copia o intercambio de respuestas');
+INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (8, 'uso de material no autorizado');
+INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (10, 'copia o intercambio de respuestas');
+INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (11, 'suplantacion de identidad');
+INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (12, 'intento de ingreso no autorizado');
+INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (15, 'uso de dispositivos electronicos');
+INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (16, 'uso de material no autorizado');
+INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (18, 'suplantacion de identidad');
+INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (19, 'otro');
+INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (22, 'intento de ingreso de material no autorizado');
+INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (24, 'uso de dispositivos electronicos');
+INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (26, 'intento de ingreso no autorizado');
+INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (27, 'aula equivocada');
+INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (29, 'otro');
+INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (30, 'otro');
+INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (32, 'copia o intercambio de respuestas');
+INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (14, 'intento de ingreso no autorizado');
+INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (17, 'copia o intercambio de respuestas');
+INSERT INTO "central_riesgo_motivo" ("id_registro", "motivo") VALUES (20, 'uso de dispositivos electronicos');
+
+-- configuracion_examen_docente: 49 filas
+INSERT INTO "configuracion_examen_docente" ("id_configuracion_examen", "id_examen", "id_docente", "created_at", "updated_at") VALUES (1, 1, 1, '2026-10-25T15:23:13'::timestamp, '2026-10-25T15:23:13'::timestamp);
+INSERT INTO "configuracion_examen_docente" ("id_configuracion_examen", "id_examen", "id_docente", "created_at", "updated_at") VALUES (2, 9, 1, '2026-10-25T15:23:13'::timestamp, '2026-10-25T15:23:13'::timestamp);
+INSERT INTO "configuracion_examen_docente" ("id_configuracion_examen", "id_examen", "id_docente", "created_at", "updated_at") VALUES (3, 15, 5, '2026-10-25T15:23:13'::timestamp, '2026-10-25T15:23:13'::timestamp);
+INSERT INTO "configuracion_examen_docente" ("id_configuracion_examen", "id_examen", "id_docente", "created_at", "updated_at") VALUES (4, 14, 1, '2026-10-25T15:23:13'::timestamp, '2026-10-25T15:23:13'::timestamp);
+INSERT INTO "configuracion_examen_docente" ("id_configuracion_examen", "id_examen", "id_docente", "created_at", "updated_at") VALUES (5, 11, 1, '2026-10-25T15:23:13'::timestamp, '2026-10-25T15:23:13'::timestamp);
+INSERT INTO "configuracion_examen_docente" ("id_configuracion_examen", "id_examen", "id_docente", "created_at", "updated_at") VALUES (6, 5, 2, '2026-10-25T15:23:13'::timestamp, '2026-10-25T15:23:13'::timestamp);
+INSERT INTO "configuracion_examen_docente" ("id_configuracion_examen", "id_examen", "id_docente", "created_at", "updated_at") VALUES (7, 12, 5, '2026-10-25T15:23:13'::timestamp, '2026-10-25T15:23:13'::timestamp);
+INSERT INTO "configuracion_examen_docente" ("id_configuracion_examen", "id_examen", "id_docente", "created_at", "updated_at") VALUES (8, 1, 2, '2026-10-25T15:23:13'::timestamp, '2026-10-25T15:23:13'::timestamp);
+INSERT INTO "configuracion_examen_docente" ("id_configuracion_examen", "id_examen", "id_docente", "created_at", "updated_at") VALUES (9, 10, 1, '2026-10-25T15:23:13'::timestamp, '2026-10-25T15:23:13'::timestamp);
+INSERT INTO "configuracion_examen_docente" ("id_configuracion_examen", "id_examen", "id_docente", "created_at", "updated_at") VALUES (10, 6, 1, '2026-10-25T15:23:13'::timestamp, '2026-10-25T15:23:13'::timestamp);
+INSERT INTO "configuracion_examen_docente" ("id_configuracion_examen", "id_examen", "id_docente", "created_at", "updated_at") VALUES (11, 4, 1, '2026-10-25T15:23:13'::timestamp, '2026-10-25T15:23:13'::timestamp);
+INSERT INTO "configuracion_examen_docente" ("id_configuracion_examen", "id_examen", "id_docente", "created_at", "updated_at") VALUES (12, 13, 1, '2026-10-25T15:23:13'::timestamp, '2026-10-25T15:23:13'::timestamp);
+INSERT INTO "configuracion_examen_docente" ("id_configuracion_examen", "id_examen", "id_docente", "created_at", "updated_at") VALUES (13, 12, 1, '2026-10-25T15:23:13'::timestamp, '2026-10-25T15:23:13'::timestamp);
+INSERT INTO "configuracion_examen_docente" ("id_configuracion_examen", "id_examen", "id_docente", "created_at", "updated_at") VALUES (14, 13, 5, '2026-10-25T15:23:13'::timestamp, '2026-10-25T15:23:13'::timestamp);
+INSERT INTO "configuracion_examen_docente" ("id_configuracion_examen", "id_examen", "id_docente", "created_at", "updated_at") VALUES (15, 3, 5, '2026-10-25T15:23:13'::timestamp, '2026-10-25T15:23:13'::timestamp);
+INSERT INTO "configuracion_examen_docente" ("id_configuracion_examen", "id_examen", "id_docente", "created_at", "updated_at") VALUES (16, 8, 1, '2026-10-25T15:23:13'::timestamp, '2026-10-25T15:23:13'::timestamp);
+INSERT INTO "configuracion_examen_docente" ("id_configuracion_examen", "id_examen", "id_docente", "created_at", "updated_at") VALUES (17, 7, 1, '2026-10-25T15:23:13'::timestamp, '2026-10-25T15:23:13'::timestamp);
+INSERT INTO "configuracion_examen_docente" ("id_configuracion_examen", "id_examen", "id_docente", "created_at", "updated_at") VALUES (18, 4, 2, '2026-10-25T15:23:13'::timestamp, '2026-10-25T15:23:13'::timestamp);
+INSERT INTO "configuracion_examen_docente" ("id_configuracion_examen", "id_examen", "id_docente", "created_at", "updated_at") VALUES (19, 16, 2, '2026-10-25T15:23:13'::timestamp, '2026-10-25T15:23:13'::timestamp);
+INSERT INTO "configuracion_examen_docente" ("id_configuracion_examen", "id_examen", "id_docente", "created_at", "updated_at") VALUES (20, 2, 2, '2026-10-25T15:23:13'::timestamp, '2026-10-25T15:23:13'::timestamp);
+INSERT INTO "configuracion_examen_docente" ("id_configuracion_examen", "id_examen", "id_docente", "created_at", "updated_at") VALUES (21, 3, 1, '2026-10-25T15:23:13'::timestamp, '2026-10-25T15:23:13'::timestamp);
+INSERT INTO "configuracion_examen_docente" ("id_configuracion_examen", "id_examen", "id_docente", "created_at", "updated_at") VALUES (22, 14, 5, '2026-10-25T15:23:13'::timestamp, '2026-10-25T15:23:13'::timestamp);
+INSERT INTO "configuracion_examen_docente" ("id_configuracion_examen", "id_examen", "id_docente", "created_at", "updated_at") VALUES (23, 15, 1, '2026-10-25T15:23:13'::timestamp, '2026-10-25T15:23:13'::timestamp);
+INSERT INTO "configuracion_examen_docente" ("id_configuracion_examen", "id_examen", "id_docente", "created_at", "updated_at") VALUES (29, 17, 1, '2026-10-25T17:08:11'::timestamp, '2026-10-25T17:08:11'::timestamp);
+INSERT INTO "configuracion_examen_docente" ("id_configuracion_examen", "id_examen", "id_docente", "created_at", "updated_at") VALUES (30, 18, 1, '2026-10-25T17:08:26'::timestamp, '2026-10-25T17:08:26'::timestamp);
+INSERT INTO "configuracion_examen_docente" ("id_configuracion_examen", "id_examen", "id_docente", "created_at", "updated_at") VALUES (31, 19, 1, '2026-10-25T17:08:38'::timestamp, '2026-10-25T17:08:38'::timestamp);
+INSERT INTO "configuracion_examen_docente" ("id_configuracion_examen", "id_examen", "id_docente", "created_at", "updated_at") VALUES (32, 20, 1, '2026-10-25T17:08:50'::timestamp, '2026-10-25T17:08:50'::timestamp);
+INSERT INTO "configuracion_examen_docente" ("id_configuracion_examen", "id_examen", "id_docente", "created_at", "updated_at") VALUES (33, 21, 1, '2026-10-25T17:09:06'::timestamp, '2026-10-25T17:09:06'::timestamp);
+INSERT INTO "configuracion_examen_docente" ("id_configuracion_examen", "id_examen", "id_docente", "created_at", "updated_at") VALUES (35, 22, 1, '2026-10-25T17:09:28'::timestamp, '2026-10-25T17:09:28'::timestamp);
+INSERT INTO "configuracion_examen_docente" ("id_configuracion_examen", "id_examen", "id_docente", "created_at", "updated_at") VALUES (36, 23, 1, '2026-10-25T17:09:39'::timestamp, '2026-10-25T17:09:39'::timestamp);
+INSERT INTO "configuracion_examen_docente" ("id_configuracion_examen", "id_examen", "id_docente", "created_at", "updated_at") VALUES (41, 24, 1, '2026-10-26T01:13:23'::timestamp, '2026-10-26T01:13:23'::timestamp);
+INSERT INTO "configuracion_examen_docente" ("id_configuracion_examen", "id_examen", "id_docente", "created_at", "updated_at") VALUES (42, 25, 1, '2026-10-26T19:15:55'::timestamp, '2026-10-26T19:15:55'::timestamp);
+INSERT INTO "configuracion_examen_docente" ("id_configuracion_examen", "id_examen", "id_docente", "created_at", "updated_at") VALUES (43, 26, 1, '2026-10-26T16:49:16'::timestamp, '2026-10-26T16:49:16'::timestamp);
+INSERT INTO "configuracion_examen_docente" ("id_configuracion_examen", "id_examen", "id_docente", "created_at", "updated_at") VALUES (44, 1, 5, '2026-10-26T17:13:36'::timestamp, '2026-10-26T17:13:36'::timestamp);
+INSERT INTO "configuracion_examen_docente" ("id_configuracion_examen", "id_examen", "id_docente", "created_at", "updated_at") VALUES (45, 26, 2, '2026-10-26T18:46:57'::timestamp, '2026-10-26T18:46:57'::timestamp);
+INSERT INTO "configuracion_examen_docente" ("id_configuracion_examen", "id_examen", "id_docente", "created_at", "updated_at") VALUES (46, 27, 1, '2026-10-27T01:09:37'::timestamp, '2026-10-27T01:09:37'::timestamp);
+INSERT INTO "configuracion_examen_docente" ("id_configuracion_examen", "id_examen", "id_docente", "created_at", "updated_at") VALUES (47, 28, 1, '2026-10-27T03:04:22'::timestamp, '2026-10-27T03:04:22'::timestamp);
+INSERT INTO "configuracion_examen_docente" ("id_configuracion_examen", "id_examen", "id_docente", "created_at", "updated_at") VALUES (48, 29, 1, '2026-10-27T03:04:33'::timestamp, '2026-10-27T03:04:33'::timestamp);
+INSERT INTO "configuracion_examen_docente" ("id_configuracion_examen", "id_examen", "id_docente", "created_at", "updated_at") VALUES (49, 30, 1, '2026-10-27T03:04:44'::timestamp, '2026-10-27T03:04:44'::timestamp);
+INSERT INTO "configuracion_examen_docente" ("id_configuracion_examen", "id_examen", "id_docente", "created_at", "updated_at") VALUES (50, 31, 1, '2026-10-27T03:04:55'::timestamp, '2026-10-27T03:04:55'::timestamp);
+INSERT INTO "configuracion_examen_docente" ("id_configuracion_examen", "id_examen", "id_docente", "created_at", "updated_at") VALUES (51, 32, 1, '2026-10-27T03:05:06'::timestamp, '2026-10-27T03:05:06'::timestamp);
+INSERT INTO "configuracion_examen_docente" ("id_configuracion_examen", "id_examen", "id_docente", "created_at", "updated_at") VALUES (52, 33, 1, '2026-10-27T03:05:17'::timestamp, '2026-10-27T03:05:17'::timestamp);
+INSERT INTO "configuracion_examen_docente" ("id_configuracion_examen", "id_examen", "id_docente", "created_at", "updated_at") VALUES (53, 34, 1, '2026-10-27T03:05:28'::timestamp, '2026-10-27T03:05:28'::timestamp);
+INSERT INTO "configuracion_examen_docente" ("id_configuracion_examen", "id_examen", "id_docente", "created_at", "updated_at") VALUES (54, 35, 1, '2026-10-27T10:54:25'::timestamp, '2026-10-27T10:54:25'::timestamp);
+INSERT INTO "configuracion_examen_docente" ("id_configuracion_examen", "id_examen", "id_docente", "created_at", "updated_at") VALUES (55, 36, 1, '2026-11-04T11:06:35'::timestamp, '2026-11-04T11:06:35'::timestamp);
+INSERT INTO "configuracion_examen_docente" ("id_configuracion_examen", "id_examen", "id_docente", "created_at", "updated_at") VALUES (56, 37, 1, '2026-11-05T02:52:51'::timestamp, '2026-11-05T02:52:51'::timestamp);
+INSERT INTO "configuracion_examen_docente" ("id_configuracion_examen", "id_examen", "id_docente", "created_at", "updated_at") VALUES (57, 38, 1, '2026-11-10T00:34:33'::timestamp, '2026-11-10T00:34:33'::timestamp);
+INSERT INTO "configuracion_examen_docente" ("id_configuracion_examen", "id_examen", "id_docente", "created_at", "updated_at") VALUES (58, 5, 1, '2026-11-09T21:29:16'::timestamp, '2026-11-09T21:29:16'::timestamp);
+INSERT INTO "configuracion_examen_docente" ("id_configuracion_examen", "id_examen", "id_docente", "created_at", "updated_at") VALUES (59, 39, 1, '2026-11-10T02:54:07'::timestamp, '2026-11-10T02:54:07'::timestamp);
+
+-- configuracion_examen_material: 42 filas
+INSERT INTO "configuracion_examen_material" ("id_configuracion_examen", "id_material") VALUES (1, 1);
+INSERT INTO "configuracion_examen_material" ("id_configuracion_examen", "id_material") VALUES (2, 1);
+INSERT INTO "configuracion_examen_material" ("id_configuracion_examen", "id_material") VALUES (3, 2);
+INSERT INTO "configuracion_examen_material" ("id_configuracion_examen", "id_material") VALUES (3, 3);
+INSERT INTO "configuracion_examen_material" ("id_configuracion_examen", "id_material") VALUES (4, 4);
+INSERT INTO "configuracion_examen_material" ("id_configuracion_examen", "id_material") VALUES (4, 1);
+INSERT INTO "configuracion_examen_material" ("id_configuracion_examen", "id_material") VALUES (5, 1);
+INSERT INTO "configuracion_examen_material" ("id_configuracion_examen", "id_material") VALUES (5, 3);
+INSERT INTO "configuracion_examen_material" ("id_configuracion_examen", "id_material") VALUES (6, 5);
+INSERT INTO "configuracion_examen_material" ("id_configuracion_examen", "id_material") VALUES (8, 1);
+INSERT INTO "configuracion_examen_material" ("id_configuracion_examen", "id_material") VALUES (9, 3);
+INSERT INTO "configuracion_examen_material" ("id_configuracion_examen", "id_material") VALUES (10, 5);
+INSERT INTO "configuracion_examen_material" ("id_configuracion_examen", "id_material") VALUES (11, 4);
+INSERT INTO "configuracion_examen_material" ("id_configuracion_examen", "id_material") VALUES (15, 3);
+INSERT INTO "configuracion_examen_material" ("id_configuracion_examen", "id_material") VALUES (16, 1);
+INSERT INTO "configuracion_examen_material" ("id_configuracion_examen", "id_material") VALUES (16, 2);
+INSERT INTO "configuracion_examen_material" ("id_configuracion_examen", "id_material") VALUES (17, 5);
+INSERT INTO "configuracion_examen_material" ("id_configuracion_examen", "id_material") VALUES (18, 4);
+INSERT INTO "configuracion_examen_material" ("id_configuracion_examen", "id_material") VALUES (20, 2);
+INSERT INTO "configuracion_examen_material" ("id_configuracion_examen", "id_material") VALUES (21, 3);
+INSERT INTO "configuracion_examen_material" ("id_configuracion_examen", "id_material") VALUES (22, 4);
+INSERT INTO "configuracion_examen_material" ("id_configuracion_examen", "id_material") VALUES (22, 1);
+INSERT INTO "configuracion_examen_material" ("id_configuracion_examen", "id_material") VALUES (23, 2);
+INSERT INTO "configuracion_examen_material" ("id_configuracion_examen", "id_material") VALUES (23, 3);
+INSERT INTO "configuracion_examen_material" ("id_configuracion_examen", "id_material") VALUES (41, 1);
+INSERT INTO "configuracion_examen_material" ("id_configuracion_examen", "id_material") VALUES (42, 1);
+INSERT INTO "configuracion_examen_material" ("id_configuracion_examen", "id_material") VALUES (42, 2);
+INSERT INTO "configuracion_examen_material" ("id_configuracion_examen", "id_material") VALUES (42, 3);
+INSERT INTO "configuracion_examen_material" ("id_configuracion_examen", "id_material") VALUES (42, 4);
+INSERT INTO "configuracion_examen_material" ("id_configuracion_examen", "id_material") VALUES (43, 2);
+INSERT INTO "configuracion_examen_material" ("id_configuracion_examen", "id_material") VALUES (43, 4);
+INSERT INTO "configuracion_examen_material" ("id_configuracion_examen", "id_material") VALUES (44, 1);
+INSERT INTO "configuracion_examen_material" ("id_configuracion_examen", "id_material") VALUES (45, 2);
+INSERT INTO "configuracion_examen_material" ("id_configuracion_examen", "id_material") VALUES (45, 4);
+INSERT INTO "configuracion_examen_material" ("id_configuracion_examen", "id_material") VALUES (46, 2);
+INSERT INTO "configuracion_examen_material" ("id_configuracion_examen", "id_material") VALUES (46, 4);
+INSERT INTO "configuracion_examen_material" ("id_configuracion_examen", "id_material") VALUES (54, 1);
+INSERT INTO "configuracion_examen_material" ("id_configuracion_examen", "id_material") VALUES (56, 1);
+INSERT INTO "configuracion_examen_material" ("id_configuracion_examen", "id_material") VALUES (56, 4);
+INSERT INTO "configuracion_examen_material" ("id_configuracion_examen", "id_material") VALUES (57, 1);
+INSERT INTO "configuracion_examen_material" ("id_configuracion_examen", "id_material") VALUES (57, 4);
+INSERT INTO "configuracion_examen_material" ("id_configuracion_examen", "id_material") VALUES (58, 5);
+
+-- configuracion_examen_norma: 42 filas
+INSERT INTO "configuracion_examen_norma" ("id_configuracion_examen", "id_norma") VALUES (1, 1);
+INSERT INTO "configuracion_examen_norma" ("id_configuracion_examen", "id_norma") VALUES (2, 1);
+INSERT INTO "configuracion_examen_norma" ("id_configuracion_examen", "id_norma") VALUES (3, 1);
+INSERT INTO "configuracion_examen_norma" ("id_configuracion_examen", "id_norma") VALUES (3, 4);
+INSERT INTO "configuracion_examen_norma" ("id_configuracion_examen", "id_norma") VALUES (4, 2);
+INSERT INTO "configuracion_examen_norma" ("id_configuracion_examen", "id_norma") VALUES (4, 5);
+INSERT INTO "configuracion_examen_norma" ("id_configuracion_examen", "id_norma") VALUES (4, 1);
+INSERT INTO "configuracion_examen_norma" ("id_configuracion_examen", "id_norma") VALUES (4, 4);
+INSERT INTO "configuracion_examen_norma" ("id_configuracion_examen", "id_norma") VALUES (4, 3);
+INSERT INTO "configuracion_examen_norma" ("id_configuracion_examen", "id_norma") VALUES (5, 5);
+INSERT INTO "configuracion_examen_norma" ("id_configuracion_examen", "id_norma") VALUES (6, 5);
+INSERT INTO "configuracion_examen_norma" ("id_configuracion_examen", "id_norma") VALUES (8, 1);
+INSERT INTO "configuracion_examen_norma" ("id_configuracion_examen", "id_norma") VALUES (9, 2);
+INSERT INTO "configuracion_examen_norma" ("id_configuracion_examen", "id_norma") VALUES (10, 1);
+INSERT INTO "configuracion_examen_norma" ("id_configuracion_examen", "id_norma") VALUES (11, 4);
+INSERT INTO "configuracion_examen_norma" ("id_configuracion_examen", "id_norma") VALUES (15, 3);
+INSERT INTO "configuracion_examen_norma" ("id_configuracion_examen", "id_norma") VALUES (16, 1);
+INSERT INTO "configuracion_examen_norma" ("id_configuracion_examen", "id_norma") VALUES (17, 1);
+INSERT INTO "configuracion_examen_norma" ("id_configuracion_examen", "id_norma") VALUES (18, 4);
+INSERT INTO "configuracion_examen_norma" ("id_configuracion_examen", "id_norma") VALUES (20, 2);
+INSERT INTO "configuracion_examen_norma" ("id_configuracion_examen", "id_norma") VALUES (21, 3);
+INSERT INTO "configuracion_examen_norma" ("id_configuracion_examen", "id_norma") VALUES (22, 2);
+INSERT INTO "configuracion_examen_norma" ("id_configuracion_examen", "id_norma") VALUES (22, 5);
+INSERT INTO "configuracion_examen_norma" ("id_configuracion_examen", "id_norma") VALUES (22, 1);
+INSERT INTO "configuracion_examen_norma" ("id_configuracion_examen", "id_norma") VALUES (22, 4);
+INSERT INTO "configuracion_examen_norma" ("id_configuracion_examen", "id_norma") VALUES (22, 3);
+INSERT INTO "configuracion_examen_norma" ("id_configuracion_examen", "id_norma") VALUES (23, 1);
+INSERT INTO "configuracion_examen_norma" ("id_configuracion_examen", "id_norma") VALUES (23, 4);
+INSERT INTO "configuracion_examen_norma" ("id_configuracion_examen", "id_norma") VALUES (41, 4);
+INSERT INTO "configuracion_examen_norma" ("id_configuracion_examen", "id_norma") VALUES (43, 2);
+INSERT INTO "configuracion_examen_norma" ("id_configuracion_examen", "id_norma") VALUES (43, 3);
+INSERT INTO "configuracion_examen_norma" ("id_configuracion_examen", "id_norma") VALUES (44, 1);
+INSERT INTO "configuracion_examen_norma" ("id_configuracion_examen", "id_norma") VALUES (45, 2);
+INSERT INTO "configuracion_examen_norma" ("id_configuracion_examen", "id_norma") VALUES (45, 3);
+INSERT INTO "configuracion_examen_norma" ("id_configuracion_examen", "id_norma") VALUES (46, 1);
+INSERT INTO "configuracion_examen_norma" ("id_configuracion_examen", "id_norma") VALUES (54, 5);
+INSERT INTO "configuracion_examen_norma" ("id_configuracion_examen", "id_norma") VALUES (56, 1);
+INSERT INTO "configuracion_examen_norma" ("id_configuracion_examen", "id_norma") VALUES (56, 4);
+INSERT INTO "configuracion_examen_norma" ("id_configuracion_examen", "id_norma") VALUES (57, 1);
+INSERT INTO "configuracion_examen_norma" ("id_configuracion_examen", "id_norma") VALUES (57, 2);
+INSERT INTO "configuracion_examen_norma" ("id_configuracion_examen", "id_norma") VALUES (57, 4);
+INSERT INTO "configuracion_examen_norma" ("id_configuracion_examen", "id_norma") VALUES (58, 5);
+
+-- configuracion_material_personalizado: 5 filas
+INSERT INTO "configuracion_material_personalizado" ("id_configuracion_material", "id_configuracion_examen", "numero_material", "descripcion_material") VALUES (1, 5, 1, 'sd23123');
+INSERT INTO "configuracion_material_personalizado" ("id_configuracion_material", "id_configuracion_examen", "numero_material", "descripcion_material") VALUES (2, 9, 1, 'asdada');
+INSERT INTO "configuracion_material_personalizado" ("id_configuracion_material", "id_configuracion_examen", "numero_material", "descripcion_material") VALUES (3, 12, 1, 'Calculadora programable');
+INSERT INTO "configuracion_material_personalizado" ("id_configuracion_material", "id_configuracion_examen", "numero_material", "descripcion_material") VALUES (4, 14, 1, 'Calculadora programable');
+INSERT INTO "configuracion_material_personalizado" ("id_configuracion_material", "id_configuracion_examen", "numero_material", "descripcion_material") VALUES (11, 42, 1, 'adasd');
+
+-- configuracion_norma_personalizada: 23 filas
+INSERT INTO "configuracion_norma_personalizada" ("id_configuracion_norma", "id_configuracion_examen", "numero_norma", "descripcion_norma") VALUES (1, 1, 1, 'Se permite el uso de calculadora científica no programable.');
+INSERT INTO "configuracion_norma_personalizada" ("id_configuracion_norma", "id_configuracion_examen", "numero_norma", "descripcion_norma") VALUES (2, 1, 2, 'No se permite hojas adicionales, usar el reverso del examen.');
+INSERT INTO "configuracion_norma_personalizada" ("id_configuracion_norma", "id_configuracion_examen", "numero_norma", "descripcion_norma") VALUES (3, 5, 1, 'dffgs');
+INSERT INTO "configuracion_norma_personalizada" ("id_configuracion_norma", "id_configuracion_examen", "numero_norma", "descripcion_norma") VALUES (4, 6, 1, 'Responder únicamente con bolígrafo de tinta negra o azul.');
+INSERT INTO "configuracion_norma_personalizada" ("id_configuracion_norma", "id_configuracion_examen", "numero_norma", "descripcion_norma") VALUES (5, 6, 2, 'Desactivar y guardar teléfonos móviles en la mochila.');
+INSERT INTO "configuracion_norma_personalizada" ("id_configuracion_norma", "id_configuracion_examen", "numero_norma", "descripcion_norma") VALUES (6, 8, 1, 'Se permite el uso de calculadora científica no programable.');
+INSERT INTO "configuracion_norma_personalizada" ("id_configuracion_norma", "id_configuracion_examen", "numero_norma", "descripcion_norma") VALUES (7, 8, 2, 'No se permite hojas adicionales, usar el reverso del examen.');
+INSERT INTO "configuracion_norma_personalizada" ("id_configuracion_norma", "id_configuracion_examen", "numero_norma", "descripcion_norma") VALUES (8, 9, 1, 'dadad');
+INSERT INTO "configuracion_norma_personalizada" ("id_configuracion_norma", "id_configuracion_examen", "numero_norma", "descripcion_norma") VALUES (9, 11, 1, 'Uso obligatorio de bata de laboratorio y gafas de seguridad.');
+INSERT INTO "configuracion_norma_personalizada" ("id_configuracion_norma", "id_configuracion_examen", "numero_norma", "descripcion_norma") VALUES (10, 11, 2, 'Entregar el reporte de datos antes de salir del aula.');
+INSERT INTO "configuracion_norma_personalizada" ("id_configuracion_norma", "id_configuracion_examen", "numero_norma", "descripcion_norma") VALUES (11, 12, 1, 'Ingreso sin mochilas');
+INSERT INTO "configuracion_norma_personalizada" ("id_configuracion_norma", "id_configuracion_examen", "numero_norma", "descripcion_norma") VALUES (12, 14, 1, 'Ingreso sin mochilas');
+INSERT INTO "configuracion_norma_personalizada" ("id_configuracion_norma", "id_configuracion_examen", "numero_norma", "descripcion_norma") VALUES (13, 15, 1, 'Tiempo estricto de 45 minutos. No hay prórroga.');
+INSERT INTO "configuracion_norma_personalizada" ("id_configuracion_norma", "id_configuracion_examen", "numero_norma", "descripcion_norma") VALUES (14, 18, 1, 'Uso obligatorio de bata de laboratorio y gafas de seguridad.');
+INSERT INTO "configuracion_norma_personalizada" ("id_configuracion_norma", "id_configuracion_examen", "numero_norma", "descripcion_norma") VALUES (15, 18, 2, 'Entregar el reporte de datos antes de salir del aula.');
+INSERT INTO "configuracion_norma_personalizada" ("id_configuracion_norma", "id_configuracion_examen", "numero_norma", "descripcion_norma") VALUES (16, 20, 1, 'El código debe compilar sin errores para ser evaluado.');
+INSERT INTO "configuracion_norma_personalizada" ("id_configuracion_norma", "id_configuracion_examen", "numero_norma", "descripcion_norma") VALUES (17, 20, 2, 'Prohibido el acceso a internet o repositorios externos.');
+INSERT INTO "configuracion_norma_personalizada" ("id_configuracion_norma", "id_configuracion_examen", "numero_norma", "descripcion_norma") VALUES (18, 21, 1, 'Tiempo estricto de 45 minutos. No hay prórroga.');
+INSERT INTO "configuracion_norma_personalizada" ("id_configuracion_norma", "id_configuracion_examen", "numero_norma", "descripcion_norma") VALUES (20, 42, 1, 'adsasdsa');
+INSERT INTO "configuracion_norma_personalizada" ("id_configuracion_norma", "id_configuracion_examen", "numero_norma", "descripcion_norma") VALUES (21, 44, 1, 'Se permite el uso de calculadora científica no programable.');
+INSERT INTO "configuracion_norma_personalizada" ("id_configuracion_norma", "id_configuracion_examen", "numero_norma", "descripcion_norma") VALUES (22, 44, 2, 'No se permite hojas adicionales, usar el reverso del examen.');
+INSERT INTO "configuracion_norma_personalizada" ("id_configuracion_norma", "id_configuracion_examen", "numero_norma", "descripcion_norma") VALUES (23, 58, 1, 'Responder únicamente con bolígrafo de tinta negra o azul.');
+INSERT INTO "configuracion_norma_personalizada" ("id_configuracion_norma", "id_configuracion_examen", "numero_norma", "descripcion_norma") VALUES (24, 58, 2, 'Desactivar y guardar teléfonos móviles en la mochila.');
+
+-- curso: 14 filas
+INSERT INTO "curso" ("id_curso", "nombre_curso", "sis_doc", "fecha_creacion", "estado", "id_ambiente") VALUES (1, 'Calculo I', 1, '2024-02-01'::date, 'EnCurso', NULL);
+INSERT INTO "curso" ("id_curso", "nombre_curso", "sis_doc", "fecha_creacion", "estado", "id_ambiente") VALUES (2, 'Fisica I', 2, '2024-02-01'::date, 'EnCurso', NULL);
+INSERT INTO "curso" ("id_curso", "nombre_curso", "sis_doc", "fecha_creacion", "estado", "id_ambiente") VALUES (4, 'Algebra Lineal', 1, '2024-02-03'::date, 'Finalizo', NULL);
+INSERT INTO "curso" ("id_curso", "nombre_curso", "sis_doc", "fecha_creacion", "estado", "id_ambiente") VALUES (5, 'Quimica General', 2, '2024-02-04'::date, 'EnCurso', NULL);
+INSERT INTO "curso" ("id_curso", "nombre_curso", "sis_doc", "fecha_creacion", "estado", "id_ambiente") VALUES (7, 'Introduccion a la Programacion - Grupo 4', 2, '2026-10-24'::date, 'EnCurso', NULL);
+INSERT INTO "curso" ("id_curso", "nombre_curso", "sis_doc", "fecha_creacion", "estado", "id_ambiente") VALUES (8, 'Introduccion a la Programacion - Grupo 15A', 2, '2026-10-24'::date, 'EnCurso', NULL);
+INSERT INTO "curso" ("id_curso", "nombre_curso", "sis_doc", "fecha_creacion", "estado", "id_ambiente") VALUES (9, 'Programacion I - Grupo 8', 1, '2026-11-04'::date, 'EnCurso', NULL);
+INSERT INTO "curso" ("id_curso", "nombre_curso", "sis_doc", "fecha_creacion", "estado", "id_ambiente") VALUES (10, 'Programacion I - Grupo 8', 1, '2026-11-04'::date, 'EnCurso', NULL);
+INSERT INTO "curso" ("id_curso", "nombre_curso", "sis_doc", "fecha_creacion", "estado", "id_ambiente") VALUES (11, 'Programacion I - Grupo 8', 1, '2026-11-04'::date, 'EnCurso', NULL);
+INSERT INTO "curso" ("id_curso", "nombre_curso", "sis_doc", "fecha_creacion", "estado", "id_ambiente") VALUES (12, 'Programacion I - Grupo 8', 1, '2026-11-04'::date, 'EnCurso', NULL);
+INSERT INTO "curso" ("id_curso", "nombre_curso", "sis_doc", "fecha_creacion", "estado", "id_ambiente") VALUES (13, 'Base de Datos 2 - Grupo JJ', 1, '2026-11-09'::date, 'EnCurso', NULL);
+INSERT INTO "curso" ("id_curso", "nombre_curso", "sis_doc", "fecha_creacion", "estado", "id_ambiente") VALUES (14, 'Base de Datos 2', 13, '2026-11-09'::date, 'EnCurso', NULL);
+INSERT INTO "curso" ("id_curso", "nombre_curso", "sis_doc", "fecha_creacion", "estado", "id_ambiente") VALUES (3, 'Programacion I', 1, '2024-02-02'::date, 'EnCurso', NULL);
+INSERT INTO "curso" ("id_curso", "nombre_curso", "sis_doc", "fecha_creacion", "estado", "id_ambiente") VALUES (6, 'Programacion I - Grupo 1', 2, '2026-10-24'::date, 'EnCurso', NULL);
+
+-- curso_tipo_gestion: 14 filas
+INSERT INTO "curso_tipo_gestion" ("id_curso", "id_tg", "anio") VALUES (1, 1, 2024);
+INSERT INTO "curso_tipo_gestion" ("id_curso", "id_tg", "anio") VALUES (2, 1, 2024);
+INSERT INTO "curso_tipo_gestion" ("id_curso", "id_tg", "anio") VALUES (4, 3, 2024);
+INSERT INTO "curso_tipo_gestion" ("id_curso", "id_tg", "anio") VALUES (5, 4, 2024);
+INSERT INTO "curso_tipo_gestion" ("id_curso", "id_tg", "anio") VALUES (3, 2, 2024);
+INSERT INTO "curso_tipo_gestion" ("id_curso", "id_tg", "anio") VALUES (6, 3, 2026);
+INSERT INTO "curso_tipo_gestion" ("id_curso", "id_tg", "anio") VALUES (7, 1, 2026);
+INSERT INTO "curso_tipo_gestion" ("id_curso", "id_tg", "anio") VALUES (8, 1, 2026);
+INSERT INTO "curso_tipo_gestion" ("id_curso", "id_tg", "anio") VALUES (9, 1, 2026);
+INSERT INTO "curso_tipo_gestion" ("id_curso", "id_tg", "anio") VALUES (10, 1, 2026);
+INSERT INTO "curso_tipo_gestion" ("id_curso", "id_tg", "anio") VALUES (11, 2, 2026);
+INSERT INTO "curso_tipo_gestion" ("id_curso", "id_tg", "anio") VALUES (12, 2, 2027);
+INSERT INTO "curso_tipo_gestion" ("id_curso", "id_tg", "anio") VALUES (13, 3, 2026);
+INSERT INTO "curso_tipo_gestion" ("id_curso", "id_tg", "anio") VALUES (14, 3, 2026);
+
+-- estudiante: 58 filas
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('90600001', 'Maria Fernanda Alejandra', 'Gutierrez Condori Villarroel', 'Ingenieria', true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('90600002', 'Luis Alberto Maximiliano', 'Quispe Mamani de la Torre', 'Ingenieria', true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('90600003', 'Juan Carlos Eduardo', 'Perez Montano Arancibia', 'Ingenieria', true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('90600004', 'Ana Sofia Valentina', 'Rojas Camacho Balderrama', 'Ingenieria', true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('20210001', 'Ana', 'Perez', 'Informatica', true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('20210002', 'Luis', 'Mamani', 'Informatica', true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('20210003', 'Maria', 'Lopez', 'Sistemas', true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('20210004', 'Carlos', 'Rojas', 'Informatica', true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('20210005', 'Sofia', 'Flores', 'Sistemas', true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201013', 'Ana', 'López', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202101022', 'Bruno', 'Díaz', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201031', 'Carla', 'Ruiz', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202202045', 'Diego', 'Soto', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202002107', 'Ernesto', 'Vera', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201056', 'Fátima', 'Quispe', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202101078', 'Gabriel', 'Mamani', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201089', 'Helena', 'Choque', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202101090', 'Iván', 'Flores', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201101', 'Julia', 'García', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202101112', 'Kevin', 'López', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201123', 'Laura', 'Díaz', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202101134', 'Miguel', 'Soto', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201145', 'Nadia', 'Vera', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202101156', 'Óscar', 'Quispe', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201167', 'Patricia', 'Mamani', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202101178', 'Raúl', 'Choque', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201189', 'Sofía', 'Flores', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202101190', 'Tomás', 'García', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201201', 'Valeria', 'López', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201212', 'Wendy', 'Zapata', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202101223', 'Xavier', 'Vargas', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201234', 'Yolanda', 'Ticona', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202101245', 'Zoe', 'Siles', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201256', 'Andrés', 'Rojas', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202101267', 'Bianca', 'Paredes', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201278', 'Cristian', 'Molina', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202101289', 'Daniela', 'Cabrera', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201290', 'Eduardo', 'Salazar', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202101301', 'Fernanda', 'Vega', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201312', 'Gonzalo', 'Arce', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202101323', 'Hugo', 'Camacho', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201334', 'Inés', 'Delgado', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202101345', 'Javier', 'Espinoza', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201356', 'Karen', 'Fuentes', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202101367', 'Luis', 'Gutiérrez', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201378', 'María', 'Herrera', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202101389', 'Nicolás', 'Iriarte', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201390', 'Olga', 'Jiménez', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202101401', 'Pablo', 'Kowalski', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201412', 'Rosa', 'Luna', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202101423', 'Sergio', 'Mendoza', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201434', 'Tatiana', 'Núñez', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202101445', 'Ulises', 'Orellana', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201456', 'Verónica', 'Paz', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202101467', 'Walter', 'Quiroga', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201478', 'Ximena', 'Ramírez', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202101489', 'Yamil', 'Sánchez', NULL, true);
+INSERT INTO "estudiante" ("sis_estudiante", "nombre_estudiante", "apellido_estudiante", "carrera", "verificado") VALUES ('202201490', 'Zaira', 'Toledo', NULL, true);
+
+-- estudiante_curso: 112 filas
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('20210001', 1);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('20210002', 2);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('20210003', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('20210004', 4);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('20210005', 5);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('90600001', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('90600002', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('90600003', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('90600004', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('20210001', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('20210002', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('20210003', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('20210004', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('20210005', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201013', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101022', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201031', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202202045', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202002107', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201056', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101078', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201089', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101090', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201101', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101112', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201123', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201013', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101022', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201031', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202202045', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202002107', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201056', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101078', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201089', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101090', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201101', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101112', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201123', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101134', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201145', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101156', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201167', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101178', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201189', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101190', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201201', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201212', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101223', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201234', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101245', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201256', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101267', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201278', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101289', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201290', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101301', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201312', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101323', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201334', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101345', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201356', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101367', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201378', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101389', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201390', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101401', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201412', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101423', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201434', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101445', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201456', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101467', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201478', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101489', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201490', 3);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101134', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201145', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101156', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201167', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101178', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201189', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101190', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201201', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201212', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101223', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201234', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101245', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201256', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101267', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201278', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101289', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201290', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101301', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201312', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101323', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201334', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101345', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201356', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101367', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201378', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101389', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201390', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101401', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201412', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101423', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201434', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101445', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201456', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101467', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201478', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202101489', 14);
+INSERT INTO "estudiante_curso" ("sis_estudiante", "id_curso") VALUES ('202201490', 14);
+
+-- estudiante_examen: 810 filas
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (199, '202002107', 17, 'habilitado', NULL, NULL, NULL, 29, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (200, '20210003', 17, 'habilitado', NULL, NULL, NULL, 29, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (201, '202101022', 17, 'habilitado', NULL, NULL, NULL, 29, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (202, '202101078', 17, 'habilitado', NULL, NULL, NULL, 29, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (204, '202101112', 17, 'habilitado', NULL, NULL, NULL, 29, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (205, '202101134', 17, 'habilitado', NULL, NULL, NULL, 29, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (206, '202101156', 17, 'habilitado', NULL, NULL, NULL, 29, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (207, '202101178', 17, 'habilitado', NULL, NULL, NULL, 29, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (208, '202101190', 17, 'habilitado', NULL, NULL, NULL, 29, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (209, '202101223', 17, 'habilitado', NULL, NULL, NULL, 29, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (210, '202101245', 17, 'habilitado', NULL, NULL, NULL, 29, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (211, '202101267', 17, 'habilitado', NULL, NULL, NULL, 29, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (212, '202101289', 17, 'habilitado', NULL, NULL, NULL, 29, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (213, '202101301', 17, 'habilitado', NULL, NULL, NULL, 29, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (214, '202101323', 17, 'habilitado', NULL, NULL, NULL, 29, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (215, '202101345', 17, 'habilitado', NULL, NULL, NULL, 29, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (216, '202101367', 17, 'habilitado', NULL, NULL, NULL, 29, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (217, '202101389', 17, 'habilitado', NULL, NULL, NULL, 29, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (218, '202101401', 17, 'habilitado', NULL, NULL, NULL, 29, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (219, '202101423', 17, 'habilitado', NULL, NULL, NULL, 29, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (220, '202101445', 17, 'habilitado', NULL, NULL, NULL, 29, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (221, '202101467', 17, 'habilitado', NULL, NULL, NULL, 29, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (222, '202101489', 17, 'habilitado', NULL, NULL, NULL, 29, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (224, '202201031', 17, 'habilitado', NULL, NULL, NULL, 29, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (225, '202201056', 17, 'habilitado', NULL, NULL, NULL, 29, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (226, '202201089', 17, 'habilitado', NULL, NULL, NULL, 29, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (227, '202201101', 17, 'habilitado', NULL, NULL, NULL, 29, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (228, '202201123', 17, 'habilitado', NULL, NULL, NULL, 29, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (229, '202201145', 17, 'habilitado', NULL, NULL, NULL, 29, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (230, '202201167', 17, 'habilitado', NULL, NULL, NULL, 29, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (231, '202201189', 17, 'habilitado', NULL, NULL, NULL, 29, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (232, '202201201', 17, 'habilitado', NULL, NULL, NULL, 29, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (233, '202201212', 17, 'habilitado', NULL, NULL, NULL, 29, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (234, '202201234', 17, 'habilitado', NULL, NULL, NULL, 29, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (235, '202201256', 17, 'habilitado', NULL, NULL, NULL, 29, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (236, '202201278', 17, 'habilitado', NULL, NULL, NULL, 29, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (237, '202201290', 17, 'habilitado', NULL, NULL, NULL, 29, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (238, '202201312', 17, 'habilitado', NULL, NULL, NULL, 29, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (239, '202201334', 17, 'habilitado', NULL, NULL, NULL, 29, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (240, '202201356', 17, 'habilitado', NULL, NULL, NULL, 29, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (241, '202201378', 17, 'habilitado', NULL, NULL, NULL, 29, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (242, '202201390', 17, 'habilitado', NULL, NULL, NULL, 29, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (243, '202201412', 17, 'habilitado', NULL, NULL, NULL, 29, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (244, '202201434', 17, 'habilitado', NULL, NULL, NULL, 29, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (246, '202201478', 17, 'habilitado', NULL, NULL, NULL, 29, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (247, '202201490', 17, 'habilitado', NULL, NULL, NULL, 29, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (248, '202202045', 17, 'habilitado', NULL, NULL, NULL, 29, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (249, '202002107', 18, 'habilitado', NULL, NULL, NULL, 30, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (250, '20210003', 18, 'habilitado', NULL, NULL, NULL, 30, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (251, '202101022', 18, 'habilitado', NULL, NULL, NULL, 30, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (252, '202101078', 18, 'habilitado', NULL, NULL, NULL, 30, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (254, '202101112', 18, 'habilitado', NULL, NULL, NULL, 30, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (255, '202101134', 18, 'habilitado', NULL, NULL, NULL, 30, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (256, '202101156', 18, 'habilitado', NULL, NULL, NULL, 30, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (257, '202101178', 18, 'habilitado', NULL, NULL, NULL, 30, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (258, '202101190', 18, 'habilitado', NULL, NULL, NULL, 30, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (259, '202101223', 18, 'habilitado', NULL, NULL, NULL, 30, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (260, '202101245', 18, 'habilitado', NULL, NULL, NULL, 30, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (261, '202101267', 18, 'habilitado', NULL, NULL, NULL, 30, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (262, '202101289', 18, 'habilitado', NULL, NULL, NULL, 30, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (263, '202101301', 18, 'habilitado', NULL, NULL, NULL, 30, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (264, '202101323', 18, 'habilitado', NULL, NULL, NULL, 30, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (265, '202101345', 18, 'habilitado', NULL, NULL, NULL, 30, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (266, '202101367', 18, 'habilitado', NULL, NULL, NULL, 30, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (267, '202101389', 18, 'habilitado', NULL, NULL, NULL, 30, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (268, '202101401', 18, 'habilitado', NULL, NULL, NULL, 30, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (269, '202101423', 18, 'habilitado', NULL, NULL, NULL, 30, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (270, '202101445', 18, 'habilitado', NULL, NULL, NULL, 30, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (271, '202101467', 18, 'habilitado', NULL, NULL, NULL, 30, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (272, '202101489', 18, 'habilitado', NULL, NULL, NULL, 30, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (273, '202201013', 18, 'habilitado', NULL, NULL, NULL, 30, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (274, '202201031', 18, 'habilitado', NULL, NULL, NULL, 30, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (275, '202201056', 18, 'habilitado', NULL, NULL, NULL, 30, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (276, '202201089', 18, 'habilitado', NULL, NULL, NULL, 30, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (277, '202201101', 18, 'habilitado', NULL, NULL, NULL, 30, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (203, '202101090', 17, 'deshabilitado', 'Rechazado en el control de ingreso', 1, '2026-10-27T07:01:32'::timestamp, 29, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (253, '202101090', 18, 'deshabilitado', 'Rechazado en el control de ingreso', 1, '2026-10-27T07:01:33'::timestamp, 30, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (109, '202101090', 5, 'deshabilitado', 'Rechazado en el control de ingreso', 1, '2026-10-27T07:01:33'::timestamp, 6, NULL);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (245, '202201456', 17, 'deshabilitado', 'Rechazado en el control de ingreso', 1, '2026-10-27T07:01:40'::timestamp, 29, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (107, '202101078', 5, 'deshabilitado', NULL, NULL, NULL, 6, NULL);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (108, '202201089', 5, 'habilitado', NULL, NULL, NULL, 6, NULL);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (110, '202201101', 5, 'habilitado', NULL, NULL, NULL, 6, NULL);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (111, '202101112', 5, 'habilitado', NULL, NULL, NULL, 6, NULL);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (112, '202201123', 5, 'habilitado', NULL, NULL, NULL, 6, NULL);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (113, '202101134', 5, 'deshabilitado', NULL, NULL, NULL, 6, NULL);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (1, '20210001', 1, 'habilitado', NULL, NULL, NULL, 1, 1);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (2, '20210002', 2, 'habilitado', NULL, NULL, NULL, 20, 2);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (3, '20210003', 3, 'habilitado', NULL, NULL, NULL, 21, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (4, '20210004', 4, 'deshabilitado', NULL, NULL, NULL, 11, 4);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (5, '20210005', 5, 'habilitado', NULL, NULL, NULL, 6, 5);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (101, '202201013', 5, 'habilitado', NULL, NULL, NULL, 6, NULL);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (102, '202101022', 5, 'habilitado', NULL, NULL, NULL, 6, NULL);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (103, '202201031', 5, 'habilitado', NULL, NULL, NULL, 6, NULL);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (104, '202202045', 5, 'deshabilitado', NULL, NULL, NULL, 6, NULL);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (105, '202002107', 5, 'habilitado', NULL, NULL, NULL, 6, NULL);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (106, '202201056', 5, 'habilitado', NULL, NULL, NULL, 6, NULL);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (114, '202201145', 5, 'habilitado', NULL, NULL, NULL, 6, NULL);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (115, '202101156', 5, 'habilitado', NULL, NULL, NULL, 6, NULL);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (116, '202201167', 5, 'habilitado', NULL, NULL, NULL, 6, NULL);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (117, '202101178', 5, 'habilitado', NULL, NULL, NULL, 6, NULL);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (118, '202201189', 5, 'habilitado', NULL, NULL, NULL, 6, NULL);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (119, '202101190', 5, 'deshabilitado', NULL, NULL, NULL, 6, NULL);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (120, '202201201', 5, 'habilitado', NULL, NULL, NULL, 6, NULL);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (121, '202201212', 5, 'habilitado', NULL, NULL, NULL, 6, NULL);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (122, '202101223', 5, 'habilitado', NULL, NULL, NULL, 6, NULL);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (123, '202201234', 5, 'habilitado', NULL, NULL, NULL, 6, NULL);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (124, '202101245', 5, 'habilitado', NULL, NULL, NULL, 6, NULL);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (125, '202201256', 5, 'habilitado', NULL, NULL, NULL, 6, NULL);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (278, '202201123', 18, 'habilitado', NULL, NULL, NULL, 30, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (279, '202201145', 18, 'habilitado', NULL, NULL, NULL, 30, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (280, '202201167', 18, 'habilitado', NULL, NULL, NULL, 30, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (281, '202201189', 18, 'habilitado', NULL, NULL, NULL, 30, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (282, '202201201', 18, 'habilitado', NULL, NULL, NULL, 30, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (283, '202201212', 18, 'habilitado', NULL, NULL, NULL, 30, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (284, '202201234', 18, 'habilitado', NULL, NULL, NULL, 30, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (285, '202201256', 18, 'habilitado', NULL, NULL, NULL, 30, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (286, '202201278', 18, 'habilitado', NULL, NULL, NULL, 30, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (287, '202201290', 18, 'habilitado', NULL, NULL, NULL, 30, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (288, '202201312', 18, 'habilitado', NULL, NULL, NULL, 30, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (289, '202201334', 18, 'habilitado', NULL, NULL, NULL, 30, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (290, '202201356', 18, 'habilitado', NULL, NULL, NULL, 30, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (291, '202201378', 18, 'habilitado', NULL, NULL, NULL, 30, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (292, '202201390', 18, 'habilitado', NULL, NULL, NULL, 30, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (293, '202201412', 18, 'habilitado', NULL, NULL, NULL, 30, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (294, '202201434', 18, 'habilitado', NULL, NULL, NULL, 30, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (296, '202201478', 18, 'habilitado', NULL, NULL, NULL, 30, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (297, '202201490', 18, 'habilitado', NULL, NULL, NULL, 30, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (126, '202101267', 5, 'habilitado', NULL, NULL, NULL, 6, NULL);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (127, '202201278', 5, 'habilitado', NULL, NULL, NULL, 6, NULL);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (128, '202101289', 5, 'habilitado', NULL, NULL, NULL, 6, NULL);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (129, '202201290', 5, 'habilitado', NULL, NULL, NULL, 6, NULL);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (130, '202101301', 5, 'habilitado', NULL, NULL, NULL, 6, NULL);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (131, '202201312', 5, 'habilitado', NULL, NULL, NULL, 6, NULL);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (132, '202101323', 5, 'habilitado', NULL, NULL, NULL, 6, NULL);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (133, '202201334', 5, 'habilitado', NULL, NULL, NULL, 6, NULL);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (134, '202101345', 5, 'habilitado', NULL, NULL, NULL, 6, NULL);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (135, '202201356', 5, 'habilitado', NULL, NULL, NULL, 6, NULL);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (136, '202101367', 5, 'habilitado', NULL, NULL, NULL, 6, NULL);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (137, '202201378', 5, 'habilitado', NULL, NULL, NULL, 6, NULL);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (138, '202101389', 5, 'habilitado', NULL, NULL, NULL, 6, NULL);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (139, '202201390', 5, 'habilitado', NULL, NULL, NULL, 6, NULL);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (140, '202101401', 5, 'habilitado', NULL, NULL, NULL, 6, NULL);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (141, '202201412', 5, 'habilitado', NULL, NULL, NULL, 6, NULL);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (142, '202101423', 5, 'habilitado', NULL, NULL, NULL, 6, NULL);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (143, '202201434', 5, 'habilitado', NULL, NULL, NULL, 6, NULL);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (144, '202101445', 5, 'habilitado', NULL, NULL, NULL, 6, NULL);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (146, '202101467', 5, 'habilitado', NULL, NULL, NULL, 6, NULL);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (147, '202201478', 5, 'habilitado', NULL, NULL, NULL, 6, NULL);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (148, '202101489', 5, 'habilitado', NULL, NULL, NULL, 6, NULL);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (149, '202201490', 5, 'habilitado', NULL, NULL, NULL, 6, NULL);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (150, '202201013', 14, 'habilitado', NULL, 1, '2026-10-12T21:31:00'::timestamp, 4, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (151, '202101022', 14, 'deshabilitado', 'no hizo su tarea', 1, '2026-10-12T03:31:43'::timestamp, 4, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (152, '202201031', 14, 'deshabilitado', 'Rechazado en el control de ingreso', 1, '2026-10-11T02:15:11'::timestamp, 4, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (153, '202202045', 14, 'habilitado', NULL, NULL, NULL, 4, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (154, '202002107', 14, 'habilitado', NULL, NULL, NULL, 4, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (155, '202201056', 14, 'deshabilitado', 'Rechazado en el control de ingreso', 1, '2026-10-12T02:39:11'::timestamp, 4, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (156, '202101078', 14, 'deshabilitado', 'Rechazado en el control de ingreso', 2, '2026-10-24T18:21:31'::timestamp, 4, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (157, '202201089', 14, 'habilitado', NULL, NULL, NULL, 4, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (159, '202201101', 14, 'habilitado', NULL, NULL, NULL, 4, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (160, '202101112', 14, 'deshabilitado', 'Deshabilitado para este examen', 3, '2026-10-10T08:00:00'::timestamp, 4, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (161, '202201123', 14, 'deshabilitado', 'Rechazado en el control de ingreso', 1, '2026-10-12T16:32:52'::timestamp, 4, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (162, '202101134', 14, 'habilitado', NULL, NULL, NULL, 4, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (163, '202201145', 14, 'habilitado', NULL, NULL, NULL, 4, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (164, '202101156', 14, 'habilitado', NULL, NULL, NULL, 4, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (165, '202201167', 14, 'deshabilitado', 'Rechazado en el control de ingreso', 1, '2026-10-10T22:24:13'::timestamp, 4, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (166, '202101178', 14, 'habilitado', NULL, NULL, NULL, 4, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (167, '202201189', 14, 'deshabilitado', 'Rechazado en el control de ingreso', 1, '2026-10-10T22:23:39'::timestamp, 4, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (168, '202101190', 14, 'habilitado', NULL, NULL, NULL, 4, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (169, '202201201', 14, 'habilitado', NULL, NULL, NULL, 4, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (170, '202201212', 14, 'habilitado', NULL, NULL, NULL, 4, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (171, '202101223', 14, 'habilitado', NULL, NULL, NULL, 4, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (172, '202201234', 14, 'deshabilitado', 'Deshabilitado para este examen', 3, '2026-10-10T08:00:00'::timestamp, 4, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (173, '202101245', 14, 'habilitado', NULL, NULL, NULL, 4, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (174, '202201256', 14, 'habilitado', NULL, 1, '2026-10-12T21:32:58'::timestamp, 4, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (175, '202101267', 14, 'habilitado', NULL, 1, '2026-10-17T20:43:58'::timestamp, 4, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (176, '202201278', 14, 'habilitado', NULL, NULL, NULL, 4, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (177, '202101289', 14, 'habilitado', NULL, NULL, NULL, 4, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (178, '202201290', 14, 'deshabilitado', 'Deshabilitado para este examen', 3, '2026-10-10T08:00:00'::timestamp, 4, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (179, '202101301', 14, 'habilitado', NULL, NULL, NULL, 4, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (180, '202201312', 14, 'habilitado', NULL, NULL, NULL, 4, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (181, '202101323', 14, 'habilitado', NULL, NULL, NULL, 4, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (182, '202201334', 14, 'deshabilitado', 'Deshabilitado para este examen', 3, '2026-10-10T08:00:00'::timestamp, 4, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (183, '202101345', 14, 'habilitado', NULL, NULL, NULL, 4, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (184, '202201356', 14, 'habilitado', NULL, NULL, NULL, 4, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (185, '202101367', 14, 'habilitado', NULL, NULL, NULL, 4, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (186, '202201378', 14, 'deshabilitado', 'Deshabilitado para este examen', 3, '2026-10-10T08:00:00'::timestamp, 4, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (187, '202101389', 14, 'habilitado', NULL, NULL, NULL, 4, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (188, '202201390', 14, 'habilitado', NULL, NULL, NULL, 4, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (189, '202101401', 14, 'habilitado', NULL, NULL, NULL, 4, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (190, '202201412', 14, 'habilitado', NULL, NULL, NULL, 4, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (191, '202101423', 14, 'habilitado', NULL, NULL, NULL, 4, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (192, '202201434', 14, 'habilitado', NULL, NULL, NULL, 4, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (193, '202101445', 14, 'habilitado', NULL, NULL, NULL, 4, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (195, '202101467', 14, 'habilitado', NULL, NULL, NULL, 4, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (196, '202201478', 14, 'habilitado', NULL, NULL, NULL, 4, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (197, '202101489', 14, 'habilitado', NULL, NULL, NULL, 4, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (198, '202201490', 14, 'deshabilitado', 'Rechazado en el control de ingreso', 1, '2026-10-11T02:19:14'::timestamp, 4, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (298, '202202045', 18, 'habilitado', NULL, NULL, NULL, 30, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (299, '202002107', 19, 'habilitado', NULL, NULL, NULL, 31, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (300, '20210003', 19, 'habilitado', NULL, NULL, NULL, 31, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (301, '202101022', 19, 'habilitado', NULL, NULL, NULL, 31, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (302, '202101078', 19, 'habilitado', NULL, NULL, NULL, 31, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (304, '202101112', 19, 'habilitado', NULL, NULL, NULL, 31, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (305, '202101134', 19, 'habilitado', NULL, NULL, NULL, 31, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (306, '202101156', 19, 'habilitado', NULL, NULL, NULL, 31, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (307, '202101178', 19, 'habilitado', NULL, NULL, NULL, 31, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (308, '202101190', 19, 'habilitado', NULL, NULL, NULL, 31, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (309, '202101223', 19, 'habilitado', NULL, NULL, NULL, 31, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (310, '202101245', 19, 'habilitado', NULL, NULL, NULL, 31, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (311, '202101267', 19, 'habilitado', NULL, NULL, NULL, 31, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (312, '202101289', 19, 'habilitado', NULL, NULL, NULL, 31, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (303, '202101090', 19, 'deshabilitado', 'Rechazado en el control de ingreso', 1, '2026-10-27T07:01:35'::timestamp, 31, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (295, '202201456', 18, 'deshabilitado', 'Rechazado en el control de ingreso', 1, '2026-10-27T07:01:41'::timestamp, 30, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (145, '202201456', 5, 'deshabilitado', 'Rechazado en el control de ingreso', 1, '2026-10-27T07:01:42'::timestamp, 6, NULL);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (194, '202201456', 14, 'deshabilitado', 'Rechazado en el control de ingreso', 1, '2026-10-27T07:01:42'::timestamp, 4, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (313, '202101301', 19, 'habilitado', NULL, NULL, NULL, 31, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (314, '202101323', 19, 'habilitado', NULL, NULL, NULL, 31, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (315, '202101345', 19, 'habilitado', NULL, NULL, NULL, 31, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (316, '202101367', 19, 'habilitado', NULL, NULL, NULL, 31, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (317, '202101389', 19, 'habilitado', NULL, NULL, NULL, 31, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (318, '202101401', 19, 'habilitado', NULL, NULL, NULL, 31, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (319, '202101423', 19, 'habilitado', NULL, NULL, NULL, 31, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (320, '202101445', 19, 'habilitado', NULL, NULL, NULL, 31, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (321, '202101467', 19, 'habilitado', NULL, NULL, NULL, 31, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (322, '202101489', 19, 'habilitado', NULL, NULL, NULL, 31, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (323, '202201013', 19, 'habilitado', NULL, NULL, NULL, 31, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (324, '202201031', 19, 'habilitado', NULL, NULL, NULL, 31, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (325, '202201056', 19, 'habilitado', NULL, NULL, NULL, 31, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (326, '202201089', 19, 'habilitado', NULL, NULL, NULL, 31, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (327, '202201101', 19, 'habilitado', NULL, NULL, NULL, 31, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (328, '202201123', 19, 'habilitado', NULL, NULL, NULL, 31, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (329, '202201145', 19, 'habilitado', NULL, NULL, NULL, 31, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (330, '202201167', 19, 'habilitado', NULL, NULL, NULL, 31, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (331, '202201189', 19, 'habilitado', NULL, NULL, NULL, 31, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (332, '202201201', 19, 'habilitado', NULL, NULL, NULL, 31, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (333, '202201212', 19, 'habilitado', NULL, NULL, NULL, 31, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (334, '202201234', 19, 'habilitado', NULL, NULL, NULL, 31, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (335, '202201256', 19, 'habilitado', NULL, NULL, NULL, 31, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (336, '202201278', 19, 'habilitado', NULL, NULL, NULL, 31, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (337, '202201290', 19, 'habilitado', NULL, NULL, NULL, 31, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (338, '202201312', 19, 'habilitado', NULL, NULL, NULL, 31, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (339, '202201334', 19, 'habilitado', NULL, NULL, NULL, 31, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (340, '202201356', 19, 'habilitado', NULL, NULL, NULL, 31, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (341, '202201378', 19, 'habilitado', NULL, NULL, NULL, 31, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (342, '202201390', 19, 'habilitado', NULL, NULL, NULL, 31, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (343, '202201412', 19, 'habilitado', NULL, NULL, NULL, 31, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (344, '202201434', 19, 'habilitado', NULL, NULL, NULL, 31, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (346, '202201478', 19, 'habilitado', NULL, NULL, NULL, 31, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (347, '202201490', 19, 'habilitado', NULL, NULL, NULL, 31, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (348, '202202045', 19, 'habilitado', NULL, NULL, NULL, 31, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (349, '202002107', 20, 'habilitado', NULL, NULL, NULL, 32, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (350, '20210003', 20, 'habilitado', NULL, NULL, NULL, 32, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (351, '202101022', 20, 'habilitado', NULL, NULL, NULL, 32, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (352, '202101078', 20, 'habilitado', NULL, NULL, NULL, 32, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (354, '202101112', 20, 'habilitado', NULL, NULL, NULL, 32, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (355, '202101134', 20, 'habilitado', NULL, NULL, NULL, 32, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (356, '202101156', 20, 'habilitado', NULL, NULL, NULL, 32, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (357, '202101178', 20, 'habilitado', NULL, NULL, NULL, 32, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (358, '202101190', 20, 'habilitado', NULL, NULL, NULL, 32, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (359, '202101223', 20, 'habilitado', NULL, NULL, NULL, 32, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (360, '202101245', 20, 'habilitado', NULL, NULL, NULL, 32, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (361, '202101267', 20, 'habilitado', NULL, NULL, NULL, 32, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (362, '202101289', 20, 'habilitado', NULL, NULL, NULL, 32, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (363, '202101301', 20, 'habilitado', NULL, NULL, NULL, 32, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (364, '202101323', 20, 'habilitado', NULL, NULL, NULL, 32, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (365, '202101345', 20, 'habilitado', NULL, NULL, NULL, 32, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (366, '202101367', 20, 'habilitado', NULL, NULL, NULL, 32, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (367, '202101389', 20, 'habilitado', NULL, NULL, NULL, 32, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (368, '202101401', 20, 'habilitado', NULL, NULL, NULL, 32, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (369, '202101423', 20, 'habilitado', NULL, NULL, NULL, 32, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (370, '202101445', 20, 'habilitado', NULL, NULL, NULL, 32, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (371, '202101467', 20, 'habilitado', NULL, NULL, NULL, 32, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (372, '202101489', 20, 'habilitado', NULL, NULL, NULL, 32, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (373, '202201013', 20, 'habilitado', NULL, NULL, NULL, 32, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (374, '202201031', 20, 'habilitado', NULL, NULL, NULL, 32, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (375, '202201056', 20, 'habilitado', NULL, NULL, NULL, 32, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (376, '202201089', 20, 'habilitado', NULL, NULL, NULL, 32, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (377, '202201101', 20, 'habilitado', NULL, NULL, NULL, 32, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (378, '202201123', 20, 'habilitado', NULL, NULL, NULL, 32, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (379, '202201145', 20, 'habilitado', NULL, NULL, NULL, 32, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (380, '202201167', 20, 'habilitado', NULL, NULL, NULL, 32, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (381, '202201189', 20, 'habilitado', NULL, NULL, NULL, 32, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (382, '202201201', 20, 'habilitado', NULL, NULL, NULL, 32, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (383, '202201212', 20, 'habilitado', NULL, NULL, NULL, 32, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (384, '202201234', 20, 'habilitado', NULL, NULL, NULL, 32, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (385, '202201256', 20, 'habilitado', NULL, NULL, NULL, 32, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (386, '202201278', 20, 'habilitado', NULL, NULL, NULL, 32, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (387, '202201290', 20, 'habilitado', NULL, NULL, NULL, 32, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (388, '202201312', 20, 'habilitado', NULL, NULL, NULL, 32, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (389, '202201334', 20, 'habilitado', NULL, NULL, NULL, 32, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (390, '202201356', 20, 'habilitado', NULL, NULL, NULL, 32, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (391, '202201378', 20, 'habilitado', NULL, NULL, NULL, 32, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (392, '202201390', 20, 'habilitado', NULL, NULL, NULL, 32, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (393, '202201412', 20, 'habilitado', NULL, NULL, NULL, 32, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (394, '202201434', 20, 'habilitado', NULL, NULL, NULL, 32, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (396, '202201478', 20, 'habilitado', NULL, NULL, NULL, 32, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (397, '202201490', 20, 'habilitado', NULL, NULL, NULL, 32, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (398, '202202045', 20, 'habilitado', NULL, NULL, NULL, 32, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (399, '202002107', 21, 'habilitado', NULL, NULL, NULL, 33, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (400, '20210003', 21, 'habilitado', NULL, NULL, NULL, 33, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (401, '202101022', 21, 'habilitado', NULL, NULL, NULL, 33, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (402, '202101078', 21, 'habilitado', NULL, NULL, NULL, 33, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (404, '202101112', 21, 'habilitado', NULL, NULL, NULL, 33, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (405, '202101134', 21, 'habilitado', NULL, NULL, NULL, 33, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (406, '202101156', 21, 'habilitado', NULL, NULL, NULL, 33, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (407, '202101178', 21, 'habilitado', NULL, NULL, NULL, 33, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (408, '202101190', 21, 'habilitado', NULL, NULL, NULL, 33, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (409, '202101223', 21, 'habilitado', NULL, NULL, NULL, 33, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (410, '202101245', 21, 'habilitado', NULL, NULL, NULL, 33, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (411, '202101267', 21, 'habilitado', NULL, NULL, NULL, 33, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (412, '202101289', 21, 'habilitado', NULL, NULL, NULL, 33, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (413, '202101301', 21, 'habilitado', NULL, NULL, NULL, 33, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (414, '202101323', 21, 'habilitado', NULL, NULL, NULL, 33, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (415, '202101345', 21, 'habilitado', NULL, NULL, NULL, 33, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (416, '202101367', 21, 'habilitado', NULL, NULL, NULL, 33, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (417, '202101389', 21, 'habilitado', NULL, NULL, NULL, 33, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (418, '202101401', 21, 'habilitado', NULL, NULL, NULL, 33, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (419, '202101423', 21, 'habilitado', NULL, NULL, NULL, 33, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (420, '202101445', 21, 'habilitado', NULL, NULL, NULL, 33, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (421, '202101467', 21, 'habilitado', NULL, NULL, NULL, 33, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (422, '202101489', 21, 'habilitado', NULL, NULL, NULL, 33, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (423, '202201013', 21, 'habilitado', NULL, NULL, NULL, 33, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (424, '202201031', 21, 'habilitado', NULL, NULL, NULL, 33, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (425, '202201056', 21, 'habilitado', NULL, NULL, NULL, 33, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (426, '202201089', 21, 'habilitado', NULL, NULL, NULL, 33, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (427, '202201101', 21, 'habilitado', NULL, NULL, NULL, 33, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (428, '202201123', 21, 'habilitado', NULL, NULL, NULL, 33, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (429, '202201145', 21, 'habilitado', NULL, NULL, NULL, 33, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (430, '202201167', 21, 'habilitado', NULL, NULL, NULL, 33, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (431, '202201189', 21, 'habilitado', NULL, NULL, NULL, 33, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (432, '202201201', 21, 'habilitado', NULL, NULL, NULL, 33, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (345, '202201456', 19, 'deshabilitado', 'Rechazado en el control de ingreso', 1, '2026-10-27T07:01:43'::timestamp, 31, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (433, '202201212', 21, 'habilitado', NULL, NULL, NULL, 33, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (434, '202201234', 21, 'habilitado', NULL, NULL, NULL, 33, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (435, '202201256', 21, 'habilitado', NULL, NULL, NULL, 33, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (436, '202201278', 21, 'habilitado', NULL, NULL, NULL, 33, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (437, '202201290', 21, 'habilitado', NULL, NULL, NULL, 33, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (438, '202201312', 21, 'habilitado', NULL, NULL, NULL, 33, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (439, '202201334', 21, 'habilitado', NULL, NULL, NULL, 33, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (440, '202201356', 21, 'habilitado', NULL, NULL, NULL, 33, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (441, '202201378', 21, 'habilitado', NULL, NULL, NULL, 33, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (442, '202201390', 21, 'habilitado', NULL, NULL, NULL, 33, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (443, '202201412', 21, 'habilitado', NULL, NULL, NULL, 33, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (444, '202201434', 21, 'habilitado', NULL, NULL, NULL, 33, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (446, '202201478', 21, 'habilitado', NULL, NULL, NULL, 33, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (447, '202201490', 21, 'habilitado', NULL, NULL, NULL, 33, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (448, '202202045', 21, 'habilitado', NULL, NULL, NULL, 33, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (449, '202002107', 22, 'habilitado', NULL, NULL, NULL, 35, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (450, '20210003', 22, 'habilitado', NULL, NULL, NULL, 35, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (451, '202101022', 22, 'habilitado', NULL, NULL, NULL, 35, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (452, '202101078', 22, 'habilitado', NULL, NULL, NULL, 35, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (454, '202101112', 22, 'habilitado', NULL, NULL, NULL, 35, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (455, '202101134', 22, 'habilitado', NULL, NULL, NULL, 35, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (456, '202101156', 22, 'habilitado', NULL, NULL, NULL, 35, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (457, '202101178', 22, 'habilitado', NULL, NULL, NULL, 35, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (458, '202101190', 22, 'habilitado', NULL, NULL, NULL, 35, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (459, '202101223', 22, 'habilitado', NULL, NULL, NULL, 35, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (460, '202101245', 22, 'habilitado', NULL, NULL, NULL, 35, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (461, '202101267', 22, 'habilitado', NULL, NULL, NULL, 35, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (462, '202101289', 22, 'habilitado', NULL, NULL, NULL, 35, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (463, '202101301', 22, 'habilitado', NULL, NULL, NULL, 35, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (464, '202101323', 22, 'habilitado', NULL, NULL, NULL, 35, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (465, '202101345', 22, 'habilitado', NULL, NULL, NULL, 35, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (466, '202101367', 22, 'habilitado', NULL, NULL, NULL, 35, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (467, '202101389', 22, 'habilitado', NULL, NULL, NULL, 35, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (468, '202101401', 22, 'habilitado', NULL, NULL, NULL, 35, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (469, '202101423', 22, 'habilitado', NULL, NULL, NULL, 35, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (470, '202101445', 22, 'habilitado', NULL, NULL, NULL, 35, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (471, '202101467', 22, 'habilitado', NULL, NULL, NULL, 35, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (472, '202101489', 22, 'habilitado', NULL, NULL, NULL, 35, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (473, '202201013', 22, 'habilitado', NULL, NULL, NULL, 35, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (474, '202201031', 22, 'habilitado', NULL, NULL, NULL, 35, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (475, '202201056', 22, 'habilitado', NULL, NULL, NULL, 35, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (476, '202201089', 22, 'habilitado', NULL, NULL, NULL, 35, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (477, '202201101', 22, 'habilitado', NULL, NULL, NULL, 35, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (478, '202201123', 22, 'habilitado', NULL, NULL, NULL, 35, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (479, '202201145', 22, 'habilitado', NULL, NULL, NULL, 35, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (480, '202201167', 22, 'habilitado', NULL, NULL, NULL, 35, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (481, '202201189', 22, 'habilitado', NULL, NULL, NULL, 35, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (482, '202201201', 22, 'habilitado', NULL, NULL, NULL, 35, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (483, '202201212', 22, 'habilitado', NULL, NULL, NULL, 35, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (484, '202201234', 22, 'habilitado', NULL, NULL, NULL, 35, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (485, '202201256', 22, 'habilitado', NULL, NULL, NULL, 35, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (486, '202201278', 22, 'habilitado', NULL, NULL, NULL, 35, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (487, '202201290', 22, 'habilitado', NULL, NULL, NULL, 35, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (488, '202201312', 22, 'habilitado', NULL, NULL, NULL, 35, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (489, '202201334', 22, 'habilitado', NULL, NULL, NULL, 35, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (490, '202201356', 22, 'habilitado', NULL, NULL, NULL, 35, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (491, '202201378', 22, 'habilitado', NULL, NULL, NULL, 35, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (492, '202201390', 22, 'habilitado', NULL, NULL, NULL, 35, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (493, '202201412', 22, 'habilitado', NULL, NULL, NULL, 35, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (494, '202201434', 22, 'habilitado', NULL, NULL, NULL, 35, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (496, '202201478', 22, 'habilitado', NULL, NULL, NULL, 35, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (497, '202201490', 22, 'habilitado', NULL, NULL, NULL, 35, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (498, '202202045', 22, 'habilitado', NULL, NULL, NULL, 35, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (499, '202002107', 23, 'habilitado', NULL, NULL, NULL, 36, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (500, '20210003', 23, 'habilitado', NULL, NULL, NULL, 36, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (501, '202101022', 23, 'habilitado', NULL, NULL, NULL, 36, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (502, '202101078', 23, 'habilitado', NULL, NULL, NULL, 36, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (445, '202201456', 21, 'deshabilitado', 'Rechazado en el control de ingreso', 1, '2026-10-27T07:01:44'::timestamp, 33, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (495, '202201456', 22, 'deshabilitado', 'Rechazado en el control de ingreso', 1, '2026-10-27T07:01:44'::timestamp, 35, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (504, '202101112', 23, 'habilitado', NULL, NULL, NULL, 36, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (505, '202101134', 23, 'habilitado', NULL, NULL, NULL, 36, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (506, '202101156', 23, 'habilitado', NULL, NULL, NULL, 36, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (508, '202101190', 23, 'habilitado', NULL, NULL, NULL, 36, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (509, '202101223', 23, 'habilitado', NULL, NULL, NULL, 36, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (510, '202101245', 23, 'habilitado', NULL, NULL, NULL, 36, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (511, '202101267', 23, 'habilitado', NULL, NULL, NULL, 36, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (512, '202101289', 23, 'habilitado', NULL, NULL, NULL, 36, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (513, '202101301', 23, 'habilitado', NULL, NULL, NULL, 36, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (514, '202101323', 23, 'habilitado', NULL, NULL, NULL, 36, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (515, '202101345', 23, 'habilitado', NULL, NULL, NULL, 36, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (516, '202101367', 23, 'habilitado', NULL, NULL, NULL, 36, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (517, '202101389', 23, 'habilitado', NULL, NULL, NULL, 36, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (518, '202101401', 23, 'habilitado', NULL, NULL, NULL, 36, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (519, '202101423', 23, 'habilitado', NULL, NULL, NULL, 36, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (520, '202101445', 23, 'habilitado', NULL, NULL, NULL, 36, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (521, '202101467', 23, 'habilitado', NULL, NULL, NULL, 36, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (522, '202101489', 23, 'habilitado', NULL, NULL, NULL, 36, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (523, '202201013', 23, 'habilitado', NULL, NULL, NULL, 36, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (524, '202201031', 23, 'habilitado', NULL, NULL, NULL, 36, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (525, '202201056', 23, 'habilitado', NULL, NULL, NULL, 36, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (526, '202201089', 23, 'habilitado', NULL, NULL, NULL, 36, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (527, '202201101', 23, 'habilitado', NULL, NULL, NULL, 36, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (528, '202201123', 23, 'habilitado', NULL, NULL, NULL, 36, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (529, '202201145', 23, 'habilitado', NULL, NULL, NULL, 36, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (530, '202201167', 23, 'habilitado', NULL, NULL, NULL, 36, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (531, '202201189', 23, 'habilitado', NULL, NULL, NULL, 36, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (532, '202201201', 23, 'habilitado', NULL, NULL, NULL, 36, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (533, '202201212', 23, 'habilitado', NULL, NULL, NULL, 36, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (534, '202201234', 23, 'habilitado', NULL, NULL, NULL, 36, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (535, '202201256', 23, 'habilitado', NULL, NULL, NULL, 36, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (536, '202201278', 23, 'habilitado', NULL, NULL, NULL, 36, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (537, '202201290', 23, 'habilitado', NULL, NULL, NULL, 36, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (538, '202201312', 23, 'habilitado', NULL, NULL, NULL, 36, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (539, '202201334', 23, 'habilitado', NULL, NULL, NULL, 36, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (540, '202201356', 23, 'habilitado', NULL, NULL, NULL, 36, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (541, '202201378', 23, 'habilitado', NULL, NULL, NULL, 36, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (542, '202201390', 23, 'habilitado', NULL, NULL, NULL, 36, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (543, '202201412', 23, 'habilitado', NULL, NULL, NULL, 36, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (544, '202201434', 23, 'habilitado', NULL, NULL, NULL, 36, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (546, '202201478', 23, 'habilitado', NULL, NULL, NULL, 36, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (547, '202201490', 23, 'habilitado', NULL, NULL, NULL, 36, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (548, '202202045', 23, 'habilitado', NULL, NULL, NULL, 36, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (223, '202201013', 17, 'deshabilitado', 'Rechazado en el control de ingreso', 1, '2026-10-25T18:14:00'::timestamp, 29, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (601, '202002107', 27, 'deshabilitado', NULL, NULL, NULL, 46, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (507, '202101178', 23, 'habilitado', NULL, 1, '2026-10-26T01:08:08'::timestamp, 36, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (549, '20210001', 24, 'habilitado', NULL, NULL, NULL, 41, 1);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (550, '202002107', 25, 'habilitado', NULL, NULL, NULL, 42, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (551, '20210003', 25, 'habilitado', NULL, NULL, NULL, 42, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (552, '202101022', 25, 'habilitado', NULL, NULL, NULL, 42, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (553, '202101078', 25, 'habilitado', NULL, NULL, NULL, 42, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (555, '202101112', 25, 'habilitado', NULL, NULL, NULL, 42, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (556, '202101134', 25, 'habilitado', NULL, NULL, NULL, 42, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (557, '202101156', 25, 'habilitado', NULL, NULL, NULL, 42, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (558, '202101178', 25, 'habilitado', NULL, NULL, NULL, 42, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (559, '202101190', 25, 'habilitado', NULL, NULL, NULL, 42, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (560, '202101223', 25, 'habilitado', NULL, NULL, NULL, 42, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (561, '202101245', 25, 'habilitado', NULL, NULL, NULL, 42, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (562, '202101267', 25, 'habilitado', NULL, NULL, NULL, 42, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (563, '202101289', 25, 'habilitado', NULL, NULL, NULL, 42, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (564, '202101301', 25, 'habilitado', NULL, NULL, NULL, 42, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (565, '202101323', 25, 'habilitado', NULL, NULL, NULL, 42, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (566, '202101345', 25, 'habilitado', NULL, NULL, NULL, 42, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (567, '202101367', 25, 'habilitado', NULL, NULL, NULL, 42, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (568, '202101389', 25, 'habilitado', NULL, NULL, NULL, 42, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (569, '202101401', 25, 'habilitado', NULL, NULL, NULL, 42, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (570, '202101423', 25, 'habilitado', NULL, NULL, NULL, 42, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (571, '202101445', 25, 'habilitado', NULL, NULL, NULL, 42, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (572, '202101467', 25, 'habilitado', NULL, NULL, NULL, 42, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (573, '202101489', 25, 'habilitado', NULL, NULL, NULL, 42, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (574, '202201013', 25, 'habilitado', NULL, NULL, NULL, 42, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (575, '202201031', 25, 'habilitado', NULL, NULL, NULL, 42, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (576, '202201056', 25, 'habilitado', NULL, NULL, NULL, 42, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (577, '202201089', 25, 'habilitado', NULL, NULL, NULL, 42, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (578, '202201101', 25, 'habilitado', NULL, NULL, NULL, 42, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (579, '202201123', 25, 'habilitado', NULL, NULL, NULL, 42, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (580, '202201145', 25, 'habilitado', NULL, NULL, NULL, 42, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (581, '202201167', 25, 'habilitado', NULL, NULL, NULL, 42, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (582, '202201189', 25, 'habilitado', NULL, NULL, NULL, 42, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (583, '202201201', 25, 'habilitado', NULL, NULL, NULL, 42, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (584, '202201212', 25, 'habilitado', NULL, NULL, NULL, 42, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (585, '202201234', 25, 'habilitado', NULL, NULL, NULL, 42, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (586, '202201256', 25, 'habilitado', NULL, NULL, NULL, 42, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (587, '202201278', 25, 'habilitado', NULL, NULL, NULL, 42, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (588, '202201290', 25, 'habilitado', NULL, NULL, NULL, 42, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (589, '202201312', 25, 'habilitado', NULL, NULL, NULL, 42, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (590, '202201334', 25, 'habilitado', NULL, NULL, NULL, 42, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (591, '202201356', 25, 'habilitado', NULL, NULL, NULL, 42, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (592, '202201378', 25, 'habilitado', NULL, NULL, NULL, 42, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (593, '202201390', 25, 'habilitado', NULL, NULL, NULL, 42, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (594, '202201412', 25, 'habilitado', NULL, NULL, NULL, 42, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (595, '202201434', 25, 'habilitado', NULL, NULL, NULL, 42, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (597, '202201478', 25, 'habilitado', NULL, NULL, NULL, 42, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (598, '202201490', 25, 'habilitado', NULL, NULL, NULL, 42, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (599, '202202045', 25, 'habilitado', NULL, NULL, NULL, 42, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (600, '20210001', 26, 'habilitado', NULL, NULL, NULL, 43, 1);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (602, '20210003', 27, 'habilitado', NULL, NULL, NULL, 46, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (603, '202101022', 27, 'habilitado', NULL, NULL, NULL, 46, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (604, '202101078', 27, 'habilitado', NULL, NULL, NULL, 46, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (606, '202101112', 27, 'habilitado', NULL, NULL, NULL, 46, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (607, '202101134', 27, 'habilitado', NULL, NULL, NULL, 46, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (609, '202101178', 27, 'habilitado', NULL, NULL, NULL, 46, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (610, '202101190', 27, 'habilitado', NULL, NULL, NULL, 46, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (611, '202101223', 27, 'habilitado', NULL, NULL, NULL, 46, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (612, '202101245', 27, 'habilitado', NULL, NULL, NULL, 46, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (545, '202201456', 23, 'deshabilitado', 'Rechazado en el control de ingreso', 1, '2026-10-27T07:01:45'::timestamp, 36, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (608, '202101156', 27, 'deshabilitado', NULL, NULL, NULL, 46, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (503, '202101090', 23, 'deshabilitado', 'Rechazado en el control de ingreso', 1, '2026-10-27T07:01:37'::timestamp, 36, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (554, '202101090', 25, 'deshabilitado', 'Rechazado en el control de ingreso', 1, '2026-10-27T07:01:37'::timestamp, 42, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (605, '202101090', 27, 'deshabilitado', 'Rechazado en el control de ingreso', 1, '2026-10-27T07:01:38'::timestamp, 46, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (596, '202201456', 25, 'deshabilitado', 'Rechazado en el control de ingreso', 1, '2026-10-27T07:01:45'::timestamp, 42, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (613, '202101267', 27, 'habilitado', NULL, NULL, NULL, 46, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (615, '202101301', 27, 'habilitado', NULL, NULL, NULL, 46, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (616, '202101323', 27, 'habilitado', NULL, NULL, NULL, 46, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (617, '202101345', 27, 'habilitado', NULL, NULL, NULL, 46, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (618, '202101367', 27, 'habilitado', NULL, NULL, NULL, 46, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (619, '202101389', 27, 'habilitado', NULL, NULL, NULL, 46, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (620, '202101401', 27, 'habilitado', NULL, NULL, NULL, 46, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (621, '202101423', 27, 'habilitado', NULL, NULL, NULL, 46, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (623, '202101467', 27, 'habilitado', NULL, NULL, NULL, 46, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (624, '202101489', 27, 'habilitado', NULL, NULL, NULL, 46, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (625, '202201013', 27, 'habilitado', NULL, NULL, NULL, 46, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (626, '202201031', 27, 'habilitado', NULL, NULL, NULL, 46, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (627, '202201056', 27, 'habilitado', NULL, NULL, NULL, 46, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (628, '202201089', 27, 'habilitado', NULL, NULL, NULL, 46, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (629, '202201101', 27, 'habilitado', NULL, NULL, NULL, 46, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (630, '202201123', 27, 'habilitado', NULL, NULL, NULL, 46, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (631, '202201145', 27, 'habilitado', NULL, NULL, NULL, 46, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (632, '202201167', 27, 'habilitado', NULL, NULL, NULL, 46, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (634, '202201201', 27, 'habilitado', NULL, NULL, NULL, 46, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (635, '202201212', 27, 'habilitado', NULL, NULL, NULL, 46, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (636, '202201234', 27, 'habilitado', NULL, NULL, NULL, 46, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (637, '202201256', 27, 'habilitado', NULL, NULL, NULL, 46, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (638, '202201278', 27, 'habilitado', NULL, NULL, NULL, 46, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (639, '202201290', 27, 'habilitado', NULL, NULL, NULL, 46, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (640, '202201312', 27, 'habilitado', NULL, NULL, NULL, 46, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (641, '202201334', 27, 'habilitado', NULL, NULL, NULL, 46, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (643, '202201378', 27, 'habilitado', NULL, NULL, NULL, 46, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (644, '202201390', 27, 'habilitado', NULL, NULL, NULL, 46, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (646, '202201434', 27, 'habilitado', NULL, NULL, NULL, 46, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (648, '202201478', 27, 'habilitado', NULL, NULL, NULL, 46, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (649, '202201490', 27, 'habilitado', NULL, NULL, NULL, 46, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (650, '202202045', 27, 'habilitado', NULL, NULL, NULL, 46, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (652, '202002107', 29, 'habilitado', NULL, NULL, NULL, 48, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (653, '20210003', 29, 'habilitado', NULL, NULL, NULL, 48, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (654, '202101022', 29, 'habilitado', NULL, NULL, NULL, 48, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (655, '202101078', 29, 'habilitado', NULL, NULL, NULL, 48, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (657, '202101112', 29, 'habilitado', NULL, NULL, NULL, 48, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (658, '202101134', 29, 'habilitado', NULL, NULL, NULL, 48, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (659, '202101156', 29, 'habilitado', NULL, NULL, NULL, 48, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (660, '202101178', 29, 'habilitado', NULL, NULL, NULL, 48, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (661, '202101190', 29, 'habilitado', NULL, NULL, NULL, 48, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (662, '202101223', 29, 'habilitado', NULL, NULL, NULL, 48, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (663, '202101245', 29, 'habilitado', NULL, NULL, NULL, 48, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (664, '202101267', 29, 'habilitado', NULL, NULL, NULL, 48, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (665, '202101289', 29, 'habilitado', NULL, NULL, NULL, 48, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (666, '202101301', 29, 'habilitado', NULL, NULL, NULL, 48, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (667, '202101323', 29, 'habilitado', NULL, NULL, NULL, 48, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (668, '202101345', 29, 'habilitado', NULL, NULL, NULL, 48, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (669, '202101367', 29, 'habilitado', NULL, NULL, NULL, 48, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (670, '202101389', 29, 'habilitado', NULL, NULL, NULL, 48, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (671, '202101401', 29, 'habilitado', NULL, NULL, NULL, 48, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (672, '202101423', 29, 'habilitado', NULL, NULL, NULL, 48, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (673, '202101445', 29, 'habilitado', NULL, NULL, NULL, 48, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (674, '202101467', 29, 'habilitado', NULL, NULL, NULL, 48, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (675, '202101489', 29, 'habilitado', NULL, NULL, NULL, 48, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (676, '202201013', 29, 'habilitado', NULL, NULL, NULL, 48, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (677, '202201031', 29, 'habilitado', NULL, NULL, NULL, 48, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (678, '202201056', 29, 'habilitado', NULL, NULL, NULL, 48, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (679, '202201089', 29, 'habilitado', NULL, NULL, NULL, 48, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (680, '202201101', 29, 'habilitado', NULL, NULL, NULL, 48, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (681, '202201123', 29, 'habilitado', NULL, NULL, NULL, 48, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (682, '202201145', 29, 'habilitado', NULL, NULL, NULL, 48, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (683, '202201167', 29, 'habilitado', NULL, NULL, NULL, 48, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (684, '202201189', 29, 'habilitado', NULL, NULL, NULL, 48, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (685, '202201201', 29, 'habilitado', NULL, NULL, NULL, 48, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (686, '202201212', 29, 'habilitado', NULL, NULL, NULL, 48, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (687, '202201234', 29, 'habilitado', NULL, NULL, NULL, 48, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (688, '202201256', 29, 'habilitado', NULL, NULL, NULL, 48, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (689, '202201278', 29, 'habilitado', NULL, NULL, NULL, 48, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (690, '202201290', 29, 'habilitado', NULL, NULL, NULL, 48, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (691, '202201312', 29, 'habilitado', NULL, NULL, NULL, 48, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (692, '202201334', 29, 'habilitado', NULL, NULL, NULL, 48, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (693, '202201356', 29, 'habilitado', NULL, NULL, NULL, 48, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (694, '202201378', 29, 'habilitado', NULL, NULL, NULL, 48, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (695, '202201390', 29, 'habilitado', NULL, NULL, NULL, 48, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (696, '202201412', 29, 'habilitado', NULL, NULL, NULL, 48, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (697, '202201434', 29, 'habilitado', NULL, NULL, NULL, 48, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (699, '202201478', 29, 'habilitado', NULL, NULL, NULL, 48, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (700, '202201490', 29, 'habilitado', NULL, NULL, NULL, 48, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (701, '202202045', 29, 'habilitado', NULL, NULL, NULL, 48, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (702, '20210004', 30, 'habilitado', NULL, NULL, NULL, 49, 4);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (703, '20210001', 31, 'habilitado', NULL, NULL, NULL, 50, 1);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (704, '202002107', 32, 'habilitado', NULL, NULL, NULL, 51, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (705, '20210003', 32, 'habilitado', NULL, NULL, NULL, 51, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (706, '202101022', 32, 'habilitado', NULL, NULL, NULL, 51, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (707, '202101078', 32, 'habilitado', NULL, NULL, NULL, 51, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (709, '202101112', 32, 'habilitado', NULL, NULL, NULL, 51, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (710, '202101134', 32, 'habilitado', NULL, NULL, NULL, 51, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (711, '202101156', 32, 'habilitado', NULL, NULL, NULL, 51, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (712, '202101178', 32, 'habilitado', NULL, NULL, NULL, 51, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (713, '202101190', 32, 'habilitado', NULL, NULL, NULL, 51, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (714, '202101223', 32, 'habilitado', NULL, NULL, NULL, 51, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (715, '202101245', 32, 'habilitado', NULL, NULL, NULL, 51, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (716, '202101267', 32, 'habilitado', NULL, NULL, NULL, 51, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (717, '202101289', 32, 'habilitado', NULL, NULL, NULL, 51, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (718, '202101301', 32, 'habilitado', NULL, NULL, NULL, 51, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (719, '202101323', 32, 'habilitado', NULL, NULL, NULL, 51, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (720, '202101345', 32, 'habilitado', NULL, NULL, NULL, 51, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (721, '202101367', 32, 'habilitado', NULL, NULL, NULL, 51, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (722, '202101389', 32, 'habilitado', NULL, NULL, NULL, 51, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (723, '202101401', 32, 'habilitado', NULL, NULL, NULL, 51, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (724, '202101423', 32, 'habilitado', NULL, NULL, NULL, 51, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (725, '202101445', 32, 'habilitado', NULL, NULL, NULL, 51, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (726, '202101467', 32, 'habilitado', NULL, NULL, NULL, 51, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (727, '202101489', 32, 'habilitado', NULL, NULL, NULL, 51, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (728, '202201013', 32, 'habilitado', NULL, NULL, NULL, 51, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (729, '202201031', 32, 'habilitado', NULL, NULL, NULL, 51, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (730, '202201056', 32, 'habilitado', NULL, NULL, NULL, 51, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (731, '202201089', 32, 'habilitado', NULL, NULL, NULL, 51, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (732, '202201101', 32, 'habilitado', NULL, NULL, NULL, 51, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (614, '202101289', 27, 'deshabilitado', NULL, NULL, NULL, 46, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (622, '202101445', 27, 'deshabilitado', 'Rechazado en el control de ingreso', 1, '2026-10-27T04:38:08'::timestamp, 46, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (642, '202201356', 27, 'deshabilitado', 'Rechazado en el control de ingreso', 1, '2026-10-27T06:28:13'::timestamp, 46, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (656, '202101090', 29, 'deshabilitado', 'Rechazado en el control de ingreso', 1, '2026-10-27T07:01:38'::timestamp, 48, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (647, '202201456', 27, 'deshabilitado', 'Rechazado en el control de ingreso', 1, '2026-10-27T07:01:46'::timestamp, 46, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (733, '202201123', 32, 'habilitado', NULL, NULL, NULL, 51, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (734, '202201145', 32, 'habilitado', NULL, NULL, NULL, 51, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (735, '202201167', 32, 'habilitado', NULL, NULL, NULL, 51, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (736, '202201189', 32, 'habilitado', NULL, NULL, NULL, 51, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (737, '202201201', 32, 'habilitado', NULL, NULL, NULL, 51, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (738, '202201212', 32, 'habilitado', NULL, NULL, NULL, 51, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (739, '202201234', 32, 'habilitado', NULL, NULL, NULL, 51, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (740, '202201256', 32, 'habilitado', NULL, NULL, NULL, 51, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (741, '202201278', 32, 'habilitado', NULL, NULL, NULL, 51, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (742, '202201290', 32, 'habilitado', NULL, NULL, NULL, 51, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (743, '202201312', 32, 'habilitado', NULL, NULL, NULL, 51, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (744, '202201334', 32, 'habilitado', NULL, NULL, NULL, 51, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (745, '202201356', 32, 'habilitado', NULL, NULL, NULL, 51, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (746, '202201378', 32, 'habilitado', NULL, NULL, NULL, 51, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (747, '202201390', 32, 'habilitado', NULL, NULL, NULL, 51, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (748, '202201412', 32, 'habilitado', NULL, NULL, NULL, 51, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (749, '202201434', 32, 'habilitado', NULL, NULL, NULL, 51, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (751, '202201478', 32, 'habilitado', NULL, NULL, NULL, 51, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (752, '202201490', 32, 'habilitado', NULL, NULL, NULL, 51, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (753, '202202045', 32, 'habilitado', NULL, NULL, NULL, 51, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (754, '20210004', 33, 'habilitado', NULL, NULL, NULL, 52, 4);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (755, '20210001', 34, 'habilitado', NULL, NULL, NULL, 53, 1);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (651, '20210001', 28, 'deshabilitado', NULL, NULL, NULL, 47, 1);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (633, '202201189', 27, 'deshabilitado', NULL, NULL, NULL, 46, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (645, '202201412', 27, 'deshabilitado', 'Rechazado en el control de ingreso', 1, '2026-10-27T04:39:25'::timestamp, 46, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (756, '202002107', 35, 'habilitado', NULL, NULL, NULL, 54, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (757, '20210003', 35, 'habilitado', NULL, NULL, NULL, 54, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (758, '202101022', 35, 'habilitado', NULL, NULL, NULL, 54, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (759, '202101078', 35, 'habilitado', NULL, NULL, NULL, 54, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (761, '202101112', 35, 'habilitado', NULL, NULL, NULL, 54, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (762, '202101134', 35, 'habilitado', NULL, NULL, NULL, 54, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (763, '202101156', 35, 'habilitado', NULL, NULL, NULL, 54, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (764, '202101178', 35, 'habilitado', NULL, NULL, NULL, 54, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (765, '202101190', 35, 'habilitado', NULL, NULL, NULL, 54, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (766, '202101223', 35, 'habilitado', NULL, NULL, NULL, 54, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (767, '202101245', 35, 'habilitado', NULL, NULL, NULL, 54, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (768, '202101267', 35, 'habilitado', NULL, NULL, NULL, 54, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (770, '202101301', 35, 'habilitado', NULL, NULL, NULL, 54, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (771, '202101323', 35, 'habilitado', NULL, NULL, NULL, 54, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (772, '202101345', 35, 'habilitado', NULL, NULL, NULL, 54, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (773, '202101367', 35, 'habilitado', NULL, NULL, NULL, 54, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (774, '202101389', 35, 'habilitado', NULL, NULL, NULL, 54, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (775, '202101401', 35, 'habilitado', NULL, NULL, NULL, 54, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (776, '202101423', 35, 'habilitado', NULL, NULL, NULL, 54, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (777, '202101445', 35, 'habilitado', NULL, NULL, NULL, 54, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (778, '202101467', 35, 'habilitado', NULL, NULL, NULL, 54, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (779, '202101489', 35, 'habilitado', NULL, NULL, NULL, 54, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (780, '202201013', 35, 'habilitado', NULL, NULL, NULL, 54, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (781, '202201031', 35, 'habilitado', NULL, NULL, NULL, 54, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (782, '202201056', 35, 'habilitado', NULL, NULL, NULL, 54, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (783, '202201089', 35, 'habilitado', NULL, NULL, NULL, 54, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (784, '202201101', 35, 'habilitado', NULL, NULL, NULL, 54, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (785, '202201123', 35, 'habilitado', NULL, NULL, NULL, 54, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (786, '202201145', 35, 'habilitado', NULL, NULL, NULL, 54, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (787, '202201167', 35, 'habilitado', NULL, NULL, NULL, 54, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (788, '202201189', 35, 'habilitado', NULL, NULL, NULL, 54, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (789, '202201201', 35, 'habilitado', NULL, NULL, NULL, 54, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (791, '202201234', 35, 'habilitado', NULL, NULL, NULL, 54, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (792, '202201256', 35, 'habilitado', NULL, NULL, NULL, 54, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (793, '202201278', 35, 'habilitado', NULL, NULL, NULL, 54, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (794, '202201290', 35, 'habilitado', NULL, NULL, NULL, 54, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (795, '202201312', 35, 'habilitado', NULL, NULL, NULL, 54, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (796, '202201334', 35, 'habilitado', NULL, NULL, NULL, 54, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (797, '202201356', 35, 'habilitado', NULL, NULL, NULL, 54, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (798, '202201378', 35, 'habilitado', NULL, NULL, NULL, 54, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (799, '202201390', 35, 'habilitado', NULL, NULL, NULL, 54, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (800, '202201412', 35, 'habilitado', NULL, NULL, NULL, 54, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (801, '202201434', 35, 'habilitado', NULL, NULL, NULL, 54, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (803, '202201478', 35, 'habilitado', NULL, NULL, NULL, 54, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (804, '202201490', 35, 'habilitado', NULL, NULL, NULL, 54, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (805, '202202045', 35, 'habilitado', NULL, NULL, NULL, 54, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (158, '202101090', 14, 'deshabilitado', 'Rechazado en el control de ingreso', 1, '2026-10-27T07:01:34'::timestamp, 4, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (353, '202101090', 20, 'deshabilitado', 'Rechazado en el control de ingreso', 1, '2026-10-27T07:01:35'::timestamp, 32, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (403, '202101090', 21, 'deshabilitado', 'Rechazado en el control de ingreso', 1, '2026-10-27T07:01:36'::timestamp, 33, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (453, '202101090', 22, 'deshabilitado', 'Rechazado en el control de ingreso', 1, '2026-10-27T07:01:36'::timestamp, 35, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (708, '202101090', 32, 'deshabilitado', 'Rechazado en el control de ingreso', 1, '2026-10-27T07:01:39'::timestamp, 51, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (760, '202101090', 35, 'deshabilitado', 'Rechazado en el control de ingreso', 1, '2026-10-27T07:01:39'::timestamp, 54, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (395, '202201456', 20, 'deshabilitado', 'Rechazado en el control de ingreso', 1, '2026-10-27T07:01:43'::timestamp, 32, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (698, '202201456', 29, 'deshabilitado', 'Rechazado en el control de ingreso', 1, '2026-10-27T07:01:46'::timestamp, 48, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (750, '202201456', 32, 'deshabilitado', 'Rechazado en el control de ingreso', 1, '2026-10-27T07:01:47'::timestamp, 51, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (802, '202201456', 35, 'deshabilitado', 'Rechazado en el control de ingreso', 1, '2026-10-27T07:01:48'::timestamp, 54, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (790, '202201212', 35, 'deshabilitado', 'Rechazado en el control de ingreso', 1, '2026-10-27T07:04:39'::timestamp, 54, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (769, '202101289', 35, 'deshabilitado', 'Rechazado en el control de ingreso', 1, '2026-10-27T07:18:14'::timestamp, 54, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (806, '202002107', 36, 'habilitado', NULL, NULL, NULL, 55, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (807, '20210003', 36, 'habilitado', NULL, NULL, NULL, 55, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (808, '202101022', 36, 'habilitado', NULL, NULL, NULL, 55, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (809, '202101078', 36, 'habilitado', NULL, NULL, NULL, 55, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (810, '202101090', 36, 'habilitado', NULL, NULL, NULL, 55, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (811, '202101112', 36, 'habilitado', NULL, NULL, NULL, 55, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (812, '202101134', 36, 'habilitado', NULL, NULL, NULL, 55, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (813, '202101156', 36, 'habilitado', NULL, NULL, NULL, 55, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (814, '202101178', 36, 'habilitado', NULL, NULL, NULL, 55, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (815, '202101190', 36, 'habilitado', NULL, NULL, NULL, 55, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (816, '202101223', 36, 'habilitado', NULL, NULL, NULL, 55, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (817, '202101245', 36, 'habilitado', NULL, NULL, NULL, 55, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (818, '202101267', 36, 'habilitado', NULL, NULL, NULL, 55, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (819, '202101289', 36, 'habilitado', NULL, NULL, NULL, 55, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (820, '202101301', 36, 'habilitado', NULL, NULL, NULL, 55, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (821, '202101323', 36, 'habilitado', NULL, NULL, NULL, 55, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (822, '202101345', 36, 'habilitado', NULL, NULL, NULL, 55, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (823, '202101367', 36, 'habilitado', NULL, NULL, NULL, 55, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (824, '202101389', 36, 'habilitado', NULL, NULL, NULL, 55, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (825, '202101401', 36, 'habilitado', NULL, NULL, NULL, 55, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (826, '202101423', 36, 'habilitado', NULL, NULL, NULL, 55, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (827, '202101445', 36, 'habilitado', NULL, NULL, NULL, 55, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (828, '202101467', 36, 'habilitado', NULL, NULL, NULL, 55, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (829, '202101489', 36, 'habilitado', NULL, NULL, NULL, 55, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (830, '202201013', 36, 'habilitado', NULL, NULL, NULL, 55, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (831, '202201031', 36, 'habilitado', NULL, NULL, NULL, 55, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (832, '202201056', 36, 'habilitado', NULL, NULL, NULL, 55, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (833, '202201089', 36, 'habilitado', NULL, NULL, NULL, 55, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (834, '202201101', 36, 'habilitado', NULL, NULL, NULL, 55, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (835, '202201123', 36, 'habilitado', NULL, NULL, NULL, 55, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (836, '202201145', 36, 'habilitado', NULL, NULL, NULL, 55, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (837, '202201167', 36, 'habilitado', NULL, NULL, NULL, 55, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (838, '202201189', 36, 'habilitado', NULL, NULL, NULL, 55, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (839, '202201201', 36, 'habilitado', NULL, NULL, NULL, 55, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (840, '202201212', 36, 'habilitado', NULL, NULL, NULL, 55, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (841, '202201234', 36, 'habilitado', NULL, NULL, NULL, 55, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (842, '202201256', 36, 'habilitado', NULL, NULL, NULL, 55, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (843, '202201278', 36, 'habilitado', NULL, NULL, NULL, 55, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (844, '202201290', 36, 'habilitado', NULL, NULL, NULL, 55, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (845, '202201312', 36, 'habilitado', NULL, NULL, NULL, 55, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (846, '202201334', 36, 'habilitado', NULL, NULL, NULL, 55, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (847, '202201356', 36, 'habilitado', NULL, NULL, NULL, 55, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (848, '202201378', 36, 'habilitado', NULL, NULL, NULL, 55, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (849, '202201390', 36, 'habilitado', NULL, NULL, NULL, 55, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (850, '202201412', 36, 'habilitado', NULL, NULL, NULL, 55, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (851, '202201434', 36, 'habilitado', NULL, NULL, NULL, 55, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (852, '202201456', 36, 'habilitado', NULL, NULL, NULL, 55, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (853, '202201478', 36, 'habilitado', NULL, NULL, NULL, 55, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (854, '202201490', 36, 'habilitado', NULL, NULL, NULL, 55, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (855, '202202045', 36, 'habilitado', NULL, NULL, NULL, 55, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (856, '202002107', 37, 'habilitado', NULL, NULL, NULL, 56, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (857, '20210003', 37, 'habilitado', NULL, NULL, NULL, 56, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (858, '202101022', 37, 'habilitado', NULL, NULL, NULL, 56, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (859, '202101078', 37, 'habilitado', NULL, NULL, NULL, 56, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (860, '202101090', 37, 'habilitado', NULL, NULL, NULL, 56, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (861, '202101112', 37, 'habilitado', NULL, NULL, NULL, 56, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (862, '202101134', 37, 'habilitado', NULL, NULL, NULL, 56, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (863, '202101156', 37, 'habilitado', NULL, NULL, NULL, 56, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (864, '202101178', 37, 'habilitado', NULL, NULL, NULL, 56, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (865, '202101190', 37, 'habilitado', NULL, NULL, NULL, 56, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (866, '202101223', 37, 'habilitado', NULL, NULL, NULL, 56, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (867, '202101245', 37, 'habilitado', NULL, NULL, NULL, 56, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (868, '202101267', 37, 'habilitado', NULL, NULL, NULL, 56, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (869, '202101289', 37, 'habilitado', NULL, NULL, NULL, 56, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (870, '202101301', 37, 'habilitado', NULL, NULL, NULL, 56, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (871, '202101323', 37, 'habilitado', NULL, NULL, NULL, 56, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (872, '202101345', 37, 'habilitado', NULL, NULL, NULL, 56, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (873, '202101367', 37, 'habilitado', NULL, NULL, NULL, 56, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (874, '202101389', 37, 'habilitado', NULL, NULL, NULL, 56, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (875, '202101401', 37, 'habilitado', NULL, NULL, NULL, 56, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (876, '202101423', 37, 'habilitado', NULL, NULL, NULL, 56, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (877, '202101445', 37, 'habilitado', NULL, NULL, NULL, 56, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (878, '202101467', 37, 'habilitado', NULL, NULL, NULL, 56, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (879, '202101489', 37, 'habilitado', NULL, NULL, NULL, 56, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (880, '202201013', 37, 'habilitado', NULL, NULL, NULL, 56, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (881, '202201031', 37, 'habilitado', NULL, NULL, NULL, 56, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (882, '202201056', 37, 'habilitado', NULL, NULL, NULL, 56, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (883, '202201089', 37, 'habilitado', NULL, NULL, NULL, 56, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (884, '202201101', 37, 'habilitado', NULL, NULL, NULL, 56, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (885, '202201123', 37, 'habilitado', NULL, NULL, NULL, 56, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (886, '202201145', 37, 'habilitado', NULL, NULL, NULL, 56, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (887, '202201167', 37, 'habilitado', NULL, NULL, NULL, 56, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (888, '202201189', 37, 'habilitado', NULL, NULL, NULL, 56, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (889, '202201201', 37, 'habilitado', NULL, NULL, NULL, 56, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (890, '202201212', 37, 'habilitado', NULL, NULL, NULL, 56, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (891, '202201234', 37, 'habilitado', NULL, NULL, NULL, 56, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (892, '202201256', 37, 'habilitado', NULL, NULL, NULL, 56, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (893, '202201278', 37, 'habilitado', NULL, NULL, NULL, 56, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (894, '202201290', 37, 'habilitado', NULL, NULL, NULL, 56, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (895, '202201312', 37, 'habilitado', NULL, NULL, NULL, 56, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (896, '202201334', 37, 'habilitado', NULL, NULL, NULL, 56, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (897, '202201356', 37, 'habilitado', NULL, NULL, NULL, 56, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (898, '202201378', 37, 'habilitado', NULL, NULL, NULL, 56, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (899, '202201390', 37, 'habilitado', NULL, NULL, NULL, 56, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (900, '202201412', 37, 'habilitado', NULL, NULL, NULL, 56, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (901, '202201434', 37, 'habilitado', NULL, NULL, NULL, 56, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (902, '202201456', 37, 'habilitado', NULL, NULL, NULL, 56, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (903, '202201478', 37, 'habilitado', NULL, NULL, NULL, 56, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (904, '202201490', 37, 'habilitado', NULL, NULL, NULL, 56, 3);
+INSERT INTO "estudiante_examen" ("id_estudiante_examen", "sis_estudiante", "id_examen", "estado", "motivo", "modificado_por", "fecha_modificacion", "id_configuracion_examen", "id_curso") VALUES (905, '202202045', 37, 'habilitado', NULL, NULL, NULL, 56, 3);
+
+-- estudiante_examen_ambiente: 56 filas
+INSERT INTO "estudiante_examen_ambiente" ("id_ee", "id_ambiente") VALUES (1, 1);
+INSERT INTO "estudiante_examen_ambiente" ("id_ee", "id_ambiente") VALUES (2, 2);
+INSERT INTO "estudiante_examen_ambiente" ("id_ee", "id_ambiente") VALUES (3, 3);
+INSERT INTO "estudiante_examen_ambiente" ("id_ee", "id_ambiente") VALUES (4, 4);
+INSERT INTO "estudiante_examen_ambiente" ("id_ee", "id_ambiente") VALUES (5, 5);
+INSERT INTO "estudiante_examen_ambiente" ("id_ee", "id_ambiente") VALUES (549, 1);
+INSERT INTO "estudiante_examen_ambiente" ("id_ee", "id_ambiente") VALUES (589, 2);
+INSERT INTO "estudiante_examen_ambiente" ("id_ee", "id_ambiente") VALUES (563, 5);
+INSERT INTO "estudiante_examen_ambiente" ("id_ee", "id_ambiente") VALUES (565, 2);
+INSERT INTO "estudiante_examen_ambiente" ("id_ee", "id_ambiente") VALUES (577, 5);
+INSERT INTO "estudiante_examen_ambiente" ("id_ee", "id_ambiente") VALUES (558, 2);
+INSERT INTO "estudiante_examen_ambiente" ("id_ee", "id_ambiente") VALUES (590, 5);
+INSERT INTO "estudiante_examen_ambiente" ("id_ee", "id_ambiente") VALUES (552, 2);
+INSERT INTO "estudiante_examen_ambiente" ("id_ee", "id_ambiente") VALUES (579, 5);
+INSERT INTO "estudiante_examen_ambiente" ("id_ee", "id_ambiente") VALUES (566, 2);
+INSERT INTO "estudiante_examen_ambiente" ("id_ee", "id_ambiente") VALUES (554, 5);
+INSERT INTO "estudiante_examen_ambiente" ("id_ee", "id_ambiente") VALUES (582, 2);
+INSERT INTO "estudiante_examen_ambiente" ("id_ee", "id_ambiente") VALUES (591, 5);
+INSERT INTO "estudiante_examen_ambiente" ("id_ee", "id_ambiente") VALUES (578, 2);
+INSERT INTO "estudiante_examen_ambiente" ("id_ee", "id_ambiente") VALUES (559, 5);
+INSERT INTO "estudiante_examen_ambiente" ("id_ee", "id_ambiente") VALUES (567, 2);
+INSERT INTO "estudiante_examen_ambiente" ("id_ee", "id_ambiente") VALUES (592, 5);
+INSERT INTO "estudiante_examen_ambiente" ("id_ee", "id_ambiente") VALUES (568, 2);
+INSERT INTO "estudiante_examen_ambiente" ("id_ee", "id_ambiente") VALUES (593, 5);
+INSERT INTO "estudiante_examen_ambiente" ("id_ee", "id_ambiente") VALUES (569, 2);
+INSERT INTO "estudiante_examen_ambiente" ("id_ee", "id_ambiente") VALUES (551, 5);
+INSERT INTO "estudiante_examen_ambiente" ("id_ee", "id_ambiente") VALUES (594, 2);
+INSERT INTO "estudiante_examen_ambiente" ("id_ee", "id_ambiente") VALUES (574, 5);
+INSERT INTO "estudiante_examen_ambiente" ("id_ee", "id_ambiente") VALUES (555, 2);
+INSERT INTO "estudiante_examen_ambiente" ("id_ee", "id_ambiente") VALUES (583, 5);
+INSERT INTO "estudiante_examen_ambiente" ("id_ee", "id_ambiente") VALUES (553, 2);
+INSERT INTO "estudiante_examen_ambiente" ("id_ee", "id_ambiente") VALUES (581, 5);
+INSERT INTO "estudiante_examen_ambiente" ("id_ee", "id_ambiente") VALUES (570, 2);
+INSERT INTO "estudiante_examen_ambiente" ("id_ee", "id_ambiente") VALUES (587, 5);
+INSERT INTO "estudiante_examen_ambiente" ("id_ee", "id_ambiente") VALUES (595, 2);
+INSERT INTO "estudiante_examen_ambiente" ("id_ee", "id_ambiente") VALUES (571, 5);
+INSERT INTO "estudiante_examen_ambiente" ("id_ee", "id_ambiente") VALUES (562, 2);
+INSERT INTO "estudiante_examen_ambiente" ("id_ee", "id_ambiente") VALUES (596, 5);
+INSERT INTO "estudiante_examen_ambiente" ("id_ee", "id_ambiente") VALUES (572, 2);
+INSERT INTO "estudiante_examen_ambiente" ("id_ee", "id_ambiente") VALUES (576, 5);
+INSERT INTO "estudiante_examen_ambiente" ("id_ee", "id_ambiente") VALUES (557, 2);
+INSERT INTO "estudiante_examen_ambiente" ("id_ee", "id_ambiente") VALUES (597, 5);
+INSERT INTO "estudiante_examen_ambiente" ("id_ee", "id_ambiente") VALUES (586, 2);
+INSERT INTO "estudiante_examen_ambiente" ("id_ee", "id_ambiente") VALUES (575, 5);
+INSERT INTO "estudiante_examen_ambiente" ("id_ee", "id_ambiente") VALUES (588, 2);
+INSERT INTO "estudiante_examen_ambiente" ("id_ee", "id_ambiente") VALUES (561, 5);
+INSERT INTO "estudiante_examen_ambiente" ("id_ee", "id_ambiente") VALUES (599, 2);
+INSERT INTO "estudiante_examen_ambiente" ("id_ee", "id_ambiente") VALUES (556, 5);
+INSERT INTO "estudiante_examen_ambiente" ("id_ee", "id_ambiente") VALUES (573, 2);
+INSERT INTO "estudiante_examen_ambiente" ("id_ee", "id_ambiente") VALUES (585, 5);
+INSERT INTO "estudiante_examen_ambiente" ("id_ee", "id_ambiente") VALUES (598, 2);
+INSERT INTO "estudiante_examen_ambiente" ("id_ee", "id_ambiente") VALUES (560, 5);
+INSERT INTO "estudiante_examen_ambiente" ("id_ee", "id_ambiente") VALUES (564, 2);
+INSERT INTO "estudiante_examen_ambiente" ("id_ee", "id_ambiente") VALUES (550, 5);
+INSERT INTO "estudiante_examen_ambiente" ("id_ee", "id_ambiente") VALUES (580, 2);
+INSERT INTO "estudiante_examen_ambiente" ("id_ee", "id_ambiente") VALUES (584, 5);
+
+-- examen: 39 filas
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (1, '2024-06-10'::date, '08:00:00'::time, 120, 1, 1, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (2, '2024-06-11'::date, '10:00:00'::time, 120, 2, 2, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (3, '2024-06-12'::date, '14:00:00'::time, 120, 5, 3, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (4, '2024-06-13'::date, '08:00:00'::time, 120, 1, 1, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (5, '2024-06-14'::date, '16:00:00'::time, 120, 2, 2, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (8, '0262-12-10'::date, '08:15:00'::time, 90, 1, 2, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (27, '2026-10-27'::date, '06:38:30'::time, 90, 1, 2, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (28, '2026-10-27'::date, '10:52:09'::time, 90, 1, 1, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (29, '2026-10-27'::date, '10:55:31'::time, 90, 1, 1, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (35, '2026-10-27'::date, '07:17:57'::time, 90, 1, 1, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (36, '2026-11-04'::date, '11:07:00'::time, 90, 1, 1, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (32, '2026-11-07'::date, '12:26:17'::time, 90, 1, 1, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (34, '2026-11-07'::date, '14:48:44'::time, 90, 1, 1, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (14, '2026-10-24'::date, '18:20:40'::time, 90, 5, 2, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (33, '2026-11-08'::date, '19:10:42'::time, 90, 1, 1, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (37, '2026-11-08'::date, '21:11:01'::time, 180, 1, 1, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (38, '2026-11-12'::date, '16:00:00'::time, 90, 1, 2, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (10, '2004-05-12'::date, '12:32:00'::time, 180, 1, 1, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (11, '2001-06-13'::date, '00:32:00'::time, 90, 1, 2, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (17, '2026-10-25'::date, '18:10:11'::time, 90, 1, 1, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (18, '2026-10-25'::date, '18:14:47'::time, 90, 1, 1, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (19, '2026-10-25'::date, '18:30:08'::time, 90, 1, 1, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (20, '2026-10-25'::date, '18:35:23'::time, 90, 1, 1, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (13, '1900-12-31'::date, '23:59:00'::time, 88, 5, 1, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (15, '1998-07-03'::date, '07:08:00'::time, 90, 5, 2, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (9, '2024-07-15'::date, '08:30:00'::time, 90, 1, 2, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (12, '2024-07-16'::date, '23:59:00'::time, 90, 5, 1, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (7, '2024-07-17'::date, '18:45:00'::time, 90, 1, 1, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (6, '2024-07-18'::date, '18:45:00'::time, 90, 1, 1, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (21, '2026-10-25'::date, '18:42:34'::time, 90, 1, 1, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (22, '2026-10-25'::date, '19:05:16'::time, 90, 1, 1, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (23, '2026-10-25'::date, '20:11:56'::time, 90, 1, 1, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (24, '2026-10-26'::date, '12:45:00'::time, 90, 1, 1, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (25, '2026-10-26'::date, '20:14:09'::time, 90, 1, 1, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (16, '2026-10-26'::date, '18:56:34'::time, 90, 2, 1, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (26, '2026-10-26'::date, '21:57:12'::time, 120, 1, 3, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (30, '2026-11-03'::date, '09:00:00'::time, 90, 1, 1, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (31, '2026-11-05'::date, '09:00:00'::time, 90, 1, 1, NULL);
+INSERT INTO "examen" ("id_examen", "fecha", "hora_inicio", "duracion", "creador", "tipo_examen", "nombre_examen") VALUES (39, '2026-11-10'::date, '06:00:00'::time, 30, 1, 3, NULL);
+
+-- examen_ambiente: 42 filas
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (1, 1);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (2, 2);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (3, 3);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (4, 4);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (5, 5);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (6, 2);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (7, 2);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (8, 1);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (9, 1);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (10, 5);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (11, 2);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (12, 2);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (13, 2);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (14, 1);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (15, 5);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (16, 5);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (17, 1);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (18, 1);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (19, 1);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (20, 1);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (21, 1);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (22, 1);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (23, 1);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (24, 1);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (24, 5);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (25, 2);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (25, 5);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (26, 5);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (26, 2);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (27, 2);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (28, 1);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (29, 1);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (30, 1);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (31, 1);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (32, 1);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (33, 1);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (34, 1);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (35, 5);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (36, 1);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (37, 3);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (38, 5);
+INSERT INTO "examen_ambiente" ("id_examen", "id_ambiente") VALUES (39, 5);
+
+-- examen_curso: 39 filas
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (1, 1);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (2, 2);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (3, 3);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (4, 4);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (5, 5);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (13, 3);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (14, 3);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (6, 1);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (7, 1);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (8, 1);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (15, 3);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (9, 1);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (16, 7);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (10, 1);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (11, 1);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (17, 3);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (18, 3);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (19, 3);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (20, 3);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (21, 3);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (12, 3);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (22, 3);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (23, 3);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (39, 13);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (24, 1);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (25, 3);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (26, 1);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (27, 3);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (28, 1);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (29, 3);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (30, 4);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (31, 1);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (32, 3);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (33, 4);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (34, 1);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (35, 3);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (36, 3);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (37, 3);
+INSERT INTO "examen_curso" ("id_examen", "id_curso") VALUES (38, 13);
+
+-- examen_material_permitido: 31 filas
+INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (1, 1);
+INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (2, 2);
+INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (3, 3);
+INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (4, 4);
+INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (5, 5);
+INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (6, 5);
+INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (7, 5);
+INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (8, 1);
+INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (8, 2);
+INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (9, 1);
+INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (10, 3);
+INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (11, 1);
+INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (11, 3);
+INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (14, 4);
+INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (14, 1);
+INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (15, 2);
+INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (15, 3);
+INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (24, 1);
+INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (25, 4);
+INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (25, 1);
+INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (25, 2);
+INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (25, 3);
+INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (26, 4);
+INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (26, 2);
+INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (27, 4);
+INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (27, 2);
+INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (35, 1);
+INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (37, 4);
+INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (37, 1);
+INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (38, 4);
+INSERT INTO "examen_material_permitido" ("id_examen", "id_material_permitido") VALUES (38, 1);
+
+-- examen_norma: 29 filas
+INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (1, 1);
+INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (2, 2);
+INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (3, 3);
+INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (4, 4);
+INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (5, 5);
+INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (6, 1);
+INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (7, 1);
+INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (8, 1);
+INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (9, 1);
+INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (10, 2);
+INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (11, 5);
+INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (14, 2);
+INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (14, 5);
+INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (14, 1);
+INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (14, 4);
+INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (14, 3);
+INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (15, 1);
+INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (15, 4);
+INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (24, 4);
+INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (26, 2);
+INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (26, 3);
+INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (27, 1);
+INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (35, 5);
+INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (37, 1);
+INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (37, 4);
+INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (38, 2);
+INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (38, 1);
+INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (38, 4);
+INSERT INTO "examen_norma" ("id_examen", "id_norma") VALUES (38, 5);
+
+-- invitacion_examen_compartido: 11 filas
+INSERT INTO "invitacion_examen_compartido" ("id_invitacion", "id_docente_invitado", "id_examen", "estado", "id_docente_invitador", "created_at", "updated_at") VALUES (1, 2, 1, 'aceptado', 1, '2026-10-25T15:14:15'::timestamp, '2026-10-25T15:14:15'::timestamp);
+INSERT INTO "invitacion_examen_compartido" ("id_invitacion", "id_docente_invitado", "id_examen", "estado", "id_docente_invitador", "created_at", "updated_at") VALUES (2, 5, 2, 'pendiente', 2, '2026-10-25T15:14:15'::timestamp, '2026-10-25T15:14:15'::timestamp);
+INSERT INTO "invitacion_examen_compartido" ("id_invitacion", "id_docente_invitado", "id_examen", "estado", "id_docente_invitador", "created_at", "updated_at") VALUES (3, 1, 3, 'rechazado', 5, '2026-10-25T15:14:15'::timestamp, '2026-10-25T15:14:15'::timestamp);
+INSERT INTO "invitacion_examen_compartido" ("id_invitacion", "id_docente_invitado", "id_examen", "estado", "id_docente_invitador", "created_at", "updated_at") VALUES (4, 2, 4, 'aceptado', 1, '2026-10-25T15:14:15'::timestamp, '2026-10-25T15:14:15'::timestamp);
+INSERT INTO "invitacion_examen_compartido" ("id_invitacion", "id_docente_invitado", "id_examen", "estado", "id_docente_invitador", "created_at", "updated_at") VALUES (5, 5, 5, 'pendiente', 2, '2026-10-25T15:14:15'::timestamp, '2026-10-25T15:14:15'::timestamp);
+INSERT INTO "invitacion_examen_compartido" ("id_invitacion", "id_docente_invitado", "id_examen", "estado", "id_docente_invitador", "created_at", "updated_at") VALUES (6, 5, 1, 'cancelado', 1, '2026-10-26T17:12:31'::timestamp, '2026-10-26T17:12:46'::timestamp);
+INSERT INTO "invitacion_examen_compartido" ("id_invitacion", "id_docente_invitado", "id_examen", "estado", "id_docente_invitador", "created_at", "updated_at") VALUES (7, 5, 1, 'aceptado', 1, '2026-10-26T17:13:14'::timestamp, '2026-10-26T17:13:34'::timestamp);
+INSERT INTO "invitacion_examen_compartido" ("id_invitacion", "id_docente_invitado", "id_examen", "estado", "id_docente_invitador", "created_at", "updated_at") VALUES (8, 5, 4, 'cancelado', 1, '2026-10-26T17:15:38'::timestamp, '2026-10-26T17:16:18'::timestamp);
+INSERT INTO "invitacion_examen_compartido" ("id_invitacion", "id_docente_invitado", "id_examen", "estado", "id_docente_invitador", "created_at", "updated_at") VALUES (9, 2, 26, 'aceptado', 1, '2026-10-26T18:24:15'::timestamp, '2026-10-26T18:46:55'::timestamp);
+INSERT INTO "invitacion_examen_compartido" ("id_invitacion", "id_docente_invitado", "id_examen", "estado", "id_docente_invitador", "created_at", "updated_at") VALUES (10, 13, 11, 'pendiente', 1, '2026-11-09T13:43:37'::timestamp, '2026-11-09T13:43:37'::timestamp);
+INSERT INTO "invitacion_examen_compartido" ("id_invitacion", "id_docente_invitado", "id_examen", "estado", "id_docente_invitador", "created_at", "updated_at") VALUES (11, 1, 5, 'aceptado', 2, '2026-11-09T21:18:11'::timestamp, '2026-11-09T21:29:14'::timestamp);
+
+-- material: 5 filas
+INSERT INTO "material" ("id_material", "descripcion") VALUES (1, 'Calculadora cientifica');
+INSERT INTO "material" ("id_material", "descripcion") VALUES (2, 'Computadora
+
+');
+INSERT INTO "material" ("id_material", "descripcion") VALUES (3, 'Formulario');
+INSERT INTO "material" ("id_material", "descripcion") VALUES (4, 'Apuntes de la materia');
+INSERT INTO "material" ("id_material", "descripcion") VALUES (5, 'Hojas de examen en blanco');
+
+-- material_personalizado: 4 filas
+INSERT INTO "material_personalizado" ("id_examen", "numero_material", "descripcion_material") VALUES (10, 1, 'asdada');
+INSERT INTO "material_personalizado" ("id_examen", "numero_material", "descripcion_material") VALUES (11, 1, 'sd23123');
+INSERT INTO "material_personalizado" ("id_examen", "numero_material", "descripcion_material") VALUES (13, 1, 'Calculadora programable');
+INSERT INTO "material_personalizado" ("id_examen", "numero_material", "descripcion_material") VALUES (25, 1, 'adasd');
+
+-- migrations: 25 filas
+INSERT INTO "migrations" ("id", "migration", "batch") VALUES (1, '0001_01_01_000000_create_users_table', 1);
+INSERT INTO "migrations" ("id", "migration", "batch") VALUES (2, '0001_01_01_000001_create_cache_table', 1);
+INSERT INTO "migrations" ("id", "migration", "batch") VALUES (3, '0001_01_01_000002_create_jobs_table', 1);
+INSERT INTO "migrations" ("id", "migration", "batch") VALUES (4, '2026_09_27_000001_migracion_servidor_oficial', 1);
+INSERT INTO "migrations" ("id", "migration", "batch") VALUES (5, '2026_09_28_000001_actualizar_usuario', 1);
+INSERT INTO "migrations" ("id", "migration", "batch") VALUES (6, '2026_10_09_000001_agregar_revision_incidencia', 2);
+INSERT INTO "migrations" ("id", "migration", "batch") VALUES (7, '2026_10_10_000001_reparar_enums_y_personalizadas', 3);
+INSERT INTO "migrations" ("id", "migration", "batch") VALUES (8, '2026_10_10_000002_quitar_hora_fin_de_examen', 4);
+INSERT INTO "migrations" ("id", "migration", "batch") VALUES (9, '2026_10_10_000003_agregar_curso_a_central_riesgo', 5);
+INSERT INTO "migrations" ("id", "migration", "batch") VALUES (10, '2026_10_11_000001_agregar_oculta_a_notificacion_docente', 6);
+INSERT INTO "migrations" ("id", "migration", "batch") VALUES (11, '2026_10_11_000002_agregar_tipo_a_notificacion_docente', 7);
+INSERT INTO "migrations" ("id", "migration", "batch") VALUES (12, '2026_10_10_000004_alinear_central_riesgo', 8);
+INSERT INTO "migrations" ("id", "migration", "batch") VALUES (13, '2026_10_17_171754_agregar_motivos_ingreso_a_enum_motivo', 9);
+INSERT INTO "migrations" ("id", "migration", "batch") VALUES (14, '2026_10_24_000001_agregar_anio_a_curso_tipo_gestion', 10);
+INSERT INTO "migrations" ("id", "migration", "batch") VALUES (15, '2026_10_24_000002_completar_curso_en_central_riesgo', 11);
+INSERT INTO "migrations" ("id", "migration", "batch") VALUES (16, '2026_10_24_000003_agregar_ambiente_a_curso_y_nombre_a_examen', 12);
+INSERT INTO "migrations" ("id", "migration", "batch") VALUES (17, '2026_10_24_000003_completar_invitaciones_examen', 13);
+INSERT INTO "migrations" ("id", "migration", "batch") VALUES (18, '2026_10_24_000004_adaptar_notificaciones_a_invitaciones', 14);
+INSERT INTO "migrations" ("id", "migration", "batch") VALUES (19, '2026_10_25_000001_separar_configuracion_examen_por_docente', 15);
+INSERT INTO "migrations" ("id", "migration", "batch") VALUES (20, '2026_10_25_000002_asociar_estudiantes_con_docente', 16);
+INSERT INTO "migrations" ("id", "migration", "batch") VALUES (21, '2026_10_25_000003_registro_incidencias_estudiante_no_verificado', 17);
+INSERT INTO "migrations" ("id", "migration", "batch") VALUES (22, '2026_10_26_000001_unificar_estado_incidencia_en_tipo_infraccion', 18);
+INSERT INTO "migrations" ("id", "migration", "batch") VALUES (23, '2026_11_07_000001_motivos_multiples_incidencia', 18);
+INSERT INTO "migrations" ("id", "migration", "batch") VALUES (24, '2026_11_07_000002_crear_cuenta_usuario', 19);
+INSERT INTO "migrations" ("id", "migration", "batch") VALUES (26, '2026_11_08_000001_validacion_registro_docente', 20);
+
+-- norma: 5 filas
+INSERT INTO "norma" ("id_norma", "detalle_norma") VALUES (5, 'No utilizar material no autorizado');
+INSERT INTO "norma" ("id_norma", "detalle_norma") VALUES (1, 'Portar CI durante toda la evaluación');
+INSERT INTO "norma" ("id_norma", "detalle_norma") VALUES (2, 'Mantener dispositivos electrónicos guardados');
+INSERT INTO "norma" ("id_norma", "detalle_norma") VALUES (3, 'Tolerancia máxima de ingreso: 15 minutos');
+INSERT INTO "norma" ("id_norma", "detalle_norma") VALUES (4, 'Prohibido hablar, consultar levantando la mano');
+
+-- norma_personalizada: 13 filas
+INSERT INTO "norma_personalizada" ("id_examen", "numero_norma", "descripcion_norma") VALUES (1, 1, 'Se permite el uso de calculadora científica no programable.');
+INSERT INTO "norma_personalizada" ("id_examen", "numero_norma", "descripcion_norma") VALUES (1, 2, 'No se permite hojas adicionales, usar el reverso del examen.');
+INSERT INTO "norma_personalizada" ("id_examen", "numero_norma", "descripcion_norma") VALUES (2, 1, 'El código debe compilar sin errores para ser evaluado.');
+INSERT INTO "norma_personalizada" ("id_examen", "numero_norma", "descripcion_norma") VALUES (2, 2, 'Prohibido el acceso a internet o repositorios externos.');
+INSERT INTO "norma_personalizada" ("id_examen", "numero_norma", "descripcion_norma") VALUES (3, 1, 'Tiempo estricto de 45 minutos. No hay prórroga.');
+INSERT INTO "norma_personalizada" ("id_examen", "numero_norma", "descripcion_norma") VALUES (4, 1, 'Uso obligatorio de bata de laboratorio y gafas de seguridad.');
+INSERT INTO "norma_personalizada" ("id_examen", "numero_norma", "descripcion_norma") VALUES (4, 2, 'Entregar el reporte de datos antes de salir del aula.');
+INSERT INTO "norma_personalizada" ("id_examen", "numero_norma", "descripcion_norma") VALUES (5, 1, 'Responder únicamente con bolígrafo de tinta negra o azul.');
+INSERT INTO "norma_personalizada" ("id_examen", "numero_norma", "descripcion_norma") VALUES (5, 2, 'Desactivar y guardar teléfonos móviles en la mochila.');
+INSERT INTO "norma_personalizada" ("id_examen", "numero_norma", "descripcion_norma") VALUES (10, 1, 'dadad');
+INSERT INTO "norma_personalizada" ("id_examen", "numero_norma", "descripcion_norma") VALUES (11, 1, 'dffgs');
+INSERT INTO "norma_personalizada" ("id_examen", "numero_norma", "descripcion_norma") VALUES (13, 1, 'Ingreso sin mochilas');
+INSERT INTO "norma_personalizada" ("id_examen", "numero_norma", "descripcion_norma") VALUES (25, 1, 'adsasdsa');
+
+-- notificacion_auxiliar: 5 filas
+INSERT INTO "notificacion_auxiliar" ("id_notificacion", "id_curso", "id_ambiente", "estado") VALUES (1, 1, 1, 'recibido');
+INSERT INTO "notificacion_auxiliar" ("id_notificacion", "id_curso", "id_ambiente", "estado") VALUES (2, 2, 2, 'visto');
+INSERT INTO "notificacion_auxiliar" ("id_notificacion", "id_curso", "id_ambiente", "estado") VALUES (3, 3, 3, 'recibido');
+INSERT INTO "notificacion_auxiliar" ("id_notificacion", "id_curso", "id_ambiente", "estado") VALUES (4, 4, 4, 'visto');
+INSERT INTO "notificacion_auxiliar" ("id_notificacion", "id_curso", "id_ambiente", "estado") VALUES (5, 5, 5, 'recibido');
+
+-- notificacion_docente: 26 filas
+INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (2, 2, 2, 'recibido', false, 'posible_tramposo', NULL, NULL);
+INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (3, 3, 3, 'visto', false, 'posible_tramposo', NULL, NULL);
+INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (5, 5, 5, 'visto', false, 'posible_tramposo', NULL, NULL);
+INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (6, 17, 3, 'recibido', false, 'central_riesgo', NULL, NULL);
+INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (4, 4, 4, 'recibido', true, 'posible_tramposo', NULL, NULL);
+INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (1, 1, 1, 'visto', true, 'posible_tramposo', NULL, NULL);
+INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (7, 18, 3, 'recibido', false, 'central_riesgo', NULL, NULL);
+INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (8, 19, 3, 'recibido', false, 'central_riesgo', NULL, NULL);
+INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (9, 20, 3, 'recibido', false, 'central_riesgo', NULL, NULL);
+INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (10, 21, 3, 'recibido', false, 'central_riesgo', NULL, NULL);
+INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (11, 22, 3, 'recibido', false, 'central_riesgo', NULL, NULL);
+INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (12, NULL, NULL, 'recibido', true, 'invitacion_examen', 5, 6);
+INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (13, NULL, NULL, 'recibido', false, 'respuesta_invitacion', 1, 7);
+INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (14, NULL, NULL, 'recibido', true, 'invitacion_examen', 5, 8);
+INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (15, NULL, NULL, 'recibido', false, 'respuesta_invitacion', 1, 9);
+INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (16, 24, 3, 'recibido', false, 'central_riesgo', NULL, NULL);
+INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (17, 25, 3, 'recibido', false, 'central_riesgo', NULL, NULL);
+INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (18, 26, 3, 'recibido', false, 'central_riesgo', NULL, NULL);
+INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (19, 27, 3, 'recibido', false, 'central_riesgo', NULL, NULL);
+INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (20, 28, 3, 'recibido', false, 'central_riesgo', NULL, NULL);
+INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (21, 31, 3, 'recibido', false, 'posible_tramposo', NULL, NULL);
+INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (22, 32, 3, 'recibido', false, 'central_riesgo', NULL, NULL);
+INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (23, NULL, NULL, 'recibido', false, 'invitacion_examen', 13, 10);
+INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (24, NULL, NULL, 'recibido', false, 'respuesta_invitacion', 2, 11);
+INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (25, 12, 14, 'recibido', false, 'central_riesgo', NULL, NULL);
+INSERT INTO "notificacion_docente" ("id_notificacion", "id_central_riesgo", "id_curso", "estado", "oculta", "tipo", "id_docente_destinatario", "id_invitacion") VALUES (26, 12, 3, 'recibido', false, 'central_riesgo', NULL, NULL);
+
+-- registro_asistencia: 81 filas
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (338, '18:14:12'::time, 17, '202201256', 1, 235);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (339, '18:14:14'::time, 17, '202101267', 1, 211);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (340, '18:14:16'::time, 17, '202101022', 1, 201);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (341, '18:19:45'::time, 18, '202201013', 1, 273);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (342, '18:19:57'::time, 18, '202201256', 1, 285);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (343, '18:19:59'::time, 18, '202101267', 1, 261);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (344, '18:20:01'::time, 18, '202101022', 1, 251);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (345, '18:30:13'::time, 19, '202201013', 1, 323);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (346, '18:30:14'::time, 19, '202201256', 1, 335);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (347, '18:30:16'::time, 19, '202101267', 1, 311);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (348, '18:30:18'::time, 19, '202101022', 1, 301);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (349, '18:35:30'::time, 20, '202201013', 1, 373);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (350, '18:35:42'::time, 20, '202201256', 1, 385);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (351, '20:13:13'::time, 23, '202201013', 1, 523);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (352, '20:13:25'::time, 23, '202201256', 1, 535);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (353, '20:13:27'::time, 23, '202101267', 1, 511);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (354, '01:13:33'::time, 27, '202201013', 1, 625);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (355, '04:36:48'::time, 27, '202101423', 1, 621);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (356, '04:40:43'::time, 27, '202201056', 1, 627);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (357, '04:41:02'::time, 27, '202202045', 1, 650);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (358, '04:52:43'::time, 27, '202101156', 1, 608);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (359, '04:54:23'::time, 27, '202201490', 1, 649);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (360, '04:54:41'::time, 27, '202101245', 1, 612);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (361, '06:27:49'::time, 27, '202201123', 1, 630);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (362, '10:56:25'::time, 29, '202201256', 1, 688);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (363, '07:03:41'::time, 35, '202101267', 1, 768);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (1, '07:45:00'::time, 1, '20210001', 3, 1);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (2, '09:45:00'::time, 2, '20210002', 4, 2);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (3, '13:45:00'::time, 3, '20210003', 3, 3);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (4, '07:50:00'::time, 4, '20210004', 4, 4);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (5, '15:45:00'::time, 5, '20210005', 3, 5);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (201, '16:45:00'::time, 5, '202201013', 1, 101);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (202, '16:16:00'::time, 5, '202101022', 2, 102);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (203, '16:16:00'::time, 5, '202002107', 2, 105);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (204, '16:21:00'::time, 5, '202101078', 1, 107);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (205, '16:26:00'::time, 5, '202201101', 1, 110);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (206, '16:02:00'::time, 5, '202201123', 2, 112);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (207, '16:33:00'::time, 5, '202101156', 2, 115);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (208, '16:46:00'::time, 5, '202201189', 1, 118);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (301, '16:41:00'::time, 5, '202101223', 1, 122);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (302, '16:52:00'::time, 5, '202201234', 1, 123);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (303, '16:39:00'::time, 5, '202201256', 2, 125);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (304, '16:29:00'::time, 5, '202101267', 1, 126);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (305, '16:54:00'::time, 5, '202101289', 2, 128);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (306, '16:20:00'::time, 5, '202201290', 2, 129);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (307, '16:05:00'::time, 5, '202201312', 2, 131);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (308, '16:24:00'::time, 5, '202101323', 1, 132);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (309, '16:37:00'::time, 5, '202101345', 1, 134);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (310, '16:02:00'::time, 5, '202201356', 2, 135);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (311, '16:52:00'::time, 5, '202201378', 1, 137);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (364, '07:04:09'::time, 35, '202002107', 1, 756);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (365, '07:04:11'::time, 35, '202101289', 1, 769);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (366, '07:04:14'::time, 35, '202101323', 1, 771);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (367, '07:04:16'::time, 35, '202201378', 1, 798);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (368, '12:53:12'::time, 32, '202201256', 1, 740);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (312, '16:10:00'::time, 5, '202101389', 2, 138);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (313, '16:38:00'::time, 5, '202101401', 1, 140);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (314, '16:45:00'::time, 5, '202201412', 2, 141);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (315, '16:10:00'::time, 5, '202201434', 2, 143);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (316, '16:53:00'::time, 5, '202101445', 1, 144);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (317, '16:31:00'::time, 5, '202101467', 2, 146);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (318, '16:09:00'::time, 5, '202201478', 2, 147);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (319, '16:17:00'::time, 5, '202201490', 1, 149);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (320, '08:05:00'::time, 14, '202101178', 3, 166);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (321, '08:10:00'::time, 14, '202101467', 3, 195);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (322, '08:15:00'::time, 14, '202101090', 3, 158);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (323, '08:20:00'::time, 14, '202201478', 3, 196);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (324, '08:25:00'::time, 14, '202101323', 3, 181);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (325, '08:30:00'::time, 14, '202101345', 3, 183);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (326, '08:35:00'::time, 14, '202201212', 3, 170);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (327, '08:40:00'::time, 14, '202201412', 3, 190);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (328, '08:45:00'::time, 14, '202101289', 3, 177);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (329, '08:50:00'::time, 14, '202101223', 3, 171);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (330, '20:37:39'::time, 14, '202201434', 1, 192);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (331, '20:38:00'::time, 14, '202201390', 1, 188);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (332, '22:22:56'::time, 14, '202201123', 1, 161);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (333, '01:43:31'::time, 14, '202202045', 1, 153);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (334, '02:13:01'::time, 14, '202201201', 1, 169);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (335, '03:38:36'::time, 14, '202101134', 1, 162);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (336, '01:51:36'::time, 14, '202201145', 1, 163);
+INSERT INTO "registro_asistencia" ("id_ingreso", "hora_ingreso", "id_examen", "id_estudiante", "id_registrador", "id_estudiante_examen") VALUES (337, '18:21:49'::time, 14, '202101423', 2, 191);
+
+-- rol: 2 filas
+INSERT INTO "rol" ("id_rol", "nombre_rol") VALUES (1, 'docente');
+INSERT INTO "rol" ("id_rol", "nombre_rol") VALUES (2, 'auxiliar');
+
+-- rol_usuario: 16 filas
+INSERT INTO "rol_usuario" ("id_usuario", "id_rol") VALUES (1, 1);
+INSERT INTO "rol_usuario" ("id_usuario", "id_rol") VALUES (2, 1);
+INSERT INTO "rol_usuario" ("id_usuario", "id_rol") VALUES (3, 2);
+INSERT INTO "rol_usuario" ("id_usuario", "id_rol") VALUES (4, 2);
+INSERT INTO "rol_usuario" ("id_usuario", "id_rol") VALUES (5, 1);
+INSERT INTO "rol_usuario" ("id_usuario", "id_rol") VALUES (6, 1);
+INSERT INTO "rol_usuario" ("id_usuario", "id_rol") VALUES (7, 1);
+INSERT INTO "rol_usuario" ("id_usuario", "id_rol") VALUES (8, 1);
+INSERT INTO "rol_usuario" ("id_usuario", "id_rol") VALUES (9, 2);
+INSERT INTO "rol_usuario" ("id_usuario", "id_rol") VALUES (10, 2);
+INSERT INTO "rol_usuario" ("id_usuario", "id_rol") VALUES (11, 1);
+INSERT INTO "rol_usuario" ("id_usuario", "id_rol") VALUES (12, 1);
+INSERT INTO "rol_usuario" ("id_usuario", "id_rol") VALUES (13, 1);
+INSERT INTO "rol_usuario" ("id_usuario", "id_rol") VALUES (14, 2);
+INSERT INTO "rol_usuario" ("id_usuario", "id_rol") VALUES (15, 1);
+INSERT INTO "rol_usuario" ("id_usuario", "id_rol") VALUES (16, 2);
+
+-- sessions: 2 filas
+INSERT INTO "sessions" ("id", "user_id", "ip_address", "user_agent", "payload", "last_activity") VALUES ('HNAlQaeBbhYTDVEAJPQkiQSHu1vSYZn56pysE95B', 1, '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0', 'YTo0OntzOjY6Il90b2tlbiI7czo0MDoiblFvdWlzZEUzYUFyamJMWldmVExnRHhoS2p5VzN2WGVnMTQxOHhnZiI7czo2OiJfZmxhc2giO2E6Mjp7czozOiJvbGQiO2E6MDp7fXM6MzoibmV3IjthOjA6e319czo5OiJfcHJldmlvdXMiO2E6MTp7czozOiJ1cmwiO3M6NDA6Imh0dHA6Ly8xMjcuMC4wLjE6ODAwMC9hcGkvbm90aWZpY2FjaW9uZXMiO31zOjUwOiJsb2dpbl93ZWJfNTliYTM2YWRkYzJiMmY5NDAxNTgwZjAxNGM3ZjU4ZWE0ZTMwOTg5ZCI7aToxO30=', 1794280328);
+INSERT INTO "sessions" ("id", "user_id", "ip_address", "user_agent", "payload", "last_activity") VALUES ('AXw4cd3O0jgHUcG4g0zNkT0qEkyhD5zSw4EvQ2jD', NULL, '127.0.0.1', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36 Edg/157.0.0.0', 'YTo0OntzOjY6Il90b2tlbiI7czo0MDoiNFQ0VkpIY1hjNGNSemxIdkViZ2tIOXJiWjFlRHpRWXFPSDRtVXE0dCI7czozOiJ1cmwiO2E6MTp7czo4OiJpbnRlbmRlZCI7czoyMToiaHR0cDovLzEyNy4wLjAuMTo4MDAwIjt9czo5OiJfcHJldmlvdXMiO2E6MTp7czozOiJ1cmwiO3M6MjE6Imh0dHA6Ly8xMjcuMC4wLjE6ODAwMCI7fXM6NjoiX2ZsYXNoIjthOjI6e3M6Mzoib2xkIjthOjA6e31zOjM6Im5ldyI7YTowOnt9fX0=', 1794273842);
+
+-- tipo_examen: 3 filas
+INSERT INTO "tipo_examen" ("id_tipo_examen", "nombre_tipo_examen") VALUES (1, 'examen parcial');
+INSERT INTO "tipo_examen" ("id_tipo_examen", "nombre_tipo_examen") VALUES (2, 'examen final');
+INSERT INTO "tipo_examen" ("id_tipo_examen", "nombre_tipo_examen") VALUES (3, 'segunda instancia');
+
+-- tipo_gestion: 4 filas
+INSERT INTO "tipo_gestion" ("id_tipo_gestion", "nombre_tipo_gestion") VALUES (1, 'primer semestre');
+INSERT INTO "tipo_gestion" ("id_tipo_gestion", "nombre_tipo_gestion") VALUES (2, 'invierno');
+INSERT INTO "tipo_gestion" ("id_tipo_gestion", "nombre_tipo_gestion") VALUES (3, 'segundo semestre');
+INSERT INTO "tipo_gestion" ("id_tipo_gestion", "nombre_tipo_gestion") VALUES (4, 'verano');
+
+-- usuario: 16 filas
+INSERT INTO "usuario" ("id_usuario", "cod_sis", "password", "nombre_usuario", "apellido", "correo", "nombre", "fecha_creacion", "estado_cuenta") VALUES (1, 'DOC001', '$2y$12$Q2NT4rFjKIiDm5rYZmhrVuvdRUoOeHRfbgkwKI3GZTsb5kn6olG1C', 'Roberto', 'Silva', NULL, 'Roberto', '2026-11-08T02:48:15'::timestamp, 'habilitada');
+INSERT INTO "usuario" ("id_usuario", "cod_sis", "password", "nombre_usuario", "apellido", "correo", "nombre", "fecha_creacion", "estado_cuenta") VALUES (2, 'DOC002', '$2y$12$cR9BiLcmfx2slphCGEJcfOrRHsfYSyY7dB2EX3ReggaZstvKvWhGK', 'Patricia', 'Rojas', NULL, 'Patricia', '2026-11-08T02:48:15'::timestamp, 'habilitada');
+INSERT INTO "usuario" ("id_usuario", "cod_sis", "password", "nombre_usuario", "apellido", "correo", "nombre", "fecha_creacion", "estado_cuenta") VALUES (3, 'AUX001', '$2y$12$88aNYUoZRhyfw9oA4BdsAujllCecA3ZpOgoe3ltMHkgpndwPwNDWq', 'Diego', 'Mendoza', NULL, 'Diego', '2026-11-08T02:48:15'::timestamp, 'habilitada');
+INSERT INTO "usuario" ("id_usuario", "cod_sis", "password", "nombre_usuario", "apellido", "correo", "nombre", "fecha_creacion", "estado_cuenta") VALUES (4, 'AUX002', '$2y$12$mzepLz/sQ9IvxSgRk0vUC.WL.mYTSPu/xIaH0NOaQHVI13ZGdi9Y2', 'Sofia', 'Castro', NULL, 'Sofia', '2026-11-08T02:48:15'::timestamp, 'habilitada');
+INSERT INTO "usuario" ("id_usuario", "cod_sis", "password", "nombre_usuario", "apellido", "correo", "nombre", "fecha_creacion", "estado_cuenta") VALUES (5, 'DOC003', '$2y$12$0hAV63bJ8fER57b4eyNCI.77qGdXZW3nsEIcsV1yZlnsI0JHbfgZW', 'Fernando', 'Vargas', NULL, 'Fernando', '2026-11-08T02:48:15'::timestamp, 'habilitada');
+INSERT INTO "usuario" ("id_usuario", "cod_sis", "password", "nombre_usuario", "apellido", "correo", "nombre", "fecha_creacion", "estado_cuenta") VALUES (14, '202600111', '$2y$12$/1RLS4MQ39MaEAChWczxue.BvqTCJMP/WyEEGNO5V9o7lGbCTNdRe', 'Auxiliar', 'gaga', NULL, NULL, '2026-11-10T01:16:22'::timestamp, 'habilitada');
+INSERT INTO "usuario" ("id_usuario", "cod_sis", "password", "nombre_usuario", "apellido", "correo", "nombre", "fecha_creacion", "estado_cuenta") VALUES (15, '111111111', '$2y$12$aIY5Pq5GQhLlP1qUK6bgwOjYl81HreujHD3NE0eastmjx/tsoycCW', 'dariana.panozo', 'Panozo', '123454@umss.edu', 'Darian', '2026-11-10T01:26:41'::timestamp, 'habilitada');
+INSERT INTO "usuario" ("id_usuario", "cod_sis", "password", "nombre_usuario", "apellido", "correo", "nombre", "fecha_creacion", "estado_cuenta") VALUES (6, '202300047', '$2y$12$VY.Ov4e/VbOgr.LDo298he9pXx9x4wJybzDPVB2sBnufBYeYtXnwi', 'zzebnell', 'Zeballos', '202300047@umss.edu', 'Leonel', '2026-11-08T03:11:52'::timestamp, 'habilitada');
+INSERT INTO "usuario" ("id_usuario", "cod_sis", "password", "nombre_usuario", "apellido", "correo", "nombre", "fecha_creacion", "estado_cuenta") VALUES (7, '201605998', '$2y$12$X0VkmJcZfz2BzsIYD6f3DePB6oe5QRakIi/rXHn.P05MgqN2b1rCa', 'ValeryPanozo', 'Panozo', 'valery@umss.edu', 'Valery', '2026-11-08T11:53:08'::timestamp, 'rechazada');
+INSERT INTO "usuario" ("id_usuario", "cod_sis", "password", "nombre_usuario", "apellido", "correo", "nombre", "fecha_creacion", "estado_cuenta") VALUES (8, '676767676', '$2y$12$dXUar98eiHpTiKtnSZIQ5elX4eU1sxr9hSkewGuVjZ1CQVnkcdcym', 'aimee.p3', 'petres', '20211@umss.edu', 'aimee', '2026-11-08T22:23:53'::timestamp, 'rechazada');
+INSERT INTO "usuario" ("id_usuario", "cod_sis", "password", "nombre_usuario", "apellido", "correo", "nombre", "fecha_creacion", "estado_cuenta") VALUES (9, '202300548', '$2y$12$R24FdBMddA2Hrd.gD2E/dO0ARl9D8DdrP3zR.wyA9HckxYMfOPEEW', 'auxi', 'gaga', NULL, NULL, '2026-11-08T22:58:08'::timestamp, 'habilitada');
+INSERT INTO "usuario" ("id_usuario", "cod_sis", "password", "nombre_usuario", "apellido", "correo", "nombre", "fecha_creacion", "estado_cuenta") VALUES (10, '202000128', '$2y$12$rLlAh6v3vU.6C3oZXkt9DeyQd84q1ve9jXfMUSvgLNmAwloiNzyle', 'Dennis', 'Man', NULL, NULL, '2026-11-09T14:21:28'::timestamp, 'habilitada');
+INSERT INTO "usuario" ("id_usuario", "cod_sis", "password", "nombre_usuario", "apellido", "correo", "nombre", "fecha_creacion", "estado_cuenta") VALUES (11, '202300001', '$2y$12$S.XppgICPLFFXiruFSm6teKAmxvcX5JNzHo31bhPkD1Lw3SCfTSg.', 'corina.flores', 'Flores', 'hola.hola@umss.edu', 'Corina', '2026-11-09T14:41:20'::timestamp, 'habilitada');
+INSERT INTO "usuario" ("id_usuario", "cod_sis", "password", "nombre_usuario", "apellido", "correo", "nombre", "fecha_creacion", "estado_cuenta") VALUES (12, '202300002', '$2y$12$dk3HXPCytDjmfFA1j.X73.gyA.IsSnjwVW6SUuRjWabMygrh0sCQm', 'ruben.ayaviri', 'Ayaviri', 'hola.adios@umss.edu', 'Ruben', '2026-11-09T14:52:25'::timestamp, 'habilitada');
+INSERT INTO "usuario" ("id_usuario", "cod_sis", "password", "nombre_usuario", "apellido", "correo", "nombre", "fecha_creacion", "estado_cuenta") VALUES (13, '202500123', '$2y$12$76ZIbcVeT70xRSW7BXHds.GXQ6bwG56JCGPm//..bpgYkjkpHsxTm', 'Campeon', 'Docente', NULL, 'Campeon', '2026-11-09T11:54:31'::timestamp, 'habilitada');
+INSERT INTO "usuario" ("id_usuario", "cod_sis", "password", "nombre_usuario", "apellido", "correo", "nombre", "fecha_creacion", "estado_cuenta") VALUES (16, '202302032', '$2y$12$xVMsMYJP0JRrz0I3Zhaq4eS85PMA8JUxGphc.HVN7bqCIecB4ctya', 'Cesar', 'Ochoa', NULL, NULL, '2026-11-10T03:26:00'::timestamp, 'habilitada');
+
+-- validacion_registro: 10 filas
+INSERT INTO "validacion_registro" ("id_solicitante", "id_validador", "decision", "motivo", "fecha") VALUES (6, 1, 'aprobado', NULL, '2026-11-08T11:49:48'::timestamp);
+INSERT INTO "validacion_registro" ("id_solicitante", "id_validador", "decision", "motivo", "fecha") VALUES (6, 2, 'aprobado', NULL, '2026-11-08T11:54:26'::timestamp);
+INSERT INTO "validacion_registro" ("id_solicitante", "id_validador", "decision", "motivo", "fecha") VALUES (7, 2, 'desaprobado', 'Hable con el docente y no es su cuenta', '2026-11-08T11:54:53'::timestamp);
+INSERT INTO "validacion_registro" ("id_solicitante", "id_validador", "decision", "motivo", "fecha") VALUES (8, 6, 'desaprobado', 'me cae mal', '2026-11-08T22:25:35'::timestamp);
+INSERT INTO "validacion_registro" ("id_solicitante", "id_validador", "decision", "motivo", "fecha") VALUES (11, 1, 'aprobado', NULL, '2026-11-09T14:42:36'::timestamp);
+INSERT INTO "validacion_registro" ("id_solicitante", "id_validador", "decision", "motivo", "fecha") VALUES (11, 2, 'aprobado', NULL, '2026-11-09T14:44:48'::timestamp);
+INSERT INTO "validacion_registro" ("id_solicitante", "id_validador", "decision", "motivo", "fecha") VALUES (12, 1, 'aprobado', NULL, '2026-11-09T14:53:59'::timestamp);
+INSERT INTO "validacion_registro" ("id_solicitante", "id_validador", "decision", "motivo", "fecha") VALUES (12, 2, 'aprobado', NULL, '2026-11-09T14:55:21'::timestamp);
+INSERT INTO "validacion_registro" ("id_solicitante", "id_validador", "decision", "motivo", "fecha") VALUES (15, 1, 'aprobado', NULL, '2026-11-09T21:29:47'::timestamp);
+INSERT INTO "validacion_registro" ("id_solicitante", "id_validador", "decision", "motivo", "fecha") VALUES (15, 2, 'aprobado', NULL, '2026-11-09T21:31:02'::timestamp);
+
+SET session_replication_role = DEFAULT;
+
+-- ============================================================================
+--  SECUENCIAS
+-- ============================================================================
+SELECT setval('configuracion_examen_docente_id_configuracion_examen_seq', COALESCE((SELECT MAX("id_configuracion_examen") FROM "configuracion_examen_docente"), 0) + 1, false);
+SELECT setval('configuracion_material_personaliz_id_configuracion_material_seq', COALESCE((SELECT MAX("id_configuracion_material") FROM "configuracion_material_personalizado"), 0) + 1, false);
+SELECT setval('configuracion_norma_personalizada_id_configuracion_norma_seq', COALESCE((SELECT MAX("id_configuracion_norma") FROM "configuracion_norma_personalizada"), 0) + 1, false);
+SELECT setval('failed_jobs_id_seq', COALESCE((SELECT MAX("id") FROM "failed_jobs"), 0) + 1, false);
+SELECT setval('jobs_id_seq', COALESCE((SELECT MAX("id") FROM "jobs"), 0) + 1, false);
+SELECT setval('migrations_id_seq', COALESCE((SELECT MAX("id") FROM "migrations"), 0) + 1, false);
+SELECT setval('users_id_seq', COALESCE((SELECT MAX("id") FROM "users"), 0) + 1, false);
+
+-- ============================================================================
+--  FIN DEL DUMP
+-- ============================================================================
