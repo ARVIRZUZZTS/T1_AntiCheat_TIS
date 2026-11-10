@@ -23,7 +23,10 @@
 
     El prop opcional `empty` muestra ese mensaje dentro de la tabla (una fila
     con colspan de todos los encabezados) cuando $rows queda vacío y no hay
-    slot `body`; sin el prop el comportamiento no cambia.
+    slot `body`; sin el prop el comportamiento no cambia. Si además se pasa
+    `emptyXShow` (expresión Alpine), la fila del mensaje se pinta siempre y
+    Alpine la muestra/oculta con esa expresión — sirve para tablas filtradas
+    en el cliente donde la fila tiene que aparecer aunque $rows no esté vacío.
 
     @see  resources/views/pages/curso-detalle.blade.php
 
@@ -44,6 +47,10 @@
     - 2026-11-09  [OchoaCesar]  feat: prop opcional `empty` para mostrar un
       mensaje dentro de la tabla cuando no hay filas. Sin el prop el
       comportamiento no cambia.
+    - 2026-11-09  [OchoaCesar]  feat: prop opcional `emptyXShow`: la fila de
+      `empty` se pinta siempre y Alpine la controla con esa expresión (para
+      tablas con filtrado en el cliente). Sin el prop el comportamiento no
+      cambia.
 --}}
 
 @props([
@@ -52,6 +59,7 @@
     'compact' => false,
     'minWidth' => null,
     'empty' => null,
+    'emptyXShow' => null,
 ])
 
 @php
@@ -70,8 +78,8 @@
         <tbody>
             @if (isset($body) && $body->isNotEmpty())
                 {{ $body }}
-            @elseif ($empty !== null && count($rows) === 0)
-                <tr class="bg-neutral-primary">
+            @elseif ($empty !== null && ($emptyXShow !== null || count($rows) === 0))
+                <tr class="bg-neutral-primary" @if ($emptyXShow !== null) x-show="{{ $emptyXShow }}" x-cloak @endif>
                     <td colspan="{{ count($headers) }}" class="{{ $cellPad }} text-center">{{ $empty }}</td>
                 </tr>
             @else
