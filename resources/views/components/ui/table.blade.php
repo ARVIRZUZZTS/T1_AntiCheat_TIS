@@ -3,6 +3,7 @@
     @author  David E. Chavez T. <virzuzz12345@gmail.com>
     @created 2026-09-23
     @updated 2026-09-26
+    @updated 2026-11-09
 
     @description
     Tabla de datos con encabezados y filas. $headers es un arreglo de
@@ -20,6 +21,10 @@
     El slot nombrado `body` reemplaza el bucle de $rows y sirve para tablas
     cuyas filas las dibuja Alpine con x-for (reportes).
 
+    El prop opcional `empty` muestra ese mensaje dentro de la tabla (una fila
+    con colspan de todos los encabezados) cuando $rows queda vacío y no hay
+    slot `body`; sin el prop el comportamiento no cambia.
+
     @see  resources/views/pages/curso-detalle.blade.php
 
     @changelog
@@ -36,6 +41,9 @@
       prop el comportamiento no cambia.
     - 2026-10-23  [Alex Candia]  feat: slot `body` para filas dinámicas de
       Alpine sin duplicar el contenedor ni los encabezados en cada reporte.
+    - 2026-11-09  [OchoaCesar]  feat: prop opcional `empty` para mostrar un
+      mensaje dentro de la tabla cuando no hay filas. Sin el prop el
+      comportamiento no cambia.
 --}}
 
 @props([
@@ -43,6 +51,7 @@
     'rows' => [],
     'compact' => false,
     'minWidth' => null,
+    'empty' => null,
 ])
 
 @php
@@ -61,6 +70,10 @@
         <tbody>
             @if (isset($body) && $body->isNotEmpty())
                 {{ $body }}
+            @elseif ($empty !== null && count($rows) === 0)
+                <tr class="bg-neutral-primary">
+                    <td colspan="{{ count($headers) }}" class="{{ $cellPad }} text-center">{{ $empty }}</td>
+                </tr>
             @else
                 @foreach ($rows as $row)
                     @if (is_array($row) && array_key_exists('__separator', $row))

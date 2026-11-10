@@ -18,6 +18,10 @@
       tarjeta (queda encima, a la derecha) y se agregan los desplegables
       Estado y Curso en la cabecera de la tarjeta; por defecto ambos en
       "Todos" muestran todos los auxiliares.
+    - 2026-11-09  [OchoaCesar]  fix: los filtros suben a la barra superior
+      junto al botón (en la cabecera de la tarjeta deformaban el espacio de
+      la tabla) y la tabla vacía muestra "No hay auxiliares registrados"
+      dentro del cuerpo (prop `empty` de x-ui.table).
 
     @see  app/Livewire/Auxiliares/GestionAuxiliares.php
 --}}
@@ -32,29 +36,27 @@
         <x-ui.alert type="danger" title="Error">{{ $mensajeError }}</x-ui.alert>
     @endif
 
-    <div class="flex justify-end">
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div class="flex flex-col gap-3 sm:flex-row">
+            <div class="sm:w-40">
+                <x-ui.select label="Estado" name="filtroEstado" wire:model.live="filtroEstado"
+                    :options="['todos' => 'Todos', 'Activo' => 'Activo', 'Baja' => 'Baja']"
+                    :selected="$filtroEstado" />
+            </div>
+            <div class="sm:w-56">
+                <x-ui.select label="Curso" name="filtroCurso" wire:model.live="filtroCurso"
+                    :options="['todos' => 'Todos'] + $cursos->pluck('nombre_curso', 'id_curso')->all()"
+                    :selected="$filtroCurso" />
+            </div>
+        </div>
         <x-ui.button type="button" variant="default" wire:click="abrirModalCrear">
             Crear Auxiliar
         </x-ui.button>
     </div>
 
     <div class="bg-neutral-primary-soft border border-default rounded-base shadow-xs p-6">
-        <div class="flex flex-col gap-4 mb-4 sm:flex-row sm:items-end sm:justify-between">
-            <h3 class="text-lg font-semibold text-heading">Auxiliares asignados</h3>
-            <div class="flex flex-col gap-3 sm:flex-row">
-                <div class="sm:w-40">
-                    <x-ui.select label="Estado" name="filtroEstado" wire:model.live="filtroEstado"
-                        :options="['todos' => 'Todos', 'Activo' => 'Activo', 'Baja' => 'Baja']"
-                        :selected="$filtroEstado" />
-                </div>
-                <div class="sm:w-56">
-                    <x-ui.select label="Curso" name="filtroCurso" wire:model.live="filtroCurso"
-                        :options="['todos' => 'Todos'] + $cursos->pluck('nombre_curso', 'id_curso')->all()"
-                        :selected="$filtroCurso" />
-                </div>
-            </div>
-        </div>
-        <x-ui.table compact :headers="['Auxiliar', 'Código SIS', 'Curso', 'Estado']" :rows="$auxiliares->map(fn($a) => [
+        <h3 class="text-lg font-semibold text-heading mb-4">Auxiliares asignados</h3>
+        <x-ui.table compact empty="No hay auxiliares registrados" :headers="['Auxiliar', 'Código SIS', 'Curso', 'Estado']" :rows="$auxiliares->map(fn($a) => [
             ['heading' => true, 'value' => $a->nombre_usuario.' '.$a->apellido],
             $a->cod_sis,
             $a->nombre_curso,
