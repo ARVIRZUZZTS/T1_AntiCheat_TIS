@@ -4,11 +4,13 @@
  * @file    ListaEstudiantes.php
  *
  * @author  Valery D. Ortuno P. <valerydariana98@gmail.com>
+ * @author  Alisson D. Alvarado <alvaradoalissondalet@gmail.com>
  *
  * @created 2026-10-10
  *
  * @updated 2026-10-11
  * @updated 2026-10-24
+ * @updated 2026-11-09
  *
  * @description
  * Componente Livewire de la central de riesgos (HU 10): lista a los estudiantes
@@ -38,6 +40,7 @@
  * - 2026-10-24  [Valery D. Ortuno P]  refactor: se quita el usuario que llegaba
  *   por la URL (`?usuario=`) y el usuario por defecto de antes del login:
  *   "Mis materias" usa siempre el usuario de la sesión.
+ * - 2026-11-09  [Alisson D. Alvarado]  feat: revisar incidencias sospechosas del docente.
  */
 
 namespace App\Livewire\CentralRiesgo;
@@ -45,16 +48,22 @@ namespace App\Livewire\CentralRiesgo;
 use App\Services\CentralRiesgo\CacheCentralRiesgo;
 use App\Services\CentralRiesgo\ConsultarDetalleIncidenciaService;
 use App\Services\CentralRiesgo\ListarIncidenciasTramposoService;
+use App\Services\CentralRiesgo\ListarIncidenciasSospechosasService;
+use App\Services\CentralRiesgo\ResolverIncidenciaService;
 use App\Services\Examen\BusquedaEstudianteService;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Cache;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
+use InvalidArgumentException;
 
 class ListaEstudiantes extends Component
 {
+    public const ALCANCE_SOSPECHOSOS = 'sospechosos';
+
     public string $alcance = ListarIncidenciasTramposoService::ALCANCE_INSTITUCION;
 
     public bool $ordenAlfabetico = false;
@@ -67,6 +76,10 @@ class ListaEstudiantes extends Component
      * Incidencia (`id_registro`) cuyo detalle está abierto, o null si no hay.
      */
     public ?int $idSeleccionado = null;
+
+    public string $mensajeRevision = '';
+
+    public string $errorRevision = '';
 
     private const POR_PAGINA = 8;
 
@@ -108,11 +121,14 @@ class ListaEstudiantes extends Component
         // login y rol docente), nunca de uno que venga por la URL.
         $usuario = (int) auth()->id();
 
-        $incidencias = Cache::remember(
-            CacheCentralRiesgo::claveLista($usuario, $this->alcance, $busqueda, $this->ordenAlfabetico),
-            CacheCentralRiesgo::ttlLista(),
-            fn () => $this->servicioLista->ejecutar($usuario, $this->alcance, $busqueda, $orden),
-        );
+        // Los pendientes se consultan nuevamente para reflejar revisiones de otros docentes.
+        $incidencias = $this->alcance === self::ALCANCE_SOSPECHOSOS
+            ? app(ListarIncidenciasSospechosasService::class)->ejecutar($usuario, $busqueda, $this->ordenAlfabetico)
+            : Cache::remember(
+                CacheCentralRiesgo::claveLista($usuario, $this->alcance, $busqueda, $this->ordenAlfabetico),
+                CacheCentralRiesgo::ttlLista(),
+                fn () => $this->servicioLista->ejecutar($usuario, $this->alcance, $busqueda, $orden),
+            );
 
         // Una página que ya no existe (quedó de un filtro anterior) cae en la
         // última disponible en vez de mostrar una lista vacía.
@@ -139,6 +155,12 @@ class ListaEstudiantes extends Component
             return null;
         }
 
+        // Solo se abre un pendiente que figure en la página autorizada del docente.
+        if ($this->alcance === self::ALCANCE_SOSPECHOSOS
+            && ! $this->estudiantes->getCollection()->contains('id_registro', $this->idSeleccionado)) {
+            return null;
+        }
+
         return Cache::remember(
             CacheCentralRiesgo::claveDetalle($this->idSeleccionado),
             CacheCentralRiesgo::ttlDetalle(),
@@ -155,12 +177,14 @@ class ListaEstudiantes extends Component
 
     public function cambiarAlcance(string $alcance): void
     {
-        if (! in_array($alcance, ListarIncidenciasTramposoService::ALCANCES_VALIDOS, true)) {
+        if (! in_array($alcance, [...ListarIncidenciasTramposoService::ALCANCES_VALIDOS, self::ALCANCE_SOSPECHOSOS], true)) {
             return;
         }
 
         $this->alcance = $alcance;
         $this->pagina = 1;
+        $this->idSeleccionado = null;
+        $this->mensajeRevision = $this->errorRevision = '';
     }
 
     public function updatedBusqueda(): void
@@ -186,6 +210,40 @@ class ListaEstudiantes extends Component
     public function cerrarDetalle(): void
     {
         $this->idSeleccionado = null;
+    }
+
+    /**
+     * Resuelve el caso seleccionado mediante el servicio que aplica la policy del curso.
+     *
+     * @param  string  $accion  Confirmar o rechazar la incidencia.
+     * @return void
+     * @throws AuthorizationException Si el docente ya no tiene acceso al curso.
+     * @author Alisson D. Alvarado <alvaradoalissondalet@gmail.com>
+     */
+    public function resolverSospechoso(string $accion): void
+    {
+        if ($this->alcance !== self::ALCANCE_SOSPECHOSOS || $this->idSeleccionado === null
+            || ! in_array($accion, ['confirmar', 'rechazar'], true)) {
+            return;
+        }
+
+        $this->mensajeRevision = $this->errorRevision = '';
+
+        try {
+            $servicio = app(ResolverIncidenciaService::class);
+            $servicio->{$accion}($this->idSeleccionado, auth()->user());
+        } catch (ModelNotFoundException|InvalidArgumentException $error) {
+            $this->idSeleccionado = null;
+            $this->errorRevision = 'La incidencia ya no está pendiente de revisión.';
+
+            return;
+        }
+
+        $this->idSeleccionado = null;
+        $this->mensajeRevision = $accion === 'confirmar'
+            ? 'Incidencia confirmada correctamente.'
+            : 'Incidencia rechazada correctamente.';
+        unset($this->estudiantes, $this->detalle);
     }
 
     public function render(): View
