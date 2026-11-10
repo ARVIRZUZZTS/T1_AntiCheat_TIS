@@ -5,6 +5,7 @@
     @created 2026-10-17
     @updated 2026-11-07
     @updated 2026-11-08
+    @updated 2026-11-09
     @description Formulario de registro de docente conectado al backend.
     @changelog
     - 2026-11-07  [Alisson D. Alvarado]  feat: validar los siete campos en el navegador.
@@ -17,6 +18,7 @@
     - 2026-11-08  [Alisson D. Alvarado]  feat: sugerir un usuario disponible y editable.
     - 2026-11-08  [Alisson D. Alvarado]  fix: mostrar la sugerencia mientras se verifica su disponibilidad.
     - 2026-11-08  [Alisson D. Alvarado]  fix: corregir el título de registro docente.
+    - 2026-11-09  [Alisson D. Alvarado]  fix: evitar que el correo se use como nombre de usuario.
 --}}
 @extends('layouts.guest')
 
@@ -93,6 +95,9 @@
                       if (!this.nombre.trim()) this.errores.nombre = 'El nombre es obligatorio';
                       if (!this.apellido.trim()) this.errores.apellido = 'El apellido es obligatorio';
                       if (!this.usuario.trim()) this.errores.usuario = 'El nombre de usuario es obligatorio';
+                      else if (this.usuario.includes('@')) {
+                          this.errores.usuario = 'El nombre de usuario no puede ser un correo electrónico';
+                      }
                       if (!this.correo.trim()) this.errores.correo = 'El correo es obligatorio';
                       else if (!/^[^\s@]+@umss\.edu$/i.test(this.correo.trim())) {
                           this.errores.correo = 'El correo electrónico no es válido';
@@ -174,7 +179,7 @@
             </div>
             <div class="mb-2">
                 <x-ui.input name="usuario" label="Nombre de usuario" placeholder="Nombre de usuario" required
-                            x-model="usuario" autocomplete="username" aria-describedby="error-usuario"
+                            x-model="usuario" autocomplete="off" aria-describedby="error-usuario"
                             x-bind:aria-invalid="!!errores.usuario" />
                 <p id="error-usuario" x-text="errores.usuario || ''" aria-live="polite"
                    class="min-h-4 text-sm text-fg-danger-strong"></p>
@@ -182,7 +187,7 @@
             </div>
             <div class="mb-2">
                 <x-ui.input name="correo" type="email" label="Correo electrónico" placeholder="nombre.apellido@umss.edu"
-                            required x-model="correo" aria-describedby="error-correo"
+                            required x-model="correo" autocomplete="email" aria-describedby="error-correo"
                             x-bind:aria-invalid="!!errores.correo" />
                 <p id="error-correo" x-text="errores.correo || ''" aria-live="polite"
                    class="min-h-4 text-sm text-fg-danger-strong"></p>
