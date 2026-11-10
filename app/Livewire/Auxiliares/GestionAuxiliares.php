@@ -5,16 +5,21 @@
  * @author  David E. Chavez T. <virzuzz12345@gmail.com>
  * @created 2026-10-19
  * @updated 2026-11-08
+ * @updated 2026-11-09
  *
  * @description
  * Componente Livewire para la gestión de auxiliares de un docente: listado de
- * auxiliares asignados y alta de un nuevo auxiliar mediante un modal.
+ * auxiliares asignados con filtros por estado y por curso, y alta de un nuevo
+ * auxiliar mediante un modal.
  *
  * @changelog
  * - 2026-10-19  [ARVIRZUZZTS]  feat: agregar autenticación y gestión de
  *   docentes/auxiliares.
  * - 2026-11-08  [David E. Chavez T.]  refactor: mover la creación de auxiliar
  *   a un modal con inputs verticales.
+ * - 2026-11-09  [OchoaCesar]  feat: filtros de estado (Todos/Activo/Baja) y
+ *   curso (Todos + cursos del docente) sobre el listado; por defecto ambos
+ *   en "todos" muestran todos los auxiliares.
  *
  * @see  App\Models\Curso
  * @see  App\Models\Usuario
@@ -97,6 +102,20 @@ class GestionAuxiliares extends Component
     public bool $mostrarModalCrear = false;
 
     /**
+     * Filtro de estado del listado: todos, Activo o Baja.
+     *
+     * @var string
+     */
+    public string $filtroEstado = 'todos';
+
+    /**
+     * Filtro de curso del listado: todos o el id de un curso del docente.
+     *
+     * @var string
+     */
+    public string $filtroCurso = 'todos';
+
+    /**
      * Inicializa el curso seleccionado por defecto.
      *
      * @return void
@@ -163,11 +182,21 @@ class GestionAuxiliares extends Component
      */
     public function auxiliares()
     {
-        return DB::table('auxiliar_curso')
+        $consulta = DB::table('auxiliar_curso')
             ->join('curso', 'curso.id_curso', '=', 'auxiliar_curso.id_curso')
             ->join('usuario', 'usuario.id_usuario', '=', 'auxiliar_curso.id_auxiliar')
             ->where('curso.sis_doc', auth()->id())
-            ->select('usuario.id_usuario', 'usuario.cod_sis', 'usuario.nombre_usuario', 'usuario.apellido', 'curso.nombre_curso', 'auxiliar_curso.estado')
+            ->select('usuario.id_usuario', 'usuario.cod_sis', 'usuario.nombre_usuario', 'usuario.apellido', 'curso.nombre_curso', 'auxiliar_curso.estado');
+
+        if (in_array($this->filtroEstado, ['Activo', 'Baja'], true)) {
+            $consulta->where('auxiliar_curso.estado', $this->filtroEstado);
+        }
+
+        if ($this->filtroCurso !== 'todos') {
+            $consulta->where('auxiliar_curso.id_curso', (int) $this->filtroCurso);
+        }
+
+        return $consulta
             ->orderBy('usuario.nombre_usuario')
             ->get();
     }

@@ -3,15 +3,21 @@
     @author  David E. Chavez T. <virzuzz12345@gmail.com>
     @created 2026-10-19
     @updated 2026-11-08
+    @updated 2026-11-09
 
     @description
     Vista del componente Livewire GestionAuxiliares: listado de auxiliares
-    asignados y modal para crear un nuevo auxiliar.
+    asignados con filtros de estado y curso, botón de creación fuera de la
+    tarjeta y modal para crear un nuevo auxiliar.
 
     @changelog
     - 2026-10-19  [ARVIRZUZZTS]  feat: creación inicial de la vista.
     - 2026-11-08  [David E. Chavez T.]  style: mover la creación a un modal
       con inputs verticales y botones Cancelar/Guardar.
+    - 2026-11-09  [OchoaCesar]  style: el botón "Crear Auxiliar" sale de la
+      tarjeta (queda encima, a la derecha) y se agregan los desplegables
+      Estado y Curso en la cabecera de la tarjeta; por defecto ambos en
+      "Todos" muestran todos los auxiliares.
 
     @see  app/Livewire/Auxiliares/GestionAuxiliares.php
 --}}
@@ -26,12 +32,27 @@
         <x-ui.alert type="danger" title="Error">{{ $mensajeError }}</x-ui.alert>
     @endif
 
+    <div class="flex justify-end">
+        <x-ui.button type="button" variant="default" wire:click="abrirModalCrear">
+            Crear Auxiliar
+        </x-ui.button>
+    </div>
+
     <div class="bg-neutral-primary-soft border border-default rounded-base shadow-xs p-6">
-        <div class="flex items-center justify-between mb-4">
+        <div class="flex flex-col gap-4 mb-4 sm:flex-row sm:items-end sm:justify-between">
             <h3 class="text-lg font-semibold text-heading">Auxiliares asignados</h3>
-            <x-ui.button type="button" variant="default" wire:click="abrirModalCrear">
-                Crear Auxiliar
-            </x-ui.button>
+            <div class="flex flex-col gap-3 sm:flex-row">
+                <div class="sm:w-40">
+                    <x-ui.select label="Estado" name="filtroEstado" wire:model.live="filtroEstado"
+                        :options="['todos' => 'Todos', 'Activo' => 'Activo', 'Baja' => 'Baja']"
+                        :selected="$filtroEstado" />
+                </div>
+                <div class="sm:w-56">
+                    <x-ui.select label="Curso" name="filtroCurso" wire:model.live="filtroCurso"
+                        :options="['todos' => 'Todos'] + $cursos->pluck('nombre_curso', 'id_curso')->all()"
+                        :selected="$filtroCurso" />
+                </div>
+            </div>
         </div>
         <x-ui.table compact :headers="['Auxiliar', 'Código SIS', 'Curso', 'Estado']" :rows="$auxiliares->map(fn($a) => [
             ['heading' => true, 'value' => $a->nombre_usuario.' '.$a->apellido],
