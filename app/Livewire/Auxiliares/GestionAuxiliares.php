@@ -20,9 +20,6 @@
  * - 2026-11-09  [OchoaCesar]  feat: filtros de estado (Todos/Activo/Baja) y
  *   curso (Todos + cursos del docente) sobre el listado; por defecto ambos
  *   en "todos" muestran todos los auxiliares.
- * - 2026-11-09  [OchoaCesar]  refactor: los filtros pasan a ser de cliente
- *   (Alpine oculta/muestra filas); auxiliares() devuelve el listado completo
- *   y ya no recibe estado ni curso, así cambiar de filtro no viaja al servidor.
  *
  * @see  App\Models\Curso
  * @see  App\Models\Usuario
@@ -105,6 +102,20 @@ class GestionAuxiliares extends Component
     public bool $mostrarModalCrear = false;
 
     /**
+     * Filtro de estado del listado: todos, Activo o Baja.
+     *
+     * @var string
+     */
+    public string $filtroEstado = 'todos';
+
+    /**
+     * Filtro de curso del listado: todos o el id de un curso del docente.
+     *
+     * @var string
+     */
+    public string $filtroCurso = 'todos';
+
+    /**
      * Inicializa el curso seleccionado por defecto.
      *
      * @return void
@@ -162,11 +173,7 @@ class GestionAuxiliares extends Component
     }
 
     /**
-     * Auxiliares asignados a los cursos del docente, sin filtrar.
-     *
-     * El listado llega completo a la vista y quien oculta/muestra filas es
-     * Alpine (ver gestion-auxiliares.blade.php): cambiar de filtro no vuelve
-     * a consultar al servidor.
+     * Auxiliares asignados a los cursos del docente.
      *
      * @return \Illuminate\Support\Collection<int, \stdClass>
      *
@@ -175,11 +182,21 @@ class GestionAuxiliares extends Component
      */
     public function auxiliares()
     {
-        return DB::table('auxiliar_curso')
+        $consulta = DB::table('auxiliar_curso')
             ->join('curso', 'curso.id_curso', '=', 'auxiliar_curso.id_curso')
             ->join('usuario', 'usuario.id_usuario', '=', 'auxiliar_curso.id_auxiliar')
             ->where('curso.sis_doc', auth()->id())
-            ->select('usuario.id_usuario', 'usuario.cod_sis', 'usuario.nombre_usuario', 'usuario.apellido', 'curso.nombre_curso', 'auxiliar_curso.id_curso', 'auxiliar_curso.estado')
+            ->select('usuario.id_usuario', 'usuario.cod_sis', 'usuario.nombre_usuario', 'usuario.apellido', 'curso.nombre_curso', 'auxiliar_curso.estado');
+
+        if (in_array($this->filtroEstado, ['Activo', 'Baja'], true)) {
+            $consulta->where('auxiliar_curso.estado', $this->filtroEstado);
+        }
+
+        if ($this->filtroCurso !== 'todos') {
+            $consulta->where('auxiliar_curso.id_curso', (int) $this->filtroCurso);
+        }
+
+        return $consulta
             ->orderBy('usuario.nombre_usuario')
             ->get();
     }

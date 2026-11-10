@@ -10,10 +10,6 @@
     asignados con filtros de estado y curso, botón de creación fuera de la
     tarjeta y modal para crear un nuevo auxiliar.
 
-    Los filtros son de Alpine (mostrar/ocultar filas ya traídas, igual que en
-    pages/cursos.blade.php): auxiliares() manda el listado completo y cambiar
-    de estado o de curso no hace ida y vuelta a Livewire ni toca la BD.
-
     @changelog
     - 2026-10-19  [ARVIRZUZZTS]  feat: creación inicial de la vista.
     - 2026-11-08  [David E. Chavez T.]  style: mover la creación a un modal
@@ -26,40 +22,13 @@
       junto al botón (en la cabecera de la tarjeta deformaban el espacio de
       la tabla) y la tabla vacía muestra "No hay auxiliares registrados"
       dentro del cuerpo (prop `empty` de x-ui.table).
-    - 2026-11-09  [OchoaCesar]  refactor: los filtros pasan a Alpine
-      (x-model + __xShow por fila, sin wire:model.live); cambiar de filtro
-      ya no consulta al servidor y el mensaje vacío lo decide !hayVisibles().
 
     @see  app/Livewire/Auxiliares/GestionAuxiliares.php
 --}}
 
 @section('title', 'Auxiliares')
 
-<div
-    class="flex flex-col gap-6 px-[2vh] mt-[2vh]"
-    x-data="{
-        estado: 'todos',
-        curso: 'todos',
-        coincide(estado, idCurso) {
-            if (this.estado !== 'todos' && estado !== this.estado) {
-                return false;
-            }
-
-            if (this.curso !== 'todos' && String(idCurso) !== this.curso) {
-                return false;
-            }
-
-            return true;
-        },
-        auxiliares: @js($auxiliares->map(fn ($a) => [
-            'estado' => $a->estado,
-            'curso' => (string) $a->id_curso,
-        ])->values()),
-        hayVisibles() {
-            return this.auxiliares.some((fila) => this.coincide(fila.estado, fila.curso));
-        }
-    }"
->
+<div class="flex flex-col gap-6 px-[2vh] mt-[2vh]">
     @if ($mensajeExito !== '')
         <x-ui.alert type="success" title="Listo">{{ $mensajeExito }}</x-ui.alert>
     @endif
@@ -70,12 +39,14 @@
     <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div class="flex flex-col gap-3 sm:flex-row">
             <div class="sm:w-40">
-                <x-ui.select label="Estado" name="filtroEstado" x-model="estado"
-                    :options="['todos' => 'Todos', 'Activo' => 'Activo', 'Baja' => 'Baja']" />
+                <x-ui.select label="Estado" name="filtroEstado" wire:model.live="filtroEstado"
+                    :options="['todos' => 'Todos', 'Activo' => 'Activo', 'Baja' => 'Baja']"
+                    :selected="$filtroEstado" />
             </div>
             <div class="sm:w-56">
-                <x-ui.select label="Curso" name="filtroCurso" x-model="curso"
-                    :options="['todos' => 'Todos'] + $cursos->pluck('nombre_curso', 'id_curso')->all()" />
+                <x-ui.select label="Curso" name="filtroCurso" wire:model.live="filtroCurso"
+                    :options="['todos' => 'Todos'] + $cursos->pluck('nombre_curso', 'id_curso')->all()"
+                    :selected="$filtroCurso" />
             </div>
         </div>
         <x-ui.button type="button" variant="default" wire:click="abrirModalCrear">
@@ -85,14 +56,12 @@
 
     <div class="bg-neutral-primary-soft border border-default rounded-base shadow-xs p-6">
         <h3 class="text-lg font-semibold text-heading mb-4">Auxiliares asignados</h3>
-        <x-ui.table compact empty="No hay auxiliares registrados" empty-x-show="!hayVisibles()"
-            :headers="['Auxiliar', 'Código SIS', 'Curso', 'Estado']" :rows="$auxiliares->map(fn($a) => [
-                ['heading' => true, 'value' => $a->nombre_usuario.' '.$a->apellido],
-                $a->cod_sis,
-                $a->nombre_curso,
-                $a->estado,
-                '__xShow' => sprintf('coincide(\'%s\', \'%s\')', $a->estado, $a->id_curso),
-            ])->toArray()" />
+        <x-ui.table compact empty="No hay auxiliares registrados" :headers="['Auxiliar', 'Código SIS', 'Curso', 'Estado']" :rows="$auxiliares->map(fn($a) => [
+            ['heading' => true, 'value' => $a->nombre_usuario.' '.$a->apellido],
+            $a->cod_sis,
+            $a->nombre_curso,
+            $a->estado,
+        ])->toArray()" />
     </div>
 
     @if ($mostrarModalCrear)
