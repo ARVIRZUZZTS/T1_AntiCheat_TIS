@@ -355,12 +355,6 @@
             <x-ui.button :variant="$modoVista === 'monitor' ? 'default' : 'secondary'" wire:click="cambiarVista('monitor')">Monitor</x-ui.button>
         </div>
 
-        <div class="flex flex-wrap gap-2 text-xs">
-            <x-ui.button variant="secondary" wire:click="ajustarExamenPrueba(30)">Iniciar en 30 min (mock)</x-ui.button>
-            <x-ui.button variant="secondary" wire:click="ajustarExamenPrueba(15)">Iniciar en 15 min (mock)</x-ui.button>
-            <x-ui.button variant="secondary" wire:click="ajustarExamenPrueba(5)">Iniciar en 5 min (mock)</x-ui.button>
-            <x-ui.button variant="secondary" wire:click="ajustarExamenPrueba(0)">Iniciar ahora (mock)</x-ui.button>
-        </div>
     </div>
 
     @if (in_array($this->estadoAcceso(), ['registro_abierto', 'en_curso']))

@@ -210,7 +210,13 @@ class MonitorEnVivo extends Component
             $examen = $fallback
                 ->orderByDesc('fecha')
                 ->orderByDesc('id_examen')
-                ->firstOrFail();
+                ->first();
+        }
+
+        if ($examen === null) {
+            $this->redirectRoute('examenes');
+
+            return;
         }
 
         $this->idExamen = (int) $examen->id_examen;
@@ -236,6 +242,10 @@ class MonitorEnVivo extends Component
     #[Computed]
     public function informe(): array
     {
+        if ($this->idExamen <= 0) {
+            return ['examen' => null, 'estudiantes' => collect()];
+        }
+
         return Cache::remember(
             $this->claveCacheInforme(),
             now()->addMinutes(self::CACHE_INFORME_MINUTOS),
@@ -250,7 +260,7 @@ class MonitorEnVivo extends Component
      * Examen que sigue el monitor.
      */
     #[Computed]
-    public function examen(): Examen
+    public function examen(): ?Examen
     {
         return $this->informe['examen'];
     }
@@ -384,21 +394,6 @@ class MonitorEnVivo extends Component
      * Cambia la vista activa del monitor (ingreso / monitor) y vuelve a la
      * primera página.
      */
-    /**
-     * Ajusta la hora del examen actual para pruebas (mock). Se elimina en
-     * producción.
-     */
-    public function ajustarExamenPrueba(int $minutos): void
-    {
-        $examen = $this->examen;
-        $nuevaHora = now()->addMinutes($minutos);
-
-        $examen->fecha = $nuevaHora->toDateString();
-        $examen->hora_inicio = $nuevaHora->format('H:i:s');
-        $examen->save();
-
-        Cache::forget($this->claveCacheInforme());
-    }
 
     public function totalProximosExamenes(): int
     {

@@ -219,6 +219,10 @@ class RegistroIngresoService
      */
     private function siguienteId(string $modelo, string $columna): int
     {
+        if (DB::getDriverName() === 'pgsql') {
+            DB::statement('LOCK TABLE registro_asistencia IN SHARE ROW EXCLUSIVE MODE');
+        }
+
         return ((int) $modelo::query()->max($columna)) + 1;
     }
 }

@@ -45,13 +45,15 @@ class ExamenMonitoreoController extends Controller
 
         $idDocente = (int) $request->user()->id_usuario;
         if ($request->user()->roles->contains('nombre_rol', Rol::NOMBRE_AUXILIAR)) {
-            $idDocente = (int) DB::table('examen_curso as ec')
+            $resuelto = DB::table('examen_curso as ec')
                 ->join('auxiliar_curso as ac', 'ac.id_curso', '=', 'ec.id_curso')
                 ->join('curso as c', 'c.id_curso', '=', 'ec.id_curso')
                 ->where('ec.id_examen', $idExamen)
                 ->where('ac.id_auxiliar', $request->user()->id_usuario)
                 ->orderBy('c.id_curso')
                 ->value('c.sis_doc');
+
+            $idDocente = $resuelto === null ? null : (int) $resuelto;
         }
 
         $reporte = $servicio->ejecutar(

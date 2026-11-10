@@ -203,6 +203,10 @@ class CambiarEstadoEstudianteService
             return $registro;
         }
 
+        if (DB::getDriverName() === 'pgsql') {
+            DB::statement('LOCK TABLE estudiante_examen IN SHARE ROW EXCLUSIVE MODE');
+        }
+
         $siguienteId = ((int) EstudianteExamen::max('id_estudiante_examen')) + 1;
 
         return EstudianteExamen::create([
