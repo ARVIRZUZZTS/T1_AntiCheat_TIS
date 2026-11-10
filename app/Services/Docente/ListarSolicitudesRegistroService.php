@@ -95,7 +95,7 @@ class ListarSolicitudesRegistroService
                 self::TTL_PENDIENTES,
                 fn (): int => DB::table('usuario')->where('estado_cuenta', EstadoCuenta::Pendiente->value)->count(),
             );
-        } catch (QueryException $error) {
+        } catch (\Throwable $error) {
             report($error);
 
             return 0;
@@ -105,7 +105,11 @@ class ListarSolicitudesRegistroService
     /** Olvida el número cacheado: se llama al registrar o validar una cuenta. */
     public static function olvidarPendientes(): void
     {
-        Cache::forget(self::CLAVE_PENDIENTES);
+        try {
+            Cache::forget(self::CLAVE_PENDIENTES);
+        } catch (\Throwable $error) {
+            report($error);
+        }
     }
 
     private function nombreCompleto(?string $nombre, ?string $apellido): string

@@ -246,14 +246,23 @@ class MonitorEnVivo extends Component
             return ['examen' => null, 'estudiantes' => collect()];
         }
 
-        return Cache::remember(
-            $this->claveCacheInforme(),
-            now()->addMinutes(self::CACHE_INFORME_MINUTOS),
-            fn (): array => $this->servicioReporte->ejecutar(
+        try {
+            return Cache::remember(
+                $this->claveCacheInforme(),
+                now()->addMinutes(self::CACHE_INFORME_MINUTOS),
+                fn (): array => $this->servicioReporte->ejecutar(
+                    $this->idExamen,
+                    idDocente: $this->idDocenteConfiguracion,
+                ),
+            );
+        } catch (\Throwable $error) {
+            report($error);
+
+            return $this->servicioReporte->ejecutar(
                 $this->idExamen,
                 idDocente: $this->idDocenteConfiguracion,
-            ),
-        );
+            );
+        }
     }
 
     /**
