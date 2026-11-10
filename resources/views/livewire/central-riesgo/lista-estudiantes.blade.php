@@ -1,11 +1,13 @@
 {{--
     @file    lista-estudiantes.blade.php
     @author  Valery D. Ortuno P. <valerydariana98@gmail.com>
+    @author  Alisson D. Alvarado <alvaradoalissondalet@gmail.com>
     @created 2026-10-10
     @updated 2026-10-11
     @updated 2026-10-24
     @updated 2026-10-25
     @updated 2026-11-07
+    @updated 2026-11-09
 
     @description
     Vista del componente Livewire ListaEstudiantes (HU 10): tabs de alcance
@@ -45,6 +47,8 @@
     - 2026-11-07  [Valery D. Ortuno P]  feat: una incidencia puede tener varios
       motivos; se muestran todos ("Motivo 1 · Motivo 2") en la lista y en el
       detalle, y en la card van en su propia línea, debajo del número.
+    - 2026-11-09  [Alisson D. Alvarado]  feat: pestaña para revisar sospechosos de mis materias.
+    - 2026-11-09  [Alisson D. Alvarado]  fix: simplificar las acciones de revisión de sospechosos.
 
     @see  App\Livewire\CentralRiesgo\ListaEstudiantes
     @see  resources/views/partials/busqueda-estudiante.blade.php
@@ -52,12 +56,14 @@
 
 @php
     use App\Models\Rol;
+    use App\Livewire\CentralRiesgo\ListaEstudiantes;
     use App\Services\CentralRiesgo\ListarIncidenciasTramposoService;
     use Illuminate\Support\Carbon;
 
     $alcances = [
         ListarIncidenciasTramposoService::ALCANCE_INSTITUCION => 'Toda la institucion',
         ListarIncidenciasTramposoService::ALCANCE_MIS_MATERIAS => 'Mis materias',
+        ListaEstudiantes::ALCANCE_SOSPECHOSOS => 'Sospechosos',
     ];
 
     $estudiantes = $this->estudiantes;
@@ -66,9 +72,10 @@
     // Distingue la lista vacía por búsqueda de la central sin estudiantes.
     $sinCoincidencias = trim($busqueda) !== '' && $estudiantes->total() === 0;
 
-    $tituloLista = $alcance === ListarIncidenciasTramposoService::ALCANCE_MIS_MATERIAS
+    $esSospechosos = $alcance === ListaEstudiantes::ALCANCE_SOSPECHOSOS;
+    $tituloLista = $esSospechosos ? 'Sospechosos de mis materias' : ($alcance === ListarIncidenciasTramposoService::ALCANCE_MIS_MATERIAS
         ? 'Estudiantes en mis materias'
-        : 'Estudiantes de toda la institucion';
+        : 'Estudiantes de toda la institucion');
 
     $etiquetaReportante = ($detalle['reportado_por_rol'] ?? null) === Rol::NOMBRE_AUXILIAR
         ? 'Auxiliar que reporto'
@@ -97,6 +104,12 @@
                 </div>
             </div>
 
+            @if ($mensajeRevision || $errorRevision)
+                <p role="status" class="mt-4 text-sm {{ $errorRevision ? 'text-fg-danger-strong' : 'text-fg-brand' }}">
+                    {{ $errorRevision ?: $mensajeRevision }}
+                </p>
+            @endif
+
             <div class="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
                 <div class="relative min-w-0 flex-1">
                     <div class="pointer-events-none absolute inset-y-0 start-0 flex items-center ps-3">
@@ -121,7 +134,7 @@
 
             @if ($estudiantes->total() === 0)
                 <p class="mt-6 rounded-xl border border-default bg-neutral-primary-soft p-8 text-center text-sm text-body">
-                    {{ $sinCoincidencias ? 'No se encontro ninguna coincidencia' : 'No hay estudiantes registrados' }}
+                    {{ $sinCoincidencias ? 'No se encontro ninguna coincidencia' : ($esSospechosos ? 'No hay sospechosos pendientes de revisión' : 'No hay estudiantes registrados') }}
                 </p>
             @else
                 {{-- Móvil: cards de estudiantes. --}}
@@ -148,12 +161,16 @@
                             </div>
                             <div class="mt-3 flex items-center justify-between gap-3">
                                 <div class="min-w-0 text-xs">
-                                    <p class="font-semibold text-heading">Incidencia N° {{ $estudiante['numero_incidencia'] }}</p>
+                                    @if ($esSospechosos)
+                                        <p class="font-semibold text-heading">Pendiente de revisión</p>
+                                    @else
+                                        <p class="font-semibold text-heading">Incidencia N° {{ $estudiante['numero_incidencia'] }}</p>
+                                    @endif
                                     <p class="mt-0.5 break-words text-body">{{ $estudiante['motivo_etiqueta'] }}</p>
                                 </div>
                                 <button type="button" wire:click.stop="verDetalle({{ $estudiante['id_registro'] }})"
                                         class="shrink-0 cursor-pointer border-0 bg-transparent p-0 text-xs font-bold text-fg-danger-strong hover:underline">
-                                    Ver detalle ›
+                                    {{ $esSospechosos ? 'Revisar' : 'Ver detalle' }} ›
                                 </button>
                             </div>
                         </article>
@@ -172,7 +189,7 @@
                                     <th scope="col" class="px-4 py-3 text-[10px] font-medium uppercase tracking-wider text-body">Estudiante</th>
                                     <th scope="col" class="px-4 py-3 text-[10px] font-medium uppercase tracking-wider text-body">Codigo SIS</th>
                                     <th scope="col" class="px-4 py-3 text-[10px] font-medium uppercase tracking-wider text-body">Materia</th>
-                                    <th scope="col" class="px-4 py-3 text-[10px] font-medium uppercase tracking-wider text-body">N° incidencia</th>
+                                    <th scope="col" class="px-4 py-3 text-[10px] font-medium uppercase tracking-wider text-body">{{ $esSospechosos ? 'Estado' : 'N° incidencia' }}</th>
                                     <th scope="col" class="px-4 py-3 text-[10px] font-medium uppercase tracking-wider text-body">Motivo</th>
                                     <th scope="col" class="px-4 py-3"><span class="sr-only">Acciones</span></th>
                                 </tr>
@@ -199,12 +216,12 @@
                                         </td>
                                         <td class="px-4 py-4 font-mono text-body">{{ $estudiante['sis'] }}</td>
                                         <td class="px-4 py-4 text-body">{{ $estudiante['materia'] ?? 'Sin materia' }}</td>
-                                        <td class="px-4 py-4 font-semibold text-heading">{{ $estudiante['numero_incidencia'] }}</td>
+                                        <td class="px-4 py-4 font-semibold text-heading">{{ $esSospechosos ? 'Pendiente' : $estudiante['numero_incidencia'] }}</td>
                                         <td class="px-4 py-4 text-body">{{ $estudiante['motivo_etiqueta'] }}</td>
                                         <td class="px-4 py-4 text-end">
                                             <button type="button" wire:click.stop="verDetalle({{ $estudiante['id_registro'] }})"
                                                     class="cursor-pointer whitespace-nowrap border-0 bg-transparent p-0 text-xs font-bold text-fg-danger-strong">
-                                                Ver detalle
+                                                {{ $esSospechosos ? 'Revisar' : 'Ver detalle' }}
                                             </button>
                                         </td>
                                     </tr>
@@ -238,8 +255,7 @@
         </section>
 
         @if ($detalle !== null)
-            {{-- Detalle como modal: se abre encima de la lista y se cierra con
-                 la X, con "Aceptar" o tocando el fondo. No hay más acciones. --}}
+            {{-- La revisión reutiliza el detalle para que el docente vea el caso antes de resolverlo. --}}
             <div wire:key="modal-detalle-{{ $detalle['id_registro'] }}"
                  class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/50 p-4"
                  role="dialog" aria-modal="true" aria-labelledby="titulo-detalle-incidencia"
@@ -300,7 +316,7 @@
                             <div>
                                 <dt class="text-[10px] font-medium uppercase tracking-wider text-body">Estado</dt>
                                 <dd class="mt-1">
-                                    <x-ui.badge type="danger" class="font-semibold">{{ $detalle['estado'] }}</x-ui.badge>
+                                    <x-ui.badge :type="$esSospechosos ? 'warning' : 'danger'" class="font-semibold">{{ $detalle['estado'] }}</x-ui.badge>
                                 </dd>
                             </div>
                             <div>
@@ -310,11 +326,22 @@
                         </dl>
                     </div>
 
-                    <div class="flex justify-end border-t border-neutral-quaternary px-4 py-3">
-                        <button type="button" wire:click="cerrarDetalle"
-                                class="inline-flex items-center justify-center rounded-base border border-transparent bg-brand px-4 py-2 text-sm font-medium text-white shadow-xs hover:bg-brand-strong focus:outline-none focus:ring-4 focus:ring-brand-medium">
-                            Aceptar
-                        </button>
+                    <div class="flex flex-wrap justify-end gap-2 border-t border-neutral-quaternary px-4 py-3">
+                        @if ($esSospechosos)
+                            <button type="button" wire:click="resolverSospechoso('rechazar')" wire:loading.attr="disabled"
+                                    class="rounded-base border border-danger-subtle px-4 py-2 text-sm font-medium text-fg-danger-strong">
+                                Rechazar incidencia
+                            </button>
+                            <button type="button" wire:click="resolverSospechoso('confirmar')" wire:loading.attr="disabled"
+                                    class="rounded-base bg-brand px-4 py-2 text-sm font-medium text-white">
+                                Confirmar incidencia
+                            </button>
+                        @else
+                            <button type="button" wire:click="cerrarDetalle"
+                                    class="inline-flex items-center justify-center rounded-base border border-transparent bg-brand px-4 py-2 text-sm font-medium text-white shadow-xs hover:bg-brand-strong focus:outline-none focus:ring-4 focus:ring-brand-medium">
+                                Aceptar
+                            </button>
+                        @endif
                     </div>
                 </div>
             </div>
