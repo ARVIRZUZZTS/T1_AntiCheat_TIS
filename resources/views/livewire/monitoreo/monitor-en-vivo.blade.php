@@ -375,11 +375,11 @@
         <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4 sm:gap-y-3">
             <h2 class="text-lg font-semibold text-heading sm:shrink-0">{{ $modoVista === 'monitor' ? 'Monitor en vivo' : 'Registro de ingresos' }}</h2>
 
-            <div class="flex-1 min-w-0 sm:min-w-[280px]">
+            <div class="flex-1 min-w-0 sm:min-w-[280px] relative">
                 {{-- Sin botón "Buscar": filtra solo con lo que se escribe
                      (debounce de 350ms). wireSubmit se mantiene nada más
                      para que Enter no dispare el submit nativo del <form>
-                     (recargaría la página) — busqueda ya viaja sola por
+                     (recargar la página) — busqueda ya viaja sola por
                      wire:model.live. Solo letras (con tildes/ñ), dígitos y
                      espacios, igual que los demás buscadores del sistema. --}}
                 <x-ui.search-input
@@ -391,6 +391,13 @@
                     wireSubmit="buscar"
                     @input="$event.target.value = $event.target.value.replace(/[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9 ]/g, '')"
                 />
+                @if ($busqueda !== '')
+                    <button type="button" wire:click="limpiarBusqueda"
+                            class="absolute right-3 top-1/2 -translate-y-1/2 text-body hover:text-heading"
+                            aria-label="Limpiar búsqueda">
+                        ✕
+                    </button>
+                @endif
             </div>
 
             <div class="flex flex-wrap gap-2 sm:shrink-0">
@@ -406,7 +413,7 @@
 
         <div class="mt-4">
             @if ($this->estudiantes->total() === 0)
-                <p class="text-center text-sm text-body py-6">No se encontraron estudiantes con ese criterio.</p>
+                <p class="text-center text-sm text-body py-6">No se encontró ninguna coincidencia.</p>
                 {{-- Un estudiante que no está en la lista (no inscrito o no
                      registrado en la base) también se puede registrar: abre el
                      modal del no inscrito con el SIS buscado precargado. --}}

@@ -549,6 +549,13 @@ class MonitorEnVivo extends Component
         $this->pagina = 1;
     }
 
+    public function limpiarBusqueda(): void
+    {
+        $this->busqueda = '';
+        $this->pagina = 1;
+        $this->filtro = 'todos';
+    }
+
     /**
      * Abre el registro de incidencia de un estudiante que no está en la lista
      * del examen (no inscrito o no registrado en la base). Si lo buscado son
@@ -561,7 +568,14 @@ class MonitorEnVivo extends Component
     public function abrirRegistroNoInscrito(): void
     {
         $termino = trim($this->busqueda);
-        $esSis = preg_match('/^\d+$/', $termino) === 1;
+
+        if ($termino !== '' && preg_match('/^\d+$/', $termino) === 1 && ! preg_match('/^\d{9}$/', $termino)) {
+            $this->mensajeError = 'SIS inválido.';
+
+            return;
+        }
+
+        $esSis = preg_match('/^\d{9}$/', $termino) === 1;
 
         $this->dispatch(
             'abrir-modal-no-inscrito',
@@ -784,6 +798,9 @@ class MonitorEnVivo extends Component
 
         Cache::forget($this->claveCacheInforme());
         $this->incidenciaRegistrada = true;
+        $this->busqueda = '';
+        $this->pagina = 1;
+        $this->filtro = 'todos';
     }
 
     /**
@@ -844,6 +861,9 @@ class MonitorEnVivo extends Component
             $accion();
             Cache::forget($this->claveCacheInforme());
             $this->mensajeExito = $exito;
+            $this->busqueda = '';
+            $this->pagina = 1;
+            $this->filtro = 'todos';
         } catch (InvalidArgumentException $e) {
             $this->mensajeError = $e->getMessage();
         }

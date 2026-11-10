@@ -282,11 +282,20 @@ class GenerarReporteAsistenciaService
             return null;
         }
 
-        return ConfiguracionExamenDocente::query()
+        $configuracion = ConfiguracionExamenDocente::query()
             ->where('id_examen', $examen->id_examen)
             ->delDocente($idDocente)
             ->with(['normas', 'materialesPermitidos', 'normasPersonalizadas', 'materialesPersonalizados'])
-            ->firstOrFail();
+            ->first();
+
+        if ($configuracion === null) {
+            \Illuminate\Support\Facades\Log::warning('Configuración de examen no encontrada para el docente.', [
+                'id_examen' => $examen->id_examen,
+                'id_docente' => $idDocente,
+            ]);
+        }
+
+        return $configuracion;
     }
 
     private function clave(mixed $idInscripcion, mixed $sis): string
