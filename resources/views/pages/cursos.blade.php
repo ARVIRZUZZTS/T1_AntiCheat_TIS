@@ -4,14 +4,18 @@
     @created 2026-09-29
     @updated 2026-10-12
     @updated 2026-10-24
+    @updated 2026-11-09
 
     @description
     Lista de los cursos del docente autenticado, con los botones "Crear curso"
-    y "Ver curso" arriba, buscador + filtros (Todos / Activos / Invitados) y una
-    card de ancho completo por curso. Al elegirla aparecen sus métricas del
-    próximo examen (inscritos, habilitados, deshabilitados, incidencias). Queda con
-    borde azul) y recién ahí se activa "Ver curso", que lleva a
-    `cursos.detalle`. "Crear curso" es otra página.
+    y "Ver curso" arriba, buscador + filtros (Todos / Activos / Finalizados)
+    y una card de ancho completo por curso. Al elegirla aparecen sus métricas
+    del próximo examen (inscritos, habilitados, deshabilitados,
+    incidencias). Queda con borde azul) y recién ahí se activa "Ver curso",
+    que lleva a `cursos.detalle`. "Crear curso" es otra página.
+
+    Solo se listan los cursos propios del docente: las invitaciones son por
+    examen y los cursos compartidos se manejan en la sección Exámenes.
 
     Los cursos llegan ordenados desde ListarCursosDocenteService: primero los
     activos y abajo los finalizados (cursos pasados), cada grupo del más
@@ -48,6 +52,16 @@
       existen cursos registrados.". Los cursos sin estudiantes ya no se pintan
       de amarillo: un curso recien creado siempre empieza sin inscritos. Debajo
       del nombre se muestra la gestión con su año ("Segundo semestre 2026").
+    - 2026-11-09  [Diegootm]  fix: se quita el filtro "Invitados" y los cursos
+      compartidos dejan de listarse (la invitación es por examen, no por curso).
+      Se agrega el filtro "Finalizados" que exigía el criterio de aceptación.
+    - 2026-11-09  [Diegootm]  fix: se quita la insignia "Anfitrion" de la lista
+      de Cursos (sigue en Exámenes, que es donde importa la invitación) y se da
+      más separación entre el nombre y la insignia de estado.
+    - 2026-11-09  [Diegootm]  style: en desktop la card pone el encabezado a la
+      izquierda y las métricas a su lado ocupando todo el ancho (rejilla de 4
+      con separadores, el último número pegado al borde derecho), en vez de
+      apilar todo o dejar espacio vacío a la derecha; en mobile sigue apilado.
 
     @see  App\Http\Controllers\CursoController
     @see  App\Services\Curso\ListarCursosDocenteService
@@ -91,7 +105,7 @@
                     this.seleccionado = null;
                 }
             },
-            coincide(nombre, activo, invitado) {
+            coincide(nombre, activo) {
                 const termino = this.busqueda.trim().toLowerCase();
 
                 if (termino !== '' && !nombre.toLowerCase().includes(termino)) {
@@ -102,7 +116,7 @@
                     return false;
                 }
 
-                if (this.filtro === 'invitados' && !invitado) {
+                if (this.filtro === 'finalizados' && activo) {
                     return false;
                 }
 
@@ -111,10 +125,9 @@
             cursos: @js($cursos->map(fn ($fila) => [
                 'nombre' => $fila['curso']->nombre_curso,
                 'activo' => $fila['curso']->estado === 'EnCurso',
-                'invitado' => $fila['invitado'],
             ])->values()),
             hayVisibles() {
-                return this.cursos.some((curso) => this.coincide(curso.nombre, curso.activo, curso.invitado));
+                return this.cursos.some((curso) => this.coincide(curso.nombre, curso.activo));
             }
         }"
         @click="soltarSeleccion($event)"
@@ -123,7 +136,7 @@
     >
         @php
             $totalActivos = $cursos->filter(fn ($fila) => $fila['curso']->estado === 'EnCurso')->count();
-            $totalInvitados = $cursos->filter(fn ($fila) => $fila['invitado'])->count();
+            $totalFinalizados = $cursos->count() - $totalActivos;
 
             $pillBase = 'shrink-0 whitespace-nowrap inline-flex items-center justify-center box-border border focus:ring-4 shadow-xs font-medium leading-5 rounded-full focus:outline-none px-4 py-2.5 text-sm';
             $pillActiva = 'text-white bg-brand border-transparent hover:bg-brand-strong focus:ring-brand-medium';
@@ -172,8 +185,8 @@
                 <button type="button" class="{{ $pillBase }}" :aria-pressed="filtro === 'activos'" :class="filtro === 'activos' ? '{{ $pillActiva }}' : '{{ $pillInactiva }}'" @click="filtro = 'activos'; seleccionado = null">
                     Activos {{ $totalActivos }}
                 </button>
-                <button type="button" class="{{ $pillBase }}" :aria-pressed="filtro === 'invitados'" :class="filtro === 'invitados' ? '{{ $pillActiva }}' : '{{ $pillInactiva }}'" @click="filtro = 'invitados'; seleccionado = null">
-                    Invitados {{ $totalInvitados }}
+                <button type="button" class="{{ $pillBase }}" :aria-pressed="filtro === 'finalizados'" :class="filtro === 'finalizados' ? '{{ $pillActiva }}' : '{{ $pillInactiva }}'" @click="filtro = 'finalizados'; seleccionado = null">
+                    Finalizados {{ $totalFinalizados }}
                 </button>
             </div>
         </div>
@@ -195,7 +208,7 @@
                 {{-- La card entera es la opción: al tocarla queda seleccionada con
                      el anillo azul, el mismo que usan las tarjetas de exámenes. --}}
                 <div
-                    x-show="coincide(@js($curso->nombre_curso), @js($esActivo), @js($fila['invitado']))"
+                    x-show="coincide(@js($curso->nombre_curso), @js($esActivo))"
                     x-cloak
                     data-seleccionable
                     role="button" tabindex="0"
@@ -204,37 +217,41 @@
                     @click="seleccionado = {{ $curso->id_curso }}"
                     @keydown.enter.prevent="seleccionado = {{ $curso->id_curso }}"
                     @keydown.space.prevent="seleccionado = {{ $curso->id_curso }}"
-                    class="cursor-pointer rounded-base bg-neutral-primary-soft shadow-xs p-4 sm:p-5 flex flex-col gap-4 sm:flex-row sm:items-center border border-default"
+                    class="cursor-pointer rounded-base bg-neutral-primary-soft shadow-xs border border-default p-4 sm:p-5 flex flex-col gap-4 lg:flex-row lg:items-center lg:gap-6"
                 >
-                    {{-- Ícono + nombre + badge de estado. --}}
-                    <div class="flex items-center gap-3 sm:w-80 sm:shrink-0 min-w-0">
-                        <span class="shrink-0 flex items-center justify-center w-10 h-10 rounded-base bg-brand-softer text-fg-brand">
-                            <svg class="w-5 h-5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25"/></svg>
+                    {{-- Encabezado: ícono + nombre + badges y la gestión debajo.
+                         En desktop ocupa la columna izquierda y las métricas van
+                         al lado para aprovechar el ancho. --}}
+                    <div class="flex items-center gap-3 sm:gap-4 min-w-0 lg:w-80 lg:shrink-0">
+                        <span class="shrink-0 flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 rounded-base bg-brand-softer text-fg-brand">
+                            <svg class="w-5 h-5 sm:w-6 sm:h-6" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25"/></svg>
                         </span>
-                        <div class="min-w-0">
-                            <div class="flex flex-wrap items-center gap-2">
+                        <div class="min-w-0 flex-1">
+                            <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5">
                                 <p class="font-semibold text-heading break-words">{{ $curso->nombre_curso }}</p>
                                 <x-ui.badge :type="$esActivo ? 'status-habilitado' : 'gray'">
                                     {{ $esActivo ? 'Activo' : 'Finalizado' }}
                                 </x-ui.badge>
-                                @if ($fila['invitado'])
-                                    <x-ui.badge type="success">Invitado</x-ui.badge>
-                                @endif
-                                @if (!empty($fila['es_anfitrion']))
-                                    <x-ui.badge type="brand">Anfitrion</x-ui.badge>
-                                @endif
                             </div>
-                            <p class="text-xs text-body">{{ $fila['gestion'] ?? 'Gestión y año no registrados' }}</p>
+                            <p class="mt-1 text-xs text-body">{{ $fila['gestion'] ?? 'Gestión y año no registrados' }}</p>
                         </div>
                     </div>
 
-                    {{-- Métricas: fila de 4 columnas compactas en mobile, en línea en desktop. --}}
-                    <div x-show="seleccionado === {{ $curso->id_curso }}" x-cloak class="w-full sm:flex-1" @click.stop>
+                    {{-- Métricas al seleccionar: a la derecha del encabezado en
+                         desktop (separadas por una línea vertical) y apiladas
+                         debajo en mobile, para que el contenido no quede todo en
+                         una sola columna ni amontonado. --}}
+                    <div
+                        x-show="seleccionado === {{ $curso->id_curso }}"
+                        x-cloak
+                        class="w-full border-t border-default pt-4 lg:w-auto lg:flex-1 lg:border-t-0 lg:border-l lg:pl-6 lg:pt-0"
+                        @click.stop
+                    >
                         @if ($fila['proximo_examen'])
-                            <p class="mb-2 text-xs text-body">Próximo examen: {{ \Illuminate\Support\Carbon::parse($fila['proximo_examen']->fecha)->format('d/m/Y') }} {{ substr($fila['proximo_examen']->hora_inicio, 0, 5) }}</p>
-                            <div class="grid grid-cols-4 gap-2 sm:flex sm:justify-center sm:gap-8">
+                            <p class="mb-3 text-xs text-body">Próximo examen: {{ \Illuminate\Support\Carbon::parse($fila['proximo_examen']->fecha)->format('d/m/Y') }} {{ substr($fila['proximo_examen']->hora_inicio, 0, 5) }}</p>
+                            <div class="grid grid-cols-4 gap-2 sm:gap-0 sm:divide-x sm:divide-default">
                                 @foreach ($metricas as $metrica)
-                                    <div class="text-center">
+                                    <div class="text-center sm:px-5 first:sm:pl-0 last:sm:pr-0">
                                         <p class="text-xl sm:text-2xl font-semibold {{ $metrica['valor'] === 0 ? 'text-fg-disabled' : $metrica['color'] }}">{{ $metrica['valor'] }}</p>
                                         <p class="text-[11px] sm:text-xs text-body">{{ $metrica['etiqueta'] }}</p>
                                     </div>

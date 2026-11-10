@@ -8,6 +8,7 @@
  * @created 2026-10-24
  *
  * @updated 2026-11-04
+ * @updated 2026-11-09
  *
  * @description
  * Pruebas de integración del alta de curso (POST /cursos) contra el esquema
@@ -30,6 +31,9 @@
  * - 2026-11-04  [Valery D. Ortuno P]  test: el año va desde el actual (sin
  *   tope) y no se repite un curso en la misma gestión y año; sí en otra
  *   gestión o en otro año.
+ * - 2026-11-09  [Diegootm]  fix: usuarios de prueba con nombre propio
+ *   ("DocenteAltaCurso") — el genérico "Docente" choca con el índice único
+ *   usuario_nombre_usuario_unique de la base compartida de Supabase.
  */
 
 namespace Tests\Feature\Cursos;
@@ -53,8 +57,8 @@ class CrearCursoTest extends TestCase
         parent::setUp();
 
         DB::table('usuario')->insert([
-            ['id_usuario' => self::ID_DOCENTE, 'cod_sis' => 'DOC900401', 'password' => 'x', 'nombre_usuario' => 'Docente', 'apellido' => 'Alta Curso'],
-            ['id_usuario' => self::ID_AUXILIAR, 'cod_sis' => 'AUX900402', 'password' => 'x', 'nombre_usuario' => 'Auxiliar', 'apellido' => 'Alta Curso'],
+            ['id_usuario' => self::ID_DOCENTE, 'cod_sis' => 'DOC900401', 'password' => 'x', 'nombre_usuario' => 'DocenteAltaCurso', 'apellido' => 'Alta Curso'],
+            ['id_usuario' => self::ID_AUXILIAR, 'cod_sis' => 'AUX900402', 'password' => 'x', 'nombre_usuario' => 'AuxiliarAltaCurso', 'apellido' => 'Alta Curso'],
         ]);
 
         DB::table('rol_usuario')->insert([
