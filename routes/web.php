@@ -14,6 +14,7 @@
  * @updated 2026-10-24
  * @updated 2026-10-25
  * @updated 2026-11-08
+ * @updated 2026-11-14
  *
  * @description
  * Definición de rutas web del panel. Incluye vistas estáticas y componentes Livewire.
@@ -78,6 +79,9 @@
  *   compatibilidad.
  * - 2026-11-08  [OchoaCesar]  refactor: se retira la ruta /docente/auxiliares
  *   (pestaña "Ver auxiliares"); los auxiliares se consultan desde /auxiliares.
+ * - 2026-11-14  [Alex Candia]  feat: /examenes deja de filtrar por materia y
+ *   usa el endpoint global /api/examenes; el curso del alta se elige en el
+ *   formulario y las rutas por curso siguen por compatibilidad.
  */
 
 use App\Http\Controllers\AuthController;
@@ -161,8 +165,8 @@ Route::middleware(['auth', 'docente'])->group(function (): void {
     Route::get('/cursos/{curso}/estudiantes/estado', EstudiantesCurso::class)
         ->name('cursos.estudiantes.estado');
 
-    // Sección Exámenes: una sola página con selector de materia y las cuatro
-    // pestañas. Las rutas por curso se mantienen por compatibilidad.
+    // Sección Exámenes: una sola página con el listado global del docente y las
+    // cuatro pestañas. Las rutas por curso se mantienen por compatibilidad.
     Route::get('/examenes', [ExamenController::class, 'index'])->name('examenes');
     Route::get('/examenes/curso/{curso}', [ExamenController::class, 'curso'])
         ->whereNumber('curso')

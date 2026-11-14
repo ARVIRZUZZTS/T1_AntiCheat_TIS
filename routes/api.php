@@ -22,12 +22,10 @@
  * - 2026-10-25  [Alisson D. Alvarado]  feat: rutas para previsualizar y confirmar división de examen por ambientes.
  * - 2026-11-05  [Alex Candia]  feat: detalle de examen para precargar la pestaña Editar Examen.
  * - 2026-11-07  [Diego Tejerina]  feat: PUT de guardado del examen editado (#261).
-<<<<<<< HEAD
  * - 2026-11-08  [OchoaCesar]  feat: GET de auxiliares del docente autenticado.
-=======
  * - 2026-11-08  [Alisson D. Alvarado]  feat: ruta para sugerir nombres de usuario.
- * @author Alisson D. Alvarado <alvaradoalissondalet@gmail.com>
->>>>>>> 8a975d175e95dc5a8d3c7dcb1a6b608b5249b74d
+ * - 2026-11-14  [Alex Candia]  feat: GET con los examenes del docente
+ *   autenticado para el listado global y los selectores de Examenes.
  */
 
 use App\Http\Controllers\Api\AuxiliaresDocenteController;
@@ -38,6 +36,7 @@ use App\Http\Controllers\Api\CursoExamenController;
 use App\Http\Controllers\Api\DetalleIncidenciaController;
 use App\Http\Controllers\Api\DividirExamenController;
 use App\Http\Controllers\Api\EstudianteExamenController;
+use App\Http\Controllers\Api\ExamenDocenteController;
 use App\Http\Controllers\Api\ExamenEdicionController;
 use App\Http\Controllers\Api\ExamenMonitoreoController;
 use App\Http\Controllers\Api\InvitacionExamenController;
@@ -84,6 +83,10 @@ Route::middleware(['web', 'auth:web'])->group(function (): void {
     Route::patch('/notificaciones/{idNotificacion}/ocultar', [NotificacionController::class, 'ocultar'])
         ->whereNumber('idNotificacion')
         ->name('api.notificaciones.ocultar');
+
+    Route::get('/examenes', [ExamenDocenteController::class, 'index'])
+        ->middleware('docente')
+        ->name('api.examenes.listar');
 
     Route::get('/examenes/{examen}/invitaciones', [InvitacionExamenController::class, 'index'])
         ->whereNumber('examen')

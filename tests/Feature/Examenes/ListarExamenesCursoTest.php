@@ -48,6 +48,7 @@ class ListarExamenesCursoTest extends TestCase
             'foreign_key_constraints' => true,
         ]]);
         DB::setDefaultConnection('examenes_pruebas');
+        $this->withoutMiddleware(\Illuminate\Auth\Middleware\Authenticate::class);
         $this->travelTo(Carbon::parse('2026-10-09 12:00:00'));
         $this->crearEsquema();
 
@@ -99,18 +100,25 @@ class ListarExamenesCursoTest extends TestCase
         $this->getJson('/api/cursos/1/examenes')->assertOk()->assertExactJson([
             'datos' => [[
                 'id' => 1,
+                'es_propio' => true,
+                'es_anfitrion' => false,
+                'nombre' => 'Examen final',
                 'tipo' => 'Examen final',
-                'estado' => 'Programado',
                 'fecha' => '2026-10-10',
                 'hora_inicio' => '08:00',
                 'hora_fin' => '10:00',
                 'duracion' => 120,
+                'cursos' => [
+                    ['id' => 1, 'nombre' => 'Sistemas'],
+                ],
+                'curso' => 'Sistemas',
                 'inscritos' => 3,
                 'ingresados' => 2,
                 'ambientes' => [
                     ['id' => 1, 'nombre' => 'Aula 101'],
                     ['id' => 2, 'nombre' => 'Laboratorio'],
                 ],
+                'estado' => 'Programado',
             ]],
         ]);
     }
@@ -227,6 +235,12 @@ class ListarExamenesCursoTest extends TestCase
             $tabla->primary(['id_examen', 'id_curso']);
             $tabla->foreign('id_examen')->references('id_examen')->on('examen');
             $tabla->foreign('id_curso')->references('id_curso')->on('curso');
+        });
+        Schema::create('invitacion_examen_compartido', function (Blueprint $tabla): void {
+            $tabla->integer('id_examen');
+            $tabla->integer('id_docente_invitador');
+            $tabla->integer('id_docente_invitado');
+            $tabla->string('estado');
         });
         Schema::create('ambiente', function (Blueprint $tabla): void {
             $tabla->integer('id_ambiente')->primary();

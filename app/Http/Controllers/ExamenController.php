@@ -12,17 +12,18 @@
  * @updated 2026-10-25
  * @updated 2026-10-26
  * @updated 2026-11-05
+ * @updated 2026-11-14
  *
  * @description
  * Controlador HTTP de la sección Exámenes del docente. Solo orquesta:
  *
- * - `index`: selector de materia y las cuatro pestañas de exámenes en una sola
- *   página.
+ * - `index`: listado global de exámenes futuros y las cuatro pestañas en una
+ *   sola página; el curso del alta se elige dentro del formulario.
  * - `curso`: página anterior de un curso (se mantiene por compatibilidad).
  * - `crear`: el formulario de alta de un examen, como página propia.
  * - `store`: valida (StoreExamenRequest), delega el alta en
- *   RegistrarExamenService y vuelve a la página única con la materia elegida
- *   y un mensaje de éxito.
+ *   RegistrarExamenService y vuelve a la página única con el curso elegido y
+ *   un mensaje de éxito.
  *
  * Si la validación falla no hace falta manejar nada: el request redirige de
  * vuelta al formulario con los errores y el input viejo.
@@ -46,6 +47,9 @@
  * - 2026-11-05  [Alex Candia]  feat: la página del curso entrega los catálogos
  *   también cuando ya no se pueden crear exámenes, porque Editar Examen los
  *   necesita para precargar el formulario.
+ * - 2026-11-14  [Alex Candia]  feat: la página única ya no filtra por materia;
+ *   cataloga los cursos activos para el selector del formulario y reabre Crear
+ *   Examen tras un error de validación aunque el curso no haya llegado.
  *
  * @see  StoreExamenRequest
  * @see  App\Services\Examen\CatalogosExamenService
@@ -69,9 +73,10 @@ use Illuminate\Support\Facades\Gate;
 class ExamenController extends Controller
 {
     /**
-     * Sección Exámenes: selector de materia y, debajo, las cuatro pestañas de
-     * gestión del curso elegido. La página no navega: el selector y las
-     * pestañas viven en el mismo documento.
+     * Sección Exámenes: listado global con las cuatro pestañas de gestión. La
+     * página no navega; el formulario de Crear Examen elige el curso con un
+     * selector propio. Si la URL o el input viejo traen un curso válido, el
+     * selector arranca con ese curso.
      *
      * @param  Request  $request  Request con el docente autenticado.
      * @param  ListarCursosDocenteService  $cursos  Servicio de cursos del docente.
@@ -100,28 +105,21 @@ class ExamenController extends Controller
             ? $cursos->firstWhere('id_curso', $cursoId)
             : null;
 
-        // Si el alta falló, se vuelve a abrir la pestaña del formulario.
+        // Si el alta falló, se vuelve a abrir la pestaña del formulario para
+        // mostrar los errores junto al curso que se alcanzó a elegir.
         $hayErrores = (bool) $request->session()->get('errors')?->any();
-        $vieneDelAlta = $request->old('curso_id') !== null;
-        $tabInicial = $hayErrores && $vieneDelAlta && $cursoInicial !== null
+        $vieneDelAlta = $request->session()->hasOldInput();
+        $tabInicial = $hayErrores && $vieneDelAlta && $cursos->isNotEmpty()
             ? 'crear'
             : 'lista';
-
-        $catalogo = $cursos->isNotEmpty()
-            ? [
-                'ambientes' => $catalogos->ambientes(),
-                'materiales' => $catalogos->materiales(),
-                'normas' => $catalogos->normas(),
-            ]
-            : ['ambientes' => [], 'materiales' => [], 'normas' => []];
 
         return view('pages.examenes', [
             'cursos' => $cursos,
             'cursoInicial' => $cursoInicial,
             'tabInicial' => $tabInicial,
-            'ambientes' => $catalogo['ambientes'],
-            'materiales' => $catalogo['materiales'],
-            'normas' => $catalogo['normas'],
+            'ambientes' => $catalogos->ambientes(),
+            'materiales' => $catalogos->materiales(),
+            'normas' => $catalogos->normas(),
         ]);
     }
 

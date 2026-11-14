@@ -3,13 +3,14 @@
     @author  Valery D. Ortuno P <valerydariana98@gmail.com>
     @created 2026-10-24
     @updated 2026-10-25
+    @updated 2026-11-14
 
     @description
     Exámenes de un curso. Página anterior, se mantiene por compatibilidad: la
-    sección Exámenes ya es una sola página con selector de materia. Aporta el
-    encabezado (nombre del curso y flecha de volver a Exámenes) y pasa los
-    catálogos del formulario; las pestañas de listado, alta, invitación y
-    división viven en el parcial examenes-curso.
+    sección Exámenes ya es una sola página con el listado global del docente.
+    Aporta el encabezado (nombre del curso y flecha de volver a Exámenes) y pasa
+    los catálogos del formulario; las pestañas de listado, alta, edición y
+    división viven en el parcial examenes-curso, con el curso fijo.
 
     @changelog
     - 2026-10-24  [Valery D. Ortuno P]  feat: creación inicial de la página.
@@ -17,6 +18,8 @@
       permiso de alta para incrustar el formulario en la pestaña Crear Examen.
     - 2026-10-25  [Alex Candia]  refactor: queda como página de compatibilidad;
       la sección Exámenes pasa a una sola página con selector de materia.
+    - 2026-11-14  [Alex Candia]  docs: la página conserva el curso fijo mientras
+      la página única usa el listado global y el selector de curso del alta.
 
     @see  App\Http\Controllers\ExamenController
     @see  resources/views/partials/examenes-curso.blade.php

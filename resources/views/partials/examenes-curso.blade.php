@@ -8,22 +8,29 @@
     @updated 2026-10-26
     @updated 2026-11-04
     @updated 2026-11-05
+    @updated 2026-11-14
 
     @description
-    Exámenes de la materia elegida en la página única Exámenes. Arriba va el
-    selector de materia; mientras no haya una seleccionada no se muestran las
-    cuatro pestañas.
+    Parcial de la sección Exámenes. En la página única lista todos los exámenes
+    del docente (propios o con invitación aceptada), pasados y futuros, con el
+    curso como parte del nombre; en la página de compatibilidad por curso
+    conserva el listado acotado a ese curso. Los selectores de Editar, Invitar y
+    Dividir siguen mostrando solo los exámenes futuros.
 
-    El parcial muestra cinco pestañas: "Ver Lista de Examenes", "Crear Examen",
-    "Editar Examen", "Invitar Docente a Examen" y "Dividir Examen". Al cambiar
-    de pestaña solo cambia el contenido de abajo; no se navega a otra página.
+    El parcial muestra cuatro pestañas: "Ver Lista de Examenes", "Crear Examen",
+    "Editar Examen" y "Dividir Examen". Al cambiar de pestaña solo cambia el
+    contenido de abajo; no se navega a otra página.
 
     La pestaña de lista es de solo lectura: las tarjetas se consultan con fetch
-    al endpoint GET /api/cursos/{idCurso}/examenes (CursoExamenController) y no
-    se seleccionan. Invitar y Dividir piden el examen en un selector. Crear
-    Examen incrusta el mismo formulario de pages/examen-crear; si la validación
-    falla, la página vuelve a abrir esa pestaña porque StoreExamenRequest
-    redirige con errores y el formulario manda el curso elegido.
+    al endpoint global GET /api/examenes (ExamenDocenteController) o al endpoint
+    por curso GET /api/cursos/{idCurso}/examenes (CursoExamenController). Desde
+    la lista se abre el modal para invitar a otro docente.
+
+    Crear Examen incrusta el mismo formulario de pages/examen-crear. En la
+    página única el curso se elige en un selector obligatorio del formulario; en
+    la página por curso queda fijo. Si la validación falla, StoreExamenRequest
+    redirige con errores y la página vuelve a abrir esa pestaña con el curso
+    elegido.
 
     Editar Examen lista solo los exámenes propios con fecha futura y precarga el
     mismo formulario con GET /api/examenes/{examen}/edicion. "Guardar cambios"
@@ -76,8 +83,14 @@
     - 2026-11-07  [Diego Tejerina]  feat: "Guardar cambios" guarda la edición con
       PUT /api/examenes/{examen}/edicion y, al terminar, refresca el listado
       (refrescarExamenes) sin perder la selección ni el aviso de éxito (#261).
+    - 2026-11-14  [Alex Candia]  feat: se quita el selector de materia. La página
+      única lista todos los exámenes de todos los cursos del docente, pasados y
+      futuros, con el curso como parte del nombre, y usa selectores
+      independientes para Editar y Dividir; Crear Examen recibe los cursos para
+      elegir el curso en el formulario.
 
     @see  App\Http\Controllers\Api\CursoExamenController
+    @see  App\Http\Controllers\Api\ExamenDocenteController
     @see  App\Http\Controllers\Api\ExamenEdicionController
     @see  App\Http\Controllers\ExamenController
     @see  resources/views/pages/examenes-curso.blade.php
@@ -92,6 +105,13 @@
     $ambientes = $ambientes ?? [];
     $materiales = $materiales ?? [];
     $normas = $normas ?? [];
+
+    // La pagina unica lista los examenes de todos los cursos del docente. La
+    // pagina de compatibilidad por curso conserva su listado acotado.
+    $listadoGlobal = $curso === null;
+    $urlExamenes = $listadoGlobal
+        ? route('api.examenes.listar')
+        : route('api.cursos.examenes.listar', ['idCurso' => '__CURSO__']);
 
     // Mismas clases de pestañas que usa el detalle del curso.
     $tabClases = 'shrink-0 whitespace-nowrap inline-flex items-center justify-center box-border border focus:ring-4 shadow-xs font-medium leading-5 rounded-base focus:outline-none px-4 py-2.5 text-sm';
@@ -114,22 +134,22 @@
     })->all();
 
     // Si el alta falló, se vuelve a abrir la pestaña del formulario.
-    $tabInicial = $tabInicial ?? (($errors->any() && $cursoInicial !== null && $puedeCrearExamen) ? 'crear' : 'lista');
+    $tabInicial = $tabInicial ?? (($errors->any() && $puedeCrearExamen) ? 'crear' : 'lista');
 @endphp
 
 <div class="flex flex-col gap-4"
      x-data="{
-         cursos: @js($opcionesCursos),
-         cursoSeleccionado: @js((string) ($cursoInicial?->id_curso ?? '')),
-         cursoNombre: @js($cursoInicial?->nombre_curso ?? ''),
-         urlExamenes: @js(route('api.cursos.examenes.listar', ['idCurso' => '__CURSO__'])),
+         cursoFijo: @js((string) ($curso?->id_curso ?? '')),
+         urlExamenes: @js($urlExamenes),
          examenes: [],
          ahora: @js(now()->format('Y-m-d H:i')),
          estado: 'listo',
          peticion: 0,
          tab: @js($tabInicial),
-         // Examen elegido en Editar, Invitar y Dividir.
+         // Cada pestana conserva su propia seleccion.
          seleccionado: '',
+         examenEdicionId: '',
+         examenDivisionId: '',
          examenEdicionCargadoId: '',
          cargandoEdicion: false,
          errorEdicion: '',
@@ -155,11 +175,14 @@
          modalInvitaciones: false,
          invitaciones: [],
          cargandoInvitaciones: false,
-         get hayCurso() {
-             return this.cursoSeleccionado !== '';
-         },
          get examenSeleccionado() {
              return this.examenes.find((examen) => String(examen.id) === String(this.seleccionado)) || null;
+         },
+         get examenEdicionSeleccionado() {
+             return this.examenes.find((examen) => String(examen.id) === String(this.examenEdicionId)) || null;
+         },
+         get examenDivisionSeleccionado() {
+             return this.examenes.find((examen) => String(examen.id) === String(this.examenDivisionId)) || null;
          },
          get examenesDisponibles() {
              return this.examenes.filter((examen) => this.examenDisponible(examen));
@@ -168,39 +191,10 @@
              return this.examenesDisponibles.filter((examen) => Boolean(examen.es_propio));
          },
          get aulasDelExamen() {
-             return this.examenSeleccionado?.ambientes?.length ?? 0;
+             return this.examenDivisionSeleccionado?.ambientes?.length ?? 0;
          },
          get puedeDividir() {
              return this.aulasDelExamen > 1;
-         },
-         cambiarCurso() {
-             this.tab = 'lista';
-             this.cursoNombre = this.cursos[this.cursoSeleccionado] ?? '';
-             this.seleccionado = '';
-             this.examenEdicionCargadoId = '';
-             this.cargandoEdicion = false;
-             this.errorEdicion = '';
-             this.criterioDivision = '';
-             this.errorDivision = '';
-             this.actualizarUrl();
-             this.avisarFormulario();
-             this.cargar();
-         },
-         actualizarUrl() {
-             const url = new URL(window.location.href);
-
-             if (this.hayCurso) {
-                 url.searchParams.set('curso', this.cursoSeleccionado);
-             } else {
-                 url.searchParams.delete('curso');
-             }
-
-             window.history.replaceState({}, '', url);
-         },
-         avisarFormulario() {
-             window.dispatchEvent(new CustomEvent('curso-seleccionado', {
-                 detail: { id: this.cursoSeleccionado, nombre: this.cursoNombre },
-             }));
          },
          async cargar() {
              const peticion = ++this.peticion;
@@ -210,16 +204,9 @@
              this.errorEdicion = '';
              this.limpiarSeleccion();
 
-             if (! this.hayCurso) {
-                 this.examenes = [];
-                 this.estado = 'listo';
-
-                 return;
-             }
-
              this.estado = 'cargando';
              try {
-                 const url = this.urlExamenes.replace('__CURSO__', this.cursoSeleccionado);
+                 const url = this.urlExamenes.replace('__CURSO__', this.cursoFijo);
                  const respuesta = await fetch(url);
                  if (!respuesta.ok) {
                      throw new Error('HTTP ' + respuesta.status);
@@ -230,18 +217,6 @@
                  }
                  this.examenes = cuerpo.datos ?? [];
                  this.estado = 'listo';
-
-                 const disponibles = this.tab === 'editar'
-                     ? this.examenesEditables
-                     : this.examenesDisponibles;
-
-                 if (disponibles.length > 0) {
-                     this.seleccionado = String(disponibles[0].id);
-                 }
-
-                 if (this.tab === 'editar') {
-                     this.cargarExamenEdicion(false);
-                 }
              } catch (error) {
                  if (peticion === this.peticion) {
                      this.estado = 'error';
@@ -250,7 +225,6 @@
          },
          init() {
              this.cargar();
-             this.$nextTick(() => this.avisarFormulario());
          },
          examenDisponible(examen) {
              if (! examen.fecha) {
@@ -262,30 +236,21 @@
              return inicio > this.ahora;
          },
          etiquetaExamen(examen) {
-             return [examen.tipo || 'Sin tipo', this.fechaDe(examen), this.horario(examen)].join(' - ');
-         },
-         seleccionar(id) {
-             this.seleccionado = id;
-             this.criterioDivision = '';
-             this.errorDivision = '';
+             return [examen.tipo || 'Sin tipo', examen.curso || '']
+                 .filter(Boolean)
+                 .join(' - ');
          },
          abrirEditar() {
              this.tab = 'editar';
 
-             // Si la seleccion venia de Invitar/Dividir y no es un examen
-             // propio, se elige el primero editable para no mostrar un 403.
              const actual = this.examenesEditables.find(
-                 (examen) => String(examen.id) === String(this.seleccionado)
+                 (examen) => String(examen.id) === String(this.examenEdicionId)
              );
 
              if (! actual) {
-                 this.seleccionado = this.examenesEditables.length > 0
-                     ? String(this.examenesEditables[0].id)
-                     : '';
+                 this.examenEdicionId = '';
                  this.examenEdicionCargadoId = '';
              }
-
-             this.cargarExamenEdicion(false);
          },
          seleccionarEdicion() {
              this.criterioDivision = '';
@@ -293,7 +258,7 @@
              this.cargarExamenEdicion(true);
          },
          async cargarExamenEdicion(forzar = true) {
-             const id = String(this.seleccionado ?? '');
+             const id = String(this.examenEdicionId ?? '');
 
              if (id === '') {
                  return;
@@ -327,8 +292,15 @@
                      return;
                  }
 
+                 const seleccionado = this.examenEdicionSeleccionado;
+                 const datos = cuerpo.datos ?? {};
+
                  window.dispatchEvent(new CustomEvent('editar-examen-datos', {
-                     detail: cuerpo.datos ?? {},
+                     detail: {
+                         ...datos,
+                         curso_id: seleccionado?.cursos?.[0]?.id ?? '',
+                         curso_nombre: seleccionado?.curso ?? '',
+                     },
                  }));
                  this.examenEdicionCargadoId = id;
              } catch (error) {
@@ -343,14 +315,14 @@
              }
          },
          async abrirModalDivision() {
-             if (this.seleccionado === '' || this.criterioDivision === '' || ! this.puedeDividir) {
+             if (this.examenDivisionId === '' || this.criterioDivision === '' || ! this.puedeDividir) {
                  return;
              }
 
              this.errorDivision = '';
 
              try {
-                 const url = this.urlPreviewDivision.replace('__ID__', this.seleccionado);
+                 const url = this.urlPreviewDivision.replace('__ID__', this.examenDivisionId);
                  const respuesta = await fetch(url, {
                      method: 'POST',
                      headers: {
@@ -359,7 +331,7 @@
                          'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content
                      },
                      body: JSON.stringify({
-                         ambientes: (this.examenSeleccionado.ambientes || []).map((ambiente) => ambiente.id),
+                         ambientes: (this.examenDivisionSeleccionado.ambientes || []).map((ambiente) => ambiente.id),
                          division_por: this.criterioDivision
                      })
                  });
@@ -372,7 +344,7 @@
 
                  window.dispatchEvent(new CustomEvent('abrir-modal-dividir', {
                      detail: {
-                         examenId: this.seleccionado,
+                         examenId: this.examenDivisionId,
                          ambientes: cuerpo.ambientes,
                          divisionPor: this.criterioDivision,
                          total: cuerpo.total_estudiantes
@@ -382,20 +354,10 @@
                  this.errorDivision = 'No se pudo conectar con el servidor.';
              }
          },
-         alternarDivision() {
-             if (this.seleccionado === null) {
-                 return;
-             }
-             this.panelDivision = ! this.panelDivision;
-             this.criterioDivision = '';
-         },
-         salirDivision() {
-             this.panelDivision = false;
-             this.criterioDivision = '';
-         },
          limpiarSeleccion() {
-             this.seleccionado = null;
-             this.panelDivision = false;
+             this.seleccionado = '';
+             this.examenEdicionId = '';
+             this.examenDivisionId = '';
              this.criterioDivision = '';
              this.errorDivision = '';
          },
@@ -559,11 +521,8 @@
          // seleccion ni reenvia los datos al formulario, asi el aviso de exito
          // del formulario sigue a la vista.
          async refrescarExamenes() {
-             if (! this.hayCurso) {
-                 return;
-             }
              try {
-                 const url = this.urlExamenes.replace('__CURSO__', this.cursoSeleccionado);
+                 const url = this.urlExamenes.replace('__CURSO__', this.cursoFijo);
                  const respuesta = await fetch(url, { headers: { 'Accept': 'application/json' }, credentials: 'same-origin' });
                  if (! respuesta.ok) {
                      return;
@@ -580,24 +539,7 @@
         <x-ui.modal-aviso :mensaje="session('mensaje')" />
     @endif
 
-    <div class="max-w-md px-3">
-        <x-ui.select
-            label="Materia"
-            name="curso"
-            x-model="cursoSeleccionado"
-            @change="cambiarCurso()"
-            :options="$opcionesCursos"
-            :selected="$cursoInicial?->id_curso"
-            placeholder="Selecciona una materia"
-        />
-    </div>
-
-    <p class="px-3 text-sm text-body" x-show="! hayCurso">
-        Selecciona una materia para ver sus examenes.
-    </p>
-
-    {{-- Las pestañas y su contenido solo aparecen con materia elegida. --}}
-    <div x-show="hayCurso" x-cloak class="flex flex-col gap-4">
+    <div x-cloak class="flex flex-col gap-4">
     <header class="flex flex-col gap-3">
 
         <nav class="flex min-w-0 gap-2 overflow-x-auto px-3" aria-label="Opciones de examenes">
@@ -615,7 +557,7 @@
                 </button>
             @else
                 <button type="button" class="{{ $tabClases }} {{ $tabInactivo }} opacity-50 cursor-not-allowed"
-                        title="El curso ya finalizo" disabled>
+                        title="{{ $listadoGlobal ? 'No hay cursos activos para crear examenes' : 'El curso ya finalizo' }}" disabled>
                     Crear Examen
                 </button>
             @endif
@@ -668,18 +610,21 @@
         <ul class="flex flex-col gap-4" x-show="estado === 'listo'" x-cloak>
             <template x-for="examen in examenes" :key="examen.id">
                 <li class="flex flex-col gap-4 border border-default bg-neutral-primary-soft rounded-base shadow-xs px-5 py-6 sm:px-8 lg:flex-row lg:items-center lg:gap-6">
-                    {{-- Ícono, tipo y estado. --}}
+                    {{-- Ícono, nombre con curso y estado. --}}
                     <div class="flex items-center gap-4 lg:w-72">
                         <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-brand-softer text-fg-brand-strong">
                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-6 w-6" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>
                         </div>
                         <div class="flex min-w-0 flex-col items-start gap-1">
-                            <h3 class="text-xl font-bold text-heading" x-text="examen.tipo || 'Sin tipo'"></h3>
+                            <h3 class="text-xl font-bold text-heading" x-text="etiquetaExamen(examen)"></h3>
                             <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
                             <span x-show="examen.es_propio" class="inline-flex items-center px-1.5 py-0.5 text-xs font-medium rounded-full border bg-brand-softer border-brand-subtle text-fg-brand-strong">Propio</span>
                             <span x-show="examen.es_anfitrion" class="inline-flex items-center px-1.5 py-0.5 text-xs font-medium rounded-full border bg-warning-soft border-warning-subtle text-fg-warning">Anfitrion</span>
                             <span x-show="!examen.es_propio" class="inline-flex items-center px-1.5 py-0.5 text-xs font-medium rounded-full border bg-success-soft border-success-subtle text-fg-success-strong">Invitado</span>
                                 <x-ui.badge type="gray" class="mt-1" x-show="examen.estado === 'Programado'">
+                                    <span x-text="examen.estado"></span>
+                                </x-ui.badge>
+                                <x-ui.badge type="warning" class="mt-1" x-show="examen.estado === 'En curso'">
                                     <span x-text="examen.estado"></span>
                                 </x-ui.badge>
                                 <x-ui.badge type="brand" class="mt-1 gap-1" x-show="examen.estado === 'Finalizado'">
@@ -718,7 +663,7 @@
             <li x-show="examenes.length === 0"
                 class="flex flex-col items-center gap-2 p-8 text-center bg-neutral-primary-soft border border-default rounded-base shadow-xs">
                 <svg class="w-6 h-6 text-fg-disabled" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-width="2" d="M4 10h16m-8-3V4M7 7V4m10 3V4M5 20h14a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2Zm3-7h.01v.01H8V13Zm4 0h.01v.01H12V13Zm4 0h.01v.01H16V13Zm-8 4h.01v.01H8V17Zm4 0h.01v.01H12V17Zm4 0h.01v.01H16V17Z"/></svg>
-                <p class="text-sm text-body">Este curso aun no tiene examenes registrados.</p>
+                <p class="text-sm text-body">No hay examenes registrados.</p>
             </li>
         </ul>
     </section>
@@ -729,6 +674,7 @@
             <div class="mx-auto w-full max-w-2xl rounded-base border border-default bg-neutral-primary-soft p-4 shadow-sm md:p-6">
                 <x-ui.form-crear-examen
                     :nombre-curso="$cursoInicial?->nombre_curso ?? ''"
+                    :cursos="$listadoGlobal ? $opcionesCursos : []"
                     :ambientes="$ambientes"
                     :materiales="$materiales"
                     :normas="$normas"
@@ -754,12 +700,8 @@
             </x-ui.alert>
         </div>
 
-        <p class="px-3 text-sm text-body" x-show="estado === 'listo' && examenes.length === 0">
-            Este curso aun no tiene examenes registrados.
-        </p>
-
-        <p class="px-3 text-sm text-body" x-show="estado === 'listo' && examenes.length > 0 && examenesDisponibles.length === 0">
-            No hay examenes disponibles con fecha y hora futuras.
+        <p class="px-3 text-sm text-body" x-show="estado === 'listo' && examenesDisponibles.length === 0">
+            No hay examenes futuros para mostrar.
         </p>
 
         <p class="px-3 text-sm text-body" x-show="estado === 'listo' && examenesDisponibles.length > 0 && examenesEditables.length === 0">
@@ -768,7 +710,7 @@
 
         <div x-show="estado === 'listo' && examenesEditables.length > 0" class="min-w-0 max-w-md px-3">
             <label for="examen-editar" class="block mb-2.5 text-sm font-medium text-heading">Examen</label>
-            <select id="examen-editar" x-model="seleccionado" @change="seleccionarEdicion()"
+            <select id="examen-editar" x-model="examenEdicionId" @change="seleccionarEdicion()"
                     class="block w-full px-3 py-2.5 border text-sm rounded-base shadow-xs bg-neutral-secondary-medium border-default-medium text-heading focus:ring-brand focus:border-brand">
                 <option value="" disabled>Selecciona un examen</option>
                 <template x-for="examen in examenesEditables" :key="'editar-' + examen.id">
@@ -788,7 +730,7 @@
             </x-ui.alert>
         </div>
 
-        <div x-show="seleccionado !== '' && ! cargandoEdicion && errorEdicion === ''"
+        <div x-show="examenEdicionId !== '' && ! cargandoEdicion && errorEdicion === ''"
              class="mx-auto w-full max-w-2xl rounded-base border border-default bg-neutral-primary-soft p-4 shadow-sm md:p-6">
             <x-ui.form-crear-examen
                 :nombre-curso="$cursoInicial?->nombre_curso ?? ''"
@@ -817,12 +759,8 @@
             </x-ui.alert>
         </div>
 
-        <p class="px-3 text-sm text-body" x-show="estado === 'listo' && examenes.length === 0">
-            Este curso aun no tiene examenes registrados.
-        </p>
-
-        <p class="px-3 text-sm text-body" x-show="estado === 'listo' && examenes.length > 0 && examenesDisponibles.length === 0">
-            No hay examenes disponibles con fecha y hora futuras.
+        <p class="px-3 text-sm text-body" x-show="estado === 'listo' && examenesDisponibles.length === 0">
+            No hay examenes futuros para mostrar.
         </p>
 
         <div x-show="estado === 'listo' && examenesDisponibles.length > 0"
@@ -867,18 +805,14 @@
             </x-ui.alert>
         </div>
 
-        <p class="px-3 text-sm text-body" x-show="estado === 'listo' && examenes.length === 0">
-            Este curso aun no tiene examenes registrados.
-        </p>
-
-        <p class="px-3 text-sm text-body" x-show="estado === 'listo' && examenes.length > 0 && examenesDisponibles.length === 0">
-            No hay examenes disponibles con fecha y hora futuras.
+        <p class="px-3 text-sm text-body" x-show="estado === 'listo' && examenesDisponibles.length === 0">
+            No hay examenes futuros para mostrar.
         </p>
 
         <div x-show="estado === 'listo' && examenesDisponibles.length > 0" class="flex flex-col gap-4">
             <div class="min-w-0 max-w-md">
                 <label for="examen-dividir" class="block mb-2.5 text-sm font-medium text-heading">Examen</label>
-                <select id="examen-dividir" x-model="seleccionado"
+                <select id="examen-dividir" x-model="examenDivisionId"
                         @change="criterioDivision = ''; errorDivision = ''"
                         class="block w-full px-3 py-2.5 border text-sm rounded-base shadow-xs bg-neutral-secondary-medium border-default-medium text-heading focus:ring-brand focus:border-brand">
                     <option value="" disabled>Selecciona un examen</option>
@@ -888,7 +822,7 @@
                 </select>
             </div>
 
-            <template x-if="examenSeleccionado && ! puedeDividir">
+            <template x-if="examenDivisionSeleccionado && ! puedeDividir">
                 <p class="px-3 text-sm text-body">
                     No se puede dividir el examen, solo se cuenta con un aula
                 </p>
@@ -896,7 +830,10 @@
 
             <template x-if="puedeDividir">
                 <div class="flex flex-col gap-4">
-                    <h3 class="px-3 text-xl font-bold text-heading" x-text="examenSeleccionado?.tipo || 'Sin tipo'"></h3>
+                    <div class="flex flex-wrap items-baseline gap-x-2 px-3">
+                        <h3 class="text-xl font-bold text-heading" x-text="examenDivisionSeleccionado?.tipo || 'Sin tipo'"></h3>
+                        <p class="text-sm font-medium text-body" x-show="examenDivisionSeleccionado?.curso" x-text="'— ' + examenDivisionSeleccionado?.curso"></p>
+                    </div>
 
                     <div class="flex flex-col gap-3 sm:flex-row sm:items-end">
                         <div class="min-w-0 flex-1 sm:max-w-xs">

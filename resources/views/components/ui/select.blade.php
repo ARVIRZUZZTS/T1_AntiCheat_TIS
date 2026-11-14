@@ -3,6 +3,7 @@
     @author  Valery D. Ortuno P. <valerydariana98@gmail.com>
     @created 2026-09-24
     @updated 2026-09-28
+    @updated 2026-11-14
 
     @description
     Select desplegable con etiqueta. $options es un arreglo de
@@ -23,6 +24,8 @@
     - 2026-10-10  [T1]  fix: la clave se usa como valor en cualquier arreglo
       asociativo, no solo cuando es texto; con claves numéricas (id de curso) el
       selector mandaba la etiqueta en vez del id.
+    - 2026-11-14  [Alex Candia]  fix: la prop `required` ahora también pone el
+      atributo HTML `required`, no solo el asterisco de la etiqueta.
 --}}
 
 @props([
@@ -54,6 +57,7 @@
 
     <select name="{{ $name }}" id="{{ $inputId }}"
             {{ $attributes->merge(['class' => 'block w-full px-3 py-2.5 border text-sm rounded-base shadow-xs placeholder:text-body ' . $stateClass]) }}
+            @required($required)
             @if ($error) aria-invalid="true" @endif>
         @if ($placeholder)
             <option value="" disabled @if (! $selected) selected @endif>{{ $placeholder }}</option>
