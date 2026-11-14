@@ -68,7 +68,9 @@ use App\Models\Curso;
 use App\Models\Estudiante;
 use App\Models\EstudianteExamen;
 use App\Models\Examen;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use InvalidArgumentException;
 use RuntimeException;
 
 class RegistrarExamenService
@@ -97,6 +99,7 @@ class RegistrarExamenService
     public function __construct(
         private readonly DividirExamenService $dividirExamenService,
         private readonly ConfiguracionExamenDocenteService $configuraciones,
+        private readonly ValidarDisponibilidadExamenService $disponibilidad,
     ) {}
 
     /**
@@ -114,8 +117,13 @@ class RegistrarExamenService
         $creador = $this->idCreador($curso);
 
         return DB::transaction(function () use ($curso, $datos, $creador): Examen {
+            // El bloqueo que protege max(id)+1 tambien hace atomica esta segunda
+            // comprobacion contra otra alta o edicion concurrente.
+            $siguienteId = $this->siguienteIdExamen();
+            $this->validarDisponibilidad($curso, $datos, $creador);
+
             $examen = new Examen;
-            $examen->id_examen = $this->siguienteIdExamen();
+            $examen->id_examen = $siguienteId;
             $examen->fecha = $this->fechaIso($datos['fecha']);
             $examen->hora_inicio = $this->horaIso($datos['hora_inicio']);
             $examen->duracion = (int) $datos['duracion'];
@@ -151,9 +159,23 @@ class RegistrarExamenService
      */
     private function siguienteIdExamen(): int
     {
-        DB::statement('LOCK TABLE examen IN SHARE ROW EXCLUSIVE MODE');
+        $this->disponibilidad->bloquearProgramacion();
 
         return (int) Examen::query()->max('id_examen') + 1;
+    }
+
+    /** @param array<string, mixed> $datos */
+    private function validarDisponibilidad(Curso $curso, array $datos, int $creador): void
+    {
+        $inicio = Carbon::createFromFormat('d/m/Y H:i', $datos['fecha'].' '.$datos['hora_inicio']);
+
+        $this->disponibilidad->asegurarDisponible(
+            $inicio,
+            (int) $datos['duracion'],
+            array_map(fn ($id): int => (int) $id, (array) $datos['ambientes']),
+            [(int) $curso->id_curso],
+            $creador,
+        );
     }
 
     /**

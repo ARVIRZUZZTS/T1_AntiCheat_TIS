@@ -47,7 +47,11 @@ class ActualizarExamenTest extends TestCase
 
     private const ID_CURSO = 900401;
 
+    private const ID_OTRO_CURSO = 900402;
+
     private const ID_EXAMEN = 900401;
+
+    private const ID_OTRO_EXAMEN = 900490;
 
     private const ID_AMBIENTE_1 = 900401;
 
@@ -85,6 +89,13 @@ class ActualizarExamenTest extends TestCase
             'id_curso' => self::ID_CURSO,
             'nombre_curso' => 'Curso de Edicion',
             'sis_doc' => self::ID_DOCENTE,
+            'fecha_creacion' => now()->toDateString(),
+            'estado' => 'EnCurso',
+        ]);
+        DB::table('curso')->insert([
+            'id_curso' => self::ID_OTRO_CURSO,
+            'nombre_curso' => 'Otro curso de Edicion',
+            'sis_doc' => self::ID_OTRO_DOCENTE,
             'fecha_creacion' => now()->toDateString(),
             'estado' => 'EnCurso',
         ]);
@@ -259,6 +270,30 @@ class ActualizarExamenTest extends TestCase
             'ambientes' => [],
         ]))->assertStatus(422)->assertJsonValidationErrors([
             'ambientes' => 'Seleccione al menos un ambiente.',
+        ]);
+    }
+
+    /** Al editar tambien se bloquea ocupar un ambiente que ya tiene otro examen. */
+    public function test_rechaza_un_ambiente_ocupado_al_editar(): void
+    {
+        $fecha = now()->addMonth();
+        $otro = new Examen;
+        $otro->id_examen = self::ID_OTRO_EXAMEN;
+        $otro->fecha = $fecha->format('Y-m-d');
+        $otro->hora_inicio = '08:00:00';
+        $otro->duracion = 120;
+        $otro->creador = self::ID_OTRO_DOCENTE;
+        $otro->tipo_examen = $this->idTipo('examen parcial');
+        $otro->save();
+        $otro->cursos()->attach(self::ID_OTRO_CURSO);
+        $otro->ambientes()->attach(self::ID_AMBIENTE_2);
+
+        $this->putJson(route('api.examenes.edicion.actualizar', self::ID_EXAMEN), $this->datosValidos([
+            'fecha' => $fecha->format('d/m/Y'),
+            'hora_inicio' => '09:00',
+            'ambientes' => [self::ID_AMBIENTE_2],
+        ]))->assertStatus(422)->assertJsonValidationErrors([
+            'ambientes' => 'El ambiente Aula '.self::ID_AMBIENTE_2.' ya tiene un examen programado en ese horario.',
         ]);
     }
 

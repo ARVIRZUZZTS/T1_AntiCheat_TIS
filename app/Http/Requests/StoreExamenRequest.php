@@ -61,6 +61,7 @@ use App\Enums\TipoExamen;
 use App\Models\Curso;
 use App\Services\Examen\CatalogosExamenService;
 use App\Services\Examen\RegistrarExamenService;
+use App\Services\Examen\ValidarDisponibilidadExamenService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\DB;
@@ -151,15 +152,32 @@ class StoreExamenRequest extends FormRequest
 
             $hora = (string) $this->input('hora_inicio');
 
-            if (! $fecha->isSameDay($ahora)
-                || $validator->errors()->has('hora_inicio')
-                || preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $hora) !== 1) {
+            if ($fecha->isSameDay($ahora)
+                && ! $validator->errors()->has('hora_inicio')
+                && preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $hora) === 1
+                // Mismo formato H:i en las dos, así que se comparan como texto.
+                && $hora <= $ahora->format('H:i')) {
+                $validator->errors()->add('hora_inicio', 'Ingrese una hora valida.');
+            }
+
+            // No se calculan cruces con datos que ya fallaron otra regla.
+            if ($validator->errors()->isNotEmpty()) {
                 return;
             }
 
-            // Mismo formato H:i en las dos, así que se comparan como texto.
-            if ($hora <= $ahora->format('H:i')) {
-                $validator->errors()->add('hora_inicio', 'Ingrese una hora valida.');
+            $errores = app(ValidarDisponibilidadExamenService::class)->errores(
+                $fecha->copy()->setTimeFromTimeString($hora),
+                (int) $this->input('duracion'),
+                (array) $this->input('ambientes', []),
+                $this->cursosParaConflictos(),
+                $this->docenteParaConflictos(),
+                $this->examenExcluidoDeConflictos(),
+            );
+
+            foreach ($errores as $campo => $mensajes) {
+                foreach ($mensajes as $mensaje) {
+                    $validator->errors()->add($campo, $mensaje);
+                }
             }
         });
     }
@@ -180,7 +198,7 @@ class StoreExamenRequest extends FormRequest
 
         // El round-trip descarta fechas como 31/02, que createFromFormat corre
         // a marzo.
-        return $fecha !== false && $fecha->format('d/m/Y') === $texto ? $fecha : null;
+        return $fecha !== null && $fecha->format('d/m/Y') === $texto ? $fecha : null;
     }
 
     /**
@@ -204,6 +222,22 @@ class StoreExamenRequest extends FormRequest
     protected function examenExcluidoDeUnicoPorTipo(): ?int
     {
         return null;
+    }
+
+    /** @return list<int> */
+    protected function cursosParaConflictos(): array
+    {
+        return $this->cursosParaUnicoPorTipo();
+    }
+
+    protected function examenExcluidoDeConflictos(): ?int
+    {
+        return $this->examenExcluidoDeUnicoPorTipo();
+    }
+
+    protected function docenteParaConflictos(): int
+    {
+        return (int) $this->user()->id_usuario;
     }
 
     /**
@@ -242,11 +276,11 @@ class StoreExamenRequest extends FormRequest
             'ambientes' => ['required', 'array', 'min:1'],
             // `in` contra el catálogo cacheado y no `exists`: `exists` hacía
             // una consulta por cada opción marcada.
-            'ambientes.*' => ['integer', Rule::in($catalogos->ids('ambientes'))],
+            'ambientes.*' => ['integer', 'distinct', Rule::in($catalogos->ids('ambientes'))],
             'materiales' => ['sometimes', 'array'],
-            'materiales.*' => ['integer', Rule::in($catalogos->ids('materiales'))],
+            'materiales.*' => ['integer', 'distinct', Rule::in($catalogos->ids('materiales'))],
             'normas' => ['sometimes', 'array'],
-            'normas.*' => ['integer', Rule::in($catalogos->ids('normas'))],
+            'normas.*' => ['integer', 'distinct', Rule::in($catalogos->ids('normas'))],
             'materiales_personalizados' => ['nullable', 'string', 'max:300'],
             'normas_personalizadas' => ['nullable', 'string', 'max:300'],
         ];
@@ -280,8 +314,11 @@ class StoreExamenRequest extends FormRequest
             'ambientes.required' => 'Seleccione al menos un ambiente.',
             'ambientes.min' => 'Seleccione al menos un ambiente.',
             'ambientes.*.in' => 'Uno de los ambientes seleccionados no existe.',
+            'ambientes.*.distinct' => 'No repita ambientes.',
             'materiales.*.in' => 'Uno de los materiales seleccionados no existe.',
+            'materiales.*.distinct' => 'No repita materiales.',
             'normas.*.in' => 'Una de las normas seleccionadas no existe.',
+            'normas.*.distinct' => 'No repita normas.',
             'materiales_personalizados.max' => 'El material personalizado no debe superar los 300 caracteres.',
             'normas_personalizadas.max' => 'La norma personalizada no debe superar los 300 caracteres.',
         ];

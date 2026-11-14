@@ -66,9 +66,17 @@ class RegistrarExamenTest extends TestCase
 
     private const ID_DOCENTE = 900301;
 
+    private const ID_OTRO_DOCENTE = 900302;
+
     private const ID_CURSO = 900301;
 
+    private const ID_OTRO_CURSO = 900302;
+
     private const ID_AMBIENTE = 900301;
+
+    private const ID_OTRO_AMBIENTE = 900302;
+
+    private const ID_EXAMEN_EXISTENTE = 900390;
 
     private const ID_MATERIAL = 900301;
 
@@ -85,6 +93,13 @@ class RegistrarExamenTest extends TestCase
             'nombre_usuario' => 'Docente',
             'apellido' => 'De Prueba Alta',
         ]);
+        DB::table('usuario')->insert([
+            'id_usuario' => self::ID_OTRO_DOCENTE,
+            'cod_sis' => 'DOC900302',
+            'password' => 'x',
+            'nombre_usuario' => 'Otro docente',
+            'apellido' => 'De Prueba Alta',
+        ]);
 
         DB::table('curso')->insert([
             'id_curso' => self::ID_CURSO,
@@ -93,10 +108,21 @@ class RegistrarExamenTest extends TestCase
             'fecha_creacion' => now()->toDateString(),
             'estado' => 'EnCurso',
         ]);
+        DB::table('curso')->insert([
+            'id_curso' => self::ID_OTRO_CURSO,
+            'nombre_curso' => 'Otro curso de Alta',
+            'sis_doc' => self::ID_OTRO_DOCENTE,
+            'fecha_creacion' => now()->toDateString(),
+            'estado' => 'EnCurso',
+        ]);
 
         DB::table('ambiente')->insert([
             'id_ambiente' => self::ID_AMBIENTE,
             'nombre_ambiente' => 'Aula 900301',
+        ]);
+        DB::table('ambiente')->insert([
+            'id_ambiente' => self::ID_OTRO_AMBIENTE,
+            'nombre_ambiente' => 'Aula 900302',
         ]);
 
         DB::table('material')->insert([
@@ -269,7 +295,6 @@ class RegistrarExamenTest extends TestCase
         ]))->assertSessionHasNoErrors();
     }
 
-
     /** Una fecha anterior a hoy (en Bolivia) no es válida. */
     public function test_rechaza_una_fecha_pasada(): void
     {
@@ -320,6 +345,102 @@ class RegistrarExamenTest extends TestCase
         $this->post(route('cursos.examenes.store', self::ID_CURSO), $this->datosValidos([
             'hora_inicio' => '22:01',
         ]))->assertSessionHasErrors(['hora_inicio' => 'La hora de inicio no puede ser posterior a las 22:00.']);
+    }
+
+    /** Un ambiente no puede tener dos exámenes con ventanas horarias cruzadas. */
+    public function test_rechaza_un_ambiente_ocupado_en_el_mismo_horario(): void
+    {
+        $fecha = now()->addMonth()->format('d/m/Y');
+        $this->crearExamenProgramado(
+            self::ID_EXAMEN_EXISTENTE,
+            [self::ID_OTRO_CURSO],
+            [self::ID_OTRO_AMBIENTE],
+            self::ID_OTRO_DOCENTE,
+            $fecha,
+            '08:00',
+            120,
+        );
+
+        $this->post(route('cursos.examenes.store', self::ID_CURSO), $this->datosValidos([
+            'fecha' => $fecha,
+            'hora_inicio' => '09:00',
+            'ambientes' => [self::ID_OTRO_AMBIENTE],
+        ]))->assertSessionHasErrors([
+            'ambientes' => 'El ambiente Aula 900302 ya tiene un examen programado en ese horario.',
+        ]);
+    }
+
+    /** Dos exámenes consecutivos pueden usar la misma aula sin solaparse. */
+    public function test_permite_un_ambiente_cuando_el_examen_anterior_ya_termino(): void
+    {
+        $fecha = now()->addMonth()->format('d/m/Y');
+        $this->crearExamenProgramado(
+            self::ID_EXAMEN_EXISTENTE,
+            [self::ID_OTRO_CURSO],
+            [self::ID_OTRO_AMBIENTE],
+            self::ID_OTRO_DOCENTE,
+            $fecha,
+            '08:00',
+            120,
+        );
+
+        $this->post(route('cursos.examenes.store', self::ID_CURSO), $this->datosValidos([
+            'fecha' => $fecha,
+            'hora_inicio' => '10:00',
+            'ambientes' => [self::ID_OTRO_AMBIENTE],
+        ]))->assertRedirect(route('examenes', ['curso' => self::ID_CURSO]));
+    }
+
+    /** Un curso debe tener una unica actividad de examen por franja horaria. */
+    public function test_rechaza_un_curso_con_otro_examen_en_el_mismo_horario(): void
+    {
+        $fecha = now()->addMonth()->format('d/m/Y');
+        $this->crearExamenProgramado(
+            self::ID_EXAMEN_EXISTENTE,
+            [self::ID_CURSO],
+            [self::ID_OTRO_AMBIENTE],
+            self::ID_OTRO_DOCENTE,
+            $fecha,
+            '08:00',
+            120,
+        );
+
+        $this->post(route('cursos.examenes.store', self::ID_CURSO), $this->datosValidos([
+            'fecha' => $fecha,
+            'hora_inicio' => '09:00',
+        ]))->assertSessionHasErrors([
+            'hora_inicio' => 'Este curso ya tiene un examen programado en ese horario.',
+        ]);
+    }
+
+    /** Un docente no puede programarse en dos cursos durante la misma franja. */
+    public function test_rechaza_un_docente_con_otro_examen_en_el_mismo_horario(): void
+    {
+        $fecha = now()->addMonth()->format('d/m/Y');
+        $this->crearExamenProgramado(
+            self::ID_EXAMEN_EXISTENTE,
+            [self::ID_OTRO_CURSO],
+            [self::ID_OTRO_AMBIENTE],
+            self::ID_DOCENTE,
+            $fecha,
+            '08:00',
+            120,
+        );
+
+        $this->post(route('cursos.examenes.store', self::ID_CURSO), $this->datosValidos([
+            'fecha' => $fecha,
+            'hora_inicio' => '09:00',
+        ]))->assertSessionHasErrors([
+            'hora_inicio' => 'El docente ya tiene un examen programado en ese horario.',
+        ]);
+    }
+
+    /** El servidor rechaza ids de ambiente repetidos aunque el formulario los evite. */
+    public function test_rechaza_ambientes_repetidos(): void
+    {
+        $this->post(route('cursos.examenes.store', self::ID_CURSO), $this->datosValidos([
+            'ambientes' => [self::ID_AMBIENTE, self::ID_AMBIENTE],
+        ]))->assertSessionHasErrors(['ambientes.0' => 'No repita ambientes.']);
     }
 
     /** En un curso finalizado no se crean exámenes, ni el formulario se abre. */
@@ -377,6 +498,31 @@ class RegistrarExamenTest extends TestCase
             'materiales' => [self::ID_MATERIAL],
             'normas' => [self::ID_NORMA],
         ], $sobrescribir);
+    }
+
+    /**
+     * @param  list<int>  $cursos
+     * @param  list<int>  $ambientes
+     */
+    private function crearExamenProgramado(
+        int $id,
+        array $cursos,
+        array $ambientes,
+        int $creador,
+        string $fecha,
+        string $horaInicio,
+        int $duracion,
+    ): void {
+        $examen = new Examen;
+        $examen->id_examen = $id;
+        $examen->fecha = Carbon::createFromFormat('d/m/Y', $fecha)->format('Y-m-d');
+        $examen->hora_inicio = $horaInicio.':00';
+        $examen->duracion = $duracion;
+        $examen->creador = $creador;
+        $examen->tipo_examen = $this->idTipoExamenParcial();
+        $examen->save();
+        $examen->cursos()->attach($cursos);
+        $examen->ambientes()->attach($ambientes);
     }
 
     /** Id del examen insertado en este test, leído del pivote del curso. */
