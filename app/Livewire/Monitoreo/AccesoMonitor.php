@@ -14,41 +14,11 @@ class AccesoMonitor extends Component
     #[Url]
     public ?int $simular = null;
 
-    public int $idExamen = 0;
-
     public function mount(): void
     {
         $this->simular = $this->simular ?? (int) request()->query('simular', 0);
         if ($this->simular === 0 && ! request()->has('simular')) {
             $this->simular = null;
-        }
-
-        $ahora = now();
-        $consulta = $this->consultaExamenesAccesibles();
-
-        $examen = $consulta
-            ->where(function ($query) use ($ahora): void {
-                $query->where('fecha', '>', $ahora->toDateString())
-                    ->orWhere(function ($subquery) use ($ahora): void {
-                        $subquery->where('fecha', $ahora->toDateString())
-                            ->where('hora_inicio', '>=', $ahora->format('H:i:s'));
-                    });
-            })
-            ->orderBy('fecha')
-            ->orderBy('hora_inicio')
-            ->first();
-
-        if ($examen === null) {
-            $fallback = $this->consultaExamenesAccesibles();
-
-            $examen = $fallback
-                ->orderByDesc('fecha')
-                ->orderByDesc('id_examen')
-                ->first();
-        }
-
-        if ($examen !== null) {
-            $this->idExamen = (int) $examen->id_examen;
         }
     }
 
@@ -57,105 +27,79 @@ class AccesoMonitor extends Component
         return $this->simular === null ? now() : now()->addMinutes($this->simular);
     }
 
-    public function examen()
-    {
-        if ($this->idExamen <= 0) {
-            return null;
-        }
-
-        return Examen::query()->with(['cursos', 'ambientes', 'materialesPermitidos', 'tipoExamen'])->find($this->idExamen);
-    }
-
-    public function estado(): string
-    {
-        $examen = $this->examen();
-        if ($examen === null) {
-            return 'sin_examen';
-        }
-
-        $inicio = Carbon::parse($examen->fecha.' '.$examen->hora_inicio);
-        $fin = $examen->hora_fin
-            ? Carbon::parse($examen->fecha.' '.$examen->hora_fin)
-            : $inicio->copy()->addMinutes((int) $examen->duracion);
-        $apertura = $inicio->copy()->subMinutes(15);
-        $ahora = $this->ahoraSimulada();
-
-        if ($ahora < $apertura) {
-            return 'proximo';
-        }
-        if ($ahora < $inicio) {
-            return 'registro_abierto';
-        }
-        if ($ahora <= $fin) {
-            return 'en_curso';
-        }
-
-        return 'finalizado';
-    }
-
-    public function minutosParaInicio(): int
-    {
-        $examen = $this->examen();
-        if ($examen === null) {
-            return 0;
-        }
-
-        $inicio = Carbon::parse($examen->fecha.' '.$examen->hora_inicio);
-
-        return (int) $this->ahoraSimulada()->diffInMinutes($inicio, false);
-    }
-
+    /**
+     * Próximos exámenes (hasta 5) con los mismos datos que las tarjetas del
+     * monitor, para que "Ingreso" mantenga la misma línea de diseño. Cada uno
+     * trae su estado (proximo / registro_abierto / en_curso / finalizado),
+     * si es hoy y el tiempo que falta, calculados con la hora simulada.
+     *
+     * @return \Illuminate\Support\Collection<int, array<string, mixed>>
+     */
     public function proximosExamenes()
     {
-        $consulta = $this->consultaExamenesAccesibles()->with('cursos');
-
-        $examenes = $consulta
+        $examenes = $this->consultaExamenesAccesibles()
+            ->with(['cursos', 'ambientes', 'tipoExamen'])
             ->where('fecha', '>=', now()->toDateString())
             ->orderBy('fecha')
             ->orderBy('hora_inicio')
             ->limit(5)
             ->get();
 
-        return $examenes->map(function (Examen $examen): array {
-            $cursoIds = $examen->cursos->pluck('id_curso');
+        $ahora = $this->ahoraSimulada();
+        $hoy = $ahora->toDateString();
 
-            $auxiliares = 0;
-            if ($cursoIds->isNotEmpty()) {
-                $auxiliares = DB::table('auxiliar_curso')
-                    ->whereIn('id_curso', $cursoIds)
-                    ->distinct()
-                    ->count('id_auxiliar');
+        return $examenes->map(function (Examen $examen) use ($ahora, $hoy): array {
+            $inicio = Carbon::parse($examen->fecha.' '.$examen->hora_inicio);
+            $fin = $examen->hora_fin
+                ? Carbon::parse($examen->fecha.' '.$examen->hora_fin)
+                : $inicio->copy()->addMinutes((int) $examen->duracion);
+            $apertura = $inicio->copy()->subMinutes(15);
+
+            if ($ahora < $apertura) {
+                $estado = 'proximo';
+            } elseif ($ahora < $inicio) {
+                $estado = 'registro_abierto';
+            } elseif ($ahora <= $fin) {
+                $estado = 'en_curso';
+            } else {
+                $estado = 'finalizado';
             }
 
             return [
                 'id' => $examen->id_examen,
                 'materias' => $examen->cursos->pluck('nombre_curso')->implode(', '),
+                'tipo' => $examen->tipoExamen->nombre_tipo_examen ?? 'Sin tipo',
                 'fecha' => $examen->fecha,
-                'hora' => substr((string) $examen->hora_inicio, 0, 5),
-                'auxiliares' => $auxiliares,
+                'hora_inicio' => substr((string) $examen->hora_inicio, 0, 5),
+                'hora_fin' => $examen->hora_fin ? substr((string) $examen->hora_fin, 0, 5) : null,
+                'ambientes' => $examen->ambientes->pluck('nombre_ambiente')->implode(', '),
+                'estado' => $estado,
+                'es_hoy' => $examen->fecha === $hoy,
+                'tiempo_restante' => $this->tiempoRestante((int) $ahora->diffInMinutes($inicio, false)),
             ];
         });
     }
 
-    public function auxiliares()
+    /**
+     * Texto legible del tiempo que falta para el inicio (misma forma que el
+     * monitor): "En X min", "En X h Y min", "En X días...", o "En curso".
+     */
+    private function tiempoRestante(int $minutos): string
     {
-        if (! auth()->check()) {
-            return collect();
+        if ($minutos <= 0) {
+            return 'En curso';
+        }
+        if ($minutos < 60) {
+            return 'En '.$minutos.' min';
+        }
+        if ($minutos < 1440) {
+            return 'En '.intdiv($minutos, 60).' h '.($minutos % 60).' min';
+        }
+        if ($minutos < 10080) {
+            return 'En '.intdiv($minutos, 1440).' días '.intdiv($minutos % 1440, 60).' h';
         }
 
-        $query = DB::table('auxiliar_curso')
-            ->join('curso', 'curso.id_curso', '=', 'auxiliar_curso.id_curso')
-            ->join('usuario', 'usuario.id_usuario', '=', 'auxiliar_curso.id_auxiliar');
-
-        if (auth()->user()->roles->contains('nombre_rol', Rol::NOMBRE_DOCENTE)) {
-            $query->where('curso.sis_doc', auth()->id());
-        } else {
-            $query->where('auxiliar_curso.id_auxiliar', auth()->id());
-        }
-
-        return $query->select('usuario.id_usuario', 'usuario.cod_sis', 'usuario.nombre_usuario', 'usuario.apellido', 'curso.nombre_curso', 'auxiliar_curso.estado')
-            ->orderBy('usuario.nombre_usuario')
-            ->get();
+        return '+7 días';
     }
 
     public function render()
