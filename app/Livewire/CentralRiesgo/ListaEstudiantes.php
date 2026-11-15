@@ -64,6 +64,13 @@ class ListaEstudiantes extends Component
 {
     public const ALCANCE_SOSPECHOSOS = 'sospechosos';
 
+    /**
+     * Página que monta el componente: 'incidencias' (pestañas Institución / Mis
+     * materias) o 'sospechosos' (lista de sospechosos a revisar). Lo fija la
+     * ruta; cada subopción del sidebar es su propia página.
+     */
+    public string $modo = 'incidencias';
+
     public string $alcance = ListarIncidenciasTramposoService::ALCANCE_INSTITUCION;
 
     public bool $ordenAlfabetico = false;
@@ -94,6 +101,19 @@ class ListaEstudiantes extends Component
         $this->servicioLista = app(ListarIncidenciasTramposoService::class);
         $this->servicioDetalle = app(ConsultarDetalleIncidenciaService::class);
         $this->servicioBusqueda = app(BusquedaEstudianteService::class);
+    }
+
+    /**
+     * El modo lo fija la ruta: 'sospechosos' arranca en ese alcance; cualquier
+     * otro valor es la página de incidencias (Institución por defecto).
+     */
+    public function mount(string $modo = 'incidencias'): void
+    {
+        $this->modo = $modo === self::ALCANCE_SOSPECHOSOS ? self::ALCANCE_SOSPECHOSOS : 'incidencias';
+
+        if ($this->modo === self::ALCANCE_SOSPECHOSOS) {
+            $this->alcance = self::ALCANCE_SOSPECHOSOS;
+        }
     }
 
     /**
@@ -177,7 +197,14 @@ class ListaEstudiantes extends Component
 
     public function cambiarAlcance(string $alcance): void
     {
-        if (! in_array($alcance, [...ListarIncidenciasTramposoService::ALCANCES_VALIDOS, self::ALCANCE_SOSPECHOSOS], true)) {
+        // En la página de sospechosos el alcance está fijo; en Incidencias solo
+        // valen los dos ámbitos propios (Institución / Mis materias). El alcance
+        // "sospechosos" ahora es su propia página, no una pestaña de aquí.
+        if ($this->modo === self::ALCANCE_SOSPECHOSOS) {
+            return;
+        }
+
+        if (! in_array($alcance, ListarIncidenciasTramposoService::ALCANCES_VALIDOS, true)) {
             return;
         }
 
