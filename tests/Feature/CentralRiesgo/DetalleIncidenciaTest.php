@@ -197,7 +197,7 @@ class DetalleIncidenciaTest extends TestCase
             ['id_usuario' => 1, 'cod_sis' => 'DOC1', 'password' => 'solo-pruebas', 'nombre_usuario' => 'Ana', 'apellido' => 'Perez'],
             ['id_usuario' => 2, 'cod_sis' => 'AUX1', 'password' => 'solo-pruebas', 'nombre_usuario' => 'Luis', 'apellido' => 'Rojas'],
         ]);
-        DB::table('rol')->insert([
+        DB::table('rol')->insertOrIgnore([
             ['id_rol' => 1, 'nombre_rol' => 'docente'], ['id_rol' => 2, 'nombre_rol' => 'auxiliar'],
         ]);
         DB::table('rol_usuario')->insert([

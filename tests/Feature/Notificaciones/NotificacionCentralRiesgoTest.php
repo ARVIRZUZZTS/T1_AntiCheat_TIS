@@ -287,7 +287,7 @@ class NotificacionCentralRiesgoTest extends TestCase
 
     private function crearDatos(): void
     {
-        DB::table('rol')->insert([
+        DB::table('rol')->insertOrIgnore([
             ['id_rol' => 1, 'nombre_rol' => 'docente'],
             ['id_rol' => 2, 'nombre_rol' => 'auxiliar'],
         ]);
