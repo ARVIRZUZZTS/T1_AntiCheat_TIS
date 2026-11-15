@@ -10,6 +10,7 @@ use App\Models\Rol;
 use App\Models\Usuario;
 use App\Services\Notificacion\NotificacionService;
 use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
@@ -42,6 +43,16 @@ class EnviarInvitacionExamenService
         if ((int) $invitador->id_usuario === (int) $invitado->id_usuario) {
             throw ValidationException::withMessages([
                 'docente_invitado_id' => 'No puede invitarse a sí mismo.',
+            ]);
+        }
+
+        // Solo se invita a exámenes a futuro: si ya empezó (o no tiene fecha) no
+        // tiene sentido sumar un docente. La zona horaria la fija config/app
+        // (America/La_Paz), así que now() ya está en hora local.
+        $inicio = $this->inicioDelExamen($examen);
+        if ($inicio === null || $inicio->lte(now())) {
+            throw ValidationException::withMessages([
+                'id_examen' => 'No se puede invitar a un examen que ya empezó o pasó.',
             ]);
         }
 
@@ -87,6 +98,20 @@ class EnviarInvitacionExamenService
         ]);
 
         return $this->resumen($invitacion);
+    }
+
+    /**
+     * Inicio del examen (fecha + hora_inicio) como Carbon, o null si no tiene
+     * fecha. fecha y hora_inicio son strings en el modelo, así que se combinan
+     * directamente.
+     */
+    private function inicioDelExamen(Examen $examen): ?Carbon
+    {
+        if ($examen->fecha === null) {
+            return null;
+        }
+
+        return Carbon::parse($examen->fecha.' '.($examen->hora_inicio ?? '00:00:00'));
     }
 
     private function esDocente(Usuario $usuario): bool
