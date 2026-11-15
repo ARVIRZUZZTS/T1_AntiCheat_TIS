@@ -79,9 +79,10 @@ class CursoController extends Controller
      */
     public function crear(ListarGestionesService $gestiones): View
     {
+        // Sin backRoute: "Crear curso" es una subopción del sidebar, no una
+        // vista de detalle, así que x-ui.page-header no muestra flecha de volver.
         return view('pages.curso-crear', [
             'gestiones' => $gestiones->ejecutar(),
-            'backRoute' => route('cursos'),
         ]);
     }
 
@@ -140,6 +141,46 @@ class CursoController extends Controller
             // x-ui.page-header muestra la flecha "Volver" en vez del
             // hamburguesa cuando recibe $backRoute.
             'backRoute' => route('cursos'),
+        ]);
+    }
+
+    /**
+     * Página "Ver curso": un selector con los cursos del docente y, debajo, la
+     * información del elegido (mismo contenido que el detalle, en un parcial
+     * compartido). Si se llega desde la lista con ?curso=ID, viene preseleccionado.
+     *
+     * @param  Request  $request  Request con el docente autenticado.
+     * @param  ListarEstudiantesCursoConEstadoService  $estudiantes  Servicio de conteos del curso.
+     *
+     * @return View  Vista pages.curso-ver.
+     *
+     * @throws \Illuminate\Auth\Access\AuthorizationException  Si el curso no es del docente (403).
+     *
+     * @author Diego Tejerina <josediegotejerinamolina@gmail.com>
+     * @since  2026-11-15
+     */
+    public function ver(Request $request, ListarEstudiantesCursoConEstadoService $estudiantes): View
+    {
+        $cursos = Curso::query()
+            ->where('sis_doc', $request->user()->id_usuario)
+            ->orderBy('nombre_curso')
+            ->get();
+
+        $cursoId = $request->integer('curso');
+        $cursoSeleccionado = $cursoId > 0 ? $cursos->firstWhere('id_curso', $cursoId) : null;
+
+        $conteos = null;
+        if ($cursoSeleccionado !== null) {
+            // Red de seguridad: el select solo ofrece cursos propios, pero el id
+            // llega por el query y se autoriza igual que el detalle.
+            Gate::authorize('gestionar', $cursoSeleccionado);
+            $conteos = $estudiantes->conteosPorEstado($cursoSeleccionado->id_curso);
+        }
+
+        return view('pages.curso-ver', [
+            'cursos' => $cursos,
+            'cursoSeleccionado' => $cursoSeleccionado,
+            'conteos' => $conteos,
         ]);
     }
 }
