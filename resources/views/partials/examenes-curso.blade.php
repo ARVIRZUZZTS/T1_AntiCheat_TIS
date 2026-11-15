@@ -115,6 +115,14 @@
 
     // Si el alta falló, se vuelve a abrir la pestaña del formulario.
     $tabInicial = $tabInicial ?? (($errors->any() && $cursoInicial !== null && $puedeCrearExamen) ? 'crear' : 'lista');
+
+    // $soloTab (opcional) acota el parcial a una sola pestaña y oculta la barra
+    // de pestañas: así las subopciones del sidebar (Editar / Dividir) reutilizan
+    // este mismo componente mostrando solo su sección.
+    $soloTab = $soloTab ?? null;
+    if ($soloTab !== null) {
+        $tabInicial = $soloTab;
+    }
 @endphp
 
 <div class="flex flex-col gap-4"
@@ -128,6 +136,7 @@
          estado: 'listo',
          peticion: 0,
          tab: @js($tabInicial),
+         soloTab: @js($soloTab),
          // Examen elegido en Editar, Invitar y Dividir.
          seleccionado: '',
          examenEdicionCargadoId: '',
@@ -174,7 +183,7 @@
              return this.aulasDelExamen > 1;
          },
          cambiarCurso() {
-             this.tab = 'lista';
+             this.tab = this.soloTab ?? 'lista';
              this.cursoNombre = this.cursos[this.cursoSeleccionado] ?? '';
              this.seleccionado = '';
              this.examenEdicionCargadoId = '';
@@ -598,6 +607,7 @@
 
     {{-- Las pestañas y su contenido solo aparecen con materia elegida. --}}
     <div x-show="hayCurso" x-cloak class="flex flex-col gap-4">
+    @if (! $soloTab)
     <header class="flex flex-col gap-3">
 
         <nav class="flex min-w-0 gap-2 overflow-x-auto px-3" aria-label="Opciones de examenes">
@@ -633,6 +643,7 @@
             </button>
         </nav>
     </header>
+    @endif
 
     {{-- Ver Lista de Examenes: solo lectura, sin selección ni acciones. --}}
     <section x-show="tab === 'lista'" x-cloak class="flex flex-col gap-4">

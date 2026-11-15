@@ -46,6 +46,9 @@
  * - 2026-11-05  [Alex Candia]  feat: la página del curso entrega los catálogos
  *   también cuando ya no se pueden crear exámenes, porque Editar Examen los
  *   necesita para precargar el formulario.
+ * - 2026-11-15  [Diego Tejerina]  feat: `crearFormulario` sirve la subopción
+ *   "Crear examen" del sidebar: selector de curso + el formulario de alta que
+ *   ya existe, sin depender del SPA de la página Exámenes.
  *
  * @see  StoreExamenRequest
  * @see  App\Services\Examen\CatalogosExamenService
@@ -91,7 +94,7 @@ class ExamenController extends Controller
 
         // El curso puede venir de la URL (recarga o enlace directo) o quedar en
         // el input viejo cuando falló el alta. Solo se acepta si es del docente.
-        $cursoId = (int) $request->old('curso_id', 0);
+        $cursoId = (int) $request->old('curso_id');
         if ($cursoId === 0) {
             $cursoId = $request->integer('curso');
         }
@@ -182,6 +185,117 @@ class ExamenController extends Controller
             'materiales' => $catalogos->materiales(),
             'normas' => $catalogos->normas(),
             'backRoute' => route('examenes'),
+        ]);
+    }
+
+    /**
+     * Pagina "Crear examen" de la subopcion del sidebar: un selector de curso
+     * arriba y, al elegir uno, el formulario de alta que ya existe
+     * (x-ui.form-crear-examen). El selector es server-driven (recarga con
+     * ?curso=ID) para no depender del SPA de la seccion Examenes.
+     *
+     * @param  Request  $request  Request con el docente autenticado.
+     * @param  ListarCursosDocenteService  $cursos  Cursos activos del docente.
+     * @param  CatalogosExamenService  $catalogos  Catalogos del formulario.
+     *
+     * @return View  Vista pages.examen-crear-seleccion.
+     *
+     * @author Diego Tejerina <josediegotejerinamolina@gmail.com>
+     * @since  2026-11-15
+     */
+    public function crearFormulario(
+        Request $request,
+        ListarCursosDocenteService $cursos,
+        CatalogosExamenService $catalogos,
+    ): View {
+        $activos = $cursos->activos((int) $request->user()->id_usuario);
+
+        // El curso puede venir del query (?curso=ID) o del input viejo cuando el
+        // alta fallo y StoreExamenRequest redirigio de vuelta. Solo vale si es
+        // del docente y todavia admite altas (CursoPolicy::crearExamen).
+        $cursoId = (int) $request->old('curso_id');
+        if ($cursoId === 0) {
+            $cursoId = $request->integer('curso');
+        }
+
+        $cursoSeleccionado = $cursoId > 0 ? $activos->firstWhere('id_curso', $cursoId) : null;
+
+        if ($cursoSeleccionado !== null && ! Gate::allows('crearExamen', $cursoSeleccionado)) {
+            $cursoSeleccionado = null;
+        }
+
+        return view('pages.examen-crear-seleccion', [
+            'cursos' => $activos,
+            'cursoSeleccionado' => $cursoSeleccionado,
+            'ambientes' => $catalogos->ambientes(),
+            'materiales' => $catalogos->materiales(),
+            'normas' => $catalogos->normas(),
+        ]);
+    }
+
+    /**
+     * Subopción "Editar examen": reutiliza el parcial de la sección acotado a
+     * la pestaña Editar (selector de materia + examen a editar + formulario).
+     *
+     * @author Diego Tejerina <josediegotejerinamolina@gmail.com>
+     * @since  2026-11-15
+     */
+    public function editarVista(
+        Request $request,
+        ListarCursosDocenteService $cursos,
+        CatalogosExamenService $catalogos,
+    ): View {
+        return $this->seccionAcotada($request, $cursos, $catalogos, 'editar', 'pages.examenes-editar');
+    }
+
+    /**
+     * Subopción "Dividir examen": el mismo parcial acotado a la pestaña Dividir
+     * (selector de materia + examen con 2+ aulas + configuración de división).
+     *
+     * @author Diego Tejerina <josediegotejerinamolina@gmail.com>
+     * @since  2026-11-15
+     */
+    public function dividirVista(
+        Request $request,
+        ListarCursosDocenteService $cursos,
+        CatalogosExamenService $catalogos,
+    ): View {
+        return $this->seccionAcotada($request, $cursos, $catalogos, 'dividir', 'pages.examenes-dividir');
+    }
+
+    /**
+     * Arma los datos del parcial de exámenes acotado a una sola pestaña.
+     *
+     * @param  string  $soloTab  Pestaña única a mostrar (editar / dividir).
+     * @param  string  $vista    Vista contenedora.
+     */
+    private function seccionAcotada(
+        Request $request,
+        ListarCursosDocenteService $cursos,
+        CatalogosExamenService $catalogos,
+        string $soloTab,
+        string $vista,
+    ): View {
+        $cursos = $cursos->activos((int) $request->user()->id_usuario);
+
+        $cursoId = $request->integer('curso');
+        $cursoInicial = $cursoId > 0 ? $cursos->firstWhere('id_curso', $cursoId) : null;
+
+        $catalogo = $cursos->isNotEmpty()
+            ? [
+                'ambientes' => $catalogos->ambientes(),
+                'materiales' => $catalogos->materiales(),
+                'normas' => $catalogos->normas(),
+            ]
+            : ['ambientes' => [], 'materiales' => [], 'normas' => []];
+
+        return view($vista, [
+            'cursos' => $cursos,
+            'cursoInicial' => $cursoInicial,
+            'soloTab' => $soloTab,
+            'ambientes' => $catalogo['ambientes'],
+            'materiales' => $catalogo['materiales'],
+            'normas' => $catalogo['normas'],
         ]);
     }
 
