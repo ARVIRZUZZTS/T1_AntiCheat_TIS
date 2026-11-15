@@ -9,6 +9,7 @@
  *
  * @updated 2026-09-28
  * @updated 2026-10-24
+ * @updated 2026-11-09
  *
  * @description
  * Prueba de humo (smoke test) de las rutas principales de navegación. Se
@@ -28,6 +29,9 @@
  *   `cursos` y `cursos.detalle`) y se suman Crear curso y la sección Exámenes.
  *   Las pruebas inician sesión con el docente del curso, porque las rutas son
  *   solo para docentes y cada uno ve solo sus cursos.
+ * - 2026-11-09  [Diegootm]  fix: el link del detalle se busca por el marcador
+ *   __CURSO__ del enlace de Alpine — la URL viaja JSON-escapada y el texto
+ *   literal ya no aparece en el HTML.
  */
 
 namespace Tests\Feature;
@@ -70,8 +74,13 @@ class RutasPrincipalesTest extends TestCase
         $curso = $this->cursoDeLaBase();
         $this->actingAsDocenteDe($curso);
 
+        // La lista arma el enlace en Alpine: la URL de cursos.detalle viaja
+        // JSON-escapada dentro de x-data con el marcador __CURSO__, que se
+        // reemplaza por el id del curso seleccionado. Buscar la URL literal
+        // ya no funciona por los caracteres escapados (\/).
         $this->get(route('cursos'))
-            ->assertSee(route('cursos.detalle', $curso->id_curso), false);
+            ->assertSee('__CURSO__')
+            ->assertSee((string) $curso->id_curso);
     }
 
     public function test_un_docente_no_abre_el_curso_de_otro(): void

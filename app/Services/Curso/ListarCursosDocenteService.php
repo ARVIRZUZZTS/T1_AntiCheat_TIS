@@ -8,14 +8,18 @@
  * @created 2026-10-24
  *
  * @updated 2026-10-26
+ * @updated 2026-11-09
  *
  * @description
  * Lista los cursos de un docente para las secciones Cursos y Exámenes.
  *
- * - `conMetricas()`: todos sus cursos con las métricas de
+ * - `conMetricas()`: solo sus cursos con las métricas de
  *   ListarMateriasConMetricasService, primero los activos y después los
  *   finalizados (cursos pasados), cada grupo del más reciente al más antiguo.
- * - `activos()`: solo los cursos en curso, para elegir uno en Exámenes.
+ *   Los cursos compartidos por invitación ya no se listan: las invitaciones
+ *   son por examen y se manejan en la sección Exámenes (`activos()`).
+ * - `activos()`: los cursos en curso propios y los de invitaciones aceptadas,
+ *   para elegir uno en Exámenes.
  *
  * El orden se aplica acá y no en ListarMateriasConMetricasService porque ese
  * servicio también alimenta a Reportes, que depende de su orden por id.
@@ -26,6 +30,10 @@
  *   gestión con año ("Segundo semestre 2026") para la lista de cursos.
  * - 2026-10-26  [Valery D. Ortuno P]  perf: los cursos del docente y sus
  *   gestiones salen de una sola consulta (antes eran dos).
+ * - 2026-11-09  [Diegootm]  fix: la lista de Cursos ya no incluye cursos
+ *   invitados ni las claves `invitado`/`es_anfitrion` — el criterio era
+ *   incorrecto, las invitaciones son por examen y solo se manejan en Exámenes
+ *   (ahí `activos()` sigue marcando el curso anfitrión).
  *
  * @see  App\Services\Curso\ListarMateriasConMetricasService
  * @see  App\Http\Controllers\CursoController
@@ -49,8 +57,11 @@ class ListarCursosDocenteService
     ) {}
 
     /**
-     * Cursos del docente con sus métricas: activos primero, luego finalizados,
-     * y dentro de cada grupo del más reciente al más antiguo.
+     * Cursos propios del docente con sus métricas: activos primero, luego
+     * finalizados, y dentro de cada grupo del más reciente al más antiguo.
+     *
+     * Los cursos recibidos por invitación no se listan: las invitaciones son
+     * por examen y el docente invitado los gestiona desde Exámenes.
      *
      * @param  int  $idDocente  ID del docente (`curso.sis_doc`).
      * @return Collection<int, array<string, mixed>> Filas de ListarMateriasConMetricasService
@@ -72,21 +83,18 @@ class ListarCursosDocenteService
         }
 
         $gestiones = $cursos->filter();
-        $idsAnfitrion = $this->idsCursosAnfitrion($idDocente);
 
         return $this->metricas->ejecutar($idsCursos, true)
             ->map(fn (array $fila): array => $fila + [
                 'gestion' => $gestiones->get($fila['curso']->id_curso),
-                'invitado' => (int) $fila['curso']->sis_doc !== $idDocente,
-                'es_anfitrion' => in_array($fila['curso']->id_curso, $idsAnfitrion, true),
             ])
             ->sortBy(fn (array $fila): array => $this->claveDeOrden($fila['curso']))
             ->values();
     }
 
     /**
-     * Cursos del docente con la gestión y el año de cada uno, en una sola
-     * consulta (cada viaje a la base remota pesa).
+     * Cursos propios del docente con la gestión y el año de cada uno, en una
+     * sola consulta (cada viaje a la base remota pesa).
      *
      * @param  int  $idDocente  ID del docente (`curso.sis_doc`).
      * @return Collection<int, non-falsy-string|null> id_curso => "Segundo semestre 2026", o
@@ -94,25 +102,11 @@ class ListarCursosDocenteService
      */
     private function cursosConGestion(int $idDocente): Collection
     {
-        $propios = DB::table('curso as c')
+        return DB::table('curso as c')
             ->leftJoin('curso_tipo_gestion as ctg', 'ctg.id_curso', '=', 'c.id_curso')
             ->leftJoin('tipo_gestion as tg', 'tg.id_tipo_gestion', '=', 'ctg.id_tg')
             ->where('c.sis_doc', $idDocente)
-            ->get(['c.id_curso', 'tg.nombre_tipo_gestion', 'ctg.anio']);
-
-        $idsCompartidos = $this->idsCursosInvitados($idDocente);
-
-        $compartidos = $idsCompartidos === []
-            ? collect()
-            : DB::table('curso as c')
-                ->leftJoin('curso_tipo_gestion as ctg', 'ctg.id_curso', '=', 'c.id_curso')
-                ->leftJoin('tipo_gestion as tg', 'tg.id_tipo_gestion', '=', 'ctg.id_tg')
-                ->whereIn('c.id_curso', $idsCompartidos)
-                ->get(['c.id_curso', 'tg.nombre_tipo_gestion', 'ctg.anio']);
-
-        return $propios
-            ->concat($compartidos)
-            ->unique('id_curso')
+            ->get(['c.id_curso', 'tg.nombre_tipo_gestion', 'ctg.anio'])
             ->mapWithKeys(fn (object $fila): array => [
                 (int) $fila->id_curso => $fila->nombre_tipo_gestion !== null
                     ? Str::ucfirst($fila->nombre_tipo_gestion).' '.$fila->anio
@@ -121,8 +115,10 @@ class ListarCursosDocenteService
     }
 
     /**
-     * Cursos en curso del docente, del más reciente al más antiguo, con la
-     * cantidad de estudiantes y de exámenes de cada uno.
+     * Cursos en curso propios y de invitaciones aceptadas (la sección
+     * Exámenes es donde el docente invitado gestiona los exámenes
+     * compartidos), del más reciente al más antiguo, con la cantidad de
+     * estudiantes y de exámenes de cada uno.
      *
      * @param  int  $idDocente  ID del docente (`curso.sis_doc`).
      * @return EloquentCollection<int, Curso> Cursos con `estudiantes_count` y `examenes_count`.

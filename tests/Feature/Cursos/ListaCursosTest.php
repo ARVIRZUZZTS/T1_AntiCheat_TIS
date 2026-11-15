@@ -8,11 +8,13 @@
  * @created 2026-11-06
  *
  * @updated 2026-11-08
+ * @updated 2026-11-09
  *
  * @description
- * Pruebas de la lista de cursos del docente: acceso autorizado (propios e
- * invitados), resumen con métricas, estados vacíos y detalle con invitaciones
- * pendientes o rechazadas.
+ * Pruebas de la lista de cursos del docente: solo cursos propios (las
+ * invitaciones son por examen y no aparecen en la lista), resumen con
+ * métricas, estados vacíos y detalle con invitaciones pendientes o
+ * rechazadas.
  *
  * @changelog
  * - 2026-11-06  [Diegootm]  test: creación inicial del listado de cursos.
@@ -21,6 +23,9 @@
  *   usuario_nombre_usuario_unique de la migración HU 26) y columnas
  *   sis_estudiante/id_examen/fecha_registro en la incidencia de ejemplo
  *   (NOT NULL en una BD recién migrada según 2026_10_10_000004).
+ * - 2026-11-09  [Diegootm]  test: la lista ya no incluye los cursos
+ *   invitados ni el filtro "Invitados" (las invitaciones son por examen) y
+ *   se cubre el filtro "Finalizados" del criterio de aceptación.
  *
  * @see  App\Services\Curso\ListarCursosDocenteService
  */
@@ -154,28 +159,25 @@ class ListaCursosTest extends TestCase
             'id_estudiante' => '996101', 'id_registrador' => self::DOCENTE,
         ]);
         DB::table('central_riesgo')->insert([
-            'id_registro' => 996101, 'id_ingreso' => 996101,
+            'id_registro' => 996101,
             'id_registrador' => self::DOCENTE, 'id_curso' => self::CURSO_PROPIO,
             'tipo_infraccion' => 'sospechoso',
-            // En una BD recién migrada la migración 2026_10_10_000004 deja
-            // estas columnas NOT NULL (solo las relaja si ya hay filas null).
+            // El esquema real (Supabase) no tiene id_ingreso en central_riesgo
+            // y estas columnas son NOT NULL.
             'sis_estudiante' => '996101',
             'id_examen' => self::EXAMEN_PROXIMO,
             'fecha_registro' => now()->toDateTimeString(),
         ]);
     }
 
-    public function test_lista_cursos_autorizados_sin_duplicar_invitaciones_y_con_gestion(): void
+    public function test_lista_solo_los_cursos_propios_con_gestion(): void
     {
         $filas = app(ListarCursosDocenteService::class)->conMetricas(self::DOCENTE);
 
         $this->assertEqualsCanonicalizing(
-            [self::CURSO_PROPIO, self::CURSO_FINALIZADO, self::CURSO_INVITADO, self::CURSO_INVITADO_FINALIZADO],
+            [self::CURSO_PROPIO, self::CURSO_FINALIZADO],
             $filas->pluck('curso.id_curso')->all(),
         );
-        $this->assertTrue($filas->firstWhere('curso.id_curso', self::CURSO_INVITADO)['invitado']);
-        $this->assertTrue($filas->firstWhere('curso.id_curso', self::CURSO_INVITADO_FINALIZADO)['invitado']);
-        $this->assertFalse($filas->firstWhere('curso.id_curso', self::CURSO_PROPIO)['invitado']);
         $this->assertStringContainsString((string) now()->year, $filas->first()['gestion']);
     }
 
@@ -198,9 +200,12 @@ class ListaCursosTest extends TestCase
         $this->actingAs(Usuario::findOrFail(self::DOCENTE))
             ->get(route('cursos'))
             ->assertOk()
-            ->assertSee('Invitados 2')
-            ->assertSee('Todos 4')
-            ->assertSee('Activos 2')
+            ->assertSee('Todos 2')
+            ->assertSee('Activos 1')
+            ->assertSee('Finalizados 1')
+            ->assertDontSee('Invitados')
+            ->assertDontSee('Física')
+            ->assertDontSee('Literatura')
             ->assertSee('Próximo examen:')
             ->assertSee('No hay exámenes programados')
             ->assertDontSee('Pendiente oculta')
