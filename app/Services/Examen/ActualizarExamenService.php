@@ -45,11 +45,14 @@
 namespace App\Services\Examen;
 
 use App\Models\Examen;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
 class ActualizarExamenService
 {
     use NormalizaDatosExamen;
+
+    public function __construct(private readonly ValidarDisponibilidadExamenService $disponibilidad) {}
 
     /**
      * Guarda los cambios del examen y de sus relaciones.
@@ -64,6 +67,9 @@ class ActualizarExamenService
     public function ejecutar(Examen $examen, array $datos): Examen
     {
         return DB::transaction(function () use ($examen, $datos): Examen {
+            $this->disponibilidad->bloquearProgramacion();
+            $this->validarDisponibilidad($examen, $datos);
+
             $examen->fecha = $this->fechaIso($datos['fecha']);
             $examen->hora_inicio = $this->horaIso($datos['hora_inicio']);
             $examen->duracion = (int) $datos['duracion'];
@@ -83,6 +89,24 @@ class ActualizarExamenService
 
             return $examen;
         });
+    }
+
+    /** @param array<string, mixed> $datos */
+    private function validarDisponibilidad(Examen $examen, array $datos): void
+    {
+        $inicio = Carbon::createFromFormat('d/m/Y H:i', $datos['fecha'].' '.$datos['hora_inicio']);
+
+        $this->disponibilidad->asegurarDisponible(
+            $inicio,
+            (int) $datos['duracion'],
+            array_map(fn ($id): int => (int) $id, (array) $datos['ambientes']),
+            $examen->cursos()
+                ->pluck('curso.id_curso')
+                ->map(fn ($id): int => (int) $id)
+                ->all(),
+            (int) $examen->creador,
+            (int) $examen->id_examen,
+        );
     }
 
     /**

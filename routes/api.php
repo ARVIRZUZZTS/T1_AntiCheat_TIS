@@ -34,6 +34,7 @@ use App\Http\Controllers\Api\CursoExamenController;
 use App\Http\Controllers\Api\DetalleIncidenciaController;
 use App\Http\Controllers\Api\DividirExamenController;
 use App\Http\Controllers\Api\EstudianteExamenController;
+use App\Http\Controllers\Api\ExamenDocenteController;
 use App\Http\Controllers\Api\ExamenEdicionController;
 use App\Http\Controllers\Api\ExamenMonitoreoController;
 use App\Http\Controllers\Api\InvitacionExamenController;
@@ -80,6 +81,10 @@ Route::middleware(['web', 'auth:web'])->group(function (): void {
     Route::patch('/notificaciones/{idNotificacion}/ocultar', [NotificacionController::class, 'ocultar'])
         ->whereNumber('idNotificacion')
         ->name('api.notificaciones.ocultar');
+
+    Route::get('/examenes', [ExamenDocenteController::class, 'index'])
+        ->middleware('docente')
+        ->name('api.examenes.listar');
 
     Route::get('/examenes/{examen}/invitaciones', [InvitacionExamenController::class, 'index'])
         ->whereNumber('examen')

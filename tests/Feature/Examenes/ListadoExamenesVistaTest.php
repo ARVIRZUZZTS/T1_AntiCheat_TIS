@@ -12,25 +12,28 @@
  * @updated 2026-10-25
  * @updated 2026-11-04
  * @updated 2026-11-05
+ * @updated 2026-11-14
  *
  * @description
- * Pruebas de la vista del listado de exámenes de un curso: verifican sobre
- * la fuente de las vistas y de las rutas que el parcial consulta con fetch el
- * endpoint /api/cursos/{idCurso}/examenes, que la página única de Exámenes lo
- * incrusta, que la tarjeta sigue un diseño horizontal (ícono, badge
- * invertido, grid con labels en mayúsculas y valores mono, fecha en
- * dd/mm/yyyy) con los campos del criterio (tipo, estado, fecha, horario,
- * ambientes e ingresados), que las acciones viven en cuatro pestañas y que
- * las rutas no resuelven los exámenes server-side.
+ * Pruebas de la vista del listado de exámenes: verifican sobre la fuente de las
+ * vistas y de las rutas que el parcial consulta con fetch el endpoint global
+ * /api/examenes o el endpoint /api/cursos/{idCurso}/examenes, que la página
+ * única de Exámenes lo incrusta, que la tarjeta sigue un diseño horizontal
+ * (ícono, badge invertido, grid con labels en mayúsculas y valores mono, fecha
+ * en dd/mm/yyyy) con los campos del criterio (tipo, estado, fecha, horario,
+ * ambientes e ingresados), que las acciones viven en cuatro pestañas y que las
+ * rutas no resuelven los exámenes server-side.
  *
  * Son aserciones de fuente, al estilo de BuscadorEstudiantesMateriaTest:
- * el comportamiento de la consulta en sí lo cubre ListarExamenesCursoTest.
+ * el comportamiento de la consulta en sí lo cubre ListarExamenesCursoTest y
+ * ListarExamenesDocenteTest.
  *
  * @see  resources/views/partials/examenes-curso.blade.php
  * @see  resources/views/pages/examenes.blade.php
  * @see  resources/views/pages/examenes-curso.blade.php
  * @see  routes/web.php
  * @see  App\Http\Controllers\Api\CursoExamenController
+ * @see  App\Http\Controllers\Api\ExamenDocenteController
  *
  * @changelog
  * - 2026-10-09  [OchoaCesar]  test: creación inicial.
@@ -50,6 +53,9 @@
  *   listan exámenes con fecha y hora futuras, sin filtrar el listado completo.
  * - 2026-11-05  [Alex Candia]  test: Editar Examen solo ofrece exámenes propios,
  *   consulta su detalle y precarga el formulario sin enviar cambios.
+ * - 2026-11-14  [Alex Candia]  test: la página única ya no tiene selector de
+ *   materia, usa el endpoint global, muestra el curso en las etiquetas y el
+ *   formulario de alta permite elegir el curso.
  */
 
 namespace Tests\Feature\Examenes;
@@ -87,7 +93,8 @@ class ListadoExamenesVistaTest extends TestCase
     {
         $parcial = $this->fuenteParcial();
 
-        $this->assertStringContainsString('<template x-for="examen in examenes"', $parcial);
+        $this->assertStringContainsString('<template x-for="examen in examenes" :key="examen.id">', $parcial);
+        $this->assertStringContainsString('<template x-for="examen in examenesDisponibles"', $parcial);
         $this->assertStringNotContainsString('@forelse', $parcial);
         $this->assertStringNotContainsString('$examenes', $parcial);
     }
@@ -98,6 +105,7 @@ class ListadoExamenesVistaTest extends TestCase
 
         // Estado debajo del tipo, con las dos etiquetas del contrato del endpoint.
         $this->assertStringContainsString("examen.estado === 'Programado'", $parcial);
+        $this->assertStringContainsString("examen.estado === 'En curso'", $parcial);
         $this->assertStringContainsString("examen.estado === 'Finalizado'", $parcial);
 
         // Ítem: fecha, horario, ambientes e ingresados, con dos puntos.
@@ -123,8 +131,8 @@ class ListadoExamenesVistaTest extends TestCase
     {
         $parcial = $this->fuenteParcial();
 
-        // Header: título grande y las cuatro pestañas de gestión.
-        $this->assertStringContainsString('text-2xl font-bold text-heading', $parcial);
+        // Las cuatro pestañas de gestión viven en la misma página.
+        $this->assertStringContainsString('aria-label="Opciones de examenes"', $parcial);
         $this->assertStringNotContainsString('Ver examenes', $parcial);
         $this->assertStringContainsString('Ver Lista de Examenes', $parcial);
         $this->assertStringContainsString('Crear Examen', $parcial);
@@ -155,7 +163,7 @@ class ListadoExamenesVistaTest extends TestCase
         $this->assertStringContainsString("estado === 'error'", $parcial);
         $this->assertStringContainsString("estado === 'listo'", $parcial);
         $this->assertStringContainsString('Reintentar', $parcial);
-        $this->assertStringContainsString('no tiene examenes registrados', $parcial);
+        $this->assertStringContainsString('No hay examenes registrados.', $parcial);
     }
 
     public function test_los_selectores_solo_listan_examenes_con_fecha_y_hora_futuras(): void
@@ -167,10 +175,14 @@ class ListadoExamenesVistaTest extends TestCase
         $this->assertStringContainsString("const inicio = examen.fecha + ' ' + (examen.hora_inicio || '00:00');", $parcial);
         $this->assertStringContainsString('return inicio > this.ahora;', $parcial);
         $this->assertStringContainsString('x-for="examen in examenesDisponibles"', $parcial);
-        $this->assertStringContainsString('No hay examenes disponibles con fecha y hora futuras.', $parcial);
+        $this->assertStringContainsString('No hay examenes futuros para mostrar.', $parcial);
         $this->assertStringContainsString('<template x-for="examen in examenes" :key="examen.id">', $parcial);
         $this->assertStringContainsString("tab === 'editar'", $parcial);
         $this->assertStringContainsString('id="examen-editar"', $parcial);
+
+        // Las etiquetas de los selectores muestran tipo y curso, sin fecha.
+        $this->assertStringContainsString("return [examen.tipo || 'Sin tipo', examen.curso || '']", $parcial);
+        $this->assertStringNotContainsString('this.fechaDe(examen), this.horario(examen)', $parcial);
     }
 
     public function test_editar_carga_el_formulario_sin_enviar_cambios(): void
@@ -202,14 +214,40 @@ class ListadoExamenesVistaTest extends TestCase
         $this->assertStringNotContainsString("'examenes' => \$examenes", $pagina);
     }
 
-    public function test_el_parcial_tiene_selector_de_materia_y_oculta_las_pestanas(): void
+    public function test_el_parcial_ya_no_tiene_selector_de_materia(): void
     {
         $parcial = $this->fuenteParcial();
 
-        $this->assertStringContainsString('label="Materia"', $parcial);
-        $this->assertStringContainsString('x-model="cursoSeleccionado"', $parcial);
-        $this->assertStringContainsString('x-show="hayCurso"', $parcial);
-        $this->assertStringContainsString('Selecciona una materia', $parcial);
+        $this->assertStringNotContainsString('label="Materia"', $parcial);
+        $this->assertStringNotContainsString('x-model="cursoSeleccionado"', $parcial);
+        $this->assertStringNotContainsString('x-show="hayCurso"', $parcial);
+        $this->assertStringNotContainsString('Selecciona una materia', $parcial);
+        $this->assertStringContainsString("route('api.examenes.listar')", $parcial);
+    }
+
+    public function test_la_pagina_unica_muestra_todos_los_examenes_del_docente(): void
+    {
+        $parcial = $this->fuenteParcial();
+        $pagina = $this->fuente(resource_path('views/pages/examenes.blade.php'));
+
+        $this->assertStringContainsString("route('api.cursos.examenes.listar', ['idCurso' => '__CURSO__'])", $parcial);
+        $this->assertStringContainsString('$listadoGlobal = $curso === null;', $parcial);
+        $this->assertStringContainsString("'puedeCrearExamen' => \$cursos->isNotEmpty()", $pagina);
+        $this->assertStringNotContainsString('@if ($cursos->isEmpty())', $pagina);
+    }
+
+    public function test_el_alta_permite_elegir_el_curso_en_la_pagina_unica(): void
+    {
+        $formulario = $this->fuente(resource_path('views/components/ui/form-crear-examen.blade.php'));
+
+        $this->assertStringContainsString("'cursos' => [],", $formulario);
+        $this->assertStringContainsString('$tieneSelectorCurso = ! $esEdicion && $opcionesCursos !== [];', $formulario);
+        $this->assertStringContainsString('label="Curso"', $formulario);
+        $this->assertStringContainsString('name="curso_id"', $formulario);
+        $this->assertStringContainsString('@change="cambiarCurso()"', $formulario);
+        $this->assertStringContainsString('this.nombreCurso = this.cursos[this.cursoId] ?? \'\';', $formulario);
+        $this->assertStringContainsString("old('curso_id', \$cursoId)", $formulario);
+        $this->assertStringContainsString(":cursos=\"\$listadoGlobal ? \$opcionesCursos : []\"", $this->fuenteParcial());
     }
 
     public function test_el_detalle_del_curso_ya_no_tiene_pestana_examenes(): void

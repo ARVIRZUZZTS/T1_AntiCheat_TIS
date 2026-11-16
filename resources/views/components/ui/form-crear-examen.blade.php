@@ -8,6 +8,7 @@
     @updated 2026-10-25
     @updated 2026-11-04
     @updated 2026-11-09
+    @updated 2026-11-14
 
     @description
     Componente UI Blade reutilizable con el formulario de alta de un examen en
@@ -16,8 +17,9 @@
     que no se abre ni se cierra: "Cancelar" vuelve a `cancelarUrl`.
 
     También se incrusta en la pestaña Crear Examen de la página única Exámenes;
-    ahí la URL de envío y el curso se actualizan sin recargar cuando cambia el
-    selector de materia.
+    ahí recibe `cursos` y muestra un selector de curso obligatorio, mientras la
+    URL de envío se arma con el curso elegido. Las páginas de compatibilidad por
+    curso no pasan `cursos`, así que conservan el curso fijo de solo lectura.
 
     La fecha se escribe dd/mm/aaaa con los separadores colocados a mano (así el
     formato no depende del navegador); las barras se ponen solas y el año en
@@ -63,6 +65,7 @@
 
     @props([
         'nombreCurso' => null,
+        'cursos' => [],
         'tipos' => null,
         'ambientes' => [],
         'materiales' => [],
@@ -172,6 +175,10 @@
       guardar pasan de `@if` a ternarios. El `@if` dentro de los atributos de
       `<x-ui.button>` no se compila (los atributos de un componente no admiten
       directivas) y el `@endif` suelto rompía la página de Exámenes.
+    - 2026-11-14  [Alex Candia]  feat: en la página única Exámenes el curso se
+      elige dentro del formulario. Recibe `cursos`, conserva el curso elegido
+      tras un error de validación y mantiene el modo de solo lectura cuando no
+      se pasa la lista (páginas de compatibilidad por curso).
 
     @see  resources/views/pages/examen-crear.blade.php
     @see  App\Enums\TipoExamen
@@ -189,6 +196,11 @@
     $opciones = $tipos ?? TipoExamen::opciones();
     $esEdicion = $modo === 'editar';
     $idIndiceAmbientes = 'indice-ambientes-examen-'.$idPrefijo;
+
+    $opcionesCursos = $cursos ?? [];
+    $tieneSelectorCurso = ! $esEdicion && $opcionesCursos !== [];
+    $cursoIdInicial = old('curso_id', $cursoId);
+    $nombreCursoInicial = $nombreCurso ?: ($opcionesCursos[$cursoIdInicial] ?? '');
 
     $catalogoAmbientes = collect($ambientes)->keyBy('id');
 
@@ -222,8 +234,9 @@
 
 <div
     x-data="{
-        cursoId: @js($cursoId ?? ''),
-        nombreCurso: @js($nombreCurso ?? ''),
+        cursos: @js($opcionesCursos),
+        cursoId: @js((string) ($cursoIdInicial ?? '')),
+        nombreCurso: @js($nombreCursoInicial),
         modo: @js($modo),
         idPrefijo: @js($idPrefijo),
         accionUrl: @js($accionInicial),
@@ -288,6 +301,12 @@
             });
         },
 
+        cambiarCurso() {
+            this.nombreCurso = this.cursos[this.cursoId] ?? '';
+            this.limpiarErrores(['curso_id']);
+            this.exito = false;
+        },
+
         cargarIndiceAmbientes() {
             const ambientes = document.getElementById('{{ $idIndiceAmbientes }}');
 
@@ -304,6 +323,8 @@
 
             this.examenId = datos.id ?? '';
             this.exito = false;
+            this.cursoId = datos.curso_id ?? this.cursoId;
+            this.nombreCurso = datos.curso_nombre ?? this.nombreCurso;
             this.tipo = datos.tipo_examen ?? '';
             this.fecha = datos.fecha ?? '';
             this.horaInicio = datos.hora_inicio ?? '';
@@ -632,7 +653,6 @@
             this.agregarAmbiente(ambiente.id);
         }
     }"
-    @curso-seleccionado.window="cursoId = $event.detail.id; nombreCurso = $event.detail.nombre"
     @if ($esEdicion)
         x-on:editar-examen-datos.window="cargarEdicion($event.detail)"
     @endif
@@ -640,19 +660,38 @@
 >
     <form method="POST" x-bind:action="urlAccion" @if ($esEdicion) x-on:submit.prevent @endif>
         @csrf
-        <input type="hidden" name="curso_id" x-bind:value="cursoId">
+        @if (! $tieneSelectorCurso)
+            <input type="hidden" name="curso_id" x-bind:value="cursoId">
+        @endif
 
     <div class="space-y-4 py-4">
-        <x-ui.input
-            label="Curso"
-            id="{{ $idPrefijo }}_curso_examen"
-            name="nombre_curso"
-            :value="$nombreCurso ?? ''"
-            x-bind:value="nombreCurso"
-            readonly
-            required
-            class="cursor-default"
-        />
+        @if ($tieneSelectorCurso)
+            <x-ui.select
+                label="Curso"
+                name="curso_id"
+                id="{{ $idPrefijo }}_curso_examen"
+                x-model="cursoId"
+                @change="cambiarCurso()"
+                :options="$opcionesCursos"
+                placeholder="Selecciona un curso"
+                x-bind:class="claseErrorDe('curso_id')"
+                x-bind:aria-invalid="errorDe('curso_id') ? 'true' : null"
+                required
+            />
+            <p x-show="errorDe('curso_id')" x-text="errorDe('curso_id')"
+               class="mt-1 text-sm text-fg-danger-strong"></p>
+        @else
+            <x-ui.input
+                label="Curso"
+                id="{{ $idPrefijo }}_curso_examen"
+                name="nombre_curso"
+                :value="$nombreCursoInicial"
+                x-bind:value="nombreCurso"
+                readonly
+                required
+                class="cursor-default"
+            />
+        @endif
 
         <x-ui.select
             label="Tipo de examen"

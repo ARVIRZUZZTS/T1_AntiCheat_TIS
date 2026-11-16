@@ -8,6 +8,7 @@
  * @created 2026-10-05
  *
  * @updated 2026-10-09
+ * @updated 2026-11-14
  *
  * @description
  * Servicio de la feature Examen que lista los exámenes de un curso con la
@@ -40,6 +41,9 @@
  *   los códigos PP/SP/FINAL/SI.
  * - 2026-10-09  [Diego Tejerina]  feat: ambientes e ingresos para el API #138;
  *   ordenar por fecha y hora descendentes, dejando los finalizados al final.
+ * - 2026-11-14  [Alex Candia]  feat: el mapeo de exámenes se comparte con el
+ *   listado global del docente e incluye los cursos asociados y su nombre
+ *   concatenado para mostrar el curso junto al tipo.
  */
 
 namespace App\Services\Examen;
@@ -102,7 +106,7 @@ class ListarExamenesCursoService
             ->all();
 
         return $curso->examenes()
-            ->with(['tipoExamen', 'ambientes'])
+            ->with(['tipoExamen', 'ambientes', 'cursos'])
             ->withCount([
                 'estudianteExamenes',
                 // Un ingreso duplicado no representa un estudiante adicional.
@@ -126,18 +130,27 @@ class ListarExamenesCursoService
     /**
      * Convierte un examen en el arreglo de datos que consume la vista.
      *
-     * @param  Examen  $examen  Examen con el tipo y el conteo de inscritos ya
-     *                          cargados por la consulta.
+     * @param  Examen  $examen  Examen con el tipo, los cursos y el conteo de
+     *                          inscritos ya cargados por la consulta.
      * @param  Carbon  $ahora  Momento de referencia para el estado.
+     * @param  list<int>  $examenesInvitados  Exámenes donde el docente actual es
+     *                                        el invitador.
      * @return array<string, mixed>
      */
-    /**
-     * @param  list<int>  $examenesInvitados
-     */
-    private function mapearExamen(Examen $examen, Carbon $ahora, array $examenesInvitados = []): array
+    public function mapearExamen(Examen $examen, Carbon $ahora, array $examenesInvitados = []): array
     {
         $tipo = TipoExamen::etiquetaDe($examen->tipoExamen?->nombre_tipo_examen);
         $nombre = $examen->nombre_examen ?? $tipo ?? 'Examen #'.$examen->id_examen;
+        $cursos = $examen->relationLoaded('cursos')
+            ? $examen->cursos
+                ->sortBy('id_curso')
+                ->map(fn (Curso $curso): array => [
+                    'id' => (int) $curso->id_curso,
+                    'nombre' => $curso->nombre_curso,
+                ])
+                ->values()
+                ->all()
+            : [];
 
         return [
             'id' => $examen->id_examen,
@@ -151,6 +164,8 @@ class ListarExamenesCursoService
             'hora_inicio' => $this->recortarHora($examen->hora_inicio),
             'hora_fin' => $this->recortarHora($examen->hora_fin),
             'duracion' => $examen->duracion,
+            'cursos' => $cursos,
+            'curso' => implode(', ', array_column($cursos, 'nombre')),
             'inscritos' => (int) $examen->getAttribute('estudiante_examenes_count'),
             'ingresados' => (int) $examen->getAttribute('ingresados'),
             'ambientes' => $examen->ambientes
