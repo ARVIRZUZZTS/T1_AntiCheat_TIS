@@ -57,6 +57,8 @@
       riesgos se agrupan con sus subopciones; Reportes queda como link directo.
       Se retira "Docentes" del menu (su ruta sigue activa, sin link). El badge
       de invitaciones pasa a la cabecera del grupo Invitaciones.
+    - 2026-11-15  [Alex Candia]  feat: "Ver curso" se divide en "Ver estudiantes"
+      y "Habilitar estudiantes"; Reportes pasa a grupo con sus tres reportes.
 --}}
 
 @props([
@@ -108,8 +110,10 @@
     $defaultItems = [
         ['label' => 'Cursos', 'children' => [
             ['label' => 'Ver lista de cursos', 'route' => 'cursos'],
-            // El detalle de un curso (/cursos/{curso}) cuelga de "Ver curso".
-            ['label' => 'Ver curso', 'route' => 'cursos.ver', 'match' => ['cursos.detalle']],
+            // El detalle de un curso (/cursos/{curso}) muestra las dos secciones;
+            // se resalta "Ver estudiantes" como acceso principal.
+            ['label' => 'Ver estudiantes', 'route' => 'cursos.ver-estudiantes', 'match' => ['cursos.detalle', 'cursos.ver']],
+            ['label' => 'Habilitar estudiantes', 'route' => 'cursos.habilitar-estudiantes'],
             ['label' => 'Crear curso', 'route' => 'cursos.crear'],
             ['label' => 'Editar curso', 'route' => 'cursos.editar'],
             ['label' => 'Cargar CSV', 'route' => 'cursos.cargar-csv'],
@@ -124,7 +128,11 @@
             ['label' => 'Ingreso', 'route' => 'monitoreo.ingreso'],
             ['label' => 'Monitor', 'route' => 'monitoreo'],
         ]],
-        ['label' => 'Reportes', 'route' => 'reportes', 'match' => ['reportes.*']],
+        ['label' => 'Reportes', 'children' => [
+            ['label' => 'Reporte de asistencia', 'route' => 'reportes.asistencia'],
+            ['label' => 'Reporte de horario de ingreso', 'route' => 'reportes.horario-ingreso'],
+            ['label' => 'Reporte de intentos no autorizados', 'route' => 'reportes.intentos-no-autorizados'],
+        ]],
         ['label' => 'Auxiliares', 'children' => [
             ['label' => 'Ver lista de auxiliares', 'route' => 'auxiliares'],
             ['label' => 'Asignar auxiliar', 'route' => 'auxiliares.asignar'],

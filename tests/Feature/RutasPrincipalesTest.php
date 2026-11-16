@@ -32,6 +32,8 @@
  * - 2026-11-09  [Diegootm]  fix: el link del detalle se busca por el marcador
  *   __CURSO__ del enlace de Alpine — la URL viaja JSON-escapada y el texto
  *   literal ya no aparece en el HTML.
+ * - 2026-11-15  [Alex Candia]  test: humo de las subopciones de Cursos (Ver /
+ *   Habilitar estudiantes) y de Reportes (asistencia, horario, intentos).
  */
 
 namespace Tests\Feature;
@@ -98,6 +100,27 @@ class RutasPrincipalesTest extends TestCase
         $this->actingAsDocenteDe($this->curso);
 
         $this->get(route('cursos.detalle', $this->cursoAjeno->id_curso))->assertForbidden();
+    }
+
+    public function test_las_subopciones_de_cursos_cargan_sin_error(): void
+    {
+        $this->actingAsDocenteDe($this->curso);
+
+        $this->get(route('cursos.ver-estudiantes'))->assertOk();
+        $this->get(route('cursos.habilitar-estudiantes'))->assertOk();
+        $this->get(route('cursos.ver-estudiantes', ['curso' => $this->curso->id_curso]))->assertOk();
+        $this->get(route('cursos.habilitar-estudiantes', ['curso' => $this->curso->id_curso]))->assertOk();
+        $this->get(route('cursos.ver', ['curso' => $this->curso->id_curso]))
+            ->assertRedirect(route('cursos.ver-estudiantes', ['curso' => $this->curso->id_curso]));
+    }
+
+    public function test_las_subopciones_de_reportes_cargan_sin_error(): void
+    {
+        $this->actingAsDocenteDe($this->curso);
+
+        $this->get(route('reportes.asistencia'))->assertOk();
+        $this->get(route('reportes.horario-ingreso'))->assertOk();
+        $this->get(route('reportes.intentos-no-autorizados'))->assertOk();
     }
 
     public function test_la_seccion_examenes_carga_sin_error(): void

@@ -15,6 +15,7 @@
  * @updated 2026-10-25
  * @updated 2026-11-08
  * @updated 2026-11-14
+ * @updated 2026-11-15
  *
  * @description
  * Definición de rutas web del panel. Incluye vistas estáticas y componentes Livewire.
@@ -82,6 +83,9 @@
  * - 2026-11-14  [Alex Candia]  feat: /examenes deja de filtrar por materia y
  *   usa el endpoint global /api/examenes; el curso del alta se elige en el
  *   formulario y las rutas por curso siguen por compatibilidad.
+ * - 2026-11-15  [Alex Candia]  feat: "Ver curso" se divide en "Ver estudiantes" y
+ *   "Habilitar estudiantes"; Reportes pasa a submenus (asistencia, horario de
+ *   ingreso y intentos no autorizados) y /reportes redirige a asistencia.
  */
 
 use App\Http\Controllers\AuthController;
@@ -89,6 +93,7 @@ use App\Http\Controllers\CursoController;
 use App\Http\Controllers\ExamenController;
 use App\Http\Controllers\Reporte\ExportarReporteIngresosIlegalesController;
 use App\Http\Controllers\Reporte\ListarReporteIngresosIlegalesController;
+use App\Http\Controllers\Reporte\ReporteController;
 use App\Livewire\Examenes\EstudiantesCurso;
 use App\Livewire\Monitoreo\MonitorEnVivo;
 use App\Livewire\Monitoreo\AccesoMonitor;
@@ -96,7 +101,6 @@ use App\Livewire\Auxiliares\CrearAuxiliar;
 use App\Livewire\Auxiliares\GestionAuxiliares;
 use App\Livewire\Invitaciones\Index as InvitacionesIndex;
 use App\Models\Usuario;
-use App\Services\Reporte\ListarFiltrosReporteService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -138,9 +142,15 @@ Route::get('/invitaciones/aceptar', InvitacionesIndex::class)->defaults('tab', '
 
 Route::view('/monitoreo/mock', 'livewire.monitoreo.mock')->name('monitoreo.mock');
 
-Route::get('/reportes', function (Request $request, ListarFiltrosReporteService $filtros) {
-    return view('pages.reportes', $filtros->ejecutar($request->user()));
-})->name('reportes');
+    // Reportes: cada tipo es una subopcion del sidebar y muestra solo su
+    // seccion, reutilizando la vista con los selectores compartidos.
+    Route::redirect('/reportes', '/reportes/asistencia')->name('reportes');
+    Route::get('/reportes/asistencia', [ReporteController::class, 'asistencia'])
+        ->name('reportes.asistencia');
+    Route::get('/reportes/horario-ingreso', [ReporteController::class, 'horarioIngreso'])
+        ->name('reportes.horario-ingreso');
+    Route::get('/reportes/intentos-no-autorizados', [ReporteController::class, 'intentosNoAutorizados'])
+        ->name('reportes.intentos-no-autorizados');
 
 Route::get('/reportes/ingresos-ilegales/exportar/{examen}', ExportarReporteIngresosIlegalesController::class)
     ->name('reportes.ingresos-ilegales.exportar');
@@ -186,9 +196,16 @@ Route::middleware(['auth', 'docente'])->group(function (): void {
     // del docente lo decide CursoPolicy en el controlador.
     Route::get('/cursos', [CursoController::class, 'index'])->name('cursos');
     Route::get('/cursos/crear', [CursoController::class, 'crear'])->name('cursos.crear');
-    // Cursos · Ver curso: select de curso arriba + la informacion del elegido
-    // (parcial compartido con el detalle). Editar y Cargar CSV son marcadores.
-    Route::get('/cursos/ver', [CursoController::class, 'ver'])->name('cursos.ver');
+    // Cursos · Ver estudiantes / Habilitar estudiantes: selector de curso +
+    // la seccion correspondiente (el detalle conserva las dos pestañas).
+    Route::get('/cursos/ver', fn (Request $request) => redirect()->route(
+        'cursos.ver-estudiantes',
+        $request->only('curso'),
+    ))->name('cursos.ver');
+    Route::get('/cursos/ver-estudiantes', [CursoController::class, 'verEstudiantes'])
+        ->name('cursos.ver-estudiantes');
+    Route::get('/cursos/habilitar-estudiantes', [CursoController::class, 'habilitarEstudiantes'])
+        ->name('cursos.habilitar-estudiantes');
     Route::view('/cursos/editar', 'pages.en-desarrollo', [
         'titulo' => 'Editar curso',
         'descripcion' => 'La edicion de curso esta en desarrollo.',
