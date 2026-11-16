@@ -7,11 +7,17 @@
  * @updated 2026-11-08
  *
  * @description
- * Componente Livewire de la página de invitaciones: pestañas para recibir y
- * enviar invitaciones a exámenes compartidos.
+ * Componente Livewire de invitaciones a exámenes compartidos. Ya no tiene un
+ * conmutador de pestañas interno: cada subopción del sidebar (Enviar / Aceptar
+ * invitación) es su propia ruta y fija la vista con el parámetro `tab` (valor
+ * por defecto de la ruta). "Aceptar invitación" lista las recibidas, ordenables
+ * de la más reciente a la más antigua.
  *
  * @changelog
  * - 2026-11-08  [David E. Chavez T.]  feat: creación inicial.
+ * - 2026-11-15  [Diego Tejerina]  refactor: se separa en dos páginas (Enviar /
+ *   Aceptar invitación); el `tab` llega por la ruta, se quita el conmutador y
+ *   se agrega el orden (reciente / antigua) de las recibidas.
  *
  * @see  App\Services\Invitacion\ListarInvitacionesRecibidasService
  */
@@ -48,16 +54,25 @@ class Index extends Component
 
     public array $invitacionesRecibidas = [];
 
+    /** Orden de las recibidas: 'reciente' (por defecto) o 'antigua'. */
+    public string $ordenRecibidas = 'reciente';
+
     public function mount(
         ListarCursosDocenteService $cursos,
         ListarInvitacionesRecibidasService $recibidas,
+        string $tab = 'recibir',
     ): void {
+        // El sidebar decide la vista: Enviar fija 'enviar', Aceptar fija
+        // 'recibir' (ver los `->defaults('tab', ...)` de las rutas).
+        $this->tab = $tab === 'enviar' ? 'enviar' : 'recibir';
+
         $this->cursos = $cursos->activos((int) auth()->id())->map(fn (Curso $curso): array => [
             'id' => (int) $curso->id_curso,
             'nombre' => (string) $curso->nombre_curso,
         ])->all();
 
         $this->invitacionesRecibidas = $recibidas->ejecutar(auth()->user())->all();
+        $this->aplicarOrden();
     }
 
     public array $cursos = [];
@@ -86,16 +101,32 @@ class Index extends Component
         ));
     }
 
-    public function cambiarTab(string $tab): void
+    public function ordenarRecibidas(string $orden): void
     {
-        $this->tab = $tab === 'enviar' ? 'enviar' : 'recibir';
-        $this->mensajeExito = '';
-        $this->mensajeError = '';
+        $this->ordenRecibidas = $orden === 'antigua' ? 'antigua' : 'reciente';
+        $this->aplicarOrden();
     }
 
     public function cargarRecibidas(ListarInvitacionesRecibidasService $servicio): void
     {
         $this->invitacionesRecibidas = $servicio->ejecutar(auth()->user())->all();
+        $this->aplicarOrden();
+    }
+
+    /**
+     * Ordena las recibidas por fecha de envío. `enviada_en` es ISO 8601, que
+     * ordena cronológicamente como texto.
+     */
+    private function aplicarOrden(): void
+    {
+        usort($this->invitacionesRecibidas, function (array $a, array $b): int {
+            $fechaA = (string) ($a['enviada_en'] ?? '');
+            $fechaB = (string) ($b['enviada_en'] ?? '');
+
+            return $this->ordenRecibidas === 'antigua'
+                ? strcmp($fechaA, $fechaB)
+                : strcmp($fechaB, $fechaA);
+        });
     }
 
     public function buscarDocentes(BuscarDocentesInvitablesService $servicio): void

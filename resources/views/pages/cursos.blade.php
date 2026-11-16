@@ -73,35 +73,17 @@
 
 @section('title', 'Cursos')
 
-@php
-    // Clases de x-ui.button: se repiten acá porque el estado deshabilitado
-    // depende de la selección de Alpine y el componente lo resuelve en Blade.
-    $botonBase = 'inline-flex items-center justify-center box-border border focus:ring-4 shadow-xs font-medium leading-5 focus:outline-none rounded-base px-6 py-2.5 text-sm font-semibold shrink-0 whitespace-nowrap';
-    $botonActivo = 'text-white bg-brand border-transparent hover:bg-brand-strong focus:ring-brand-medium cursor-pointer';
-    $botonInactivo = 'text-fg-disabled bg-disabled border-default-medium cursor-not-allowed';
-
-    // El id real lo pone Alpine; la ruta se arma una sola vez con un marcador.
-    $urlVerCurso = route('cursos.detalle', ['curso' => '__CURSO__']);
-@endphp
-
 @section('content')
     <div
         x-data="{
             busqueda: '',
             filtro: 'todos',
             seleccionado: null,
-            verCurso() {
-                if (this.seleccionado === null) {
-                    return;
-                }
-
-                window.location.href = @js($urlVerCurso).replace('__CURSO__', this.seleccionado);
-            },
-            // Un clic que no cae en una card ni en el botón que la usa suelta
-            // la selección. Los clics fuera del componente los cubre
+            // Un clic que no cae en una card suelta la selección (que solo
+            // muestra las métricas del curso). Los clics fuera los cubre
             // @click.outside.
             soltarSeleccion(evento) {
-                if (! evento.target.closest('[data-seleccionable], [data-accion-seleccion]')) {
+                if (! evento.target.closest('[data-seleccionable]')) {
                     this.seleccionado = null;
                 }
             },
@@ -148,21 +130,9 @@
             <x-ui.modal-aviso :mensaje="session('mensaje')" />
         @endif
 
-        <div class="flex gap-2 overflow-x-auto" role="group" aria-label="Acciones de cursos">
-            <x-ui.button :href="route('cursos.crear')" variant="default" class="shrink-0 whitespace-nowrap px-6 font-semibold">
-                Crear curso
-            </x-ui.button>
-            <button type="button" class="{{ $botonBase }}" data-accion-seleccion
-                    :class="seleccionado === null ? '{{ $botonInactivo }}' : '{{ $botonActivo }}'"
-                    :disabled="seleccionado === null"
-                    @click="verCurso()">
-                Ver curso
-            </button>
-        </div>
-
-        <p class="mt-4 text-sm text-body" x-show="seleccionado === null">
-            Selecciona un curso para verlo.
-        </p>
+        {{-- Ni "Crear curso" ni "Ver curso" viven aca: son subopciones del
+             sidebar. La lista solo busca, filtra y, al tocar una card, muestra
+             sus metricas. --}}
 
         {{-- Barra blanca: buscador + píldoras de filtro. --}}
         <div class="mt-4 bg-neutral-primary-soft border border-default rounded-base shadow-xs p-3 flex flex-col gap-3 sm:flex-row sm:items-center">

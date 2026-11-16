@@ -38,7 +38,7 @@ class InvitacionesExamenTest extends TestCase
     {
         parent::setUp();
 
-        DB::table('rol')->insert([
+        DB::table('rol')->insertOrIgnore([
             ['id_rol' => self::ROL_DOCENTE, 'nombre_rol' => 'docente'],
             ['id_rol' => self::ROL_AUXILIAR, 'nombre_rol' => 'auxiliar'],
         ]);
@@ -71,9 +71,12 @@ class InvitacionesExamenTest extends TestCase
             [
                 'id_usuario' => self::AUXILIAR,
                 'cod_sis' => 'AUX991004',
+                // nombre_usuario único: es un handle con índice único por
+                // `lower(btrim(...))` (registro de cuentas, HU 13), así que no
+                // puede repetir el 'Ana' del docente invitado.
                 'correo' => 'ana.auxiliar@example.com',
                 'password' => 'x',
-                'nombre_usuario' => 'Ana',
+                'nombre_usuario' => 'Andrea',
                 'apellido' => 'Auxiliar',
             ],
         ]);
@@ -98,9 +101,12 @@ class InvitacionesExamenTest extends TestCase
             'estado' => 'EnCurso',
         ]);
 
+        // Fecha a futuro relativa a hoy: solo se invita a exámenes que aún no
+        // empiezan (EnviarInvitacionExamenService). Antes era un '2026-11-10'
+        // fijo que, al pasar esa fecha, volvía inválido el examen de la prueba.
         DB::table('examen')->insert([
             'id_examen' => self::EXAMEN,
-            'fecha' => '2026-11-10',
+            'fecha' => now()->addDays(10)->toDateString(),
             'hora_inicio' => '08:00',
             'duracion' => 90,
             'creador' => self::DOCENTE_CREADOR,
@@ -180,6 +186,24 @@ class InvitacionesExamenTest extends TestCase
         ])
             ->assertUnprocessable()
             ->assertJsonPath('errors.docente_invitado_id.0', 'No puede invitarse a sí mismo.');
+    }
+
+    public function test_no_invita_a_un_examen_que_ya_empezo_o_paso(): void
+    {
+        DB::table('examen')->where('id_examen', self::EXAMEN)->update([
+            'fecha' => now()->subDay()->toDateString(),
+        ]);
+
+        $this->postJson(route('api.examenes.invitaciones.enviar', self::EXAMEN), [
+            'docente_invitado_id' => self::DOCENTE_INVITADO,
+        ])
+            ->assertUnprocessable()
+            ->assertJsonPath('errors.id_examen.0', 'No se puede invitar a un examen que ya empezó o pasó.');
+
+        $this->assertDatabaseMissing('invitacion_examen_compartido', [
+            'id_examen' => self::EXAMEN,
+            'id_docente_invitado' => self::DOCENTE_INVITADO,
+        ]);
     }
 
     public function test_rechaza_un_usuario_que_no_es_docente(): void

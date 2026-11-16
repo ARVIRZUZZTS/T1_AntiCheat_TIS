@@ -8,6 +8,7 @@
  * @created 2026-10-24
  *
  * @updated 2026-11-04
+ * @updated 2026-11-15
  *
  * @description
  * Controlador HTTP de la sección Cursos del docente: la lista de sus cursos,
@@ -24,6 +25,9 @@
  *   concatenados y su gestión con año; al guardar vuelve a la lista de cursos.
  * - 2026-11-04  [Valery D. Ortuno P]  fix: si el curso ya existe vuelve al
  *   formulario con el aviso (`curso`) y lo escrito.
+ * - 2026-11-15  [Alex Candia]  feat: "Ver curso" se divide en verEstudiantes y
+ *   habilitarEstudiantes; ambas páginas comparten selector de curso y muestran
+ *   solo su sección.
  *
  * @see  App\Services\Curso\ListarCursosDocenteService
  * @see  App\Services\Curso\ListarGestionesService
@@ -41,6 +45,7 @@ use App\Services\Curso\ListarCursosDocenteService;
 use App\Services\Curso\ListarGestionesService;
 use App\Services\Curso\RegistrarCursoService;
 use App\Services\Examen\ListarEstudiantesCursoConEstadoService;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -54,10 +59,10 @@ class CursoController extends Controller
      *
      * @param  Request  $request  Request con el docente autenticado.
      * @param  ListarCursosDocenteService  $cursos  Servicio de cursos del docente.
-     *
-     * @return View  Vista pages.cursos.
+     * @return View Vista pages.cursos.
      *
      * @author Valery D. Ortuno P <valerydariana98@gmail.com>
+     *
      * @since  2026-10-24
      */
     public function index(Request $request, ListarCursosDocenteService $cursos): View
@@ -71,17 +76,18 @@ class CursoController extends Controller
      * "Crear curso": formulario de alta de un curso.
      *
      * @param  ListarGestionesService  $gestiones  Catálogo del selector "Gestion".
-     *
-     * @return View  Vista pages.curso-crear.
+     * @return View Vista pages.curso-crear.
      *
      * @author Valery D. Ortuno P <valerydariana98@gmail.com>
+     *
      * @since  2026-10-24
      */
     public function crear(ListarGestionesService $gestiones): View
     {
+        // Sin backRoute: "Crear curso" es una subopción del sidebar, no una
+        // vista de detalle, así que x-ui.page-header no muestra flecha de volver.
         return view('pages.curso-crear', [
             'gestiones' => $gestiones->ejecutar(),
-            'backRoute' => route('cursos'),
         ]);
     }
 
@@ -91,10 +97,10 @@ class CursoController extends Controller
      *
      * @param  StoreCursoRequest  $request  Datos validados (materia, grupo y gestión).
      * @param  RegistrarCursoService  $servicio  Servicio de alta.
-     *
-     * @return RedirectResponse  Redirige al listado de cursos con mensaje de éxito.
+     * @return RedirectResponse Redirige al listado de cursos con mensaje de éxito.
      *
      * @author Valery D. Ortuno P <valerydariana98@gmail.com>
+     *
      * @since  2026-10-24
      */
     public function store(StoreCursoRequest $request, RegistrarCursoService $servicio): RedirectResponse
@@ -122,12 +128,12 @@ class CursoController extends Controller
      *
      * @param  Curso  $curso  Curso de la URL.
      * @param  ListarEstudiantesCursoConEstadoService  $estudiantes  Servicio de conteos del curso.
+     * @return View Vista pages.curso-detalle.
      *
-     * @return View  Vista pages.curso-detalle.
-     *
-     * @throws \Illuminate\Auth\Access\AuthorizationException  Si el curso no es del docente (403).
+     * @throws AuthorizationException Si el curso no es del docente (403).
      *
      * @author Valery D. Ortuno P <valerydariana98@gmail.com>
+     *
      * @since  2026-10-24
      */
     public function detalle(Curso $curso, ListarEstudiantesCursoConEstadoService $estudiantes): View
@@ -140,6 +146,94 @@ class CursoController extends Controller
             // x-ui.page-header muestra la flecha "Volver" en vez del
             // hamburguesa cuando recibe $backRoute.
             'backRoute' => route('cursos'),
+        ]);
+    }
+
+    /**
+     * Página "Ver estudiantes": un selector con los cursos del docente y,
+     * debajo, la sección Estudiantes del curso elegido.
+     *
+     * @param  Request  $request  Request con el docente autenticado.
+     * @param  ListarEstudiantesCursoConEstadoService  $estudiantes  Servicio de conteos del curso.
+     * @return View Vista pages.curso-ver.
+     *
+     * @throws AuthorizationException Si el curso no es del docente (403).
+     *
+     * @author Diego Tejerina <josediegotejerinamolina@gmail.com>
+     *
+     * @since  2026-11-15
+     */
+    public function verEstudiantes(
+        Request $request,
+        ListarEstudiantesCursoConEstadoService $estudiantes,
+    ): View {
+        return $this->vistaSeccionCurso($request, $estudiantes, 'estudiantes');
+    }
+
+    /**
+     * Página "Habilitar estudiantes": mismo selector de curso y la sección
+     * Habilitaciones del elegido, con sus modales de cambio de estado.
+     *
+     * @param  Request  $request  Request con el docente autenticado.
+     * @param  ListarEstudiantesCursoConEstadoService  $estudiantes  Servicio de conteos del curso.
+     * @return View Vista pages.curso-ver.
+     *
+     * @throws AuthorizationException Si el curso no es del docente (403).
+     *
+     * @author Diego Tejerina <josediegotejerinamolina@gmail.com>
+     *
+     * @since  2026-11-15
+     */
+    public function habilitarEstudiantes(
+        Request $request,
+        ListarEstudiantesCursoConEstadoService $estudiantes,
+    ): View {
+        return $this->vistaSeccionCurso($request, $estudiantes, 'habilitacion');
+    }
+
+    /**
+     * Arma la página de una sola sección del curso: select de cursos del
+     * docente, curso inicial desde ?curso=ID y conteos del elegido.
+     *
+     * @param  Request  $request  Request con el docente autenticado.
+     * @param  ListarEstudiantesCursoConEstadoService  $estudiantes  Servicio de conteos del curso.
+     * @param  string  $soloTab  Sección única a mostrar (estudiantes / habilitacion).
+     * @return View Vista pages.curso-ver acotada a la sección.
+     *
+     * @throws AuthorizationException Si el curso no es del docente (403).
+     */
+    private function vistaSeccionCurso(
+        Request $request,
+        ListarEstudiantesCursoConEstadoService $estudiantes,
+        string $soloTab,
+    ): View {
+        $cursos = Curso::query()
+            ->where('sis_doc', $request->user()->id_usuario)
+            ->orderBy('nombre_curso')
+            ->get();
+
+        $cursoId = $request->integer('curso');
+        $cursoSeleccionado = $cursoId > 0 ? $cursos->firstWhere('id_curso', $cursoId) : null;
+
+        $conteos = null;
+        if ($cursoSeleccionado !== null) {
+            // Red de seguridad: el select solo ofrece cursos propios, pero el id
+            // llega por el query y se autoriza igual que el detalle.
+            Gate::authorize('gestionar', $cursoSeleccionado);
+            $conteos = $estudiantes->conteosPorEstado($cursoSeleccionado->id_curso);
+        }
+
+        $esEstudiantes = $soloTab === 'estudiantes';
+
+        return view('pages.curso-ver', [
+            'cursos' => $cursos,
+            'cursoSeleccionado' => $cursoSeleccionado,
+            'conteos' => $conteos,
+            'soloTab' => $soloTab,
+            'titulo' => $esEstudiantes ? 'Ver estudiantes' : 'Habilitar estudiantes',
+            'accionUrl' => $esEstudiantes
+                ? route('cursos.ver-estudiantes')
+                : route('cursos.habilitar-estudiantes'),
         ]);
     }
 }

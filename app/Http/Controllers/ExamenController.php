@@ -12,17 +12,18 @@
  * @updated 2026-10-25
  * @updated 2026-10-26
  * @updated 2026-11-05
+ * @updated 2026-11-14
  *
  * @description
  * Controlador HTTP de la sección Exámenes del docente. Solo orquesta:
  *
- * - `index`: selector de materia y las cuatro pestañas de exámenes en una sola
- *   página.
+ * - `index`: listado global de exámenes futuros y las cuatro pestañas en una
+ *   sola página; el curso del alta se elige dentro del formulario.
  * - `curso`: página anterior de un curso (se mantiene por compatibilidad).
  * - `crear`: el formulario de alta de un examen, como página propia.
  * - `store`: valida (StoreExamenRequest), delega el alta en
- *   RegistrarExamenService y vuelve a la página única con la materia elegida
- *   y un mensaje de éxito.
+ *   RegistrarExamenService y vuelve a la página única con el curso elegido y
+ *   un mensaje de éxito.
  *
  * Si la validación falla no hace falta manejar nada: el request redirige de
  * vuelta al formulario con los errores y el input viejo.
@@ -46,6 +47,9 @@
  * - 2026-11-05  [Alex Candia]  feat: la página del curso entrega los catálogos
  *   también cuando ya no se pueden crear exámenes, porque Editar Examen los
  *   necesita para precargar el formulario.
+ * - 2026-11-15  [Diego Tejerina]  feat: `crearFormulario` sirve la subopción
+ *   "Crear examen" del sidebar: selector de curso + el formulario de alta que
+ *   ya existe, sin depender del SPA de la página Exámenes.
  *
  * @see  StoreExamenRequest
  * @see  App\Services\Examen\CatalogosExamenService
@@ -69,9 +73,10 @@ use Illuminate\Support\Facades\Gate;
 class ExamenController extends Controller
 {
     /**
-     * Sección Exámenes: selector de materia y, debajo, las cuatro pestañas de
-     * gestión del curso elegido. La página no navega: el selector y las
-     * pestañas viven en el mismo documento.
+     * Sección Exámenes: listado global con las cuatro pestañas de gestión. La
+     * página no navega; el formulario de Crear Examen elige el curso con un
+     * selector propio. Si la URL o el input viejo traen un curso válido, el
+     * selector arranca con ese curso.
      *
      * @param  Request  $request  Request con el docente autenticado.
      * @param  ListarCursosDocenteService  $cursos  Servicio de cursos del docente.
@@ -91,7 +96,7 @@ class ExamenController extends Controller
 
         // El curso puede venir de la URL (recarga o enlace directo) o quedar en
         // el input viejo cuando falló el alta. Solo se acepta si es del docente.
-        $cursoId = (int) $request->old('curso_id', 0);
+        $cursoId = (int) $request->old('curso_id');
         if ($cursoId === 0) {
             $cursoId = $request->integer('curso');
         }
@@ -100,28 +105,21 @@ class ExamenController extends Controller
             ? $cursos->firstWhere('id_curso', $cursoId)
             : null;
 
-        // Si el alta falló, se vuelve a abrir la pestaña del formulario.
+        // Si el alta falló, se vuelve a abrir la pestaña del formulario para
+        // mostrar los errores junto al curso que se alcanzó a elegir.
         $hayErrores = (bool) $request->session()->get('errors')?->any();
-        $vieneDelAlta = $request->old('curso_id') !== null;
-        $tabInicial = $hayErrores && $vieneDelAlta && $cursoInicial !== null
+        $vieneDelAlta = $request->session()->hasOldInput();
+        $tabInicial = $hayErrores && $vieneDelAlta && $cursos->isNotEmpty()
             ? 'crear'
             : 'lista';
-
-        $catalogo = $cursos->isNotEmpty()
-            ? [
-                'ambientes' => $catalogos->ambientes(),
-                'materiales' => $catalogos->materiales(),
-                'normas' => $catalogos->normas(),
-            ]
-            : ['ambientes' => [], 'materiales' => [], 'normas' => []];
 
         return view('pages.examenes', [
             'cursos' => $cursos,
             'cursoInicial' => $cursoInicial,
             'tabInicial' => $tabInicial,
-            'ambientes' => $catalogo['ambientes'],
-            'materiales' => $catalogo['materiales'],
-            'normas' => $catalogo['normas'],
+            'ambientes' => $catalogos->ambientes(),
+            'materiales' => $catalogos->materiales(),
+            'normas' => $catalogos->normas(),
         ]);
     }
 
@@ -182,6 +180,117 @@ class ExamenController extends Controller
             'materiales' => $catalogos->materiales(),
             'normas' => $catalogos->normas(),
             'backRoute' => route('examenes'),
+        ]);
+    }
+
+    /**
+     * Pagina "Crear examen" de la subopcion del sidebar: un selector de curso
+     * arriba y, al elegir uno, el formulario de alta que ya existe
+     * (x-ui.form-crear-examen). El selector es server-driven (recarga con
+     * ?curso=ID) para no depender del SPA de la seccion Examenes.
+     *
+     * @param  Request  $request  Request con el docente autenticado.
+     * @param  ListarCursosDocenteService  $cursos  Cursos activos del docente.
+     * @param  CatalogosExamenService  $catalogos  Catalogos del formulario.
+     *
+     * @return View  Vista pages.examen-crear-seleccion.
+     *
+     * @author Diego Tejerina <josediegotejerinamolina@gmail.com>
+     * @since  2026-11-15
+     */
+    public function crearFormulario(
+        Request $request,
+        ListarCursosDocenteService $cursos,
+        CatalogosExamenService $catalogos,
+    ): View {
+        $activos = $cursos->activos((int) $request->user()->id_usuario);
+
+        // El curso puede venir del query (?curso=ID) o del input viejo cuando el
+        // alta fallo y StoreExamenRequest redirigio de vuelta. Solo vale si es
+        // del docente y todavia admite altas (CursoPolicy::crearExamen).
+        $cursoId = (int) $request->old('curso_id');
+        if ($cursoId === 0) {
+            $cursoId = $request->integer('curso');
+        }
+
+        $cursoSeleccionado = $cursoId > 0 ? $activos->firstWhere('id_curso', $cursoId) : null;
+
+        if ($cursoSeleccionado !== null && ! Gate::allows('crearExamen', $cursoSeleccionado)) {
+            $cursoSeleccionado = null;
+        }
+
+        return view('pages.examen-crear-seleccion', [
+            'cursos' => $activos,
+            'cursoSeleccionado' => $cursoSeleccionado,
+            'ambientes' => $catalogos->ambientes(),
+            'materiales' => $catalogos->materiales(),
+            'normas' => $catalogos->normas(),
+        ]);
+    }
+
+    /**
+     * Subopción "Editar examen": reutiliza el parcial de la sección acotado a
+     * la pestaña Editar (selector de materia + examen a editar + formulario).
+     *
+     * @author Diego Tejerina <josediegotejerinamolina@gmail.com>
+     * @since  2026-11-15
+     */
+    public function editarVista(
+        Request $request,
+        ListarCursosDocenteService $cursos,
+        CatalogosExamenService $catalogos,
+    ): View {
+        return $this->seccionAcotada($request, $cursos, $catalogos, 'editar', 'pages.examenes-editar');
+    }
+
+    /**
+     * Subopción "Dividir examen": el mismo parcial acotado a la pestaña Dividir
+     * (selector de materia + examen con 2+ aulas + configuración de división).
+     *
+     * @author Diego Tejerina <josediegotejerinamolina@gmail.com>
+     * @since  2026-11-15
+     */
+    public function dividirVista(
+        Request $request,
+        ListarCursosDocenteService $cursos,
+        CatalogosExamenService $catalogos,
+    ): View {
+        return $this->seccionAcotada($request, $cursos, $catalogos, 'dividir', 'pages.examenes-dividir');
+    }
+
+    /**
+     * Arma los datos del parcial de exámenes acotado a una sola pestaña.
+     *
+     * @param  string  $soloTab  Pestaña única a mostrar (editar / dividir).
+     * @param  string  $vista    Vista contenedora.
+     */
+    private function seccionAcotada(
+        Request $request,
+        ListarCursosDocenteService $cursos,
+        CatalogosExamenService $catalogos,
+        string $soloTab,
+        string $vista,
+    ): View {
+        $cursos = $cursos->activos((int) $request->user()->id_usuario);
+
+        $cursoId = $request->integer('curso');
+        $cursoInicial = $cursoId > 0 ? $cursos->firstWhere('id_curso', $cursoId) : null;
+
+        $catalogo = $cursos->isNotEmpty()
+            ? [
+                'ambientes' => $catalogos->ambientes(),
+                'materiales' => $catalogos->materiales(),
+                'normas' => $catalogos->normas(),
+            ]
+            : ['ambientes' => [], 'materiales' => [], 'normas' => []];
+
+        return view($vista, [
+            'cursos' => $cursos,
+            'cursoInicial' => $cursoInicial,
+            'soloTab' => $soloTab,
+            'ambientes' => $catalogo['ambientes'],
+            'materiales' => $catalogo['materiales'],
+            'normas' => $catalogo['normas'],
         ]);
     }
 

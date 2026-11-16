@@ -510,11 +510,14 @@ class ListaEstudiantesCentralRiesgoTest extends TestCase
     public function test_la_pantalla_carga_desde_el_boton_central_de_riesgos_del_sidebar(): void
     {
         $this->actingAs(Usuario::query()->firstOrFail());
+        // La central se dividio en dos subopciones; la pantalla principal es
+        // ahora Incidencias, y el sidebar enlaza a ella (ruta
+        // central-riesgo.incidencias) desde el grupo "Central de riesgos".
         $this->withoutVite()
-            ->get(route('central-riesgo'))
+            ->get(route('central-riesgo.incidencias'))
             ->assertOk()
             ->assertSeeInOrder(['Central de riesgos', 'Toda la institucion', 'Mis materias', 'Ordenar A-Z'])
-            ->assertSee('href="'.route('central-riesgo').'"', false)
+            ->assertSee('href="'.route('central-riesgo.incidencias').'"', false)
             ->assertSee('Luis Alvarez Gomez');
     }
 
@@ -694,7 +697,7 @@ class ListaEstudiantesCentralRiesgoTest extends TestCase
             ['id_usuario' => self::DOCENTE_B, 'cod_sis' => 'DOC2', 'password' => 'x', 'nombre_usuario' => 'Patricia', 'apellido' => 'Rojas'],
             ['id_usuario' => self::AUXILIAR, 'cod_sis' => 'AUX1', 'password' => 'x', 'nombre_usuario' => 'Diego', 'apellido' => 'Mendoza'],
         ]);
-        DB::table('rol')->insert([
+        DB::table('rol')->insertOrIgnore([
             ['id_rol' => 1, 'nombre_rol' => 'docente'], ['id_rol' => 2, 'nombre_rol' => 'auxiliar'],
         ]);
         DB::table('rol_usuario')->insert([

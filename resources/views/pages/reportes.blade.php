@@ -8,7 +8,10 @@
 
     @description
     Pantalla de reportes por materia y examen. Dos selectores dinámicos
-    (materia -> examen) condicionan la aparición de tres pestañas de reporte.
+    (materia -> examen) condicionan la aparición del reporte elegido. Cada
+    subopción del sidebar (asistencia, horario de ingreso o intentos no
+    autorizados) llega con $soloTab y muestra solo esa pestaña; sin $soloTab se
+    conservan las tres pestañas.
 
     Esta vista solo conserva el estado compartido (materia, examen y pestaña
     activa). El contenido de cada reporte vive en su propio parcial bajo
@@ -39,15 +42,22 @@
     - 2026-10-26  [Alex Candia]  feat: el evento de selección incluye materia,
       tipo de examen y fecha formateada para que los tres reportes usen el
       mismo título y subtítulo.
+    - 2026-11-15  [Alex Candia]  refactor: $soloTab acota la vista a un solo
+      reporte y oculta las pestañas; cada subopción del sidebar usa su ruta.
 
     @see  resources/views/partials/reportes/horario-ingreso.blade.php
 --}}
 
 @extends('layouts.app')
 
-@section('title', 'Reportes')
+@section('title', $titulo ?? 'Reportes')
 
 @section('content')
+    @php
+        $soloTab = $soloTab ?? null;
+        $tabInicial = $soloTab ?? 'asistencia';
+    @endphp
+
     <div
         {{-- OJO: este atributo va entre comillas dobles, así que dentro no puede
              aparecer ni una sola comilla doble, ni en código ni en comentarios.
@@ -55,7 +65,7 @@
         x-data="{
             materiaId: '',
             examenId: '',
-            tab: 'asistencia',
+            tab: @js($tabInicial),
             materias: @js($opcionesMaterias),
             examenesPorCurso: @js($examenesPorCurso),
 
@@ -149,21 +159,29 @@
                 $tabInactivo = 'text-body bg-neutral-secondary-medium border-default-medium hover:bg-neutral-tertiary-medium hover:text-heading focus:ring-neutral-tertiary';
             @endphp
 
-            <nav class="flex gap-2 overflow-x-auto px-4 sm:px-6 lg:px-8" aria-label="Tipos de reporte">
-                <button type="button" @click="tab = 'asistencia'" :class="tab === 'asistencia' ? '{{ $tabActivo }}' : '{{ $tabInactivo }}'" class="{{ $tabClases }}">Reporte de asistencia</button>
-                <button type="button" @click="tab = 'ingresos'" :class="tab === 'ingresos' ? '{{ $tabActivo }}' : '{{ $tabInactivo }}'" class="{{ $tabClases }}">Reporte de intentos no autorizados</button>
-                <button type="button" @click="tab = 'horarios'" :class="tab === 'horarios' ? '{{ $tabActivo }}' : '{{ $tabInactivo }}'" class="{{ $tabClases }}">Reporte de horarios de ingreso</button>
-            </nav>
+            @if (! $soloTab)
+                <nav class="flex gap-2 overflow-x-auto px-4 sm:px-6 lg:px-8" aria-label="Tipos de reporte">
+                    <button type="button" @click="tab = 'asistencia'" :class="tab === 'asistencia' ? '{{ $tabActivo }}' : '{{ $tabInactivo }}'" class="{{ $tabClases }}">Reporte de asistencia</button>
+                    <button type="button" @click="tab = 'ingresos'" :class="tab === 'ingresos' ? '{{ $tabActivo }}' : '{{ $tabInactivo }}'" class="{{ $tabClases }}">Reporte de intentos no autorizados</button>
+                    <button type="button" @click="tab = 'horarios'" :class="tab === 'horarios' ? '{{ $tabActivo }}' : '{{ $tabInactivo }}'" class="{{ $tabClases }}">Reporte de horarios de ingreso</button>
+                </nav>
+            @endif
 
-            <section x-show="tab === 'asistencia' && materiaId && examenId" x-cloak class="mt-4 px-4 sm:px-6 lg:px-8">
-                @include('partials.reportes.asistencia')
-            </section>
-            <section x-show="tab === 'ingresos' && materiaId && examenId" x-cloak class="mt-4 px-4 sm:px-6 lg:px-8">
-                @include('partials.reportes.ingresos-ilegales')
-            </section>
-            <section x-show="tab === 'horarios' && materiaId && examenId" x-cloak class="mt-4 px-4 sm:px-6 lg:px-8">
-                @include('partials.reportes.horario-ingreso')
-            </section>
+            @if ($soloTab === null || $soloTab === 'asistencia')
+                <section x-show="tab === 'asistencia' && materiaId && examenId" x-cloak class="mt-4 px-4 sm:px-6 lg:px-8">
+                    @include('partials.reportes.asistencia')
+                </section>
+            @endif
+            @if ($soloTab === null || $soloTab === 'ingresos')
+                <section x-show="tab === 'ingresos' && materiaId && examenId" x-cloak class="mt-4 px-4 sm:px-6 lg:px-8">
+                    @include('partials.reportes.ingresos-ilegales')
+                </section>
+            @endif
+            @if ($soloTab === null || $soloTab === 'horarios')
+                <section x-show="tab === 'horarios' && materiaId && examenId" x-cloak class="mt-4 px-4 sm:px-6 lg:px-8">
+                    @include('partials.reportes.horario-ingreso')
+                </section>
+            @endif
         </div>
         @include('partials.reportes.test-datos')
     </div>

@@ -22,14 +22,17 @@
       perdió en el rediseño; abre el formulario con `origen=central-riesgo`.
     - 2026-10-10  [Valery D. Ortuno P]  feat: la lista deja de estar mockeada;
       la pantalla incrusta el componente Livewire con los datos reales (HU 10).
+    - 2026-11-15  [Diego Tejerina]  refactor: es la pagina "Incidencias" de la
+      central (solo las pestanhas Institucion / Mis materias); los sospechosos
+      pasan a su propia pagina (central-riesgo-sospechosos).
 
     @see  App\Livewire\CentralRiesgo\ListaEstudiantes
 --}}
 
 @extends('layouts.app')
 
-@section('title', 'Central de riesgos')
+@section('title', 'Incidencias')
 
 @section('content')
-    @livewire(\App\Livewire\CentralRiesgo\ListaEstudiantes::class)
+    @livewire(\App\Livewire\CentralRiesgo\ListaEstudiantes::class, ['modo' => 'incidencias'])
 @endsection

@@ -5,16 +5,18 @@
     @updated 2026-09-29
     @updated 2026-10-24
     @updated 2026-10-25
+    @updated 2026-11-14
 
     @description
-    Sección Exámenes del docente. Es una sola página: arriba el selector de
-    materia y, apenas se elige una, las cuatro pestañas de gestión (lista,
-    alta, invitación y división) en el parcial examenes-curso. Sin materia
-    seleccionada no se muestran las pestañas. Los botones que navegaban a otra
-    página ya no existen.
+    Sección Exámenes del docente. Es una sola página con las cuatro pestañas de
+    gestión (lista, alta, edición y división) en el parcial examenes-curso. La
+    lista muestra todos los exámenes de los cursos del docente, con el curso en
+    el nombre, y el curso del alta se elige dentro del formulario. Los botones
+    que navegaban a otra página ya no existen.
 
-    La materia puede llegar por el query string (`?curso=ID`) o por el input
-    viejo cuando falló el alta, para que la página vuelva con la selección y la
+    La página entrega los cursos activos para el selector del formulario. El
+    curso puede llegar por el query string (`?curso=ID`) o por el input viejo
+    cuando falló el alta, para que el formulario vuelva con esa selección y la
     pestaña Crear Examen abierta.
 
     @changelog
@@ -31,6 +33,9 @@
     - 2026-10-25  [Alex Candia]  refactor: la sección pasa a una sola página con
       selector de materia; el parcial de exámenes se incrusta debajo y los
       botones de navegación anteriores se quitan.
+    - 2026-11-14  [Alex Candia]  feat: se quita el selector de materia. La
+      página siempre monta el parcial con el listado global y entrega los cursos
+      activos para el selector de curso del formulario de alta.
 
     @see  App\Http\Controllers\ExamenController
     @see  App\Services\Curso\ListarCursosDocenteService
@@ -43,20 +48,14 @@
 
 @section('content')
     <div class="px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
-        @if ($cursos->isEmpty())
-            <p class="rounded-base border border-default bg-neutral-primary-soft p-8 text-center text-sm text-body shadow-xs">
-                No tienes cursos activos.
-            </p>
-        @else
-            @include('partials.examenes-curso', [
-                'cursos' => $cursos,
-                'cursoInicial' => $cursoInicial,
-                'tabInicial' => $tabInicial,
-                'ambientes' => $ambientes,
-                'materiales' => $materiales,
-                'normas' => $normas,
-                'puedeCrearExamen' => true,
-            ])
-        @endif
+        @include('partials.examenes-curso', [
+            'cursos' => $cursos,
+            'cursoInicial' => $cursoInicial,
+            'tabInicial' => $tabInicial,
+            'ambientes' => $ambientes,
+            'materiales' => $materiales,
+            'normas' => $normas,
+            'puedeCrearExamen' => $cursos->isNotEmpty(),
+        ])
     </div>
 @endsection

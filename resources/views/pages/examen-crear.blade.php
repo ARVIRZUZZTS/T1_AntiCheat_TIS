@@ -13,7 +13,7 @@
 
     Si la validación falla, StoreExamenRequest redirige de vuelta acá con los
     errores y lo escrito; si el alta sale bien, ExamenController vuelve a la
-    página única de Exámenes con la materia elegida.
+    página única de Exámenes con el curso elegido.
 
     @changelog
     - 2026-10-24  [Valery D. Ortuno P]  feat: creación inicial de la página.

@@ -44,7 +44,7 @@ class ResponderCancelarInvitacionTest extends TestCase
     {
         parent::setUp();
 
-        DB::table('rol')->insert([
+        DB::table('rol')->insertOrIgnore([
             ['id_rol' => self::ROL_DOCENTE, 'nombre_rol' => 'docente'],
             ['id_rol' => self::ROL_AUXILIAR, 'nombre_rol' => 'auxiliar'],
         ]);

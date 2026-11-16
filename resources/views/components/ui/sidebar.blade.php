@@ -1,68 +1,64 @@
 {{--
     @file    sidebar.blade.php
-@author  Valery D. Ortuno P. <valerydariana98@gmail.com>
+    @author  Valery D. Ortuno P. <valerydariana98@gmail.com>
     @created 2026-09-24
     @updated 2026-10-10
     @updated 2026-10-24
     @updated 2026-11-08
+    @updated 2026-11-15
 
     @description
-    Sidebar de navegación del panel. $items es un arreglo de ítems:
-    ['label', 'route' (nombre de ruta), 'badge', 'count', 'countEvent'].
-    Con 'countEvent' el contador se actualiza sin recargar al recibir ese
-    evento de ventana con `pendientes` en el detalle. El ítem activo
-    se resalta en blanco sobre el fondo azul (`bg-surface-sidebar`); se
-    detecta solo por la ruta actual y/o por el prop $active. El título
-    ($title) se muestra junto al logo FCyT dentro de una caja blanca con
-    borde redondeado (para que el SVG, que es negro, resalte sobre el
-    azul). $logo es un slot opcional para reemplazar el logo.
+    Sidebar de navegacion del panel, en formato acordeon. Cada seccion
+    principal es o bien un link directo (clave 'route', sin subopciones) o
+    bien un grupo (clave 'children') que despliega sus subopciones hacia
+    abajo, indentadas y con texto mas pequenho. El grupo se abre y cierra con
+    un click en su boton (chevron que rota); el grupo que contiene la pagina
+    actual arranca abierto y su subopcion activa queda resaltada. La logica es
+    la misma en desktop y dentro del Drawer movil (mismo markup); al tocar una
+    subopcion en movil se navega y se cierra el drawer (data-drawer-hide).
 
-    En móvil el cajón mide `w-72` en vez del 15% de ancho, que a esa
-    pantalla apenas dejaba 56px. El botón hamburguesa que lo abre ya NO vive
-    acá: lo dibuja x-ui.page-header (misma franja que el título de cada
-    vista), este componente solo pone el `data-drawer-target`/`id` al que
-    apunta.
+    Cada item admite: 'label', 'route' (link directo), 'children' (grupo),
+    'badge', 'count' y 'countEvent' (contador que se actualiza sin recargar al
+    recibir ese evento de ventana con `pendientes` en el detalle). El estado de
+    apertura es Alpine y se recalcula en el servidor en cada navegacion, por lo
+    que sigue funcionando despues de wire:navigate. Accesible: el boton de cada
+    grupo expone aria-expanded y aria-controls, y se opera con teclado.
+
+    El titulo ($titleMain/$titleSub) se muestra junto al logo FCyT. En movil el
+    cajon mide `w-72`. El boton hamburguesa lo dibuja x-ui.page-header; este
+    componente solo pone el `data-drawer-target`/`id` al que apunta. Se
+    mantienen el badge de notificaciones, el bloque del usuario autenticado y
+    "Cerrar sesion".
 
     @changelog
-    - 2026-09-24  [Valery D. Ortuno P]  feat: creación inicial del sidebar.
-    - 2026-09-25  [OchoaCesar]  feat: el item activo también se resalta en
+    - 2026-09-24  [Valery D. Ortuno P]  feat: creacion inicial del sidebar.
+    - 2026-09-25  [OchoaCesar]  feat: el item activo tambien se resalta en
       rutas hijas (routeName.*) para vistas de detalle.
-    - 2026-09-26  [Valery D. Ortuno P]  fix: ancho del cajón y posición del
-      botón hamburguesa en móvil; se corrigen también los acentos del
-      comentario de cabecera, que quedaron como "A3" al escribir el archivo.
-    - 2026-09-28  [T1]  chore: resolver el conflicto de merge del changelog al
-      integrar dev en feature/28 (#28).
-    - 2026-10-09  [Alisson D. Alvarado]  feat: botón de notificaciones en la
-      parte inferior del sidebar, con icono de campana y estado activo propio.
-    - 2026-10-10  [Valery D. Ortuno P]  fix: el ítem pasa a llamarse "Central de
-      riesgos", como lo nombra la HU 10 y el título de la pantalla.
+    - 2026-09-26  [Valery D. Ortuno P]  fix: ancho del cajon y posicion del
+      boton hamburguesa en movil.
+    - 2026-09-28  [T1]  chore: resolver el conflicto de merge del changelog.
+    - 2026-10-09  [Alisson D. Alvarado]  feat: boton de notificaciones en la
+      parte inferior del sidebar.
+    - 2026-10-10  [Valery D. Ortuno P]  fix: el item pasa a llamarse "Central de
+      riesgos", como la HU 10.
     - 2026-10-12  [Diego Tejerina]  fix: el `<aside>` pasa de `sticky` a `fixed`
-      en mobile (con `lg:sticky` para no tocar el desktop). `sticky` nunca saca
-      al elemento del flujo del `flex` del layout, así que aunque quedara
-      corrido fuera de pantalla con `-translate-x-full`, sus 288px (`w-72`)
-      seguían reservados y empujaban TODO el contenido de CADA página fuera del
-      viewport: esto era la causa del scroll horizontal en todo el sitio en
-      mobile, no un problema de cada vista por separado.
-    - 2026-10-12  [Diego Tejerina]  fix: el botón hamburguesa se saca de este
-      componente (quedaba en su propia franja de ~88px a la izquierda del
-      contenido: al volverse `fixed` el `<aside>`, ese botón pasaba a ser el
-      único hermano angosto de `<main>` en el `flex` del layout y los dos
-      quedaban en fila, no apilados). Ahora lo dibuja x-ui.page-header arriba
-      del contenido, como una franja de ancho completo. Se quita el prop
-      $showTrigger (ya no aplica). $title se reemplaza por $titleMain/$titleSub
-      (nombre de la app en 2 líneas) y se agrega el bloque del usuario
-      autenticado al final, debajo de Notificaciones.
-    - 2026-10-24  [Valery D. Ortuno P]  refactor: "Materias" pasa a "Cursos"
-      (ruta `cursos`) y el "Mis materias" del auxiliar pasa a "Cursos", que
-      apunta a su propia ruta `auxiliar.cursos`.
-    - 2026-10-24  [Valery D. Ortuno P]  refactor: se quita "Inicio" del menú,
-      "Exámenes" pasa a "Examenes" y Monitor en vivo y Central de riesgos pasan
-      al final, en ese orden.
-    - 2026-11-08  [Valery D. Ortuno P]  feat: el contador de "Docentes" deja de
-      ser fijo (3): muestra las solicitudes de registro pendientes (cacheado),
-      solo al docente, y se actualiza al aprobar o desaprobar (HU 26).
-    - 2026-11-08  [OchoaCesar]  refactor: se retira el ítem "Ver auxiliares"
-      (pestaña redundante); los auxiliares se consultan desde "Auxiliares".
+      en mobile (con `lg:sticky`); se corrige el scroll horizontal del sitio.
+    - 2026-10-12  [Diego Tejerina]  fix: el boton hamburguesa se saca de este
+      componente; lo dibuja x-ui.page-header. $title se divide en
+      $titleMain/$titleSub y se agrega el bloque del usuario autenticado.
+    - 2026-10-24  [Valery D. Ortuno P]  refactor: "Materias" pasa a "Cursos".
+    - 2026-10-24  [Valery D. Ortuno P]  refactor: se quita "Inicio"; Monitor en
+      vivo y Central de riesgos pasan al final.
+    - 2026-11-08  [Valery D. Ortuno P]  feat: el contador de "Docentes" muestra
+      las solicitudes de registro pendientes.
+    - 2026-11-08  [OchoaCesar]  refactor: se retira el item "Ver auxiliares".
+    - 2026-11-15  [Diego Tejerina]  feat: el menu pasa a acordeon con submenus.
+      Cursos, Examenes, Monitor en vivo, Auxiliares, Invitaciones y Central de
+      riesgos se agrupan con sus subopciones; Reportes queda como link directo.
+      Se retira "Docentes" del menu (su ruta sigue activa, sin link). El badge
+      de invitaciones pasa a la cabecera del grupo Invitaciones.
+    - 2026-11-15  [Alex Candia]  feat: "Ver curso" se divide en "Ver estudiantes"
+      y "Habilitar estudiantes"; Reportes pasa a grupo con sus tres reportes.
 --}}
 
 @props([
@@ -80,28 +76,86 @@
     $nombreUsuario = $usuario ? trim($usuario->nombre_usuario.' '.$usuario->apellido) : null;
     $rolUsuario = $usuario?->roles->first()?->nombre_rol;
 
+    // Un item (o subopcion) esta activo si su ruta coincide con la actual, con
+    // el prop $active o con uno de sus patrones extra ($extra). El comodin
+    // `ruta.*` solo se agrega cuando el nombre ya tiene punto (una hoja como
+    // `cursos.crear`): si se aplicara al nombre pelado del listado (`cursos`)
+    // marcaria tambien a sus hermanas (`cursos.crear`, `cursos.editar`...) y se
+    // resaltarian dos subopciones a la vez.
+    $esActivo = function (?string $ruta, array $extra = []) use ($current, $active): bool {
+        if ($ruta === null) {
+            return false;
+        }
+
+        if ($ruta === $active) {
+            return true;
+        }
+
+        if ($current === '') {
+            return false;
+        }
+
+        $patrones = [$ruta];
+        if (str_contains($ruta, '.')) {
+            $patrones[] = $ruta.'.*';
+        }
+
+        return request()->routeIs(...array_merge($patrones, $extra));
+    };
+
+    $contarPendientesInvitaciones = $rolUsuario === \App\Models\Rol::NOMBRE_DOCENTE && $usuario
+        ? app(\App\Services\Invitacion\ListarInvitacionesRecibidasService::class)->contarPendientes($usuario)
+        : 0;
+
     $defaultItems = [
-        ['label' => 'Cursos', 'route' => 'cursos'],
-        ['label' => 'Examenes', 'route' => 'examenes'],
-        ['label' => 'Monitor en vivo', 'route' => 'monitoreo'],
-        ['label' => 'Reportes', 'route' => 'reportes'],
-        ['label' => 'Auxiliares', 'route' => 'auxiliares'],
-        ['label' => 'Invitaciones', 'route' => 'invitaciones', 'countEvent' => 'invitaciones-pendientes',
-            'count' => $rolUsuario === \App\Models\Rol::NOMBRE_DOCENTE && $usuario
-                ? app(\App\Services\Invitacion\ListarInvitacionesRecibidasService::class)->contarPendientes($usuario)
-                : 0],
-        ['label' => 'Docentes', 'route' => 'docentes', 'countEvent' => 'solicitudes-registro',
-            // Solo el docente valida registros: al resto no se le consulta.
-            'count' => $rolUsuario === \App\Models\Rol::NOMBRE_DOCENTE
-                ? \App\Services\Docente\ListarSolicitudesRegistroService::contarPendientes()
-                : 0],
-        ['label' => 'Central de riesgos', 'route' => 'central-riesgo'],
+        ['label' => 'Cursos', 'children' => [
+            ['label' => 'Ver lista de cursos', 'route' => 'cursos'],
+            // El detalle de un curso (/cursos/{curso}) muestra las dos secciones;
+            // se resalta "Ver estudiantes" como acceso principal.
+            ['label' => 'Ver estudiantes', 'route' => 'cursos.ver-estudiantes', 'match' => ['cursos.detalle', 'cursos.ver']],
+            ['label' => 'Habilitar estudiantes', 'route' => 'cursos.habilitar-estudiantes'],
+            ['label' => 'Crear curso', 'route' => 'cursos.crear'],
+            ['label' => 'Editar curso', 'route' => 'cursos.editar'],
+            ['label' => 'Cargar CSV', 'route' => 'cursos.cargar-csv'],
+        ]],
+        ['label' => 'Examenes', 'children' => [
+            ['label' => 'Ver lista de examenes', 'route' => 'examenes'],
+            ['label' => 'Crear examen', 'route' => 'examenes.crear'],
+            ['label' => 'Editar examen', 'route' => 'examenes.editar'],
+            ['label' => 'Dividir examen', 'route' => 'examenes.dividir'],
+        ]],
+        ['label' => 'Monitor en vivo', 'children' => [
+            ['label' => 'Ingreso', 'route' => 'monitoreo.ingreso'],
+            ['label' => 'Monitor', 'route' => 'monitoreo'],
+        ]],
+        ['label' => 'Reportes', 'children' => [
+            ['label' => 'Reporte de asistencia', 'route' => 'reportes.asistencia'],
+            ['label' => 'Reporte de horario de ingreso', 'route' => 'reportes.horario-ingreso'],
+            ['label' => 'Reporte de intentos no autorizados', 'route' => 'reportes.intentos-no-autorizados'],
+        ]],
+        ['label' => 'Auxiliares', 'children' => [
+            ['label' => 'Ver lista de auxiliares', 'route' => 'auxiliares'],
+            ['label' => 'Asignar auxiliar', 'route' => 'auxiliares.asignar'],
+            ['label' => 'Crear auxiliar', 'route' => 'auxiliares.crear'],
+        ]],
+        ['label' => 'Invitaciones', 'countEvent' => 'invitaciones-pendientes',
+            'count' => $contarPendientesInvitaciones, 'children' => [
+            ['label' => 'Enviar', 'route' => 'invitaciones.enviar'],
+            ['label' => 'Aceptar invitacion', 'route' => 'invitaciones.aceptar'],
+        ]],
+        ['label' => 'Central de riesgos', 'children' => [
+            ['label' => 'Incidencias', 'route' => 'central-riesgo.incidencias'],
+            ['label' => 'Sospechosos', 'route' => 'central-riesgo.sospechosos'],
+        ]],
     ];
 
     $auxiliarItems = [
         // Sus cursos no son los del docente: tiene su propia ruta (HU aparte).
         ['label' => 'Cursos', 'route' => 'auxiliar.cursos'],
-        ['label' => 'Monitor en vivo', 'route' => 'monitoreo'],
+        ['label' => 'Monitor en vivo', 'children' => [
+            ['label' => 'Ingreso', 'route' => 'monitoreo.ingreso'],
+            ['label' => 'Monitor', 'route' => 'monitoreo'],
+        ]],
     ];
 
     if ($items) {
@@ -112,8 +166,8 @@
         $nav = $defaultItems;
     }
 
-    // El acceso a notificaciones vive fuera de $nav (es un botón fijo del
-    // sidebar, no un ítem más del menú), por eso se resalta aparte.
+    // El acceso a notificaciones vive fuera de $nav (es un boton fijo del
+    // sidebar, no un item mas del menu), por eso se resalta aparte.
     $notificacionesActivas = $current !== '' && request()->routeIs('notificaciones', 'notificaciones.*');
 @endphp
 
@@ -143,42 +197,87 @@
             @endif
         </a>
 
-        <ul class="space-y-2 font-medium">
-            @foreach ($nav as $item)
-                @php
-                    $isActive = ($item['route'] ?? null) === $active
-                        || (($item['route'] ?? null) !== null && $current !== '' && request()->routeIs($item['route'], $item['route'].'.*'));
-                @endphp
-                <li>
-                    <a href="{{ route($item['route']) }}" @class([
-                        'flex items-center px-3 py-2 rounded-base group',
-                        'bg-neutral-primary-soft text-fg-brand' => $isActive,
-                        'text-neutral-primary hover:bg-brand-active hover:text-neutral-primary' => ! $isActive,
-                    ])>
-                        <span class="flex-1 whitespace-nowrap">{{ $item['label'] }}</span>
+        <ul class="space-y-1 font-medium">
+            @foreach ($nav as $indice => $item)
+                @php $children = $item['children'] ?? null; @endphp
 
-                        @if (! empty($item['badge']))
-                            <span @class([
-                                'text-xs font-medium px-1.5 py-0.5 rounded-sm',
-                                'bg-brand-softer text-fg-brand' => $isActive,
-                                'bg-brand-strong text-neutral-primary' => ! $isActive,
-                            ])>{{ $item['badge'] }}</span>
-                        @endif
+                @if ($children)
+                    @php
+                        // El grupo arranca abierto si alguna de sus subopciones
+                        // es la pagina actual, para que el usuario vea donde esta
+                        // parado sin tener que expandir a mano.
+                        $grupoAbierto = collect($children)->contains(fn (array $hijo): bool => $esActivo($hijo['route'] ?? null, $hijo['match'] ?? []));
+                        $idSubmenu = $id.'-grupo-'.$indice;
+                    @endphp
+                    <li x-data="{ abierto: {{ $grupoAbierto ? 'true' : 'false' }} }">
+                        <button type="button" x-on:click="abierto = ! abierto"
+                                :aria-expanded="abierto ? 'true' : 'false'" aria-controls="{{ $idSubmenu }}"
+                                @class([
+                                    'w-full flex items-center px-3 py-2 rounded-base group',
+                                    'text-neutral-primary hover:bg-brand-active hover:text-neutral-primary',
+                                ])>
+                            <span class="flex-1 text-start whitespace-nowrap">{{ $item['label'] }}</span>
 
-                        @if (! empty($item['countEvent']))
-                            <span x-data="{ n: {{ (int) ($item['count'] ?? 0) }} }" x-show="n > 0" @style(['display: none' => empty($item['count'])])
-                                  x-on:{{ $item['countEvent'] }}.window="n = $event.detail.pendientes" x-text="n > 99 ? '99+' : n"
-                                  class="inline-flex items-center justify-center min-w-5 h-5 px-1 ms-2 text-xs font-medium bg-danger-soft text-fg-danger-strong rounded-full">{{ $item['count'] ?? 0 }}</span>
-                        @elseif (! empty($item['count']))
-                            <span class="inline-flex items-center justify-center w-5 h-5 ms-2 text-xs font-medium bg-danger-soft text-fg-danger-strong rounded-full">{{ $item['count'] }}</span>
-                        @endif
-                    </a>
-                </li>
+                            @if (! empty($item['countEvent']))
+                                <span x-data="{ n: {{ (int) ($item['count'] ?? 0) }} }" x-show="n > 0" @style(['display: none' => empty($item['count'])])
+                                      x-on:{{ $item['countEvent'] }}.window="n = $event.detail.pendientes" x-text="n > 99 ? '99+' : n"
+                                      class="inline-flex items-center justify-center min-w-5 h-5 px-1 ms-2 text-xs font-medium bg-danger-soft text-fg-danger-strong rounded-full">{{ $item['count'] ?? 0 }}</span>
+                            @endif
+
+                            <svg class="w-4 h-4 ms-2 shrink-0 transition-transform" :class="abierto ? 'rotate-180' : ''"
+                                 aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m19 9-7 7-7-7"/></svg>
+                        </button>
+
+                        <ul id="{{ $idSubmenu }}" x-show="abierto" x-cloak class="mt-1 space-y-1 ps-3 border-s border-brand-medium/40">
+                            @foreach ($children as $hijo)
+                                @php $hijoActivo = $esActivo($hijo['route'] ?? null, $hijo['match'] ?? []); @endphp
+                                <li>
+                                    <a href="{{ route($hijo['route']) }}" data-drawer-hide="{{ $id }}" @class([
+                                        'flex items-center ps-3 pe-3 py-1.5 rounded-base text-sm group',
+                                        'bg-neutral-primary-soft text-fg-brand' => $hijoActivo,
+                                        'text-brand-subtle hover:bg-brand-active hover:text-neutral-primary' => ! $hijoActivo,
+                                    ])
+                                       @if ($hijoActivo) aria-current="page" @endif>
+                                        <span class="flex-1 whitespace-nowrap">{{ $hijo['label'] }}</span>
+                                    </a>
+                                </li>
+                            @endforeach
+                        </ul>
+                    </li>
+                @else
+                    @php $itemActivo = $esActivo($item['route'] ?? null, $item['match'] ?? []); @endphp
+                    <li>
+                        <a href="{{ route($item['route']) }}" data-drawer-hide="{{ $id }}" @class([
+                            'flex items-center px-3 py-2 rounded-base group',
+                            'bg-neutral-primary-soft text-fg-brand' => $itemActivo,
+                            'text-neutral-primary hover:bg-brand-active hover:text-neutral-primary' => ! $itemActivo,
+                        ])
+                           @if ($itemActivo) aria-current="page" @endif>
+                            <span class="flex-1 whitespace-nowrap">{{ $item['label'] }}</span>
+
+                            @if (! empty($item['badge']))
+                                <span @class([
+                                    'text-xs font-medium px-1.5 py-0.5 rounded-sm',
+                                    'bg-brand-softer text-fg-brand' => $itemActivo,
+                                    'bg-brand-strong text-neutral-primary' => ! $itemActivo,
+                                ])>{{ $item['badge'] }}</span>
+                            @endif
+
+                            @if (! empty($item['countEvent']))
+                                <span x-data="{ n: {{ (int) ($item['count'] ?? 0) }} }" x-show="n > 0" @style(['display: none' => empty($item['count'])])
+                                      x-on:{{ $item['countEvent'] }}.window="n = $event.detail.pendientes" x-text="n > 99 ? '99+' : n"
+                                      class="inline-flex items-center justify-center min-w-5 h-5 px-1 ms-2 text-xs font-medium bg-danger-soft text-fg-danger-strong rounded-full">{{ $item['count'] ?? 0 }}</span>
+                            @elseif (! empty($item['count']))
+                                <span class="inline-flex items-center justify-center w-5 h-5 ms-2 text-xs font-medium bg-danger-soft text-fg-danger-strong rounded-full">{{ $item['count'] }}</span>
+                            @endif
+                        </a>
+                    </li>
+                @endif
             @endforeach
         </ul>
 
         <div class="mt-auto pt-4">
-            <a href="{{ route('notificaciones') }}" @class([
+            <a href="{{ route('notificaciones') }}" data-drawer-hide="{{ $id }}" @class([
                 'flex items-center px-3 py-2 rounded-base group',
                 'bg-neutral-primary-soft text-fg-brand' => $notificacionesActivas,
                 'text-neutral-primary hover:bg-brand-active hover:text-neutral-primary' => ! $notificacionesActivas,
@@ -189,8 +288,7 @@
 
             {{-- Bloque del usuario autenticado: avatar + nombre + rol. Sale
                  de auth()->user() (tabla `usuario`, login por cod_sis); sin
-                 login real todavía (solo /dev/login en local), no se muestra
-                 nada si no hay sesión en vez de inventar datos. --}}
+                 sesion no se muestra nada en vez de inventar datos. --}}
             @if ($usuario)
                 <div class="mt-4 flex items-center gap-3 border-t border-brand-medium/40 pt-4">
                     <x-ui.avatar :name="$nombreUsuario" size="sm" class="shrink-0" />
@@ -203,7 +301,7 @@
                 </div>
                 <form method="POST" action="{{ route('logout') }}" class="mt-3">
                     @csrf
-                    <x-ui.button type="submit" variant="secondary" class="w-full justify-center">Cerrar sesión</x-ui.button>
+                    <x-ui.button type="submit" variant="secondary" class="w-full justify-center">Cerrar sesion</x-ui.button>
                 </form>
             @endif
         </div>

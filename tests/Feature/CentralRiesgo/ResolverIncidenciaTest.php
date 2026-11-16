@@ -305,7 +305,7 @@ class ResolverIncidenciaTest extends TestCase
                 'id_usuario' => $idUsuario, 'cod_sis' => 'TEST'.$idUsuario, 'password' => 'solo-pruebas',
             ]);
         }
-        DB::table('rol')->insert([
+        DB::table('rol')->insertOrIgnore([
             ['id_rol' => 1, 'nombre_rol' => 'docente'], ['id_rol' => 2, 'nombre_rol' => 'auxiliar'],
         ]);
         DB::table('rol_usuario')->insert([
