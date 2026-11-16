@@ -90,7 +90,6 @@ use App\Http\Controllers\ExamenController;
 use App\Http\Controllers\Reporte\ExportarReporteIngresosIlegalesController;
 use App\Http\Controllers\Reporte\ListarReporteIngresosIlegalesController;
 use App\Livewire\Examenes\EstudiantesCurso;
-use App\Livewire\Examenes\ListaExamenes;
 use App\Livewire\Monitoreo\MonitorEnVivo;
 use App\Livewire\Monitoreo\AccesoMonitor;
 use App\Livewire\Auxiliares\CrearAuxiliar;
@@ -205,11 +204,9 @@ Route::middleware(['auth', 'docente'])->group(function (): void {
 
     Route::get('/cursos/{curso}/estudiantes/estado', EstudiantesCurso::class)
         ->name('cursos.estudiantes.estado');
-    // Sección Exámenes: una sola página con selector de materia y las cuatro
-    // pestañas. Las rutas por curso se mantienen por compatibilidad.
-    // Ver lista de examenes: lista plana con buscador y filtros (Propios/
-    // Invitados, Proximos/Finalizados), sin selector de materia.
-    Route::get('/examenes', ListaExamenes::class)->name('examenes');
+    // Sección Exámenes: una sola página con el listado global del docente y las
+    // cuatro pestañas. Las rutas por curso se mantienen por compatibilidad.
+    Route::get('/examenes', [ExamenController::class, 'index'])->name('examenes');
     Route::get('/examenes/curso/{curso}', [ExamenController::class, 'curso'])
         ->whereNumber('curso')
         ->name('examenes.curso');
