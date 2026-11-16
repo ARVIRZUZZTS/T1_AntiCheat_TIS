@@ -448,7 +448,7 @@ class RegistrarExamenTest extends TestCase
     {
         DB::table('curso')->where('id_curso', self::ID_CURSO)->update(['estado' => 'Finalizo']);
 
-        $this->get(route('examenes.crear', self::ID_CURSO))->assertForbidden();
+        $this->get(route('examenes.curso.crear', self::ID_CURSO))->assertForbidden();
         $this->post(route('cursos.examenes.store', self::ID_CURSO), $this->datosValidos())
             ->assertForbidden();
     }

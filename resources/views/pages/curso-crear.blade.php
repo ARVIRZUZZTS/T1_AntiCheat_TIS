@@ -6,8 +6,8 @@
     @updated 2026-11-04
 
     @description
-    "Crear curso": página propia (con flecha de volver a Cursos) con el
-    formulario de alta de un curso: se piden materia, grupo, gestión y año, y
+    "Crear curso": página propia (subopción del sidebar, sin flecha de volver)
+    con el formulario de alta de un curso: se piden materia, grupo, gestión y año, y
     debajo, en texto corrido, va el nombre del curso, que se arma solo con la
     materia y el grupo mientras se escriben ("{materia} - Grupo {grupo}"); no
     es un campo ni lo parece, para que nadie intente escribir ahí. El curso se

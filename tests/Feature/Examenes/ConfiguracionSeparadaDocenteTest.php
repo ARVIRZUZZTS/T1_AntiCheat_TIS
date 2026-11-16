@@ -52,7 +52,7 @@ class ConfiguracionSeparadaDocenteTest extends TestCase
         parent::setUp();
         Cache::flush();
 
-        DB::table('rol')->insert([
+        DB::table('rol')->insertOrIgnore([
             'id_rol' => self::ROL_DOCENTE,
             'nombre_rol' => 'docente',
         ]);

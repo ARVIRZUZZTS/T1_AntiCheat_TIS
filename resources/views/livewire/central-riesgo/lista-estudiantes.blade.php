@@ -60,10 +60,12 @@
     use App\Services\CentralRiesgo\ListarIncidenciasTramposoService;
     use Illuminate\Support\Carbon;
 
-    $alcances = [
+    // En la pagina de sospechosos no hay pestanhas de alcance; en Incidencias
+    // solo las dos propias (Institucion / Mis materias). Sospechosos es su
+    // propia pagina del sidebar.
+    $alcances = $modo === ListaEstudiantes::ALCANCE_SOSPECHOSOS ? [] : [
         ListarIncidenciasTramposoService::ALCANCE_INSTITUCION => 'Toda la institucion',
         ListarIncidenciasTramposoService::ALCANCE_MIS_MATERIAS => 'Mis materias',
-        ListaEstudiantes::ALCANCE_SOSPECHOSOS => 'Sospechosos',
     ];
 
     $estudiantes = $this->estudiantes;
@@ -87,22 +89,24 @@
         {{-- Lista. El detalle se abre como modal encima, así que la lista nunca
              se oculta y conserva orden, filtro y página. --}}
         <section class="min-w-0 lg:flex-1" aria-label="Lista de estudiantes">
-            <div class="flex flex-wrap items-center justify-between gap-3">
-                <div class="flex flex-wrap gap-2" role="tablist" aria-label="Ambito de la central">
-                    @foreach ($alcances as $clave => $etiqueta)
-                        <button type="button" role="tab" wire:key="alcance-{{ $clave }}"
-                                wire:click="cambiarAlcance('{{ $clave }}')"
-                                aria-selected="{{ $alcance === $clave ? 'true' : 'false' }}"
-                                @class([
-                                    'inline-flex items-center justify-center rounded-full border px-5 py-2.5 text-sm font-semibold shadow-xs focus:outline-none focus:ring-4 focus:ring-brand-medium',
-                                    'bg-brand text-white border-transparent' => $alcance === $clave,
-                                    'bg-neutral-secondary-medium text-body border-neutral-quaternary' => $alcance !== $clave,
-                                ])>
-                            {{ $etiqueta }}
-                        </button>
-                    @endforeach
+            @if (! empty($alcances))
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div class="flex flex-wrap gap-2" role="tablist" aria-label="Ambito de la central">
+                        @foreach ($alcances as $clave => $etiqueta)
+                            <button type="button" role="tab" wire:key="alcance-{{ $clave }}"
+                                    wire:click="cambiarAlcance('{{ $clave }}')"
+                                    aria-selected="{{ $alcance === $clave ? 'true' : 'false' }}"
+                                    @class([
+                                        'inline-flex items-center justify-center rounded-full border px-5 py-2.5 text-sm font-semibold shadow-xs focus:outline-none focus:ring-4 focus:ring-brand-medium',
+                                        'bg-brand text-white border-transparent' => $alcance === $clave,
+                                        'bg-neutral-secondary-medium text-body border-neutral-quaternary' => $alcance !== $clave,
+                                    ])>
+                                {{ $etiqueta }}
+                            </button>
+                        @endforeach
+                    </div>
                 </div>
-            </div>
+            @endif
 
             @if ($mensajeRevision || $errorRevision)
                 <p role="status" class="mt-4 text-sm {{ $errorRevision ? 'text-fg-danger-strong' : 'text-fg-brand' }}">

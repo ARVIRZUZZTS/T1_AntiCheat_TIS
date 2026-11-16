@@ -134,7 +134,15 @@
     })->all();
 
     // Si el alta falló, se vuelve a abrir la pestaña del formulario.
-    $tabInicial = $tabInicial ?? (($errors->any() && $puedeCrearExamen) ? 'crear' : 'lista');
+    $tabInicial = $tabInicial ?? (($errors->any() && $cursoInicial !== null && $puedeCrearExamen) ? 'crear' : 'lista');
+
+    // $soloTab (opcional) acota el parcial a una sola pestaña y oculta la barra
+    // de pestañas: así las subopciones del sidebar (Editar / Dividir) reutilizan
+    // este mismo componente mostrando solo su sección.
+    $soloTab = $soloTab ?? null;
+    if ($soloTab !== null) {
+        $tabInicial = $soloTab;
+    }
 @endphp
 
 <div class="flex flex-col gap-4"
@@ -146,7 +154,8 @@
          estado: 'listo',
          peticion: 0,
          tab: @js($tabInicial),
-         // Cada pestana conserva su propia seleccion.
+         soloTab: @js($soloTab),
+         // Examen elegido en Editar, Invitar y Dividir.
          seleccionado: '',
          examenEdicionId: '',
          examenDivisionId: '',
@@ -195,6 +204,35 @@
          },
          get puedeDividir() {
              return this.aulasDelExamen > 1;
+         },
+         cambiarCurso() {
+             this.tab = this.soloTab ?? 'lista';
+             this.cursoNombre = this.cursos[this.cursoSeleccionado] ?? '';
+             this.seleccionado = '';
+             this.examenEdicionCargadoId = '';
+             this.cargandoEdicion = false;
+             this.errorEdicion = '';
+             this.criterioDivision = '';
+             this.errorDivision = '';
+             this.actualizarUrl();
+             this.avisarFormulario();
+             this.cargar();
+         },
+         actualizarUrl() {
+             const url = new URL(window.location.href);
+
+             if (this.hayCurso) {
+                 url.searchParams.set('curso', this.cursoSeleccionado);
+             } else {
+                 url.searchParams.delete('curso');
+             }
+
+             window.history.replaceState({}, '', url);
+         },
+         avisarFormulario() {
+             window.dispatchEvent(new CustomEvent('curso-seleccionado', {
+                 detail: { id: this.cursoSeleccionado, nombre: this.cursoNombre },
+             }));
          },
          async cargar() {
              const peticion = ++this.peticion;
@@ -539,7 +577,25 @@
         <x-ui.modal-aviso :mensaje="session('mensaje')" />
     @endif
 
-    <div x-cloak class="flex flex-col gap-4">
+    <div class="max-w-md px-3">
+        <x-ui.select
+            label="Materia"
+            name="curso"
+            x-model="cursoSeleccionado"
+            @change="cambiarCurso()"
+            :options="$opcionesCursos"
+            :selected="$cursoInicial?->id_curso"
+            placeholder="Selecciona una materia"
+        />
+    </div>
+
+    <p class="px-3 text-sm text-body" x-show="! hayCurso">
+        Selecciona una materia para ver sus examenes.
+    </p>
+
+    {{-- Las pestañas y su contenido solo aparecen con materia elegida. --}}
+    <div x-show="hayCurso" x-cloak class="flex flex-col gap-4">
+    @if (! $soloTab)
     <header class="flex flex-col gap-3">
 
         <nav class="flex min-w-0 gap-2 overflow-x-auto px-3" aria-label="Opciones de examenes">
@@ -575,6 +631,7 @@
             </button>
         </nav>
     </header>
+    @endif
 
     {{-- Ver Lista de Examenes: solo lectura, sin selección ni acciones. --}}
     <section x-show="tab === 'lista'" x-cloak class="flex flex-col gap-4">

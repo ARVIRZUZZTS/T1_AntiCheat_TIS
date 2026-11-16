@@ -24,8 +24,6 @@
  * - 2026-11-07  [Diego Tejerina]  feat: PUT de guardado del examen editado (#261).
  * - 2026-11-08  [OchoaCesar]  feat: GET de auxiliares del docente autenticado.
  * - 2026-11-08  [Alisson D. Alvarado]  feat: ruta para sugerir nombres de usuario.
- * - 2026-11-14  [Alex Candia]  feat: GET con los examenes del docente
- *   autenticado para el listado global y los selectores de Examenes.
  */
 
 use App\Http\Controllers\Api\AuxiliaresDocenteController;

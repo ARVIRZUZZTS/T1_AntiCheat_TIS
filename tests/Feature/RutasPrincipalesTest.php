@@ -9,6 +9,7 @@
  *
  * @updated 2026-09-28
  * @updated 2026-10-24
+ * @updated 2026-11-09
  *
  * @description
  * Prueba de humo (smoke test) de las rutas principales de navegación. Se
@@ -28,26 +29,54 @@
  *   `cursos` y `cursos.detalle`) y se suman Crear curso y la sección Exámenes.
  *   Las pruebas inician sesión con el docente del curso, porque las rutas son
  *   solo para docentes y cada uno ve solo sus cursos.
+ * - 2026-11-09  [Diegootm]  fix: el link del detalle se busca por el marcador
+ *   __CURSO__ del enlace de Alpine — la URL viaja JSON-escapada y el texto
+ *   literal ya no aparece en el HTML.
  */
 
 namespace Tests\Feature;
 
 use App\Models\Curso;
 use App\Models\Usuario;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
 class RutasPrincipalesTest extends TestCase
 {
+    // La prueba arma sus propios datos en una transacción que se revierte,
+    // igual que el resto del suite; antes dependía de que la base ya tuviera
+    // cursos sembrados.
+    use DatabaseTransactions;
+
+    private Curso $curso;
+
+    private Curso $cursoAjeno;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        DB::table('rol')->insertOrIgnore(['id_rol' => 1, 'nombre_rol' => 'docente']);
+
+        $docente = $this->crearDocente(880001, 'RutasDocenteUno');
+        $otroDocente = $this->crearDocente(880002, 'RutasDocenteDos');
+
+        $this->curso = $this->crearCurso(880101, 'Rutas Curso Propio', $docente);
+        $this->cursoAjeno = $this->crearCurso(880102, 'Rutas Curso Ajeno', $otroDocente);
+    }
+
     public function test_la_lista_de_cursos_carga_sin_error(): void
     {
-        $this->actingAsDocenteDe($this->cursoDeLaBase());
+        $this->actingAsDocenteDe($this->curso);
 
         $this->get(route('cursos'))->assertOk();
     }
 
     public function test_la_pagina_de_crear_curso_carga_sin_error(): void
     {
-        $this->actingAsDocenteDe($this->cursoDeLaBase());
+        $this->actingAsDocenteDe($this->curso);
 
         $this->get(route('cursos.crear'))->assertOk();
     }
@@ -59,48 +88,55 @@ class RutasPrincipalesTest extends TestCase
      */
     public function test_el_detalle_de_un_curso_carga_sin_error(): void
     {
-        $curso = $this->cursoDeLaBase();
-        $this->actingAsDocenteDe($curso);
+        $this->actingAsDocenteDe($this->curso);
 
-        $this->get(route('cursos.detalle', $curso->id_curso))->assertOk();
-    }
-
-    public function test_el_link_de_la_lista_apunta_al_detalle_correcto(): void
-    {
-        $curso = $this->cursoDeLaBase();
-        $this->actingAsDocenteDe($curso);
-
-        $this->get(route('cursos'))
-            ->assertSee(route('cursos.detalle', $curso->id_curso), false);
+        $this->get(route('cursos.detalle', $this->curso->id_curso))->assertOk();
     }
 
     public function test_un_docente_no_abre_el_curso_de_otro(): void
     {
-        $curso = $this->cursoDeLaBase();
-        $otroCurso = Curso::query()->where('sis_doc', '!=', $curso->sis_doc)->first();
+        $this->actingAsDocenteDe($this->curso);
 
-        if ($otroCurso === null) {
-            $this->markTestSkipped('La base no tiene cursos de dos docentes distintos.');
-        }
-
-        $this->actingAsDocenteDe($curso);
-
-        $this->get(route('cursos.detalle', $otroCurso->id_curso))->assertForbidden();
+        $this->get(route('cursos.detalle', $this->cursoAjeno->id_curso))->assertForbidden();
     }
 
     public function test_la_seccion_examenes_carga_sin_error(): void
     {
-        $curso = $this->cursoDeLaBase();
-        $this->actingAsDocenteDe($curso);
+        $this->actingAsDocenteDe($this->curso);
 
         $this->get(route('examenes'))->assertOk();
-        $this->get(route('examenes.curso', $curso->id_curso))->assertOk();
-        $this->get(route('examenes.crear', $curso->id_curso))->assertOk();
+        $this->get(route('examenes.curso', $this->curso->id_curso))->assertOk();
+        // El alta por curso se renombro a examenes.curso.crear (el nombre
+        // examenes.crear lo usa ahora la pagina nueva "Crear examen").
+        $this->get(route('examenes.curso.crear', $this->curso->id_curso))->assertOk();
     }
 
-    private function cursoDeLaBase(): Curso
+    private function crearDocente(int $id, string $nombreUsuario): Usuario
     {
-        return Curso::query()->orderBy('id_curso')->firstOrFail();
+        DB::table('usuario')->insert([
+            'id_usuario' => $id,
+            'cod_sis' => 'RUT'.$id,
+            'password' => Hash::make('secret123'),
+            'nombre_usuario' => $nombreUsuario,
+            'apellido' => 'Prueba',
+            'estado_cuenta' => 'habilitada',
+        ]);
+        DB::table('rol_usuario')->insert(['id_usuario' => $id, 'id_rol' => 1]);
+
+        return Usuario::query()->findOrFail($id);
+    }
+
+    private function crearCurso(int $id, string $nombre, Usuario $docente): Curso
+    {
+        DB::table('curso')->insert([
+            'id_curso' => $id,
+            'nombre_curso' => $nombre,
+            'sis_doc' => $docente->id_usuario,
+            'estado' => 'EnCurso',
+            'fecha_creacion' => now()->toDateString(),
+        ]);
+
+        return Curso::query()->findOrFail($id);
     }
 
     private function actingAsDocenteDe(Curso $curso): void

@@ -5,16 +5,21 @@
     @updated 2026-11-08
 
     @description
-    Vista del componente Livewire Invitaciones\Index: pestañas para recibir y
-    enviar invitaciones a exámenes compartidos.
+    Vista del componente Livewire Invitaciones\Index. Cada subopción del sidebar
+    (Enviar / Aceptar invitación) es su propia ruta y fija `$tab`; no hay
+    conmutador. "Aceptar invitación" lista las recibidas con orden reciente /
+    antigua y sus acciones Aceptar / Rechazar.
 
     @changelog
     - 2026-11-08  [David E. Chavez T.]  feat: creación inicial de la vista.
+    - 2026-11-15  [Diego Tejerina]  refactor: se separan Enviar y Aceptar
+      invitación en dos páginas; "Recibir" pasa a "Aceptar invitación" y se
+      agrega el orden de las recibidas.
 
     @see  app/Livewire/Invitaciones/Index.php
 --}}
 
-@section('title', 'Invitaciones')
+@section('title', $tab === 'enviar' ? 'Enviar invitación' : 'Aceptar invitación')
 
 <div class="flex flex-col gap-6 px-[2vh] mt-[2vh]">
     @if ($mensajeExito !== '')
@@ -24,18 +29,18 @@
         <x-ui.alert type="danger" title="Error">{{ $mensajeError }}</x-ui.alert>
     @endif
 
-    <div class="flex gap-2">
-        <x-ui.button type="button" variant="{{ $tab === 'recibir' ? 'default' : 'secondary' }}" wire:click="cambiarTab('recibir')">
-            Recibir
-        </x-ui.button>
-        <x-ui.button type="button" variant="{{ $tab === 'enviar' ? 'default' : 'secondary' }}" wire:click="cambiarTab('enviar')">
-            Enviar
-        </x-ui.button>
-    </div>
-
     @if ($tab === 'recibir')
         <div class="bg-neutral-primary-soft border border-default rounded-base shadow-xs p-6 space-y-4">
-            <h3 class="text-lg font-semibold text-heading">Invitaciones recibidas</h3>
+            @if (count($invitacionesRecibidas) > 1)
+                <div class="flex gap-2" role="group" aria-label="Ordenar invitaciones">
+                    <x-ui.button type="button" variant="{{ $ordenRecibidas === 'reciente' ? 'default' : 'secondary' }}" wire:click="ordenarRecibidas('reciente')">
+                        Más reciente
+                    </x-ui.button>
+                    <x-ui.button type="button" variant="{{ $ordenRecibidas === 'antigua' ? 'default' : 'secondary' }}" wire:click="ordenarRecibidas('antigua')">
+                        Más antigua
+                    </x-ui.button>
+                </div>
+            @endif
 
             @if (count($invitacionesRecibidas) === 0)
                 <p class="text-sm text-body">No tienes invitaciones pendientes.</p>
@@ -60,8 +65,6 @@
         </div>
     @else
         <div class="bg-neutral-primary-soft border border-default rounded-base shadow-xs p-6 space-y-4">
-            <h3 class="text-lg font-semibold text-heading">Enviar invitación</h3>
-
             <div>
                 <label class="block text-sm font-medium text-heading mb-1">Curso</label>
                 <select wire:model.live="idCurso" class="w-full rounded-base border border-default px-3 py-2">
