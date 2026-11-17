@@ -14,8 +14,8 @@
  * muestra el estado vacío.
  *
  * @changelog
- * - 2026-11-16  [Alex Candia]  test: eliminación de curso, conteo de afectados
- *   y lista de la página "Eliminar curso".
+ * - 2026-11-16  [Alex Candia]  test: eliminación de curso, conteo de afectados,
+ *   lista de la página "Eliminar curso" y respuesta JSON del borrado.
  *
  * @see  App\Services\Curso\EliminarCursoService
  * @see  App\Services\Curso\ContarAfectadosCursoService
@@ -208,7 +208,18 @@ class EliminarCursoTest extends TestCase
             ->assertOk()
             ->assertSee('Curso a eliminar')
             ->assertSee('Eliminar curso')
+            ->assertSee('data-url-afectados', false)
             ->assertDontSee('Curso de otro docente');
+    }
+
+    public function test_la_eliminacion_por_json_devuelve_el_mensaje_de_exito(): void
+    {
+        $this->actingAs(Usuario::findOrFail(self::DOCENTE))
+            ->deleteJson(route('cursos.destroy', self::CURSO_PROPIO))
+            ->assertOk()
+            ->assertExactJson(['mensaje' => 'Curso eliminado con exito']);
+
+        $this->assertDatabaseMissing('curso', ['id_curso' => self::CURSO_PROPIO]);
     }
 
     public function test_otro_docente_no_puede_eliminar_ni_consultar_el_curso(): void

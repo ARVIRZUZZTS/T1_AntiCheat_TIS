@@ -177,11 +177,14 @@ class CursoController extends Controller
     }
 
     /**
-     * Elimina el curso propio y vuelve a la lista con el aviso de éxito.
+     * Elimina el curso propio y vuelve a la lista con el aviso de éxito. Si la
+     * petición espera JSON (el modal de la página "Eliminar curso"), devuelve
+     * el mensaje para que la lista se actualice sin recargar.
      *
+     * @param  Request  $request  Request de la eliminación.
      * @param  Curso  $curso  Curso de la URL.
      * @param  EliminarCursoService  $servicio  Servicio de borrado.
-     * @return RedirectResponse Redirige al listado de cursos con mensaje de éxito.
+     * @return RedirectResponse|JsonResponse Redirección al listado o mensaje JSON.
      *
      * @throws AuthorizationException Si el curso no es del docente (403).
      *
@@ -189,11 +192,18 @@ class CursoController extends Controller
      *
      * @since  2026-11-16
      */
-    public function destroy(Curso $curso, EliminarCursoService $servicio): RedirectResponse
-    {
+    public function destroy(
+        Request $request,
+        Curso $curso,
+        EliminarCursoService $servicio,
+    ): RedirectResponse|JsonResponse {
         Gate::authorize('eliminar', $curso);
 
         $servicio->ejecutar($curso);
+
+        if ($request->expectsJson()) {
+            return response()->json(['mensaje' => 'Curso eliminado con exito']);
+        }
 
         return redirect()
             ->route('cursos')
