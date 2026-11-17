@@ -11,6 +11,7 @@
  * @updated 2026-10-25
  * @updated 2026-11-05
  * @updated 2026-11-08
+ * @updated 2026-11-16
  *
  * @description Rutas JSON del backend.
  *
@@ -24,6 +25,8 @@
  * - 2026-11-07  [Diego Tejerina]  feat: PUT de guardado del examen editado (#261).
  * - 2026-11-08  [OchoaCesar]  feat: GET de auxiliares del docente autenticado.
  * - 2026-11-08  [Alisson D. Alvarado]  feat: ruta para sugerir nombres de usuario.
+ * - 2026-11-16  [OchoaCesar]  feat: DELETE de examen por curso (desvinculación
+ *   lógica con guardas de inicio y de ingresos/incidencias).
  */
 
 use App\Http\Controllers\Api\AuxiliaresDocenteController;
@@ -149,6 +152,14 @@ Route::middleware(['web', 'auth:web'])->group(function (): void {
         ->whereNumber('curso')
         ->middleware('docente')
         ->name('api.examenes.cursos.vincular');
+
+    // Eliminacion logica del examen en el curso: desvincula examen_curso sin
+    // borrar el examen ni tocar los demas cursos ni los datos de otros docentes.
+    Route::delete('/examenes/{examen}/cursos/{curso}', [ConfiguracionExamenDocenteController::class, 'desvincularCurso'])
+        ->whereNumber('examen')
+        ->whereNumber('curso')
+        ->middleware('docente')
+        ->name('api.examenes.cursos.desvincular');
 
     Route::get('/cursos/{idCurso}/estudiantes', [CursoEstudianteController::class, 'index'])
         ->whereNumber('idCurso')
