@@ -9,12 +9,14 @@
  *
  * @updated 2026-11-04
  * @updated 2026-11-15
+ * @updated 2026-11-16
  *
  * @description
  * Controlador HTTP de la sección Cursos del docente: la lista de sus cursos,
- * el formulario de alta ("Crear curso"), el alta del curso y la vista de un
- * curso con sus estudiantes y habilitaciones. Solo orquesta: los datos los
- * resuelven los Services y la pertenencia del curso la decide CursoPolicy.
+ * el formulario de alta ("Crear curso"), el alta y la eliminación del curso y
+ * la vista de un curso con sus estudiantes y habilitaciones. Solo orquesta:
+ * los datos los resuelven los Services y la pertenencia del curso la decide
+ * CursoPolicy.
  *
  * Reemplaza a las closures de `/materias` y `/materias/{curso}` que vivían
  * en routes/web.php.
@@ -28,7 +30,11 @@
  * - 2026-11-15  [Alex Candia]  feat: "Ver curso" se divide en verEstudiantes y
  *   habilitarEstudiantes; ambas páginas comparten selector de curso y muestran
  *   solo su sección.
+ * - 2026-11-16  [Alex Candia]  feat: eliminación de un curso propio con el
+ *   conteo previo de auxiliares y estudiantes afectados.
  *
+ * @see  App\Services\Curso\ContarAfectadosCursoService
+ * @see  App\Services\Curso\EliminarCursoService
  * @see  App\Services\Curso\ListarCursosDocenteService
  * @see  App\Services\Curso\ListarGestionesService
  * @see  App\Services\Curso\RegistrarCursoService
@@ -41,12 +47,15 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreCursoRequest;
 use App\Models\Curso;
+use App\Services\Curso\ContarAfectadosCursoService;
+use App\Services\Curso\EliminarCursoService;
 use App\Services\Curso\ListarCursosDocenteService;
 use App\Services\Curso\ListarGestionesService;
 use App\Services\Curso\RegistrarCursoService;
 use App\Services\Examen\ListarEstudiantesCursoConEstadoService;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -120,6 +129,51 @@ class CursoController extends Controller
         return redirect()
             ->route('cursos')
             ->with('mensaje', 'Curso creado con exito');
+    }
+
+    /**
+     * Devuelve cuántos auxiliares y estudiantes quedarían desvinculados si se
+     * elimina el curso. Alimenta la advertencia del modal "Eliminar curso".
+     *
+     * @param  Curso  $curso  Curso de la URL.
+     * @param  ContarAfectadosCursoService  $afectados  Servicio de conteos.
+     * @return JsonResponse Conteos de auxiliares y estudiantes.
+     *
+     * @throws AuthorizationException Si el curso no es del docente (403).
+     *
+     * @author Alex Candia
+     *
+     * @since  2026-11-16
+     */
+    public function afectados(Curso $curso, ContarAfectadosCursoService $afectados): JsonResponse
+    {
+        Gate::authorize('eliminar', $curso);
+
+        return response()->json($afectados->ejecutar($curso));
+    }
+
+    /**
+     * Elimina el curso propio y vuelve a la lista con el aviso de éxito.
+     *
+     * @param  Curso  $curso  Curso de la URL.
+     * @param  EliminarCursoService  $servicio  Servicio de borrado.
+     * @return RedirectResponse Redirige al listado de cursos con mensaje de éxito.
+     *
+     * @throws AuthorizationException Si el curso no es del docente (403).
+     *
+     * @author Alex Candia
+     *
+     * @since  2026-11-16
+     */
+    public function destroy(Curso $curso, EliminarCursoService $servicio): RedirectResponse
+    {
+        Gate::authorize('eliminar', $curso);
+
+        $servicio->ejecutar($curso);
+
+        return redirect()
+            ->route('cursos')
+            ->with('mensaje', 'Curso eliminado con exito');
     }
 
     /**

@@ -16,6 +16,7 @@
  * @updated 2026-11-08
  * @updated 2026-11-14
  * @updated 2026-11-15
+ * @updated 2026-11-16
  *
  * @description
  * Definición de rutas web del panel. Incluye vistas estáticas y componentes Livewire.
@@ -86,6 +87,8 @@
  * - 2026-11-15  [Alex Candia]  feat: "Ver curso" se divide en "Ver estudiantes" y
  *   "Habilitar estudiantes"; Reportes pasa a submenus (asistencia, horario de
  *   ingreso y intentos no autorizados) y /reportes redirige a asistencia.
+ * - 2026-11-16  [Alex Candia]  feat: endpoints para eliminar un curso propio y
+ *   consultar los auxiliares y estudiantes afectados antes de borrarlo.
  */
 
 use App\Http\Controllers\AuthController;
@@ -215,6 +218,14 @@ Route::middleware(['auth', 'docente'])->group(function (): void {
         'descripcion' => 'La carga de estudiantes por CSV esta en desarrollo.',
     ])->name('cursos.cargar-csv');
     Route::post('/cursos', [CursoController::class, 'store'])->name('cursos.store');
+    // Cursos · Eliminar curso: conteo previo para el modal y borrado definitivo.
+    // Solo el docente dueño puede hacerlo (CursoPolicy::eliminar).
+    Route::get('/cursos/{curso}/afectados', [CursoController::class, 'afectados'])
+        ->whereNumber('curso')
+        ->name('cursos.eliminar.afectados');
+    Route::delete('/cursos/{curso}', [CursoController::class, 'destroy'])
+        ->whereNumber('curso')
+        ->name('cursos.destroy');
     Route::get('/cursos/{curso}', [CursoController::class, 'detalle'])
         ->whereNumber('curso')
         ->name('cursos.detalle');

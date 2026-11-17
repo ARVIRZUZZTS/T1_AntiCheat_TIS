@@ -10,12 +10,15 @@
  * @description
  * Autoriza la gestión de un curso (ver su detalle y sus exámenes) solo al
  * docente responsable del curso (`curso.sis_doc`), y la creación de exámenes
- * solo si además el curso sigue en curso.
+ * solo si además el curso sigue en curso. La eliminación queda reservada al
+ * docente que creó el curso.
  *
  * @changelog
  * - 2026-10-24  [Valery D. Ortuno P]  feat: creación inicial de la policy.
  * - 2026-10-24  [Valery D. Ortuno P]  feat: crearExamen() impide crear
  *   exámenes en un curso finalizado (HU 11).
+ * - 2026-11-16  [Alex Candia]  feat: eliminar() reserva el borrado al docente
+ *   dueño del curso, sin incluir a los invitados.
  *
  * @see  App\Http\Controllers\CursoController
  * @see  App\Http\Controllers\ExamenController
@@ -58,6 +61,24 @@ class CursoPolicy
             ->where('iec.estado', InvitacionEstado::Aceptada->value)
             ->where('ec.id_curso', $curso->id_curso)
             ->exists();
+    }
+
+    /**
+     * Indica si el usuario puede eliminar el curso. Solo el docente que lo
+     * creó (`curso.sis_doc`); un docente invitado puede gestionar exámenes,
+     * pero no borrar el curso de otro.
+     *
+     * @param  Usuario  $usuario  Usuario autenticado.
+     * @param  Curso  $curso  Curso que se quiere eliminar.
+     * @return bool Si el curso pertenece al usuario.
+     *
+     * @author Alex Candia
+     *
+     * @since  2026-11-16
+     */
+    public function eliminar(Usuario $usuario, Curso $curso): bool
+    {
+        return (int) $curso->sis_doc === (int) $usuario->id_usuario;
     }
 
     /**
