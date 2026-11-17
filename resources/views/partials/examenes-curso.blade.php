@@ -9,6 +9,7 @@
     @updated 2026-11-04
     @updated 2026-11-05
     @updated 2026-11-14
+    @updated 2026-11-16
 
     @description
     Parcial de la sección Exámenes. En la página única lista todos los exámenes
@@ -21,10 +22,13 @@
     "Editar Examen" y "Dividir Examen". Al cambiar de pestaña solo cambia el
     contenido de abajo; no se navega a otra página.
 
-    La pestaña de lista es de solo lectura: las tarjetas se consultan con fetch
-    al endpoint global GET /api/examenes (ExamenDocenteController) o al endpoint
-    por curso GET /api/cursos/{idCurso}/examenes (CursoExamenController). Desde
-    la lista se abre el modal para invitar a otro docente.
+    La pestaña de lista se consulta con fetch al endpoint global GET
+    /api/examenes (ExamenDocenteController) o al endpoint por curso GET
+    /api/cursos/{idCurso}/examenes (CursoExamenController). En la página única
+    un selector de curso (por defecto "Todos los cursos") acota el listado; con
+    un curso concreto cada tarjeta ofrece "Eliminar", que confirma en un modal
+    y llama a DELETE /api/examenes/{examen}/cursos/{curso}. Desde la lista
+    también se abre el modal para invitar a otro docente.
 
     Crear Examen incrusta el mismo formulario de pages/examen-crear. En la
     página única el curso se elige en un selector obligatorio del formulario; en
@@ -83,11 +87,16 @@
     - 2026-11-07  [Diego Tejerina]  feat: "Guardar cambios" guarda la edición con
       PUT /api/examenes/{examen}/edicion y, al terminar, refresca el listado
       (refrescarExamenes) sin perder la selección ni el aviso de éxito (#261).
-    - 2026-11-14  [Alex Candia]  feat: se quita el selector de materia. La página
-      única lista todos los exámenes de todos los cursos del docente, pasados y
+    - 2026-11-14  [Alex Candia]  feat: se quita el selector de materia. La
+      página única lista todos los exámenes de todos los cursos del docente, pasados y
       futuros, con el curso como parte del nombre, y usa selectores
       independientes para Editar y Dividir; Crear Examen recibe los cursos para
       elegir el curso en el formulario.
+    - 2026-11-16  [OchoaCesar]  feat: la pestaña de lista gana un selector de
+      curso (por defecto "Todos los cursos"), el botón "Eliminar" por tarjeta
+      cuando hay curso concreto, el modal de confirmación "Eliminar examen" y
+      los mensajes de bloqueo (al presionar) y de exito. Con un curso elegido
+      el estado vacío dice "No hay exámenes programados".
 
     @see  App\Http\Controllers\Api\CursoExamenController
     @see  App\Http\Controllers\Api\ExamenDocenteController
@@ -106,12 +115,12 @@
     $materiales = $materiales ?? [];
     $normas = $normas ?? [];
 
-    // La pagina unica lista los examenes de todos los cursos del docente. La
-    // pagina de compatibilidad por curso conserva su listado acotado.
+    // La pagina unica lista los examenes de todos los cursos del docente y
+    // trae un selector de curso para acotar el listado. La pagina de
+    // compatibilidad por curso conserva su listado acotado.
     $listadoGlobal = $curso === null;
-    $urlExamenes = $listadoGlobal
-        ? route('api.examenes.listar')
-        : route('api.cursos.examenes.listar', ['idCurso' => '__CURSO__']);
+    $urlListaGlobal = route('api.examenes.listar');
+    $urlListaCurso = route('api.cursos.examenes.listar', ['idCurso' => '__CURSO__']);
 
     // Mismas clases de pestañas que usa el detalle del curso.
     $tabClases = 'shrink-0 whitespace-nowrap inline-flex items-center justify-center box-border border focus:ring-4 shadow-xs font-medium leading-5 rounded-base focus:outline-none px-4 py-2.5 text-sm';
@@ -148,7 +157,10 @@
 <div class="flex flex-col gap-4"
      x-data="{
          cursoFijo: @js((string) ($curso?->id_curso ?? '')),
-         urlExamenes: @js($urlExamenes),
+         urlListaGlobal: @js($urlListaGlobal),
+         urlListaCurso: @js($urlListaCurso),
+         // Contexto de la pestana de lista: vacio = todos los cursos.
+         cursoLista: @js($listadoGlobal ? '' : (string) ($curso?->id_curso ?? '')),
          examenes: [],
          ahora: @js(now()->format('Y-m-d H:i')),
          estado: 'listo',
@@ -167,6 +179,15 @@
          errorDivision: '',
          urlPreviewDivision: @js(route('api.examenes.dividir.preview', ['examen' => '__ID__'])),
          csrfToken: document.querySelector('meta[name=csrf-token]')?.getAttribute('content') || '',
+         // Eliminacion de examen del curso.
+         modalEliminar: false,
+         examenEliminarId: '',
+         eliminando: false,
+         errorEliminacion: '',
+         avisoEliminacion: '',
+         exitoEliminacion: false,
+         mensajeNoIniciado: 'El examen ya inició o finalizó',
+         mensajeConDatos: 'El examen tiene ingresos o incidencias registradas',
          // Modal de invitacion a docente.
          modalInvitar: false,
          examenInvitarId: '',
@@ -192,6 +213,17 @@
          get examenDivisionSeleccionado() {
              return this.examenes.find((examen) => String(examen.id) === String(this.examenDivisionId)) || null;
          },
+         get examenEliminarSeleccionado() {
+             return this.examenes.find((examen) => String(examen.id) === String(this.examenEliminarId)) || null;
+         },
+         get cursoContexto() {
+             return this.cursoLista || this.cursoFijo;
+         },
+         get urlActual() {
+             return this.cursoContexto !== ''
+                 ? this.urlListaCurso.replace('__CURSO__', this.cursoContexto)
+                 : this.urlListaGlobal;
+         },
          get examenesDisponibles() {
              return this.examenes.filter((examen) => this.examenDisponible(examen));
          },
@@ -212,10 +244,10 @@
              this.errorEdicion = '';
              this.limpiarSeleccion();
 
-             this.estado = 'cargando';
-             try {
-                 const url = this.urlExamenes.replace('__CURSO__', this.cursoFijo);
-                 const respuesta = await fetch(url);
+              this.estado = 'cargando';
+              try {
+                  const url = this.urlActual;
+                  const respuesta = await fetch(url);
                  if (!respuesta.ok) {
                      throw new Error('HTTP ' + respuesta.status);
                  }
@@ -530,7 +562,7 @@
          // del formulario sigue a la vista.
          async refrescarExamenes() {
              try {
-                 const url = this.urlExamenes.replace('__CURSO__', this.cursoFijo);
+                 const url = this.urlActual;
                  const respuesta = await fetch(url, { headers: { 'Accept': 'application/json' }, credentials: 'same-origin' });
                  if (! respuesta.ok) {
                      return;
@@ -539,6 +571,78 @@
                  this.examenes = cuerpo.datos ?? [];
              } catch (error) {
                  // El listado se pone al dia al recargar la pagina.
+             }
+         },
+          // El bloqueo ocurre al presionar 'Eliminar' en la tarjeta, con los
+          // datos del listado; el servidor vuelve a validar al confirmar.
+         motivoBloqueoEliminar(examen) {
+             if (examen.fecha) {
+                 const inicio = examen.fecha + ' ' + (examen.hora_inicio || '00:00');
+                 if (inicio <= this.ahora) {
+                     return this.mensajeNoIniciado;
+                 }
+             }
+
+             if (Number(examen.ingresados || 0) > 0 || Number(examen.incidencias || 0) > 0) {
+                 return this.mensajeConDatos;
+             }
+
+             return '';
+         },
+         abrirModalEliminar(examen) {
+             this.avisoEliminacion = '';
+             this.errorEliminacion = '';
+
+             const motivo = this.motivoBloqueoEliminar(examen);
+             if (motivo !== '') {
+                 this.avisoEliminacion = motivo;
+                 return;
+             }
+
+             this.examenEliminarId = String(examen.id);
+             this.modalEliminar = true;
+         },
+         cerrarModalEliminar() {
+             this.modalEliminar = false;
+             this.examenEliminarId = '';
+             this.errorEliminacion = '';
+         },
+         async confirmarEliminar() {
+             const examen = this.examenEliminarSeleccionado;
+             if (! examen || this.cursoContexto === '' || this.eliminando) {
+                 return;
+             }
+
+             this.eliminando = true;
+             this.errorEliminacion = '';
+
+             try {
+                 const respuesta = await fetch('/api/examenes/' + examen.id + '/cursos/' + this.cursoContexto, {
+                     method: 'DELETE',
+                     credentials: 'same-origin',
+                     headers: {
+                         'Accept': 'application/json',
+                         'X-CSRF-TOKEN': this.csrfToken,
+                         'X-Requested-With': 'XMLHttpRequest',
+                     },
+                 });
+                 const cuerpo = await respuesta.json().catch(() => ({}));
+
+                 if (! respuesta.ok) {
+                     this.errorEliminacion = cuerpo?.errors?.eliminar?.[0]
+                         || cuerpo?.message
+                         || 'No se pudo eliminar el examen.';
+                     return;
+                 }
+
+                 this.modalEliminar = false;
+                 this.examenEliminarId = '';
+                 this.exitoEliminacion = true;
+                 await this.refrescarExamenes();
+             } catch (error) {
+                 this.errorEliminacion = 'No se pudo conectar con el servidor.';
+             } finally {
+                 this.eliminando = false;
              }
          },
      }"
@@ -586,9 +690,34 @@
     </header>
     @endif
 
-    {{-- Ver Lista de Examenes: solo lectura, sin selección ni acciones. --}}
+    {{-- Ver Lista de Examenes: selector de curso y Eliminar por tarjeta. --}}
     <section x-show="tab === 'lista'" x-cloak class="flex flex-col gap-4">
-        <div class="flex flex-col gap-4" x-show="estado === 'cargando'">
+        {{-- Selector de curso: solo en la pagina unica; con un curso elegido
+             la lista se acota a ese curso y cada tarjeta ofrece Eliminar. --}}
+        @if ($listadoGlobal)
+            <div class="flex flex-col gap-1.5">
+                <div class="min-w-0 sm:max-w-xs">
+                    <label for="examen-curso-lista" class="block mb-2.5 text-sm font-medium text-heading">Curso</label>
+                    <select id="examen-curso-lista"
+                            x-model="cursoLista"
+                            @change="avisoEliminacion = ''; exitoEliminacion = false; cargar()"
+                            class="block w-full px-3 py-2.5 border text-sm rounded-base shadow-xs bg-neutral-secondary-medium border-default-medium text-heading focus:ring-brand focus:border-brand">
+                        <option value="">Todos los cursos</option>
+                        @foreach ($opcionesCursos as $idCursoLista => $nombreCursoLista)
+                            <option value="{{ $idCursoLista }}">{{ $nombreCursoLista }}</option>
+                        @endforeach
+                    </select>
+                </div>
+            </div>
+        @endif
+
+        <div x-show="avisoEliminacion !== ''" x-cloak>
+            <x-ui.alert type="danger" title="No se puede eliminar el examen:">
+                <span x-text="avisoEliminacion"></span>
+            </x-ui.alert>
+        </div>
+
+        <div x-show="estado === 'cargando'" x-cloak class="flex flex-col gap-4">
             @foreach ([1, 2] as $placeholder)
                 <div class="animate-pulse border border-default bg-neutral-primary-soft rounded-base shadow-xs px-5 py-6 sm:px-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:gap-6" aria-hidden="true">
                     <div class="flex items-center gap-4 lg:w-72">
@@ -646,34 +775,41 @@
                     </div>
 
                     {{-- Datos de la tarjeta. --}}
-                    <div class="grid flex-1 grid-cols-2 gap-4 sm:grid-cols-4">
-                        <div class="flex flex-col items-center gap-1.5 text-center">
-                            <span class="text-xs font-semibold uppercase text-muted">Fecha:</span>
-                            <time class="text-sm font-mono text-body" :datetime="examen.fecha" x-text="fechaDe(examen)"></time>
+                        <div class="grid flex-1 grid-cols-2 gap-4 sm:grid-cols-4">
+                            <div class="flex flex-col items-center gap-1.5 text-center">
+                                <span class="text-xs font-semibold uppercase text-muted">Fecha:</span>
+                                <time class="text-sm font-mono text-body" :datetime="examen.fecha" x-text="fechaDe(examen)"></time>
+                            </div>
+
+                            <div class="flex flex-col items-center gap-1.5 text-center">
+                                <span class="text-xs font-semibold uppercase text-muted">Horario:</span>
+                                <span class="text-sm font-mono text-body" x-text="horario(examen)"></span>
+                            </div>
+
+                            <div class="flex flex-col items-center gap-1.5 text-center">
+                                <span class="text-xs font-semibold uppercase text-muted">Ambientes:</span>
+                                <span class="text-sm font-mono text-body" x-text="ambientesDe(examen)"></span>
+                            </div>
+
+                            <div class="flex flex-col items-center gap-1.5 text-center">
+                                <span class="text-xs font-semibold uppercase text-muted">Ingresos:</span>
+                                <span class="text-sm font-bold text-heading" x-text="examen.ingresados"></span>
+                            </div>
                         </div>
 
-                        <div class="flex flex-col items-center gap-1.5 text-center">
-                            <span class="text-xs font-semibold uppercase text-muted">Horario:</span>
-                            <span class="text-sm font-mono text-body" x-text="horario(examen)"></span>
+                        {{-- Acciones de la tarjeta: solo con un curso concreto. --}}
+                        <div class="flex shrink-0 items-center justify-end" x-show="cursoContexto !== ''" x-cloak>
+                            <x-ui.button variant="danger" @click="abrirModalEliminar(examen)">
+                                Eliminar
+                            </x-ui.button>
                         </div>
-
-                        <div class="flex flex-col items-center gap-1.5 text-center">
-                            <span class="text-xs font-semibold uppercase text-muted">Ambientes:</span>
-                            <span class="text-sm font-mono text-body" x-text="ambientesDe(examen)"></span>
-                        </div>
-
-                        <div class="flex flex-col items-center gap-1.5 text-center">
-                            <span class="text-xs font-semibold uppercase text-muted">Ingresos:</span>
-                            <span class="text-sm font-bold text-heading" x-text="examen.ingresados"></span>
-                        </div>
-                    </div>
-                </li>
+                    </li>
             </template>
 
             <li x-show="examenes.length === 0"
                 class="flex flex-col items-center gap-2 p-8 text-center bg-neutral-primary-soft border border-default rounded-base shadow-xs">
                 <svg class="w-6 h-6 text-fg-disabled" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-width="2" d="M4 10h16m-8-3V4M7 7V4m10 3V4M5 20h14a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2Zm3-7h.01v.01H8V13Zm4 0h.01v.01H12V13Zm4 0h.01v.01H16V13Zm-8 4h.01v.01H8V17Zm4 0h.01v.01H12V17Zm4 0h.01v.01H16V17Z"/></svg>
-                <p class="text-sm text-body">No hay examenes registrados.</p>
+                <p class="text-sm text-body" x-text="cursoContexto !== '' ? 'No hay exámenes programados' : 'No hay examenes registrados.'"></p>
             </li>
         </ul>
     </section>
@@ -965,6 +1101,53 @@
                 <p class="mt-1 text-xs text-muted" x-text="resumenInvitacion ? ((resumenInvitacion.examen?.tipo || 'Examen') + ' - ' + (resumenInvitacion.examen?.materias || []).join(', ')) : ''"></p>
                 <div class="mt-4">
                     <button type="button" @click="modalExitoInvitacion = false" class="inline-flex items-center justify-center rounded-base border border-transparent bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-strong">Aceptar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- Modal: confirmar la eliminacion del examen del curso. --}}
+    <div x-show="modalEliminar" x-cloak class="overflow-y-auto overflow-x-hidden fixed top-0 right-0 left-0 z-50 flex justify-center items-center w-full md:inset-0 h-full max-h-full bg-overlay-modal/50" @click.self="cerrarModalEliminar()" @keydown.escape.window="cerrarModalEliminar()">
+        <div class="relative p-4 w-full max-w-md max-h-full">
+            <div class="relative bg-neutral-primary-soft border border-default rounded-base shadow-sm p-4 md:p-6">
+                <div class="flex items-start justify-between gap-3 border-b border-default pb-4">
+                    <div>
+                        <h3 class="text-lg font-medium text-heading">Eliminar examen</h3>
+                        <p class="text-sm text-muted">El examen dejara de aparecer en la lista de este curso.</p>
+                    </div>
+                    <button type="button" @click="cerrarModalEliminar()" class="text-body bg-transparent hover:bg-neutral-tertiary hover:text-heading rounded-base text-sm w-9 h-9 ms-auto inline-flex justify-center items-center cursor-pointer">
+                        <svg class="w-5 h-5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18 17.94 6M18 18 6.06 6"/></svg>
+                        <span class="sr-only">Cerrar modal</span>
+                    </button>
+                </div>
+
+                <div class="py-4 space-y-3">
+                    <p class="text-sm text-body">Se eliminara el examen del curso. Esta accion no se puede deshacer.</p>
+                    <p class="text-sm font-semibold text-heading" x-text="examenEliminarSeleccionado?.nombre || ''"></p>
+                    <p x-show="errorEliminacion !== ''" x-text="errorEliminacion" class="text-sm text-fg-danger-strong"></p>
+                </div>
+
+                <div class="border-t border-default pt-4 flex flex-col gap-3 sm:flex-row sm:justify-end">
+                    <x-ui.button-cancelar class="w-full justify-center sm:w-auto" @click="cerrarModalEliminar()">Cancelar</x-ui.button-cancelar>
+                    <x-ui.button variant="danger" class="w-full justify-center sm:w-auto"
+                                 @click="confirmarEliminar()"
+                                 x-bind:disabled="eliminando"
+                                 x-bind:class="eliminando ? 'cursor-not-allowed opacity-50' : ''">
+                        <span x-text="eliminando ? 'Eliminando...' : 'Eliminar'"></span>
+                    </x-ui.button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{-- Modal de exito de eliminacion. --}}
+    <div x-show="exitoEliminacion" x-cloak class="overflow-y-auto overflow-x-hidden fixed top-0 right-0 left-0 z-50 flex justify-center items-center w-full md:inset-0 h-full max-h-full bg-overlay-modal/50" @click.self="exitoEliminacion = false" @keydown.escape.window="exitoEliminacion = false">
+        <div class="relative p-4 w-full max-w-md max-h-full">
+            <div class="relative bg-neutral-primary-soft border border-default rounded-base shadow-sm p-4 md:p-6 text-center">
+                <h3 class="text-lg font-medium text-heading">Examen eliminado con exito</h3>
+                <p class="mt-2 text-sm text-body">El examen ya no está en la lista de cursos.</p>
+                <div class="mt-4">
+                    <button type="button" @click="exitoEliminacion = false" class="inline-flex items-center justify-center rounded-base border border-transparent bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-strong">Aceptar</button>
                 </div>
             </div>
         </div>
