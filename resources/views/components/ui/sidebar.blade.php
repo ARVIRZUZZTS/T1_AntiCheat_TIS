@@ -6,6 +6,7 @@
     @updated 2026-10-24
     @updated 2026-11-08
     @updated 2026-11-15
+    @updated 2026-11-16
 
     @description
     Sidebar de navegacion del panel, en formato acordeon. Cada seccion
@@ -59,6 +60,8 @@
       de invitaciones pasa a la cabecera del grupo Invitaciones.
     - 2026-11-15  [Alex Candia]  feat: "Ver curso" se divide en "Ver estudiantes"
       y "Habilitar estudiantes"; Reportes pasa a grupo con sus tres reportes.
+    - 2026-11-16  [Alex Candia]  feat: subopción "Eliminar curso" debajo de
+      "Editar curso".
 --}}
 
 @props([
@@ -116,6 +119,7 @@
             ['label' => 'Habilitar estudiantes', 'route' => 'cursos.habilitar-estudiantes'],
             ['label' => 'Crear curso', 'route' => 'cursos.crear'],
             ['label' => 'Editar curso', 'route' => 'cursos.editar'],
+            ['label' => 'Eliminar curso', 'route' => 'cursos.eliminar'],
             ['label' => 'Cargar CSV', 'route' => 'cursos.cargar-csv'],
         ]],
         ['label' => 'Examenes', 'children' => [

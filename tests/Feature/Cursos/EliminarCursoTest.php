@@ -14,7 +14,8 @@
  * muestra el estado vacío.
  *
  * @changelog
- * - 2026-11-16  [Alex Candia]  test: eliminación de curso y conteo de afectados.
+ * - 2026-11-16  [Alex Candia]  test: eliminación de curso, conteo de afectados
+ *   y lista de la página "Eliminar curso".
  *
  * @see  App\Services\Curso\EliminarCursoService
  * @see  App\Services\Curso\ContarAfectadosCursoService
@@ -198,6 +199,16 @@ class EliminarCursoTest extends TestCase
                 'auxiliares' => 2,
                 'estudiantes' => 3,
             ]);
+    }
+
+    public function test_la_pagina_eliminar_lista_los_cursos_con_su_boton(): void
+    {
+        $this->actingAs(Usuario::findOrFail(self::DOCENTE))
+            ->get(route('cursos.eliminar'))
+            ->assertOk()
+            ->assertSee('Curso a eliminar')
+            ->assertSee('Eliminar curso')
+            ->assertDontSee('Curso de otro docente');
     }
 
     public function test_otro_docente_no_puede_eliminar_ni_consultar_el_curso(): void

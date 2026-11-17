@@ -13,10 +13,10 @@
  *
  * @description
  * Controlador HTTP de la sección Cursos del docente: la lista de sus cursos,
- * el formulario de alta ("Crear curso"), el alta y la eliminación del curso y
- * la vista de un curso con sus estudiantes y habilitaciones. Solo orquesta:
- * los datos los resuelven los Services y la pertenencia del curso la decide
- * CursoPolicy.
+ * el formulario de alta ("Crear curso"), el alta y la eliminación del curso,
+ * la página "Eliminar curso" y la vista de un curso con sus estudiantes y
+ * habilitaciones. Solo orquesta: los datos los resuelven los Services y la
+ * pertenencia del curso la decide CursoPolicy.
  *
  * Reemplaza a las closures de `/materias` y `/materias/{curso}` que vivían
  * en routes/web.php.
@@ -31,7 +31,8 @@
  *   habilitarEstudiantes; ambas páginas comparten selector de curso y muestran
  *   solo su sección.
  * - 2026-11-16  [Alex Candia]  feat: eliminación de un curso propio con el
- *   conteo previo de auxiliares y estudiantes afectados.
+ *   conteo previo de auxiliares y estudiantes afectados, y página con la lista
+ *   de cursos para eliminar (sin modal de confirmación todavía).
  *
  * @see  App\Services\Curso\ContarAfectadosCursoService
  * @see  App\Services\Curso\EliminarCursoService
@@ -41,6 +42,7 @@
  * @see  App\Services\Examen\ListarEstudiantesCursoConEstadoService
  * @see  App\Http\Requests\StoreCursoRequest
  * @see  App\Policies\CursoPolicy
+ * @see  resources/views/pages/curso-eliminar.blade.php
  */
 
 namespace App\Http\Controllers;
@@ -97,6 +99,28 @@ class CursoController extends Controller
         // vista de detalle, así que x-ui.page-header no muestra flecha de volver.
         return view('pages.curso-crear', [
             'gestiones' => $gestiones->ejecutar(),
+        ]);
+    }
+
+    /**
+     * Página "Eliminar curso": lista simple de todos los cursos del docente,
+     * cada uno con su botón "Eliminar curso". El modal de confirmación se
+     * integra en una iteración posterior.
+     *
+     * @param  Request  $request  Request con el docente autenticado.
+     * @return View Vista pages.curso-eliminar.
+     *
+     * @author Alex Candia
+     *
+     * @since  2026-11-16
+     */
+    public function eliminar(Request $request): View
+    {
+        return view('pages.curso-eliminar', [
+            'cursos' => Curso::query()
+                ->where('sis_doc', $request->user()->id_usuario)
+                ->orderBy('nombre_curso')
+                ->get(['id_curso', 'nombre_curso']),
         ]);
     }
 
