@@ -9,6 +9,7 @@ use App\Models\Curso;
 use App\Models\Examen;
 use App\Models\Usuario;
 use App\Services\Examen\ConfiguracionExamenDocenteService;
+use App\Services\Examen\EliminarExamenCursoService;
 use App\Services\Examen\VincularCursoExamenCompartidoService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -50,6 +51,34 @@ class ConfiguracionExamenDocenteController extends Controller
         return response()->json([
             'inscripciones_creadas' => $servicio->ejecutar($usuario, $examen, $curso),
         ]);
+    }
+
+    /**
+     * Elimina el examen del curso (desvinculación lógica). Solo el docente
+     * que gestiona el curso; el examen puede seguir en otros cursos.
+     *
+     * @param  Request  $request  Request con el docente autenticado.
+     * @param  Examen  $examen  Examen de la URL.
+     * @param  Curso  $curso  Curso de la URL.
+     * @param  EliminarExamenCursoService  $servicio  Servicio de eliminación.
+     * @return JsonResponse Mensaje de exito.
+     *
+     * @author OchoaCesar <cesareduardonick@gmail.com>
+     *
+     * @since  2026-11-16
+     */
+    public function desvincularCurso(
+        Request $request,
+        Examen $examen,
+        Curso $curso,
+        EliminarExamenCursoService $servicio,
+    ): JsonResponse {
+        $usuario = $request->user();
+        abort_unless($usuario instanceof Usuario, 401);
+
+        $servicio->ejecutar($usuario, $examen, $curso);
+
+        return response()->json(['mensaje' => 'Examen eliminado con exito']);
     }
 
     /** @return array<string, mixed> */

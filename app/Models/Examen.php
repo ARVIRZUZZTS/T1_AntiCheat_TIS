@@ -147,6 +147,12 @@ class Examen extends Model
         return $this->hasMany(RegistroAsistencia::class, 'id_examen');
     }
 
+    /** @return HasMany<CentralRiesgo, $this> */
+    public function incidencias(): HasMany
+    {
+        return $this->hasMany(CentralRiesgo::class, 'id_examen');
+    }
+
     /**
      * Tipo de examen del catálogo (`tipo_examen`). La clave foránea se pasa
      * explícita porque el nombre de la relación es `tipoExamen`: si se dejara
