@@ -9,16 +9,20 @@
  *
  * @description
  * Pruebas de la eliminación de un curso: el docente dueño puede borrarlo y se
- * limpian sus vínculos, el modal obtiene el conteo de auxiliares y estudiantes
- * afectados, otro docente no puede borrarlo y, al quedar sin cursos, la lista
- * muestra el estado vacío.
+ * limpian sus vínculos, sus exámenes se desvinculan con
+ * EliminarExamenCursoService, el modal obtiene el conteo de auxiliares y
+ * estudiantes afectados, otro docente no puede borrarlo y, al quedar sin
+ * cursos, la lista muestra el estado vacío.
  *
  * @changelog
  * - 2026-11-16  [Alex Candia]  test: eliminación de curso, conteo de afectados,
  *   lista de la página "Eliminar curso" y respuesta JSON del borrado.
+ * - 2026-11-16  [Alex Candia]  test: los exámenes del curso se eliminan con el
+ *   servicio de examen.
  *
  * @see  App\Services\Curso\EliminarCursoService
  * @see  App\Services\Curso\ContarAfectadosCursoService
+ * @see  App\Services\Examen\EliminarExamenCursoService
  * @see  App\Policies\CursoPolicy
  */
 
@@ -168,21 +172,22 @@ class EliminarCursoTest extends TestCase
         $this->assertDatabaseMissing('estudiante_curso', ['id_curso' => self::CURSO_PROPIO]);
         $this->assertDatabaseMissing('examen_curso', ['id_curso' => self::CURSO_PROPIO]);
 
-        // El examen compartido sigue vivo y conserva el vínculo con el otro curso.
+        // El servicio de examen borra la inscripción de este curso y desvincula
+        // el examen, pero respeta el vínculo con el otro curso que lo comparte.
+        $this->assertDatabaseMissing('estudiante_examen', [
+            'id_estudiante_examen' => self::ESTUDIANTE_EXAMEN,
+        ]);
         $this->assertDatabaseHas('examen', ['id_examen' => self::EXAMEN]);
         $this->assertDatabaseHas('examen_curso', [
             'id_examen' => self::EXAMEN,
             'id_curso' => self::CURSO_AJENO,
         ]);
 
-        // Las filas que pueden sobrevivir sin curso quedan sin id_curso.
-        $this->assertDatabaseHas('estudiante_examen', [
-            'id_estudiante_examen' => self::ESTUDIANTE_EXAMEN,
-            'id_curso' => null,
-        ]);
+        // Las incidencias pueden sobrevivir sin curso, pero no sin examen.
         $this->assertDatabaseHas('central_riesgo', [
             'id_registro' => self::INCIDENCIA,
             'id_curso' => null,
+            'id_examen' => self::EXAMEN,
         ]);
 
         $this->get(route('cursos'))

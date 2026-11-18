@@ -13,9 +13,11 @@
     afectados al endpoint `cursos.eliminar.afectados`, los muestra como
     advertencia y confirma con los botones Eliminar / Cancelar. Al confirmar
     envía DELETE a `cursos.destroy` con fetch, quita la fila de la lista y
-    muestra el aviso "Curso eliminado con exito" sin recargar la página. Si se
-    elimina el último curso, la lista muestra "No tienes cursos registrados".
-    Cancelar, la X, Esc o un clic fuera cierran el modal sin cambios.
+    muestra el aviso "Curso eliminado con exito" sin recargar la página. El
+    borrado también elimina los exámenes del curso con
+    EliminarExamenCursoService. Si se elimina el último curso, la lista muestra
+    "No tienes cursos registrados". Cancelar, la X, Esc o un clic fuera cierran
+    el modal sin cambios.
 
     @changelog
     - 2026-11-16  [Alex Candia]  feat: lista de cursos con botón de eliminación.
@@ -26,6 +28,7 @@
     @see  App\Http\Controllers\CursoController::afectados()
     @see  App\Http\Controllers\CursoController::destroy()
     @see  App\Services\Curso\EliminarCursoService
+    @see  App\Services\Examen\EliminarExamenCursoService
 --}}
 
 @extends('layouts.app')
@@ -278,6 +281,10 @@
 
                         <p class="text-sm text-fg-danger-strong">
                             Esta acción no se puede deshacer.
+                        </p>
+
+                        <p class="text-sm text-body">
+                            Los exámenes de este curso también se eliminarán.
                         </p>
 
                         <p x-show="cargandoAfectados" x-cloak class="text-sm text-body">

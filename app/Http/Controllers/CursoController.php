@@ -33,12 +33,15 @@
  * - 2026-11-16  [Alex Candia]  feat: eliminación de un curso propio con el
  *   conteo previo de auxiliares y estudiantes afectados, y página con la lista
  *   de cursos para eliminar (sin modal de confirmación todavía).
+ * - 2026-11-16  [Alex Candia]  feat: el borrado del curso elimina también sus
+ *   exámenes con EliminarExamenCursoService.
  *
  * @see  App\Services\Curso\ContarAfectadosCursoService
  * @see  App\Services\Curso\EliminarCursoService
  * @see  App\Services\Curso\ListarCursosDocenteService
  * @see  App\Services\Curso\ListarGestionesService
  * @see  App\Services\Curso\RegistrarCursoService
+ * @see  App\Services\Examen\EliminarExamenCursoService
  * @see  App\Services\Examen\ListarEstudiantesCursoConEstadoService
  * @see  App\Http\Requests\StoreCursoRequest
  * @see  App\Policies\CursoPolicy
@@ -49,6 +52,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreCursoRequest;
 use App\Models\Curso;
+use App\Models\Usuario;
 use App\Services\Curso\ContarAfectadosCursoService;
 use App\Services\Curso\EliminarCursoService;
 use App\Services\Curso\ListarCursosDocenteService;
@@ -179,7 +183,8 @@ class CursoController extends Controller
     /**
      * Elimina el curso propio y vuelve a la lista con el aviso de éxito. Si la
      * petición espera JSON (el modal de la página "Eliminar curso"), devuelve
-     * el mensaje para que la lista se actualice sin recargar.
+     * el mensaje para que la lista se actualice sin recargar. El servicio de
+     * curso se encarga de eliminar también los exámenes del curso.
      *
      * @param  Request  $request  Request de la eliminación.
      * @param  Curso  $curso  Curso de la URL.
@@ -199,7 +204,10 @@ class CursoController extends Controller
     ): RedirectResponse|JsonResponse {
         Gate::authorize('eliminar', $curso);
 
-        $servicio->ejecutar($curso);
+        $usuario = $request->user();
+        abort_unless($usuario instanceof Usuario, 401);
+
+        $servicio->ejecutar($usuario, $curso);
 
         if ($request->expectsJson()) {
             return response()->json(['mensaje' => 'Curso eliminado con exito']);
