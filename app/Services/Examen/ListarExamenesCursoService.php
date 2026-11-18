@@ -9,6 +9,7 @@
  *
  * @updated 2026-10-09
  * @updated 2026-11-14
+ * @updated 2026-11-16
  *
  * @description
  * Servicio de la feature Examen que lista los exámenes de un curso con la
@@ -44,6 +45,9 @@
  * - 2026-11-14  [Alex Candia]  feat: el mapeo de exámenes se comparte con el
  *   listado global del docente e incluye los cursos asociados y su nombre
  *   concatenado para mostrar el curso junto al tipo.
+ * - 2026-11-16  [OchoaCesar]  feat: el payload suma `incidencias` (conteo de
+ *   central_riesgo del examen) para que la vista bloquee la eliminacion sin
+ *   un viaje extra al servidor.
  */
 
 namespace App\Services\Examen;
@@ -88,6 +92,7 @@ class ListarExamenesCursoService
      *     duracion: int|null,
      *     inscritos: int,
      *     ingresados: int,
+     *     incidencias: int,
      *     ambientes: list<array{id: int, nombre: string}>,
      *     estado: string
      * }> Exámenes listos para la vista. `tipo` ya viene con el nombre legible
@@ -113,6 +118,7 @@ class ListarExamenesCursoService
                 'registrosAsistencia as ingresados' => function (Builder $consulta): Builder {
                     return $consulta->select(DB::raw('COUNT(DISTINCT id_estudiante)'));
                 },
+                'incidencias',
             ])
             ->get()
             ->map(fn (Examen $examen): array => $this->mapearExamen($examen, $ahora, $examenesInvitados))
@@ -168,6 +174,7 @@ class ListarExamenesCursoService
             'curso' => implode(', ', array_column($cursos, 'nombre')),
             'inscritos' => (int) $examen->getAttribute('estudiante_examenes_count'),
             'ingresados' => (int) $examen->getAttribute('ingresados'),
+            'incidencias' => (int) $examen->getAttribute('incidencias_count'),
             'ambientes' => $examen->ambientes
                 ->sortBy('id_ambiente')
                 ->map(fn (Ambiente $ambiente): array => [
