@@ -24,10 +24,17 @@
  *  2. El examen tiene ingresos (registro_asistencia) o incidencias
  *     (central_riesgo) registrados.
  *
+ * Eliminar un curso completo necesita desvincular sus exámenes aunque tengan
+ * historia; para ese caso el parámetro `$forzar` omite las dos guardas. El
+ * examen sigue vivo para otros cursos con los que se comparta.
+ *
  * @changelog
  * - 2026-11-16  [OchoaCesar]  feat: creación inicial del servicio.
+ * - 2026-11-16  [Alex Candia]  feat: parámetro $forzar para desvincular
+ *   exámenes desde la eliminación de un curso.
  *
  * @see  App\Http\Controllers\Api\ConfiguracionExamenDocenteController
+ * @see  App\Services\Curso\EliminarCursoService
  * @see  App\Services\Examen\ListarExamenesCursoService
  * @see  resources/views/partials/examenes-curso.blade.php
  */
@@ -60,14 +67,15 @@ class EliminarExamenCursoService
      * @param  Usuario  $docente  Docente autenticado (debe gestionar el curso).
      * @param  Examen  $examen  Examen a eliminar del curso.
      * @param  Curso  $curso  Curso del que se desvincula el examen.
+     * @param  bool  $forzar  Omitir las guardas de historia al borrar el curso completo.
      *
-     * @throws ValidationException Si el examen ya inició o tiene datos.
+     * @throws ValidationException Si el examen ya inició o tiene datos y no se fuerza.
      *
      * @author OchoaCesar <cesareduardonick@gmail.com>
      *
      * @since  2026-11-16
      */
-    public function ejecutar(Usuario $docente, Examen $examen, Curso $curso): void
+    public function ejecutar(Usuario $docente, Examen $examen, Curso $curso, bool $forzar = false): void
     {
         Gate::forUser($docente)->authorize('gestionar', $curso);
 
@@ -79,13 +87,13 @@ class EliminarExamenCursoService
             abort(404, 'El examen no pertenece a este curso.');
         }
 
-        if ($this->yaInicio($examen)) {
+        if (! $forzar && $this->yaInicio($examen)) {
             throw ValidationException::withMessages([
                 'eliminar' => self::MENSAJE_NO_INICIADO,
             ]);
         }
 
-        if ($this->tieneIngresosIncidencias($examen)) {
+        if (! $forzar && $this->tieneIngresosIncidencias($examen)) {
             throw ValidationException::withMessages([
                 'eliminar' => self::MENSAJE_CON_DATOS,
             ]);
