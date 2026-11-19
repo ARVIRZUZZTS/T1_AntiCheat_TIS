@@ -10,6 +10,7 @@
     @updated 2026-11-05
     @updated 2026-11-14
     @updated 2026-11-16
+    @updated 2026-11-19
 
     @description
     Parcial de la sección Exámenes. En la página única lista todos los exámenes
@@ -97,6 +98,8 @@
       cuando hay curso concreto, el modal de confirmación "Eliminar examen" y
       los mensajes de bloqueo (al presionar) y de exito. Con un curso elegido
       el estado vacío dice "No hay exámenes programados".
+    - 2026-11-19  [Valery D. Ortuno P]  style: las tarjetas de la lista (página
+      Eliminar examen) pierden el icono; nombre y etiquetas quedan solos.
 
     @see  App\Http\Controllers\Api\CursoExamenController
     @see  App\Http\Controllers\Api\ExamenDocenteController
@@ -749,11 +752,8 @@
         <ul class="flex flex-col gap-4" x-show="estado === 'listo'" x-cloak>
             <template x-for="examen in examenes" :key="examen.id">
                 <li class="flex flex-col gap-4 border border-default bg-neutral-primary-soft rounded-base shadow-xs px-5 py-6 sm:px-8 lg:flex-row lg:items-center lg:gap-6">
-                    {{-- Ícono, nombre con curso y estado. --}}
+                    {{-- Nombre con curso y estado. --}}
                     <div class="flex items-center gap-4 lg:w-72">
-                        <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-brand-softer text-fg-brand-strong">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-6 w-6" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>
-                        </div>
                         <div class="flex min-w-0 flex-col items-start gap-1">
                             <h3 class="text-xl font-bold text-heading" x-text="etiquetaExamen(examen)"></h3>
                             <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
