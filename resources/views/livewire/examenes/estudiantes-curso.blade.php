@@ -3,6 +3,7 @@
     @author  Diego Tejerina <josediegotejerinamolina@gmail.com>
     @created 2026-09-24
     @updated 2026-09-26
+    @updated 2026-11-19
 
     @description
     Vista del componente Livewire EstudiantesCurso: encabezado del curso,
@@ -34,6 +35,9 @@
       abajo); desde `lg:` sigue siendo la tabla de siempre, sin cambios. Los
       datos de la tarjeta salen de los mismos closures $badge/$avatar/
       $acciones que ya arma $filas, no hay lógica nueva.
+    - 2026-11-19  [Valery D. Ortuno P]  style: en modo habilitación ("Habilitar
+      estudiantes") el nombre va sin el avatar de iniciales, en la tabla y en
+      las tarjetas de mobile.
 --}}
 
 @php
@@ -133,7 +137,8 @@
                     default => null,
                 };
 
-                $avatarHtml = $avatar(
+                // En "Habilitar estudiantes" el nombre va sin avatar.
+                $avatarHtml = $this->modoHabilitacion ? '' : $avatar(
                     $nombreCompleto !== '' ? $nombreCompleto : 'na',
                     $tono,
                     'sm',
@@ -190,7 +195,7 @@
 
                 return [
                     'cardClass' => $cardClass,
-                    'avatarHtml' => $avatar($nombreCompleto !== '' ? $nombreCompleto : 'na', $tono, 'md', 'shrink-0'),
+                    'avatarHtml' => $this->modoHabilitacion ? '' : $avatar($nombreCompleto !== '' ? $nombreCompleto : 'na', $tono, 'md', 'shrink-0'),
                     'nombre' => $nombreCompleto,
                     'sis' => $estudiante['sis'] ?? '—',
                     'estadoHtml' => $badge($estudiante['estado'] ?? null, $estadoBadges, 'Sin estado', 'status-pendiente'),
