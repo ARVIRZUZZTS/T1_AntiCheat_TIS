@@ -20,8 +20,9 @@
     - 2026-11-18  [Alex Candia]  feat: listado propio de "Ver lista de examenes".
     - 2026-11-19  [Valery D. Ortuno P]  refactor: la lista es solo de consulta:
       sale "Eliminar" (queda en la página Eliminar examen) y el código de las
-      otras pestañas que no se usaba; entra "Ver detalle" con su modal. Se
-      quita el icono de la tarjeta.
+      otras pestañas que no se usaba; entra "Ver detalle" con su modal, con el
+      mismo formato que el detalle de la central de riesgos. Se quita el icono
+      de la tarjeta.
 
     @see  App\Http\Controllers\Api\ExamenDetalleController
     @see  resources/views/pages/examenes.blade.php
@@ -58,7 +59,7 @@
          examenes: [],
          estado: 'listo',
          peticion: 0,
-         // Modal "Ver detalle".
+         // Modal Ver detalle.
          modalDetalle: false,
          examenDetalle: null,
          detalle: null,
@@ -241,10 +242,12 @@
                     </div>
                 </div>
 
+                {{-- Mismo enlace que "Ver detalle" de la central de riesgos. --}}
                 <div class="flex shrink-0 justify-end">
-                    <x-ui.button variant="secondary" class="w-full justify-center sm:w-auto" @click="abrirDetalle(examen)">
-                        Ver detalle
-                    </x-ui.button>
+                    <button type="button" @click="abrirDetalle(examen)"
+                            class="cursor-pointer whitespace-nowrap border-0 bg-transparent p-0 text-xs font-bold text-fg-brand-strong hover:underline">
+                        Ver detalle ›
+                    </button>
                 </div>
             </li>
         </template>
@@ -255,101 +258,119 @@
         </li>
     </ul>
 
-    {{-- Modal "Ver detalle": datos del examen, reglas y materiales. --}}
+    {{-- Modal Ver detalle: mismo formato que el detalle de la central de
+         riesgos (titulo, recuadro destacado, etiquetas en mayuscula y
+         "Aceptar"), con los datos del examen, sus reglas y materiales. --}}
     <div x-show="modalDetalle" x-cloak
-         class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-overlay-modal/50 p-4"
+         class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/50 p-4"
          role="dialog" aria-modal="true" aria-labelledby="titulo-detalle-examen"
          @click.self="cerrarDetalle()" @keydown.escape.window="modalDetalle && cerrarDetalle()">
-        <div class="w-full max-w-2xl max-h-full overflow-y-auto rounded-base border border-default bg-neutral-primary-soft shadow-sm">
-            <div class="flex items-start justify-between gap-3 border-b border-default p-4 md:p-5">
-                <div class="min-w-0">
-                    <h3 id="titulo-detalle-examen" class="text-lg font-semibold text-heading wrap-break-word"
-                        x-text="examenDetalle ? etiquetaExamen(examenDetalle) : 'Detalle del examen'"></h3>
-                    <p class="text-sm text-muted" x-show="examenDetalle?.estado" x-text="examenDetalle?.estado"></p>
-                </div>
-                <button type="button" @click="cerrarDetalle()" class="shrink-0 text-body bg-transparent hover:bg-neutral-tertiary hover:text-heading rounded-base text-sm w-9 h-9 inline-flex justify-center items-center cursor-pointer">
-                    <svg class="w-5 h-5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18 17.94 6M18 18 6.06 6"/></svg>
-                    <span class="sr-only">Cerrar</span>
+        <div class="w-full max-w-lg rounded-xl border border-neutral-quaternary bg-neutral-primary-soft shadow-lg">
+            <div class="flex items-center gap-2 border-b border-neutral-quaternary px-4 py-3">
+                <h2 id="titulo-detalle-examen" class="min-w-0 flex-1 text-[15px] font-semibold text-fg-brand">
+                    Detalles del examen
+                </h2>
+
+                <button type="button" @click="cerrarDetalle()" aria-label="Cerrar detalles del examen"
+                        class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-body hover:bg-neutral-secondary-medium hover:text-heading focus:outline-none">
+                    <svg class="h-5 w-5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18 17.94 6M18 18 6.06 6"/></svg>
                 </button>
             </div>
 
-            <div class="p-4 md:p-5">
+            <div class="max-h-[65vh] space-y-4 overflow-y-auto p-4">
                 <p x-show="cargandoDetalle" class="py-6 text-center text-sm text-body">Cargando detalle...</p>
                 <p x-show="! cargandoDetalle && errorDetalle !== ''" x-text="errorDetalle" class="py-6 text-center text-sm text-fg-danger-strong"></p>
 
-                <div x-show="! cargandoDetalle && detalle" class="space-y-5">
-                    {{-- Datos generales. --}}
-                    <dl class="grid grid-cols-1 gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
-                        <div>
-                            <dt class="text-xs font-semibold uppercase text-muted">Tipo</dt>
-                            <dd class="mt-0.5 text-heading" x-text="detalle?.tipo || '—'"></dd>
+                <template x-if="! cargandoDetalle && detalle">
+                    <div class="space-y-4">
+                        <div class="rounded-xl border border-brand-subtle bg-brand-softer p-4">
+                            <p class="font-semibold text-fg-brand-strong wrap-break-word" x-text="etiquetaExamen(examenDetalle)"></p>
+                            <p class="mt-1 text-sm text-fg-brand">Creado por: <span x-text="detalle.creador || 'Sin registrar'"></span></p>
                         </div>
-                        <div>
-                            <dt class="text-xs font-semibold uppercase text-muted">Fecha</dt>
-                            <dd class="mt-0.5 text-heading" x-text="detalle?.fecha || '—'"></dd>
-                        </div>
-                        <div>
-                            <dt class="text-xs font-semibold uppercase text-muted">Horario</dt>
-                            <dd class="mt-0.5 text-heading" x-text="[detalle?.hora_inicio, detalle?.hora_fin].filter(Boolean).join(' - ') || '—'"></dd>
-                        </div>
-                        <div>
-                            <dt class="text-xs font-semibold uppercase text-muted">Duracion</dt>
-                            <dd class="mt-0.5 text-heading" x-text="detalle?.duracion ? detalle.duracion + ' minutos' : '—'"></dd>
-                        </div>
-                        <div>
-                            <dt class="text-xs font-semibold uppercase text-muted">Creado por</dt>
-                            <dd class="mt-0.5 text-heading" x-text="detalle?.creador || '—'"></dd>
-                        </div>
-                        <div>
-                            <dt class="text-xs font-semibold uppercase text-muted">Ingresos</dt>
-                            <dd class="mt-0.5 text-heading" x-text="examenDetalle?.ingresados ?? 0"></dd>
-                        </div>
-                        <div class="sm:col-span-2">
-                            <dt class="text-xs font-semibold uppercase text-muted">Ambientes</dt>
-                            <dd class="mt-0.5 text-heading" x-text="(detalle?.ambientes || []).join(', ') || 'Sin ambientes asignados'"></dd>
-                        </div>
-                    </dl>
 
-                    {{-- Cursos con su docente. --}}
-                    <section>
-                        <h4 class="text-sm font-semibold text-heading">Cursos</h4>
-                        <ul class="mt-2 space-y-1 text-sm text-body" x-show="(detalle?.cursos || []).length > 0">
-                            <template x-for="(cursoDetalle, indice) in (detalle?.cursos || [])" :key="indice">
-                                <li>
-                                    <span class="text-heading" x-text="cursoDetalle.nombre"></span>
-                                    <span x-show="cursoDetalle.docente" x-text="'(' + cursoDetalle.docente + ')'"></span>
-                                </li>
-                            </template>
-                        </ul>
-                        <p class="mt-2 text-sm text-muted" x-show="(detalle?.cursos || []).length === 0">Sin cursos asignados</p>
-                    </section>
-
-                    {{-- Reglas del examen. --}}
-                    <section>
-                        <h4 class="text-sm font-semibold text-heading">Reglas del examen</h4>
-                        <ol class="mt-2 list-decimal space-y-1 ps-5 text-sm text-body" x-show="(detalle?.normas || []).length > 0">
-                            <template x-for="(norma, indice) in (detalle?.normas || [])" :key="indice">
-                                <li class="wrap-break-word" x-text="norma"></li>
-                            </template>
-                        </ol>
-                        <p class="mt-2 text-sm text-muted" x-show="(detalle?.normas || []).length === 0">Sin reglas registradas</p>
-                    </section>
-
-                    {{-- Materiales permitidos. --}}
-                    <section>
-                        <h4 class="text-sm font-semibold text-heading">Materiales permitidos</h4>
-                        <ul class="mt-2 list-disc space-y-1 ps-5 text-sm text-body" x-show="(detalle?.materiales || []).length > 0">
-                            <template x-for="(material, indice) in (detalle?.materiales || [])" :key="indice">
-                                <li class="wrap-break-word" x-text="material"></li>
-                            </template>
-                        </ul>
-                        <p class="mt-2 text-sm text-muted" x-show="(detalle?.materiales || []).length === 0">Sin materiales permitidos</p>
-                    </section>
-                </div>
+                        <dl class="space-y-4 text-sm">
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <dt class="text-[10px] font-medium uppercase tracking-wider text-body">Tipo</dt>
+                                    <dd class="mt-1 font-medium text-heading" x-text="detalle.tipo || '—'"></dd>
+                                </div>
+                                <div>
+                                    <dt class="text-[10px] font-medium uppercase tracking-wider text-body">Estado</dt>
+                                    <dd class="mt-1">
+                                        <x-ui.badge type="gray" class="font-semibold" x-show="examenDetalle?.estado !== 'En curso' && examenDetalle?.estado !== 'Finalizado'"><span x-text="examenDetalle?.estado || 'Programado'"></span></x-ui.badge>
+                                        <x-ui.badge type="warning" class="font-semibold" x-show="examenDetalle?.estado === 'En curso'">En curso</x-ui.badge>
+                                        <x-ui.badge type="brand" class="font-semibold" x-show="examenDetalle?.estado === 'Finalizado'">Finalizado</x-ui.badge>
+                                    </dd>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <dt class="text-[10px] font-medium uppercase tracking-wider text-body">Fecha</dt>
+                                    <dd class="mt-1 font-medium text-heading" x-text="detalle.fecha || '—'"></dd>
+                                </div>
+                                <div>
+                                    <dt class="text-[10px] font-medium uppercase tracking-wider text-body">Horario</dt>
+                                    <dd class="mt-1 font-medium text-heading" x-text="[detalle.hora_inicio, detalle.hora_fin].filter(Boolean).join(' - ') || '—'"></dd>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <dt class="text-[10px] font-medium uppercase tracking-wider text-body">Duracion</dt>
+                                    <dd class="mt-1 font-medium text-heading" x-text="detalle.duracion ? detalle.duracion + ' minutos' : '—'"></dd>
+                                </div>
+                                <div>
+                                    <dt class="text-[10px] font-medium uppercase tracking-wider text-body">Ingresos</dt>
+                                    <dd class="mt-1 font-medium text-heading" x-text="examenDetalle?.ingresados ?? 0"></dd>
+                                </div>
+                            </div>
+                            <div>
+                                <dt class="text-[10px] font-medium uppercase tracking-wider text-body">Ambientes</dt>
+                                <dd class="mt-1 font-medium text-heading" x-text="detalle.ambientes.join(', ') || 'Sin ambientes asignados'"></dd>
+                            </div>
+                            <div>
+                                <dt class="text-[10px] font-medium uppercase tracking-wider text-body">Cursos</dt>
+                                <dd class="mt-1 text-heading">
+                                    <template x-for="(cursoDetalle, indice) in detalle.cursos" :key="indice">
+                                        <p class="font-medium">
+                                            <span x-text="cursoDetalle.nombre"></span>
+                                            <span class="font-normal text-body" x-show="cursoDetalle.docente" x-text="'(' + cursoDetalle.docente + ')'"></span>
+                                        </p>
+                                    </template>
+                                    <p class="font-medium" x-show="detalle.cursos.length === 0">Sin cursos asignados</p>
+                                </dd>
+                            </div>
+                            <div>
+                                <dt class="text-[10px] font-medium uppercase tracking-wider text-body">Reglas del examen</dt>
+                                <dd class="mt-1 text-heading">
+                                    <ol class="list-decimal space-y-1 ps-5" x-show="detalle.normas.length > 0">
+                                        <template x-for="(norma, indice) in detalle.normas" :key="indice">
+                                            <li class="wrap-break-word" x-text="norma"></li>
+                                        </template>
+                                    </ol>
+                                    <p class="font-medium" x-show="detalle.normas.length === 0">Sin reglas registradas</p>
+                                </dd>
+                            </div>
+                            <div>
+                                <dt class="text-[10px] font-medium uppercase tracking-wider text-body">Materiales permitidos</dt>
+                                <dd class="mt-1 text-heading">
+                                    <ul class="list-disc space-y-1 ps-5" x-show="detalle.materiales.length > 0">
+                                        <template x-for="(material, indice) in detalle.materiales" :key="indice">
+                                            <li class="wrap-break-word" x-text="material"></li>
+                                        </template>
+                                    </ul>
+                                    <p class="font-medium" x-show="detalle.materiales.length === 0">Sin materiales permitidos</p>
+                                </dd>
+                            </div>
+                        </dl>
+                    </div>
+                </template>
             </div>
 
-            <div class="flex justify-end border-t border-default p-4 md:p-5">
-                <x-ui.button class="w-full justify-center sm:w-auto" @click="cerrarDetalle()">Aceptar</x-ui.button>
+            <div class="flex flex-wrap justify-end gap-2 border-t border-neutral-quaternary px-4 py-3">
+                <button type="button" @click="cerrarDetalle()"
+                        class="inline-flex items-center justify-center rounded-base border border-transparent bg-brand px-4 py-2 text-sm font-medium text-white shadow-xs hover:bg-brand-strong focus:outline-none focus:ring-4 focus:ring-brand-medium">
+                    Aceptar
+                </button>
             </div>
         </div>
     </div>
