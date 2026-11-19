@@ -7,6 +7,8 @@
  *
  * @created 2026-10-12
  *
+ * @updated 2026-11-19
+ *
  * @description
  * Arma la lista de materias para `/materias` con las métricas de su examen
  * actual: inscritos, habilitados, deshabilitados e incidencias registradas
@@ -36,10 +38,15 @@
  * - 2026-10-21  [Alex Candia]  feat: parámetro opcional `$idsCursos` para
  *   acotar el listado a un subconjunto (usado por los reportes por usuario).
  *   Sin argumento conserva el comportamiento anterior (todos los cursos).
+ * - 2026-11-19  [Valery D. Ortuno P]  feat: cada fila trae `estudiantes`, los
+ *   inscritos del curso (en la misma consulta), para que Ver cursos lo muestre
+ *   aunque el curso no tenga un examen próximo. En Ver cursos las incidencias
+ *   cuentan solo las confirmadas (`tramposo`), como la central de riesgos.
  */
 
 namespace App\Services\Curso;
 
+use App\Enums\TipoInfraccion;
 use App\Models\Curso;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -55,6 +62,7 @@ class ListarMateriasConMetricasService
      * @return Collection<int, array{
      *     curso: Curso,
      *     inscritos: int,
+     *     estudiantes: int,
      *     habilitados: int,
      *     deshabilitados: int,
      *     incidencias: int,
@@ -68,6 +76,9 @@ class ListarMateriasConMetricasService
 
         if (! $proximoExamen) {
             $consulta->withCount(['estudiantes as inscritos']);
+        } else {
+            // Inscritos del curso, aparte de los del próximo examen.
+            $consulta->withCount(['estudiantes as total_estudiantes']);
         }
 
         if ($idsCursos !== null) {
@@ -91,6 +102,9 @@ class ListarMateriasConMetricasService
 
         $incidenciasPorCurso = DB::table('central_riesgo')
             ->whereIn('id_curso', $idsCurso)
+            // Ver cursos solo cuenta las confirmadas: una sospechosa sin
+            // revisar todavía puede rechazarse. Los reportes siguen igual.
+            ->when($proximoExamen, fn ($consulta) => $consulta->where('tipo_infraccion', TipoInfraccion::Tramposo->value))
             ->select('id_curso', DB::raw('count(*) as total'))
             ->groupBy('id_curso')
             ->pluck('total', 'id_curso');
@@ -102,6 +116,7 @@ class ListarMateriasConMetricasService
             return [
                 'curso' => $curso,
                 'inscritos' => $proximoExamen ? (int) $estados->sum('total') : (int) $curso->getAttribute('inscritos'),
+                'estudiantes' => (int) $curso->getAttribute($proximoExamen ? 'total_estudiantes' : 'inscritos'),
                 'habilitados' => (int) ($estados->get('habilitado')->total ?? 0),
                 'deshabilitados' => (int) ($estados->get('deshabilitado')->total ?? 0),
                 'incidencias' => (int) ($incidenciasPorCurso->get($curso->id_curso) ?? 0),
