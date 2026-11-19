@@ -9,7 +9,7 @@
 
     @description
     Lista de los cursos del docente autenticado: buscador + filtros (Todos /
-    Activos / Finalizados) y una card de ancho completo por curso con su
+    Activos / Archivados) y una card de ancho completo por curso con su
     gestion, el proximo examen (fecha y horario), los estudiantes inscritos y
     las incidencias. Es solo de consulta: las cards no se seleccionan. "Crear
     curso" y "Ver estudiantes" son subopciones del sidebar.
@@ -18,7 +18,7 @@
     examen y los cursos compartidos se manejan en la sección Exámenes.
 
     Los cursos llegan ordenados desde ListarCursosDocenteService: primero los
-    activos y abajo los finalizados (cursos pasados), cada grupo del más
+    activos y abajo los archivados (estado `Finalizo` en la base), cada grupo del más
     reciente al más antiguo.
 
     El grupo ya va dentro del nombre ("Calculo I - Grupo 2", ver Crear curso)
@@ -71,7 +71,8 @@
       metricas de habilitados / deshabilitados. "Inscritos" pasa a ser los
       estudiantes del curso (se ve aunque no haya examen proximo) e
       "Incidencias" cuenta solo las confirmadas de la central de riesgos.
-      Textos sin acentos.
+      "Finalizado" pasa a "Archivado" (filtro y estado; en la base sigue
+      `Finalizo`). Textos sin acentos.
 
     @see  App\Http\Controllers\CursoController
     @see  App\Services\Curso\ListarCursosDocenteService
@@ -99,7 +100,7 @@
                     return false;
                 }
 
-                if (this.filtro === 'finalizados' && activo) {
+                if (this.filtro === 'archivados' && activo) {
                     return false;
                 }
 
@@ -117,7 +118,7 @@
     >
         @php
             $totalActivos = $cursos->filter(fn ($fila) => $fila['curso']->estado === 'EnCurso')->count();
-            $totalFinalizados = $cursos->count() - $totalActivos;
+            $totalArchivados = $cursos->count() - $totalActivos;
 
             $pillBase = 'shrink-0 whitespace-nowrap inline-flex items-center justify-center box-border border focus:ring-4 shadow-xs font-medium leading-5 rounded-full focus:outline-none px-4 py-2.5 text-sm';
             $pillActiva = 'text-white bg-brand border-transparent hover:bg-brand-strong focus:ring-brand-medium';
@@ -152,8 +153,8 @@
                 <button type="button" class="{{ $pillBase }}" :aria-pressed="filtro === 'activos'" :class="filtro === 'activos' ? '{{ $pillActiva }}' : '{{ $pillInactiva }}'" @click="filtro = 'activos'">
                     Activos {{ $totalActivos }}
                 </button>
-                <button type="button" class="{{ $pillBase }}" :aria-pressed="filtro === 'finalizados'" :class="filtro === 'finalizados' ? '{{ $pillActiva }}' : '{{ $pillInactiva }}'" @click="filtro = 'finalizados'">
-                    Finalizados {{ $totalFinalizados }}
+                <button type="button" class="{{ $pillBase }}" :aria-pressed="filtro === 'archivados'" :class="filtro === 'archivados' ? '{{ $pillActiva }}' : '{{ $pillInactiva }}'" @click="filtro = 'archivados'">
+                    Archivados {{ $totalArchivados }}
                 </button>
             </div>
         </div>
@@ -188,7 +189,7 @@
                             <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5">
                                 <p class="font-semibold text-heading wrap-break-word">{{ $curso->nombre_curso }}</p>
                                 <x-ui.badge :type="$esActivo ? 'status-habilitado' : 'gray'">
-                                    {{ $esActivo ? 'Activo' : 'Finalizado' }}
+                                    {{ $esActivo ? 'Activo' : 'Archivado' }}
                                 </x-ui.badge>
                             </div>
                             <p class="mt-1 text-xs text-body">{{ $fila['gestion'] ?? 'Gestion no registrada' }}</p>

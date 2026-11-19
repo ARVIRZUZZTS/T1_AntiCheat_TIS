@@ -30,7 +30,7 @@
  * - 2026-11-19  [Valery D. Ortuno P]  test: los textos de la card van sin
  *   acentos ("Proximo examen:", "No hay examenes programados") y las
  *   incidencias del curso cuentan solo las confirmadas (una sospechosa no
- *   suma).
+ *   suma). El filtro "Finalizados" pasa a "Archivados".
  *
  * @see  App\Services\Curso\ListarCursosDocenteService
  */
@@ -216,7 +216,7 @@ class ListaCursosTest extends TestCase
             ->assertOk()
             ->assertSee('Todos 2')
             ->assertSee('Activos 1')
-            ->assertSee('Finalizados 1')
+            ->assertSee('Archivados 1')
             ->assertDontSee('Invitados')
             ->assertDontSee('Física')
             ->assertDontSee('Literatura')
