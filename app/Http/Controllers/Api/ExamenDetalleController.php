@@ -11,32 +11,30 @@
  * Endpoint del modal "Ver detalle" de Ver examenes: devuelve los datos del
  * examen, sus reglas y los materiales permitidos. Es de solo lectura; lo
  * puede ver quien lo creo, el docente de uno de sus cursos o el invitado que
- * acepto (ExamenPolicy::ver).
+ * acepto. El servicio revisa ese permiso en su misma consulta (403 si no), asi
+ * que aqui no se carga el examen por la ruta: cada consulta a la base remota
+ * pesa ~380 ms.
  *
  * @changelog
  * - 2026-11-19  [Valery D. Ortuno P]  feat: creacion inicial.
  *
  * @see  App\Services\Examen\ObtenerDetalleExamenService
- * @see  App\Policies\ExamenPolicy::ver()
  */
 
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Examen;
 use App\Services\Examen\ObtenerDetalleExamenService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Gate;
 
 class ExamenDetalleController extends Controller
 {
-    public function mostrar(Request $request, Examen $examen, ObtenerDetalleExamenService $servicio): JsonResponse
+    public function mostrar(Request $request, int $examen, ObtenerDetalleExamenService $servicio): JsonResponse
     {
-        Gate::authorize('ver', $examen);
+        $datos = $servicio->ejecutar($examen, (int) $request->user()->id_usuario);
+        abort_if($datos === null, 404);
 
-        return response()->json([
-            'datos' => $servicio->ejecutar($examen, (int) $request->user()->id_usuario),
-        ]);
+        return response()->json(['datos' => $datos]);
     }
 }
