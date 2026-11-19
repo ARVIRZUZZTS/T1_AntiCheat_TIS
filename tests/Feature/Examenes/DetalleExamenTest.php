@@ -169,6 +169,12 @@ class DetalleExamenTest extends TestCase
         $this->assertStringContainsString('Ver detalle', $parcial);
         $this->assertStringContainsString("route('api.examenes.detalle'", $parcial);
         $this->assertStringNotContainsString('abrirModalEliminar', $parcial);
+
+        // Una comilla doble dentro de x-data corta el atributo y Alpine no
+        // arma la lista (la pagina queda vacia).
+        $inicio = strpos($parcial, 'x-data="') + strlen('x-data="');
+        $xData = substr($parcial, $inicio, strpos($parcial, "\n     }\">", $inicio) - $inicio);
+        $this->assertStringNotContainsString('"', $xData);
         $this->assertStringNotContainsString('<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-6 w-6"', $parcial);
     }
 
