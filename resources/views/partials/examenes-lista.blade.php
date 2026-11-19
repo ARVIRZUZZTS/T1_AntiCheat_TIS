@@ -21,8 +21,12 @@
     - 2026-11-19  [Valery D. Ortuno P]  refactor: la lista es solo de consulta:
       sale "Eliminar" (queda en la página Eliminar examen) y el código de las
       otras pestañas que no se usaba; entra "Ver detalle" con su modal, con el
-      mismo formato que el detalle de la central de riesgos. Se quita el icono
-      de la tarjeta.
+      mismo formato que el detalle de la central de riesgos (docentes del
+      examen con sus cursos, tipo con mayuscula y reglas con viñetas). Se
+      quita el icono de la tarjeta.
+    - 2026-11-19  [Valery D. Ortuno P]  perf: el detalle abre al instante con
+      los datos de la tarjeta y solo espera docentes, reglas y materiales; se
+      pide al pasar el mouse por "Ver detalle" y queda guardado para reabrirlo.
 
     @see  App\Http\Controllers\Api\ExamenDetalleController
     @see  resources/views/pages/examenes.blade.php
@@ -66,6 +70,10 @@
          cargandoDetalle: false,
          errorDetalle: '',
          peticionDetalle: 0,
+         // Detalles ya traidos (por id) y pedidos en curso: reabrir un examen
+         // es instantaneo y pasar el mouse por el enlace adelanta la consulta.
+         detalles: {},
+         pedidos: {},
          get cursoContexto() {
              return this.cursoLista || this.cursoFijo;
          },
@@ -88,6 +96,7 @@
                      return;
                  }
                  this.examenes = cuerpo.datos ?? [];
+                 this.detalles = {};
                  this.estado = 'listo';
              } catch (error) {
                  if (peticion === this.peticion) {
@@ -98,8 +107,11 @@
          init() {
              this.cargar();
          },
+         tipoDe(examen) {
+             return examen?.tipo ? examen.tipo.charAt(0).toUpperCase() + examen.tipo.slice(1) : 'Sin tipo';
+         },
          etiquetaExamen(examen) {
-             return [examen.tipo || 'Sin tipo', examen.curso || '']
+             return [this.tipoDe(examen), examen.curso || '']
                  .filter(Boolean)
                  .join(' - ');
          },
@@ -116,32 +128,58 @@
          ambientesDe(examen) {
              return (examen.ambientes || []).map((ambiente) => ambiente.nombre).join(', ') || '—';
          },
-         async abrirDetalle(examen) {
-             const peticion = ++this.peticionDetalle;
-
-             this.examenDetalle = examen;
-             this.detalle = null;
-             this.errorDetalle = '';
-             this.cargandoDetalle = true;
-             this.modalDetalle = true;
-
-             try {
-                 const respuesta = await fetch(this.urlDetalle.replace('__ID__', examen.id), {
+         pedirDetalle(id) {
+             if (this.detalles[id]) {
+                 return Promise.resolve(this.detalles[id]);
+             }
+             if (! this.pedidos[id]) {
+                 this.pedidos[id] = fetch(this.urlDetalle.replace('__ID__', id), {
                      headers: { 'Accept': 'application/json' },
                      credentials: 'same-origin',
-                 });
-                 const cuerpo = await respuesta.json().catch(() => ({}));
-                 if (peticion !== this.peticionDetalle) {
-                     return;
+                 })
+                     .then(async (respuesta) => {
+                         const cuerpo = await respuesta.json().catch(() => ({}));
+                         if (! respuesta.ok) {
+                             throw new Error(cuerpo?.message || 'No se pudo cargar el detalle del examen.');
+                         }
+                         this.detalles[id] = cuerpo.datos;
+
+                         return cuerpo.datos;
+                     })
+                     .finally(() => {
+                         delete this.pedidos[id];
+                     });
+             }
+
+             return this.pedidos[id];
+         },
+         precargar(examen) {
+             this.pedirDetalle(String(examen.id)).catch(() => {});
+         },
+         async abrirDetalle(examen) {
+             const id = String(examen.id);
+             const peticion = ++this.peticionDetalle;
+
+             // El modal abre ya con los datos de la tarjeta; solo espera lo
+             // que la lista no trae (duracion, docentes, reglas y materiales).
+             this.examenDetalle = examen;
+             this.detalle = this.detalles[id] || null;
+             this.errorDetalle = '';
+             this.cargandoDetalle = this.detalle === null;
+             this.modalDetalle = true;
+
+             if (this.detalle !== null) {
+                 return;
+             }
+
+             try {
+                 const datos = await this.pedirDetalle(id);
+                 if (peticion === this.peticionDetalle) {
+                     this.detalle = datos;
                  }
-                 if (! respuesta.ok) {
-                     this.errorDetalle = cuerpo?.message || 'No se pudo cargar el detalle del examen.';
-                     return;
-                 }
-                 this.detalle = cuerpo.datos ?? null;
              } catch (error) {
                  if (peticion === this.peticionDetalle) {
-                     this.errorDetalle = 'No se pudo conectar con el servidor.';
+                     this.errorDetalle = error.message || 'No se pudo conectar con el servidor.';
                  }
              } finally {
                  if (peticion === this.peticionDetalle) {
@@ -244,7 +282,7 @@
 
                 {{-- Mismo enlace que "Ver detalle" de la central de riesgos. --}}
                 <div class="flex shrink-0 justify-end">
-                    <button type="button" @click="abrirDetalle(examen)"
+                    <button type="button" @click="abrirDetalle(examen)" @mouseenter="precargar(examen)" @focus="precargar(examen)"
                             class="cursor-pointer whitespace-nowrap border-0 bg-transparent p-0 text-xs font-bold text-fg-brand-strong hover:underline">
                         Ver detalle ›
                     </button>
@@ -278,91 +316,104 @@
             </div>
 
             <div class="max-h-[65vh] space-y-4 overflow-y-auto p-4">
-                <p x-show="cargandoDetalle" class="py-6 text-center text-sm text-body">Cargando detalle...</p>
-                <p x-show="! cargandoDetalle && errorDetalle !== ''" x-text="errorDetalle" class="py-6 text-center text-sm text-fg-danger-strong"></p>
+                {{-- Lo que ya trae la tarjeta se muestra al instante. --}}
+                <div class="rounded-xl border border-brand-subtle bg-brand-softer p-4">
+                    <p class="font-semibold text-fg-brand-strong wrap-break-word" x-text="examenDetalle ? etiquetaExamen(examenDetalle) : ''"></p>
+                    <p class="mt-1 text-sm text-fg-brand">Creado por: <span x-text="detalle ? (detalle.creador || 'Sin registrar') : '...'"></span></p>
+                </div>
 
-                <template x-if="! cargandoDetalle && detalle">
-                    <div class="space-y-4">
-                        <div class="rounded-xl border border-brand-subtle bg-brand-softer p-4">
-                            <p class="font-semibold text-fg-brand-strong wrap-break-word" x-text="etiquetaExamen(examenDetalle)"></p>
-                            <p class="mt-1 text-sm text-fg-brand">Creado por: <span x-text="detalle.creador || 'Sin registrar'"></span></p>
+                <dl class="space-y-4 text-sm">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <dt class="text-[10px] font-medium uppercase tracking-wider text-body">Tipo</dt>
+                            <dd class="mt-1 font-medium text-heading" x-text="tipoDe(examenDetalle)"></dd>
                         </div>
-
-                        <dl class="space-y-4 text-sm">
-                            <div class="grid grid-cols-2 gap-4">
-                                <div>
-                                    <dt class="text-[10px] font-medium uppercase tracking-wider text-body">Tipo</dt>
-                                    <dd class="mt-1 font-medium text-heading" x-text="detalle.tipo || '—'"></dd>
-                                </div>
-                                <div>
-                                    <dt class="text-[10px] font-medium uppercase tracking-wider text-body">Estado</dt>
-                                    <dd class="mt-1">
-                                        <x-ui.badge type="gray" class="font-semibold" x-show="examenDetalle?.estado !== 'En curso' && examenDetalle?.estado !== 'Finalizado'"><span x-text="examenDetalle?.estado || 'Programado'"></span></x-ui.badge>
-                                        <x-ui.badge type="warning" class="font-semibold" x-show="examenDetalle?.estado === 'En curso'">En curso</x-ui.badge>
-                                        <x-ui.badge type="brand" class="font-semibold" x-show="examenDetalle?.estado === 'Finalizado'">Finalizado</x-ui.badge>
-                                    </dd>
-                                </div>
-                            </div>
-                            <div class="grid grid-cols-2 gap-4">
-                                <div>
-                                    <dt class="text-[10px] font-medium uppercase tracking-wider text-body">Fecha</dt>
-                                    <dd class="mt-1 font-medium text-heading" x-text="detalle.fecha || '—'"></dd>
-                                </div>
-                                <div>
-                                    <dt class="text-[10px] font-medium uppercase tracking-wider text-body">Horario</dt>
-                                    <dd class="mt-1 font-medium text-heading" x-text="[detalle.hora_inicio, detalle.hora_fin].filter(Boolean).join(' - ') || '—'"></dd>
-                                </div>
-                            </div>
-                            <div class="grid grid-cols-2 gap-4">
-                                <div>
-                                    <dt class="text-[10px] font-medium uppercase tracking-wider text-body">Duracion</dt>
-                                    <dd class="mt-1 font-medium text-heading" x-text="detalle.duracion ? detalle.duracion + ' minutos' : '—'"></dd>
-                                </div>
-                                <div>
-                                    <dt class="text-[10px] font-medium uppercase tracking-wider text-body">Ingresos</dt>
-                                    <dd class="mt-1 font-medium text-heading" x-text="examenDetalle?.ingresados ?? 0"></dd>
-                                </div>
-                            </div>
-                            <div>
-                                <dt class="text-[10px] font-medium uppercase tracking-wider text-body">Ambientes</dt>
-                                <dd class="mt-1 font-medium text-heading" x-text="detalle.ambientes.join(', ') || 'Sin ambientes asignados'"></dd>
-                            </div>
-                            <div>
-                                <dt class="text-[10px] font-medium uppercase tracking-wider text-body">Cursos</dt>
-                                <dd class="mt-1 text-heading">
-                                    <template x-for="(cursoDetalle, indice) in detalle.cursos" :key="indice">
-                                        <p class="font-medium">
-                                            <span x-text="cursoDetalle.nombre"></span>
-                                            <span class="font-normal text-body" x-show="cursoDetalle.docente" x-text="'(' + cursoDetalle.docente + ')'"></span>
-                                        </p>
-                                    </template>
-                                    <p class="font-medium" x-show="detalle.cursos.length === 0">Sin cursos asignados</p>
-                                </dd>
-                            </div>
-                            <div>
-                                <dt class="text-[10px] font-medium uppercase tracking-wider text-body">Reglas del examen</dt>
-                                <dd class="mt-1 text-heading">
-                                    <ol class="list-decimal space-y-1 ps-5" x-show="detalle.normas.length > 0">
-                                        <template x-for="(norma, indice) in detalle.normas" :key="indice">
-                                            <li class="wrap-break-word" x-text="norma"></li>
-                                        </template>
-                                    </ol>
-                                    <p class="font-medium" x-show="detalle.normas.length === 0">Sin reglas registradas</p>
-                                </dd>
-                            </div>
-                            <div>
-                                <dt class="text-[10px] font-medium uppercase tracking-wider text-body">Materiales permitidos</dt>
-                                <dd class="mt-1 text-heading">
-                                    <ul class="list-disc space-y-1 ps-5" x-show="detalle.materiales.length > 0">
-                                        <template x-for="(material, indice) in detalle.materiales" :key="indice">
-                                            <li class="wrap-break-word" x-text="material"></li>
-                                        </template>
-                                    </ul>
-                                    <p class="font-medium" x-show="detalle.materiales.length === 0">Sin materiales permitidos</p>
-                                </dd>
-                            </div>
-                        </dl>
+                        <div>
+                            <dt class="text-[10px] font-medium uppercase tracking-wider text-body">Estado</dt>
+                            <dd class="mt-1">
+                                <x-ui.badge type="gray" class="font-semibold" x-show="examenDetalle?.estado !== 'En curso' && examenDetalle?.estado !== 'Finalizado'"><span x-text="examenDetalle?.estado || 'Programado'"></span></x-ui.badge>
+                                <x-ui.badge type="warning" class="font-semibold" x-show="examenDetalle?.estado === 'En curso'">En curso</x-ui.badge>
+                                <x-ui.badge type="brand" class="font-semibold" x-show="examenDetalle?.estado === 'Finalizado'">Finalizado</x-ui.badge>
+                            </dd>
+                        </div>
                     </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <dt class="text-[10px] font-medium uppercase tracking-wider text-body">Fecha</dt>
+                            <dd class="mt-1 font-medium text-heading" x-text="examenDetalle ? fechaDe(examenDetalle) : ''"></dd>
+                        </div>
+                        <div>
+                            <dt class="text-[10px] font-medium uppercase tracking-wider text-body">Horario</dt>
+                            <dd class="mt-1 font-medium text-heading" x-text="examenDetalle ? horario(examenDetalle) : ''"></dd>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <dt class="text-[10px] font-medium uppercase tracking-wider text-body">Duracion</dt>
+                            <dd class="mt-1 font-medium text-heading" x-text="detalle ? (detalle.duracion ? detalle.duracion + ' minutos' : '—') : '...'"></dd>
+                        </div>
+                        <div>
+                            <dt class="text-[10px] font-medium uppercase tracking-wider text-body">Ingresos</dt>
+                            <dd class="mt-1 font-medium text-heading" x-text="examenDetalle?.ingresados ?? 0"></dd>
+                        </div>
+                    </div>
+                    <div>
+                        <dt class="text-[10px] font-medium uppercase tracking-wider text-body">Ambientes</dt>
+                        <dd class="mt-1 font-medium text-heading" x-text="examenDetalle ? ambientesDe(examenDetalle) : ''"></dd>
+                    </div>
+                </dl>
+
+                {{-- Lo que llega del endpoint de detalle. --}}
+                <p x-show="cargandoDetalle" class="py-2 text-center text-sm text-body">Cargando docentes, reglas y materiales...</p>
+                <p x-show="! cargandoDetalle && errorDetalle !== ''" x-text="errorDetalle" class="py-2 text-center text-sm text-fg-danger-strong"></p>
+
+                <template x-if="detalle">
+                    <dl class="space-y-4 text-sm">
+                        {{-- Todos los docentes del examen (creador e invitados
+                             que aceptaron) con los cursos que vincularon. --}}
+                        <div>
+                            <dt class="text-[10px] font-medium uppercase tracking-wider text-body">Cursos y docentes</dt>
+                            <dd class="mt-1 space-y-2 text-heading">
+                                <template x-for="(participante, indice) in detalle.participantes" :key="indice">
+                                    <div>
+                                        <p class="font-medium">
+                                            <span x-text="participante.docente"></span>
+                                            <span class="font-normal text-body" x-text="'(' + participante.rol + ')'"></span>
+                                        </p>
+                                        <ul class="list-disc ps-5 text-body" x-show="participante.cursos.length > 0">
+                                            <template x-for="(nombreCurso, indiceCurso) in participante.cursos" :key="indiceCurso">
+                                                <li class="wrap-break-word" x-text="nombreCurso"></li>
+                                            </template>
+                                        </ul>
+                                        <p class="ps-5 text-body" x-show="participante.cursos.length === 0">Sin curso vinculado</p>
+                                    </div>
+                                </template>
+                                <p class="font-medium" x-show="detalle.participantes.length === 0">Sin docentes asignados</p>
+                            </dd>
+                        </div>
+                        <div>
+                            <dt class="text-[10px] font-medium uppercase tracking-wider text-body">Reglas del examen</dt>
+                            <dd class="mt-1 text-heading">
+                                <ul class="list-disc space-y-1 ps-5" x-show="detalle.normas.length > 0">
+                                    <template x-for="(norma, indice) in detalle.normas" :key="indice">
+                                        <li class="wrap-break-word" x-text="norma"></li>
+                                    </template>
+                                </ul>
+                                <p class="font-medium" x-show="detalle.normas.length === 0">Sin reglas registradas</p>
+                            </dd>
+                        </div>
+                        <div>
+                            <dt class="text-[10px] font-medium uppercase tracking-wider text-body">Materiales permitidos</dt>
+                            <dd class="mt-1 text-heading">
+                                <ul class="list-disc space-y-1 ps-5" x-show="detalle.materiales.length > 0">
+                                    <template x-for="(material, indice) in detalle.materiales" :key="indice">
+                                        <li class="wrap-break-word" x-text="material"></li>
+                                    </template>
+                                </ul>
+                                <p class="font-medium" x-show="detalle.materiales.length === 0">Sin materiales permitidos</p>
+                            </dd>
+                        </div>
+                    </dl>
                 </template>
             </div>
 
