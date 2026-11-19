@@ -35,6 +35,8 @@
  * - 2026-11-19  [Valery D. Ortuno P]  feat: cada ambiente trae `en_uso` (ya se
  *   usó en un examen), en la misma consulta, para que el selector solo ofrezca
  *   eliminar los que no se usaron.
+ * - 2026-11-19  [Valery D. Ortuno P]  refactor: se quita `en_uso` (ya no se
+ *   eliminan ambientes); la consulta vuelve a ser la de antes.
  */
 
 namespace App\Services\Ambiente;
@@ -46,23 +48,17 @@ class ListarAmbientesService
     /**
      * Ambientes del catálogo, ordenados por nombre, con su término de búsqueda.
      *
-     * @return list<array{id: int, nombre: string, termino: string, en_uso: bool}>
+     * @return list<array{id: int, nombre: string, termino: string}>
      */
     public function ejecutar(): array
     {
         return Ambiente::query()
             ->orderBy('nombre_ambiente')
-            ->select(['id_ambiente', 'nombre_ambiente'])
-            ->selectRaw(
-                'exists (select 1 from examen_ambiente ea where ea.id_ambiente = ambiente.id_ambiente)'
-                .' or exists (select 1 from estudiante_examen_ambiente eea where eea.id_ambiente = ambiente.id_ambiente) as en_uso'
-            )
-            ->get()
+            ->get(['id_ambiente', 'nombre_ambiente'])
             ->map(fn (Ambiente $ambiente): array => [
                 'id' => $ambiente->id_ambiente,
                 'nombre' => $ambiente->nombre_ambiente,
                 'termino' => mb_strtolower(trim($ambiente->nombre_ambiente)),
-                'en_uso' => (bool) $ambiente->getAttribute('en_uso'),
             ])
             ->values()
             ->all();

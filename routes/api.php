@@ -32,6 +32,8 @@
  *   examen para Ver examenes (GET /examenes/{examen}/detalle).
  * - 2026-11-19  [Valery D. Ortuno P]  feat: agregar y eliminar ambientes desde
  *   el selector de Crear / Editar examen (POST y DELETE /ambientes).
+ * - 2026-11-19  [Valery D. Ortuno P]  refactor: se quita DELETE /ambientes;
+ *   los ambientes solo se agregan.
  */
 
 use App\Http\Controllers\Api\AmbienteController;
@@ -133,15 +135,10 @@ Route::middleware(['web', 'auth:web'])->group(function (): void {
         ->name('api.reportes.horarios-ingreso.exportar');
 
     // Selector de ambientes de Crear / Editar examen: agregar uno que no esta
-    // en la lista y eliminar uno sugerido que aun no se uso en un examen.
+    // en la lista.
     Route::post('/ambientes', [AmbienteController::class, 'store'])
         ->middleware('docente')
         ->name('api.ambientes.crear');
-
-    Route::delete('/ambientes/{ambiente}', [AmbienteController::class, 'destroy'])
-        ->whereNumber('ambiente')
-        ->middleware('docente')
-        ->name('api.ambientes.eliminar');
 
     // Detalle de solo lectura de un examen (Ver examenes): datos, reglas y
     // materiales permitidos con la configuracion del docente que lo consulta.

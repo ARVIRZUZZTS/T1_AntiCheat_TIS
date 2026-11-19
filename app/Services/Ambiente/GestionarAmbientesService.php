@@ -8,22 +8,19 @@
  * @created 2026-11-19
  *
  * @description
- * Alta y baja de ambientes desde el selector de Crear / Editar examen.
- *
- * - `crear`: arma el nombre con el tipo y el identificador ("Aula 625",
- *   "Laboratorio 3", "Auditorio Central"), igual que los ambientes que ya
- *   estan en la tabla, y rechaza uno que ya exista (sin distinguir
- *   mayusculas ni espacios de mas).
- * - `eliminar`: solo borra un ambiente que no se uso en ningun examen
- *   (`examen_ambiente`) ni en la asignacion de estudiantes
- *   (`estudiante_examen_ambiente`).
+ * Alta de ambientes desde el selector de Crear / Editar examen: `crear` arma
+ * el nombre con el tipo y el identificador ("Aula 625", "Laboratorio 3",
+ * "Auditorio Central"), igual que los ambientes que ya estan en la tabla, y
+ * rechaza uno que ya exista (sin distinguir mayusculas ni espacios de mas).
  *
  * El tipo va dentro del nombre, como en los datos existentes, asi que no hace
- * falta columna nueva. Tras cada cambio se olvida el catalogo cacheado de
+ * falta columna nueva. Tras el alta se olvida el catalogo cacheado de
  * CatalogosExamenService para que el formulario y su validacion lo vean.
  *
  * @changelog
  * - 2026-11-19  [Valery D. Ortuno P]  feat: creacion inicial.
+ * - 2026-11-19  [Valery D. Ortuno P]  refactor: se quita `eliminar`; los
+ *   ambientes solo se agregan.
  *
  * @see  App\Http\Controllers\Api\AmbienteController
  * @see  App\Services\Ambiente\ListarAmbientesService
@@ -32,7 +29,6 @@
 namespace App\Services\Ambiente;
 
 use App\Services\Examen\CatalogosExamenService;
-use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -59,12 +55,8 @@ class GestionarAmbientesService
 
     public const MENSAJE_DUPLICADO = 'Ese ambiente ya existe.';
 
-    public const MENSAJE_EN_USO = 'No se puede eliminar: el ambiente ya se uso en un examen.';
-
-    public const MENSAJE_NO_EXISTE = 'El ambiente ya no existe.';
-
     /**
-     * @return array{id: int, nombre: string, termino: string, en_uso: bool}
+     * @return array{id: int, nombre: string, termino: string}
      *
      * @throws ValidationException Si el tipo o el identificador no son validos o ya existe.
      */
@@ -113,46 +105,7 @@ class GestionarAmbientesService
 
         $this->olvidarCatalogo();
 
-        return ['id' => $id, 'nombre' => $nombre, 'termino' => mb_strtolower($nombre), 'en_uso' => false];
-    }
-
-    /**
-     * @throws ValidationException Si no existe o ya se uso en un examen.
-     */
-    public function eliminar(int $idAmbiente): void
-    {
-        DB::transaction(function () use ($idAmbiente): void {
-            $ambiente = DB::table('ambiente')
-                ->where('id_ambiente', $idAmbiente)
-                ->lockForUpdate()
-                ->selectRaw(
-                    'id_ambiente, '
-                    .'exists (select 1 from examen_ambiente ea where ea.id_ambiente = ambiente.id_ambiente)'
-                    .' or exists (select 1 from estudiante_examen_ambiente eea where eea.id_ambiente = ambiente.id_ambiente) as en_uso'
-                )
-                ->first();
-
-            if ($ambiente === null) {
-                throw ValidationException::withMessages(['ambiente' => self::MENSAJE_NO_EXISTE]);
-            }
-
-            if ((bool) $ambiente->en_uso) {
-                throw ValidationException::withMessages(['ambiente' => self::MENSAJE_EN_USO]);
-            }
-
-            try {
-                DB::table('ambiente')->where('id_ambiente', $idAmbiente)->delete();
-            } catch (QueryException $error) {
-                // Otra tabla lo referencia (llave foranea): se trata como en uso.
-                if ((string) $error->getCode() === '23503') {
-                    throw ValidationException::withMessages(['ambiente' => self::MENSAJE_EN_USO]);
-                }
-
-                throw $error;
-            }
-        });
-
-        $this->olvidarCatalogo();
+        return ['id' => $id, 'nombre' => $nombre, 'termino' => mb_strtolower($nombre)];
     }
 
     private function olvidarCatalogo(): void
