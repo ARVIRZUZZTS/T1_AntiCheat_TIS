@@ -2,13 +2,14 @@
     @file    curso-contenido.blade.php
     @author  OchoaCesar <cesareduardonick@gmail.com>
     @created 2026-11-15
+    @updated 2026-11-19
 
     @description
     Contenido de un curso (tarjetas de conteo + pestañas Estudiantes /
     Habilitaciones). Es el contenido original de pages/curso-detalle (OchoaCesar),
     extraído a un parcial para reutilizarlo también en las páginas "Ver
     estudiantes" y "Habilitar estudiantes" (select de curso + este contenido
-    debajo). Espera $curso y $conteos. Si llega $soloTab ('estudiantes' o
+    debajo). Espera $curso y, en el detalle, $conteos. Si llega $soloTab ('estudiantes' o
     'habilitacion'), oculta las pestañas y renderiza solo esa sección. El botón
     "Cargar CSV" enlaza a su página propia (subopción del sidebar), conservando
     el curso en el query.
@@ -23,6 +24,10 @@
       sección y evita cargar el componente Livewire que no se muestra.
     - 2026-11-16  [Alex Candia]  fix: el x-show del botón "Cargar CSV" va como
       atributo fijo (un @if dentro del tag x-ui.button rompía la vista).
+    - 2026-11-19  [Valery D. Ortuno P]  refactor: "Ver estudiantes" y
+      "Habilitar estudiantes" son solo la lista: sin tarjetas de conteo ni
+      "Cargar CSV" (que ya es su propia subopcion del sidebar). El detalle
+      sigue igual.
 
     @see  resources/views/pages/curso-detalle.blade.php
     @see  resources/views/pages/curso-ver.blade.php
@@ -31,9 +36,14 @@
 
 @php
     $soloTab = $soloTab ?? null;
-    $muestraCsv = $soloTab === null || $soloTab === 'estudiantes';
+    // Las paginas acotadas (Ver / Habilitar estudiantes) muestran solo la
+    // lista: los conteos del curso y "Cargar CSV" (subopcion propia del
+    // sidebar) quedan para el detalle.
+    $muestraConteos = $soloTab === null;
+    $muestraCsv = $soloTab === null;
 @endphp
 
+@if ($muestraConteos)
 {{-- Tarjetas de conteo: grid de 2 columnas en mobile y 4 en desktop. --}}
 <div class="grid grid-cols-2 gap-4 px-4 pt-4 sm:px-6 sm:pt-6 lg:grid-cols-4 lg:px-8">
     <x-ui.stat-card :value="$conteos['todos']" label="Inscritos" tone="brand">
@@ -63,6 +73,7 @@
         </x-slot:icon>
     </x-ui.stat-card>
 </div>
+@endif
 
 <div x-data="{ tab: @js($soloTab ?? 'estudiantes') }" class="mt-6">
     @php
@@ -72,21 +83,18 @@
     @endphp
 
     @if ($muestraCsv)
-        {{-- Fila única: pestañas con scroll horizontal propio y, a la derecha,
-             "Cargar CSV", que solo aplica a Estudiantes y lleva a su página. En
-             las páginas acotadas no hay pestañas: solo queda el botón. --}}
-        <div class="{{ $soloTab === null ? 'flex items-center justify-between gap-3' : 'flex justify-end' }} px-4 sm:px-6 lg:px-8">
-            @if ($soloTab === null)
-                <nav class="flex min-w-0 gap-2 overflow-x-auto" aria-label="Secciones del curso">
-                    <button type="button" @click="tab = 'estudiantes'" :class="tab === 'estudiantes' ? '{{ $tabActivo }}' : '{{ $tabInactivo }}'" class="{{ $tabClases }}">Estudiantes</button>
-                    <button type="button" @click="tab = 'habilitacion'" :class="tab === 'habilitacion' ? '{{ $tabActivo }}' : '{{ $tabInactivo }}'" class="{{ $tabClases }}">Habilitaciones</button>
-                </nav>
-            @endif
+        {{-- Fila única (solo en el detalle): pestañas con scroll horizontal
+             propio y, a la derecha, "Cargar CSV", que solo aplica a
+             Estudiantes y lleva a su página. --}}
+        <div class="flex items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
+            <nav class="flex min-w-0 gap-2 overflow-x-auto" aria-label="Secciones del curso">
+                <button type="button" @click="tab = 'estudiantes'" :class="tab === 'estudiantes' ? '{{ $tabActivo }}' : '{{ $tabInactivo }}'" class="{{ $tabClases }}">Estudiantes</button>
+                <button type="button" @click="tab = 'habilitacion'" :class="tab === 'habilitacion' ? '{{ $tabActivo }}' : '{{ $tabInactivo }}'" class="{{ $tabClases }}">Habilitaciones</button>
+            </nav>
 
             {{-- El x-show va fijo y no con @if dentro del tag: Blade no compila
                  directivas dentro de componentes y deja roto el archivo
-                 compilado. En "Ver estudiantes" el tab inicial ya es
-                 estudiantes; en "Habilitar" no se renderiza ($muestraCsv). --}}
+                 compilado. --}}
             <x-ui.button variant="tertiary" pill class="shrink-0"
                          x-show="tab === 'estudiantes'"
                          :href="route('cursos.cargar-csv', ['curso' => $curso->id_curso])">
@@ -98,14 +106,14 @@
 
     @if ($soloTab === null || $soloTab === 'estudiantes')
         {{-- Estudiantes: componente Livewire con los datos reales. --}}
-        <section x-show="tab === 'estudiantes'" x-cloak class="mt-4">
+        <section x-show="tab === 'estudiantes'" x-cloak class="{{ $muestraCsv ? 'mt-4' : '' }}">
             @livewire(\App\Livewire\Examenes\EstudiantesCurso::class, ['curso' => $curso, 'soloLectura' => true], key('estudiantes-'.$curso->id_curso))
         </section>
     @endif
 
     @if ($soloTab === null || $soloTab === 'habilitacion')
         {{-- Habilitaciones: el mismo componente con los modales de cambio de estado. --}}
-        <section x-show="tab === 'habilitacion'" x-cloak class="mt-4">
+        <section x-show="tab === 'habilitacion'" x-cloak class="{{ $muestraCsv ? 'mt-4' : '' }}">
             @livewire(\App\Livewire\Examenes\EstudiantesCurso::class, ['curso' => $curso, 'modoHabilitacion' => true], key('habilitacion-'.$curso->id_curso))
         </section>
     @endif
