@@ -35,9 +35,9 @@
       abajo); desde `lg:` sigue siendo la tabla de siempre, sin cambios. Los
       datos de la tarjeta salen de los mismos closures $badge/$avatar/
       $acciones que ya arma $filas, no hay lógica nueva.
-    - 2026-11-19  [Valery D. Ortuno P]  style: en modo habilitación ("Habilitar
-      estudiantes") el nombre va sin el avatar de iniciales, en la tabla y en
-      las tarjetas de mobile.
+    - 2026-11-19  [Valery D. Ortuno P]  style: el nombre del estudiante va sin
+      el avatar de iniciales ("Ver estudiantes" y "Habilitar estudiantes"), en
+      la tabla y en las tarjetas de mobile; se quita el closure $avatar.
 --}}
 
 @php
@@ -88,19 +88,6 @@
         ])->render();
     };
 
-    $avatar = function (string $nombre, string $tono, string $tamanio = 'sm', string $clase = 'shrink-0'): string {
-        static $cache = [];
-
-        return $cache[$nombre . '|' . $tono . '|' . $tamanio . '|' . $clase] ??= view('components.ui.avatar', [
-            'name' => $nombre,
-            'src' => null,
-            'size' => $tamanio,
-            'alt' => null,
-            'tone' => $tono,
-            'attributes' => new ComponentAttributeBag(['class' => $clase]),
-        ])->render();
-    };
-
     // Deshabilitado -> ofrece "Habilitar" (issue #25). Cualquier otro estado
     // (incluido null / sin fila todavia) -> ofrece "Deshabilitar" (issue #26),
     // igual que ya hacia antes de agregar el caso de #25.
@@ -121,15 +108,9 @@
     $filas = [];
     if ($entradasValidas) {
                 $filas = collect($this->estudiantes->items())
-                    ->map(function (array $estudiante, int $indice) use ($badge, $avatar, $acciones, $estadoBadges, $observacionBadges, $esDocente): array {
+                    ->map(function (array $estudiante, int $indice) use ($badge, $acciones, $estadoBadges, $observacionBadges, $esDocente): array {
                 $nombreCompleto = trim(($estudiante['nombre'] ?? '') . ' ' . ($estudiante['apellido'] ?? ''));
                 $observacion = $estudiante['observacion'] ?? null;
-
-                $tono = match ($observacion) {
-                    'sospechoso' => 'sospechoso',
-                    'tramposo' => 'tramposo',
-                    default => 'default',
-                };
 
                 $rowClass = match ($observacion) {
                     'sospechoso' => 'bg-status-en-revision-bg',
@@ -137,19 +118,11 @@
                     default => null,
                 };
 
-                // En "Habilitar estudiantes" el nombre va sin avatar.
-                $avatarHtml = $this->modoHabilitacion ? '' : $avatar(
-                    $nombreCompleto !== '' ? $nombreCompleto : 'na',
-                    $tono,
-                    'sm',
-                    'shrink-0'
-                );
-
                 $columnas = [
                     ['value' => (string) ($this->estudiantes->firstItem() + $indice)],
                     [
                         'heading' => true,
-                        'html' => '<span class="inline-flex items-center gap-3">' . $avatarHtml . '<span class="font-semibold text-heading">' . e($nombreCompleto) . '</span></span>',
+                        'html' => '<span class="font-semibold text-heading">' . e($nombreCompleto) . '</span>',
                     ],
                     ['html' => '<span class="font-mono">' . e($estudiante['sis'] ?? '—') . '</span>'],
                     ['html' => $badge($estudiante['estado'] ?? null, $estadoBadges, 'Sin estado', 'status-pendiente')],
@@ -171,21 +144,15 @@
     }
 
     // Mismos datos que $filas, para las tarjetas de mobile (misma info que la
-    // tabla: avatar + nombre + SIS, badges de estado/observación, motivo y la
+    // tabla: nombre + SIS, badges de estado/observación, motivo y la
     // acción Habilitar/Deshabilitar), reutilizando los closures de arriba
-    // (su caché interna hace que repetir avatar/badge acá no sea costoso).
+    // (su caché interna hace que repetir badges acá no sea costoso).
     $tarjetas = [];
     if ($entradasValidas) {
         $tarjetas = collect($this->estudiantes->items())
-            ->map(function (array $estudiante) use ($badge, $avatar, $acciones, $estadoBadges, $observacionBadges, $esDocente): array {
+            ->map(function (array $estudiante) use ($badge, $acciones, $estadoBadges, $observacionBadges, $esDocente): array {
                 $nombreCompleto = trim(($estudiante['nombre'] ?? '') . ' ' . ($estudiante['apellido'] ?? ''));
                 $observacion = $estudiante['observacion'] ?? null;
-
-                $tono = match ($observacion) {
-                    'sospechoso' => 'sospechoso',
-                    'tramposo' => 'tramposo',
-                    default => 'default',
-                };
 
                 $cardClass = match ($observacion) {
                     'sospechoso' => 'bg-status-en-revision-bg',
@@ -195,7 +162,6 @@
 
                 return [
                     'cardClass' => $cardClass,
-                    'avatarHtml' => $this->modoHabilitacion ? '' : $avatar($nombreCompleto !== '' ? $nombreCompleto : 'na', $tono, 'md', 'shrink-0'),
                     'nombre' => $nombreCompleto,
                     'sis' => $estudiante['sis'] ?? '—',
                     'estadoHtml' => $badge($estudiante['estado'] ?? null, $estadoBadges, 'Sin estado', 'status-pendiente'),
@@ -304,12 +270,9 @@
                 <div class="space-y-3 lg:hidden">
                     @foreach ($tarjetas as $tarjeta)
                         <div class="{{ $tarjeta['cardClass'] }} border border-default rounded-base shadow-xs p-4">
-                            <div class="flex items-center gap-3">
-                                {!! $tarjeta['avatarHtml'] !!}
-                                <div class="min-w-0 flex-1">
-                                    <p class="font-semibold text-heading truncate">{{ $tarjeta['nombre'] }}</p>
-                                    <p class="text-sm text-muted">{{ $tarjeta['sis'] }}</p>
-                                </div>
+                            <div class="min-w-0">
+                                <p class="font-semibold text-heading truncate">{{ $tarjeta['nombre'] }}</p>
+                                <p class="text-sm text-muted">{{ $tarjeta['sis'] }}</p>
                             </div>
 
                             <div class="mt-3 flex flex-wrap items-center gap-2">
