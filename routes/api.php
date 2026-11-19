@@ -30,8 +30,11 @@
  *   lógica con guardas de inicio y de ingresos/incidencias).
  * - 2026-11-19  [Valery D. Ortuno P]  feat: detalle de solo lectura de un
  *   examen para Ver examenes (GET /examenes/{examen}/detalle).
+ * - 2026-11-19  [Valery D. Ortuno P]  feat: agregar y eliminar ambientes desde
+ *   el selector de Crear / Editar examen (POST y DELETE /ambientes).
  */
 
+use App\Http\Controllers\Api\AmbienteController;
 use App\Http\Controllers\Api\AuxiliaresDocenteController;
 use App\Http\Controllers\Api\CentralRiesgoController;
 use App\Http\Controllers\Api\ConfiguracionExamenDocenteController;
@@ -128,6 +131,17 @@ Route::middleware(['web', 'auth:web'])->group(function (): void {
 
     Route::get('/reportes/horarios-ingreso/exportar', [ReporteHorarioIngresoController::class, 'exportar'])
         ->name('api.reportes.horarios-ingreso.exportar');
+
+    // Selector de ambientes de Crear / Editar examen: agregar uno que no esta
+    // en la lista y eliminar uno sugerido que aun no se uso en un examen.
+    Route::post('/ambientes', [AmbienteController::class, 'store'])
+        ->middleware('docente')
+        ->name('api.ambientes.crear');
+
+    Route::delete('/ambientes/{ambiente}', [AmbienteController::class, 'destroy'])
+        ->whereNumber('ambiente')
+        ->middleware('docente')
+        ->name('api.ambientes.eliminar');
 
     // Detalle de solo lectura de un examen (Ver examenes): datos, reglas y
     // materiales permitidos con la configuracion del docente que lo consulta.
