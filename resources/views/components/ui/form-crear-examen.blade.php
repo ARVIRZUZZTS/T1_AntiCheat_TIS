@@ -184,6 +184,11 @@
       la lista se puede agregar (aula, laboratorio o auditorio) y queda elegido;
       los ambientes sugeridos que aun no se usaron en un examen se pueden
       eliminar, con confirmacion. Usa POST y DELETE /api/ambientes.
+    - 2026-11-19  [Valery D. Ortuno P]  refactor: se quita eliminar ambientes;
+      solo se agregan los que no estan registrados.
+    - 2026-11-19  [Valery D. Ortuno P]  style: el boton para quitar un ambiente
+      elegido vuelve a ser el icono de papelera (el texto "Descartar" era de
+      bb6221b).
 
     @see  resources/views/pages/examen-crear.blade.php
     @see  App\Enums\TipoExamen
@@ -265,17 +270,14 @@
         duracion: @js(old('duracion', '')),
         busquedaAmbiente: '',
         indiceAmbientes: [],
-        // Agregar un ambiente que no esta en la lista / eliminar uno sin uso.
+        // Agregar un ambiente que no esta en la lista.
         urlCrearAmbiente: @js(route('api.ambientes.crear')),
-        urlEliminarAmbiente: @js(route('api.ambientes.eliminar', ['ambiente' => '__ID__'])),
         tiposAmbiente: @js(\App\Services\Ambiente\GestionarAmbientesService::TIPOS),
         nuevoAmbienteAbierto: false,
         nuevoAmbienteTipo: 'aula',
         nuevoAmbienteNombre: '',
         guardandoAmbiente: false,
         errorAmbiente: '',
-        ambienteAEliminar: null,
-        eliminandoAmbiente: false,
         ambientesElegidos: @js($ambientesElegidos),
         listaAbierta: false,
         indiceResaltado: -1,
@@ -706,44 +708,6 @@
             }
         },
 
-        async eliminarAmbiente(ambiente) {
-            if (this.eliminandoAmbiente) {
-                return;
-            }
-
-            this.eliminandoAmbiente = true;
-            this.errorAmbiente = '';
-
-            try {
-                const respuesta = await fetch(this.urlEliminarAmbiente.replace('__ID__', ambiente.id), {
-                    method: 'DELETE',
-                    credentials: 'same-origin',
-                    headers: {
-                        'Accept': 'application/json',
-                        'X-CSRF-TOKEN': this.csrfToken,
-                        'X-Requested-With': 'XMLHttpRequest',
-                    },
-                });
-                const cuerpo = await respuesta.json().catch(() => ({}));
-
-                if (! respuesta.ok) {
-                    this.errorAmbiente = cuerpo?.errors?.ambiente?.[0] || cuerpo?.message || 'No se pudo eliminar el ambiente.';
-                    // Lo usaron mientras tanto: ya no se ofrece eliminarlo.
-                    ambiente.en_uso = true;
-
-                    return;
-                }
-
-                this.indiceAmbientes = this.indiceAmbientes.filter((item) => item.id !== ambiente.id);
-                this.ambientesElegidos = this.ambientesElegidos.filter((item) => item.id !== ambiente.id);
-            } catch (error) {
-                this.errorAmbiente = 'No se pudo conectar con el servidor.';
-            } finally {
-                this.eliminandoAmbiente = false;
-                this.ambienteAEliminar = null;
-            }
-        },
-
         agregarAmbiente(id) {
             const ambiente = this.indiceAmbientes.find((item) => item.id === id);
 
@@ -920,35 +884,16 @@
                 x-show="listaAbierta" x-cloak
                 class="mt-2 max-h-40 overflow-y-auto rounded-base border border-default divide-y divide-default">
                 <template x-for="(ambiente, posicion) in ambientesVisibles()" :key="ambiente.id">
-                    <li class="flex items-center gap-1 pe-1"
-                        :class="posicion === indiceResaltado ? 'bg-neutral-secondary-medium' : ''">
+                    <li>
                         <button type="button" role="option"
                                 :aria-selected="posicion === indiceResaltado"
                                 @click="agregarAmbiente(ambiente.id)"
-                                class="flex min-w-0 flex-1 items-center justify-between gap-2 px-3 py-2.5 text-start text-sm hover:bg-neutral-secondary-medium focus:outline-none focus:ring-2 focus:ring-brand-medium"
-                                :class="posicion === indiceResaltado ? 'text-heading' : 'text-body'">
+                                class="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-start text-sm hover:bg-neutral-secondary-medium focus:outline-none focus:ring-2 focus:ring-brand-medium"
+                                :class="posicion === indiceResaltado ? 'bg-neutral-secondary-medium text-heading' : 'text-body'">
                             <span class="truncate" x-text="ambiente.nombre"></span>
                             <svg class="w-4 h-4 shrink-0 text-fg-brand" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v14m7-7H5"/></svg>
                         </button>
 
-                        {{-- Solo los que aun no se usaron en un examen se pueden
-                             eliminar, y piden confirmacion en la misma fila. --}}
-                        <template x-if="! ambiente.en_uso && ambienteAEliminar !== ambiente.id">
-                            <button type="button" @click.stop="ambienteAEliminar = ambiente.id; errorAmbiente = ''"
-                                    class="shrink-0 inline-flex h-8 w-8 items-center justify-center rounded-base text-body hover:bg-danger-soft hover:text-fg-danger-strong focus:outline-none focus:ring-2 focus:ring-danger-medium"
-                                    :aria-label="'Eliminar ' + ambiente.nombre" title="Eliminar ambiente">
-                                <svg class="w-4 h-4" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 7h14m-9 3v8m4-8v8M10 3h4a1 1 0 0 1 1 1v3H9V4a1 1 0 0 1 1-1ZM6 7h12v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V7Z"/></svg>
-                            </button>
-                        </template>
-                        <template x-if="ambienteAEliminar === ambiente.id">
-                            <span class="flex shrink-0 items-center gap-1 text-xs">
-                                <span class="text-fg-danger-strong">Eliminar?</span>
-                                <button type="button" @click.stop="eliminarAmbiente(ambiente)" :disabled="eliminandoAmbiente"
-                                        class="rounded-base bg-danger px-2 py-1 font-medium text-white hover:bg-danger-strong disabled:opacity-50">Si</button>
-                                <button type="button" @click.stop="ambienteAEliminar = null"
-                                        class="rounded-base border border-default px-2 py-1 font-medium text-body hover:bg-neutral-secondary-medium">No</button>
-                            </span>
-                        </template>
                     </li>
                 </template>
 
@@ -1006,9 +951,10 @@
                     <li class="flex items-center justify-between gap-2 px-3 py-2 rounded-base border border-default bg-neutral-secondary-soft">
                         <span class="truncate text-sm text-heading" x-text="ambiente.nombre"></span>
                         <button type="button" @click="quitarAmbiente(ambiente.id)"
-                                class="shrink-0 inline-flex items-center justify-center h-9 px-3 rounded-base text-body hover:text-fg-danger hover:bg-neutral-secondary-medium focus:outline-none focus:ring-2 focus:ring-danger-medium"
-                                :aria-label="'Descartar ' + ambiente.nombre">
-                            Descartar
+                                class="shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-base text-body hover:text-fg-danger hover:bg-neutral-secondary-medium focus:outline-none focus:ring-2 focus:ring-danger-medium"
+                                :aria-label="'Quitar ' + ambiente.nombre" title="Quitar ambiente">
+                            <svg class="w-4 h-4" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0 1 16.138 21H7.862a2 2 0 0 1-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 0 0-1-1H10a1 1 0 0 0-1 1v3M4 7h16"/></svg>
+                            <span class="sr-only" x-text="'Quitar ' + ambiente.nombre"></span>
                         </button>
                     </li>
                 </template>
