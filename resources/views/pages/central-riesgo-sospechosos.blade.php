@@ -15,13 +15,14 @@
     - 2026-11-09  [Alisson D. Alvarado]  feat: revisión de sospechosos del docente.
     - 2026-11-15  [Diego Tejerina]  refactor: se mueve a su propia página,
       separada de Incidencias.
+    - 2026-11-19  [Valery D. Ortuno P]  refactor: el titulo pasa a "Incidencias pendientes", como en el sidebar.
 
     @see  App\Livewire\CentralRiesgo\ListaEstudiantes
 --}}
 
 @extends('layouts.app')
 
-@section('title', 'Sospechosos')
+@section('title', 'Incidencias pendientes')
 
 @section('content')
     @livewire(\App\Livewire\CentralRiesgo\ListaEstudiantes::class, ['modo' => 'sospechosos'])

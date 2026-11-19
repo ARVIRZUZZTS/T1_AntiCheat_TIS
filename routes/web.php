@@ -17,6 +17,7 @@
  * @updated 2026-11-14
  * @updated 2026-11-15
  * @updated 2026-11-16
+ * @updated 2026-11-19
  *
  * @description
  * Definición de rutas web del panel. Incluye vistas estáticas y componentes Livewire.
@@ -90,6 +91,9 @@
  * - 2026-11-16  [Alex Candia]  feat: endpoints para eliminar un curso propio y
  *   consultar los auxiliares y estudiantes afectados antes de borrarlo; página
  *   "Eliminar curso" con la lista de cursos (sin modal todavía).
+ * - 2026-11-19  [Valery D. Ortuno P]  feat: marcadores "Editar auxiliar" y
+ *   "Eliminar auxiliar" (pagina en desarrollo) para el menu de Auxiliares, y
+ *   pagina "Eliminar examen" (/examenes/eliminar).
  */
 
 use App\Http\Controllers\AuthController;
@@ -134,6 +138,15 @@ Route::view('/auxiliares/asignar', 'pages.en-desarrollo', [
 // Auxiliares · Crear: el alta de auxiliar como pagina propia (antes era un
 // modal dentro de GestionAuxiliares). Al guardar vuelve a la lista.
 Route::get('/auxiliares/crear', CrearAuxiliar::class)->name('auxiliares.crear');
+// Auxiliares · Editar / Eliminar: marcadores hasta que se implementen.
+Route::view('/auxiliares/editar', 'pages.en-desarrollo', [
+    'titulo' => 'Editar auxiliar',
+    'descripcion' => 'La edicion de auxiliares esta en desarrollo.',
+])->name('auxiliares.editar');
+Route::view('/auxiliares/eliminar', 'pages.en-desarrollo', [
+    'titulo' => 'Eliminar auxiliar',
+    'descripcion' => 'La eliminacion de auxiliares esta en desarrollo.',
+])->name('auxiliares.eliminar');
 
 // Invitaciones: hoy un solo componente con pestanhas Enviar/Recibir. Se
 // separa en dos subopciones; ambas sirven el mismo componente de momento y
@@ -254,6 +267,8 @@ Route::middleware(['auth', 'docente'])->group(function (): void {
     // a su pestaña (selector de examen + formulario/edicion y division por API).
     Route::get('/examenes/editar', [ExamenController::class, 'editarVista'])->name('examenes.editar');
     Route::get('/examenes/dividir', [ExamenController::class, 'dividirVista'])->name('examenes.dividir');
+    // Examenes · Eliminar: la lista con selector de curso y Eliminar por tarjeta.
+    Route::get('/examenes/eliminar', [ExamenController::class, 'eliminarVista'])->name('examenes.eliminar');
 
     // Alta de examen desde su formulario. La validación vive en
     // StoreExamenRequest y el alta en RegistrarExamenService.

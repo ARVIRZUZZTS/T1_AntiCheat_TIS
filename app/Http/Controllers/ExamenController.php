@@ -13,6 +13,7 @@
  * @updated 2026-10-26
  * @updated 2026-11-05
  * @updated 2026-11-14
+ * @updated 2026-11-19
  *
  * @description
  * Controlador HTTP de la sección Exámenes del docente. Solo orquesta:
@@ -50,6 +51,9 @@
  * - 2026-11-15  [Diego Tejerina]  feat: `crearFormulario` sirve la subopción
  *   "Crear examen" del sidebar: selector de curso + el formulario de alta que
  *   ya existe, sin depender del SPA de la página Exámenes.
+ * - 2026-11-19  [Valery D. Ortuno P]  feat: `eliminarVista` sirve la subopción
+ *   "Eliminar examen": el parcial acotado a la lista, con selector de curso y
+ *   el botón Eliminar de cada tarjeta.
  *
  * @see  StoreExamenRequest
  * @see  App\Services\Examen\CatalogosExamenService
@@ -241,6 +245,22 @@ class ExamenController extends Controller
         CatalogosExamenService $catalogos,
     ): View {
         return $this->seccionAcotada($request, $cursos, $catalogos, 'editar', 'pages.examenes-editar');
+    }
+
+    /**
+     * Subopción "Eliminar examen": el parcial acotado a la pestaña de lista,
+     * que con un curso elegido ofrece Eliminar en cada tarjeta (con su modal
+     * de confirmación y el bloqueo de exámenes ya iniciados).
+     *
+     * @author Valery D. Ortuno P <valerydariana98@gmail.com>
+     * @since  2026-11-19
+     */
+    public function eliminarVista(
+        Request $request,
+        ListarCursosDocenteService $cursos,
+        CatalogosExamenService $catalogos,
+    ): View {
+        return $this->seccionAcotada($request, $cursos, $catalogos, 'lista', 'pages.examenes-eliminar');
     }
 
     /**
