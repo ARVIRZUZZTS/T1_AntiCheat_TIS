@@ -7,12 +7,20 @@
  *
  * @created 2026-10-23
  *
+ * @updated 2026-11-19
+ *
  * @description Autoriza el reporte de horarios de ingreso de un examen a su
  * docente responsable o a un docente invitado que acepto la invitacion, y la
  * edicion de los datos base del examen solo a su creador.
  *
+ * @changelog
+ * - 2026-11-19  [Valery D. Ortuno P]  feat: `ver` autoriza el detalle de un
+ *   examen (Ver examenes) a quien lo creo, al docente de uno de sus cursos, al
+ *   invitado que acepto o a quien ya tiene su configuracion.
+ *
  * @see  App\Services\Reporte\ConsultarReporteHorarioIngresoService
  * @see  App\Http\Controllers\Api\ExamenEdicionController
+ * @see  App\Http\Controllers\Api\ExamenDetalleController
  */
 
 namespace App\Policies;
@@ -34,6 +42,29 @@ class ExamenPolicy
         return $examen->configuracionesDocentes()
             ->where('id_docente', $usuario->id_usuario)
             ->exists();
+    }
+
+    /**
+     * Ver el detalle del examen: el mismo alcance que el listado de "Ver
+     * examenes" (propios, de sus cursos o con invitacion aceptada).
+     */
+    public function ver(Usuario $usuario, Examen $examen): bool
+    {
+        if (! $usuario->roles()->where('nombre_rol', Rol::NOMBRE_DOCENTE)->exists()) {
+            return false;
+        }
+
+        if ((int) $examen->creador === (int) $usuario->id_usuario) {
+            return true;
+        }
+
+        return $examen->cursos()->where('curso.sis_doc', $usuario->id_usuario)->exists()
+            || $examen->configuracionesDocentes()->where('id_docente', $usuario->id_usuario)->exists()
+            || DB::table('invitacion_examen_compartido')
+                ->where('id_examen', $examen->id_examen)
+                ->where('id_docente_invitado', $usuario->id_usuario)
+                ->where('estado', 'aceptado')
+                ->exists();
     }
 
     public function monitorear(Usuario $usuario, Examen $examen): bool

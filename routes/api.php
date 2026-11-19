@@ -12,6 +12,7 @@
  * @updated 2026-11-05
  * @updated 2026-11-08
  * @updated 2026-11-16
+ * @updated 2026-11-19
  *
  * @description Rutas JSON del backend.
  *
@@ -27,6 +28,8 @@
  * - 2026-11-08  [Alisson D. Alvarado]  feat: ruta para sugerir nombres de usuario.
  * - 2026-11-16  [OchoaCesar]  feat: DELETE de examen por curso (desvinculación
  *   lógica con guardas de inicio y de ingresos/incidencias).
+ * - 2026-11-19  [Valery D. Ortuno P]  feat: detalle de solo lectura de un
+ *   examen para Ver examenes (GET /examenes/{examen}/detalle).
  */
 
 use App\Http\Controllers\Api\AuxiliaresDocenteController;
@@ -37,6 +40,7 @@ use App\Http\Controllers\Api\CursoExamenController;
 use App\Http\Controllers\Api\DetalleIncidenciaController;
 use App\Http\Controllers\Api\DividirExamenController;
 use App\Http\Controllers\Api\EstudianteExamenController;
+use App\Http\Controllers\Api\ExamenDetalleController;
 use App\Http\Controllers\Api\ExamenDocenteController;
 use App\Http\Controllers\Api\ExamenEdicionController;
 use App\Http\Controllers\Api\ExamenMonitoreoController;
@@ -124,6 +128,13 @@ Route::middleware(['web', 'auth:web'])->group(function (): void {
 
     Route::get('/reportes/horarios-ingreso/exportar', [ReporteHorarioIngresoController::class, 'exportar'])
         ->name('api.reportes.horarios-ingreso.exportar');
+
+    // Detalle de solo lectura de un examen (Ver examenes): datos, reglas y
+    // materiales permitidos con la configuracion del docente que lo consulta.
+    Route::get('/examenes/{examen}/detalle', [ExamenDetalleController::class, 'mostrar'])
+        ->whereNumber('examen')
+        ->middleware('docente')
+        ->name('api.examenes.detalle');
 
     Route::get('/examenes/{examen}/edicion', [ExamenEdicionController::class, 'mostrar'])
         ->whereNumber('examen')
