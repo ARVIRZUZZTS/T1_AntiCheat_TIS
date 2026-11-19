@@ -9,6 +9,7 @@
     @updated 2026-11-04
     @updated 2026-11-09
     @updated 2026-11-14
+    @updated 2026-11-19
 
     @description
     Componente UI Blade reutilizable con el formulario de alta de un examen en
@@ -179,6 +180,10 @@
       elige dentro del formulario. Recibe `cursos`, conserva el curso elegido
       tras un error de validación y mantiene el modo de solo lectura cuando no
       se pasa la lista (páginas de compatibilidad por curso).
+    - 2026-11-19  [Valery D. Ortuno P]  feat: si el ambiente buscado no esta en
+      la lista se puede agregar (aula, laboratorio o auditorio) y queda elegido;
+      los ambientes sugeridos que aun no se usaron en un examen se pueden
+      eliminar, con confirmacion. Usa POST y DELETE /api/ambientes.
 
     @see  resources/views/pages/examen-crear.blade.php
     @see  App\Enums\TipoExamen
@@ -260,6 +265,17 @@
         duracion: @js(old('duracion', '')),
         busquedaAmbiente: '',
         indiceAmbientes: [],
+        // Agregar un ambiente que no esta en la lista / eliminar uno sin uso.
+        urlCrearAmbiente: @js(route('api.ambientes.crear')),
+        urlEliminarAmbiente: @js(route('api.ambientes.eliminar', ['ambiente' => '__ID__'])),
+        tiposAmbiente: @js(\App\Services\Ambiente\GestionarAmbientesService::TIPOS),
+        nuevoAmbienteAbierto: false,
+        nuevoAmbienteTipo: 'aula',
+        nuevoAmbienteNombre: '',
+        guardandoAmbiente: false,
+        errorAmbiente: '',
+        ambienteAEliminar: null,
+        eliminandoAmbiente: false,
         ambientesElegidos: @js($ambientesElegidos),
         listaAbierta: false,
         indiceResaltado: -1,
@@ -614,6 +630,120 @@
             );
         },
 
+        // Hay que ofrecer agregar si lo buscado no coincide exacto con ninguno.
+        puedeAgregarAmbiente() {
+            const termino = this.busquedaAmbiente.trim().toLowerCase();
+
+            return termino !== '' && ! this.indiceAmbientes.some((ambiente) => ambiente.termino === termino);
+        },
+
+        nombreNuevoAmbiente() {
+            const identificador = this.nuevoAmbienteNombre.trim().replace(/\s+/g, ' ');
+
+            return identificador === '' ? '' : this.tiposAmbiente[this.nuevoAmbienteTipo] + ' ' + identificador;
+        },
+
+        // Si lo buscado empieza con el tipo (por ejemplo laboratorio 3) se
+        // separa: el tipo va al selector y el resto al identificador.
+        abrirNuevoAmbiente() {
+            const texto = this.busquedaAmbiente.trim().replace(/\s+/g, ' ');
+            const [primera, ...resto] = texto.split(' ');
+            const tipo = Object.keys(this.tiposAmbiente).find((clave) => clave === (primera || '').toLowerCase());
+
+            this.nuevoAmbienteTipo = tipo || 'aula';
+            this.nuevoAmbienteNombre = tipo ? resto.join(' ') : texto;
+            this.errorAmbiente = '';
+            this.nuevoAmbienteAbierto = true;
+            this.listaAbierta = false;
+            this.$nextTick(() => document.getElementById(this.idPrefijo + '_nuevo_ambiente_nombre')?.focus());
+        },
+
+        cerrarNuevoAmbiente() {
+            this.nuevoAmbienteAbierto = false;
+            this.errorAmbiente = '';
+        },
+
+        async guardarAmbiente() {
+            if (this.guardandoAmbiente) {
+                return;
+            }
+
+            this.guardandoAmbiente = true;
+            this.errorAmbiente = '';
+
+            try {
+                const respuesta = await fetch(this.urlCrearAmbiente, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': this.csrfToken,
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    body: JSON.stringify({ tipo: this.nuevoAmbienteTipo, nombre: this.nuevoAmbienteNombre }),
+                });
+                const cuerpo = await respuesta.json().catch(() => ({}));
+
+                if (! respuesta.ok) {
+                    const errores = cuerpo?.errors || {};
+                    this.errorAmbiente = errores.nombre?.[0] || errores.tipo?.[0] || cuerpo?.message || 'No se pudo agregar el ambiente.';
+
+                    return;
+                }
+
+                const nuevo = cuerpo.datos;
+                this.indiceAmbientes = this.indiceAmbientes
+                    .concat(nuevo)
+                    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { numeric: true }));
+                this.agregarAmbiente(nuevo.id);
+                this.nuevoAmbienteAbierto = false;
+                this.nuevoAmbienteNombre = '';
+            } catch (error) {
+                this.errorAmbiente = 'No se pudo conectar con el servidor.';
+            } finally {
+                this.guardandoAmbiente = false;
+            }
+        },
+
+        async eliminarAmbiente(ambiente) {
+            if (this.eliminandoAmbiente) {
+                return;
+            }
+
+            this.eliminandoAmbiente = true;
+            this.errorAmbiente = '';
+
+            try {
+                const respuesta = await fetch(this.urlEliminarAmbiente.replace('__ID__', ambiente.id), {
+                    method: 'DELETE',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': this.csrfToken,
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                });
+                const cuerpo = await respuesta.json().catch(() => ({}));
+
+                if (! respuesta.ok) {
+                    this.errorAmbiente = cuerpo?.errors?.ambiente?.[0] || cuerpo?.message || 'No se pudo eliminar el ambiente.';
+                    // Lo usaron mientras tanto: ya no se ofrece eliminarlo.
+                    ambiente.en_uso = true;
+
+                    return;
+                }
+
+                this.indiceAmbientes = this.indiceAmbientes.filter((item) => item.id !== ambiente.id);
+                this.ambientesElegidos = this.ambientesElegidos.filter((item) => item.id !== ambiente.id);
+            } catch (error) {
+                this.errorAmbiente = 'No se pudo conectar con el servidor.';
+            } finally {
+                this.eliminandoAmbiente = false;
+                this.ambienteAEliminar = null;
+            }
+        },
+
         agregarAmbiente(id) {
             const ambiente = this.indiceAmbientes.find((item) => item.id === id);
 
@@ -647,6 +777,11 @@
             const ambiente = this.ambientesVisibles()[this.indiceResaltado];
 
             if (! ambiente) {
+                // Enter sin sugerencia elegida: ofrece agregar lo buscado.
+                if (this.puedeAgregarAmbiente()) {
+                    this.abrirNuevoAmbiente();
+                }
+
                 return;
             }
 
@@ -785,22 +920,85 @@
                 x-show="listaAbierta" x-cloak
                 class="mt-2 max-h-40 overflow-y-auto rounded-base border border-default divide-y divide-default">
                 <template x-for="(ambiente, posicion) in ambientesVisibles()" :key="ambiente.id">
-                    <li>
+                    <li class="flex items-center gap-1 pe-1"
+                        :class="posicion === indiceResaltado ? 'bg-neutral-secondary-medium' : ''">
                         <button type="button" role="option"
                                 :aria-selected="posicion === indiceResaltado"
                                 @click="agregarAmbiente(ambiente.id)"
-                                class="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-start text-sm hover:bg-neutral-secondary-medium focus:outline-none focus:ring-2 focus:ring-brand-medium"
-                                :class="posicion === indiceResaltado ? 'bg-neutral-secondary-medium text-heading' : 'text-body'">
+                                class="flex min-w-0 flex-1 items-center justify-between gap-2 px-3 py-2.5 text-start text-sm hover:bg-neutral-secondary-medium focus:outline-none focus:ring-2 focus:ring-brand-medium"
+                                :class="posicion === indiceResaltado ? 'text-heading' : 'text-body'">
                             <span class="truncate" x-text="ambiente.nombre"></span>
                             <svg class="w-4 h-4 shrink-0 text-fg-brand" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v14m7-7H5"/></svg>
                         </button>
+
+                        {{-- Solo los que aun no se usaron en un examen se pueden
+                             eliminar, y piden confirmacion en la misma fila. --}}
+                        <template x-if="! ambiente.en_uso && ambienteAEliminar !== ambiente.id">
+                            <button type="button" @click.stop="ambienteAEliminar = ambiente.id; errorAmbiente = ''"
+                                    class="shrink-0 inline-flex h-8 w-8 items-center justify-center rounded-base text-body hover:bg-danger-soft hover:text-fg-danger-strong focus:outline-none focus:ring-2 focus:ring-danger-medium"
+                                    :aria-label="'Eliminar ' + ambiente.nombre" title="Eliminar ambiente">
+                                <svg class="w-4 h-4" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 7h14m-9 3v8m4-8v8M10 3h4a1 1 0 0 1 1 1v3H9V4a1 1 0 0 1 1-1ZM6 7h12v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V7Z"/></svg>
+                            </button>
+                        </template>
+                        <template x-if="ambienteAEliminar === ambiente.id">
+                            <span class="flex shrink-0 items-center gap-1 text-xs">
+                                <span class="text-fg-danger-strong">Eliminar?</span>
+                                <button type="button" @click.stop="eliminarAmbiente(ambiente)" :disabled="eliminandoAmbiente"
+                                        class="rounded-base bg-danger px-2 py-1 font-medium text-white hover:bg-danger-strong disabled:opacity-50">Si</button>
+                                <button type="button" @click.stop="ambienteAEliminar = null"
+                                        class="rounded-base border border-default px-2 py-1 font-medium text-body hover:bg-neutral-secondary-medium">No</button>
+                            </span>
+                        </template>
                     </li>
                 </template>
 
-                <li x-show="ambientesVisibles().length === 0" class="px-3 py-2.5 text-sm text-body">
+                <li x-show="ambientesVisibles().length === 0 && ! puedeAgregarAmbiente()" class="px-3 py-2.5 text-sm text-body">
                     No hay ambientes que coincidan con la busqueda.
                 </li>
+
+                {{-- Lo buscado no esta en la lista: se ofrece agregarlo. --}}
+                <li x-show="puedeAgregarAmbiente()">
+                    <button type="button" @click="abrirNuevoAmbiente()"
+                            class="flex w-full items-center gap-2 px-3 py-2.5 text-start text-sm font-medium text-fg-brand hover:bg-neutral-secondary-medium focus:outline-none focus:ring-2 focus:ring-brand-medium">
+                        <svg class="w-4 h-4 shrink-0" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v14m7-7H5"/></svg>
+                        <span class="truncate">Agregar <span class="font-semibold" x-text="busquedaAmbiente.trim()"></span> como nuevo ambiente</span>
+                    </button>
+                </li>
             </ul>
+
+            <p x-show="errorAmbiente !== '' && ! nuevoAmbienteAbierto" x-text="errorAmbiente" class="mt-1 text-sm text-fg-danger-strong"></p>
+
+            {{-- Alta de un ambiente que no esta en la lista. --}}
+            <div x-show="nuevoAmbienteAbierto" x-cloak class="mt-2 rounded-base border border-default bg-neutral-secondary-soft p-3">
+                <p class="text-sm font-medium text-heading">Nuevo ambiente</p>
+                <div class="mt-2 flex flex-col gap-2 sm:flex-row">
+                    <select x-model="nuevoAmbienteTipo" aria-label="Tipo de ambiente"
+                            class="block w-full sm:w-40 px-3 py-2.5 border text-sm rounded-base shadow-xs bg-neutral-secondary-medium border-default-medium text-heading focus:ring-brand focus:border-brand">
+                        <template x-for="(etiqueta, clave) in tiposAmbiente" :key="clave">
+                            <option :value="clave" x-text="etiqueta" :selected="clave === nuevoAmbienteTipo"></option>
+                        </template>
+                    </select>
+                    <input type="text" :id="idPrefijo + '_nuevo_ambiente_nombre'" x-model="nuevoAmbienteNombre"
+                           @keydown.enter.prevent="guardarAmbiente()" @keydown.escape="cerrarNuevoAmbiente()"
+                           maxlength="40" autocomplete="off" placeholder="Numero o nombre, ej. 625"
+                           aria-label="Numero o nombre del ambiente"
+                           class="block w-full min-w-0 flex-1 p-2.5 border border-default-medium bg-neutral-secondary-medium text-heading text-sm rounded-base focus:ring-brand focus:border-brand shadow-xs placeholder:text-body" />
+                </div>
+                <p class="mt-2 text-xs text-body" x-show="nombreNuevoAmbiente() !== ''">
+                    Se guardara como: <span class="font-semibold text-heading" x-text="nombreNuevoAmbiente()"></span>
+                </p>
+                <p x-show="errorAmbiente !== ''" x-text="errorAmbiente" class="mt-2 text-sm text-fg-danger-strong"></p>
+                <div class="mt-3 flex flex-col gap-2 sm:flex-row sm:justify-end">
+                    <button type="button" @click="cerrarNuevoAmbiente()"
+                            class="inline-flex items-center justify-center rounded-base border border-default px-4 py-2 text-sm font-medium text-body hover:bg-neutral-secondary-medium">
+                        Cancelar
+                    </button>
+                    <button type="button" @click="guardarAmbiente()" :disabled="guardandoAmbiente || nombreNuevoAmbiente() === ''"
+                            class="inline-flex items-center justify-center rounded-base bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-strong disabled:cursor-not-allowed disabled:opacity-50">
+                        <span x-text="guardandoAmbiente ? 'Agregando...' : 'Agregar ambiente'"></span>
+                    </button>
+                </div>
+            </div>
 
             {{-- Elegidos: cada uno con su papelera para sacarlo. --}}
             <ul class="mt-3 flex flex-col gap-2">
