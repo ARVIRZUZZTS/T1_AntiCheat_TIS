@@ -9,7 +9,8 @@
  *
  * @description
  * Pruebas del "Ver detalle" de Ver examenes: el endpoint devuelve los datos
- * del examen, sus cursos y ambientes, y las reglas y materiales permitidos
+ * del examen (tipo con mayuscula), sus ambientes, los docentes del examen con
+ * los cursos que vincularon, y las reglas y materiales permitidos
  * (catalogo y escritos a mano) de la configuracion del docente que consulta,
  * o los del examen si aun no tiene una. Solo lo ve quien lo creo, el docente
  * de uno de sus cursos o el invitado que acepto.
@@ -19,10 +20,11 @@
  *
  * @changelog
  * - 2026-11-19  [Valery D. Ortuno P]  test: creacion inicial.
+ * - 2026-11-19  [Valery D. Ortuno P]  test: docentes del examen con sus cursos,
+ *   examen inexistente (404) y permiso revisado por el servicio.
  *
  * @see App\Http\Controllers\Api\ExamenDetalleController
  * @see App\Services\Examen\ObtenerDetalleExamenService
- * @see App\Policies\ExamenPolicy::ver()
  */
 
 namespace Tests\Feature\Examenes;
@@ -69,15 +71,16 @@ class DetalleExamenTest extends TestCase
             ->assertOk()
             ->assertExactJson(['datos' => [
                 'id' => self::EXAMEN,
-                'tipo' => 'examen parcial',
+                'tipo' => 'Examen parcial',
                 'fecha' => '02/12/2026',
                 'hora_inicio' => '08:15',
                 'hora_fin' => '09:45',
                 'duracion' => 90,
                 'creador' => 'Roberto Silva',
-                'cursos' => [
-                    ['nombre' => 'Calculo I - Grupo 1', 'docente' => 'Roberto Silva'],
-                    ['nombre' => 'Calculo I - Grupo 2', 'docente' => 'Patricia Rojas'],
+                // Creador primero; despues el resto por nombre.
+                'participantes' => [
+                    ['docente' => 'Roberto Silva', 'rol' => 'Creador', 'cursos' => ['Calculo I - Grupo 1']],
+                    ['docente' => 'Patricia Rojas', 'rol' => 'Docente del curso', 'cursos' => ['Calculo I - Grupo 2']],
                 ],
                 'ambientes' => ['Aula 623', 'Aula 691B'],
                 // Catalogo primero y despues lo escrito a mano.
@@ -119,6 +122,25 @@ class DetalleExamenTest extends TestCase
             ->assertJsonPath('datos.id', self::EXAMEN);
     }
 
+    public function test_el_detalle_lista_a_los_invitados_aunque_no_vinculen_curso(): void
+    {
+        DB::table('invitacion_examen_compartido')->insert([
+            ['id_invitacion' => 1, 'id_docente_invitador' => self::ROBERTO,
+                'id_docente_invitado' => self::FERNANDO, 'id_examen' => self::EXAMEN, 'estado' => 'aceptado'],
+            ['id_invitacion' => 2, 'id_docente_invitador' => self::ROBERTO,
+                'id_docente_invitado' => self::PATRICIA, 'id_examen' => self::EXAMEN, 'estado' => 'aceptado'],
+        ]);
+
+        $this->actingAs(Usuario::findOrFail(self::FERNANDO))
+            ->getJson(route('api.examenes.detalle', ['examen' => self::EXAMEN]))
+            ->assertOk()
+            ->assertJsonPath('datos.participantes', [
+                ['docente' => 'Roberto Silva', 'rol' => 'Creador', 'cursos' => ['Calculo I - Grupo 1']],
+                ['docente' => 'Fernando Vargas', 'rol' => 'Invitado', 'cursos' => []],
+                ['docente' => 'Patricia Rojas', 'rol' => 'Invitado', 'cursos' => ['Calculo I - Grupo 2']],
+            ]);
+    }
+
     public function test_un_docente_ajeno_al_examen_no_lo_ve(): void
     {
         DB::table('invitacion_examen_compartido')->insert([
@@ -136,6 +158,13 @@ class DetalleExamenTest extends TestCase
         $this->actingAs(Usuario::findOrFail(self::AUXILIAR))
             ->getJson(route('api.examenes.detalle', ['examen' => self::EXAMEN]))
             ->assertForbidden();
+    }
+
+    public function test_un_examen_que_no_existe_da_404(): void
+    {
+        $this->actingAs(Usuario::findOrFail(self::ROBERTO))
+            ->getJson(route('api.examenes.detalle', ['examen' => 999]))
+            ->assertNotFound();
     }
 
     public function test_sin_sesion_no_hay_detalle(): void
@@ -157,7 +186,9 @@ class DetalleExamenTest extends TestCase
             ->assertJsonPath('datos.tipo', null)
             ->assertJsonPath('datos.fecha', null)
             ->assertJsonPath('datos.hora_fin', null)
-            ->assertJsonPath('datos.cursos', [])
+            ->assertJsonPath('datos.participantes', [
+                ['docente' => 'Roberto Silva', 'rol' => 'Creador', 'cursos' => []],
+            ])
             ->assertJsonPath('datos.normas', [])
             ->assertJsonPath('datos.materiales', []);
     }
