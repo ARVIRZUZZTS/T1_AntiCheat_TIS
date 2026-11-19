@@ -8,16 +8,18 @@
  * @created 2026-11-19
  *
  * @description
- * Pruebas del alta y la baja de ambientes desde el selector de Crear / Editar
- * examen: el nombre se arma con el tipo (aula, laboratorio o auditorio), no se
- * repite, entra al catalogo del formulario al instante, y solo se elimina un
- * ambiente que no se uso en un examen. Solo los docentes pueden hacerlo.
+ * Pruebas del alta de ambientes desde el selector de Crear / Editar examen:
+ * el nombre se arma con el tipo (aula, laboratorio o auditorio), no se repite
+ * y entra al catalogo del formulario al instante. Solo los docentes pueden
+ * agregar, y no hay ruta para eliminar.
  *
  * Usan SQLite en memoria con un esquema minimo, asi que no leen ni escriben en
  * la base de desarrollo.
  *
  * @changelog
  * - 2026-11-19  [Valery D. Ortuno P]  test: creacion inicial.
+ * - 2026-11-19  [Valery D. Ortuno P]  test: se quitan las pruebas de eliminar
+ *   (los ambientes solo se agregan).
  *
  * @see App\Services\Ambiente\GestionarAmbientesService
  * @see App\Http\Controllers\Api\AmbienteController
@@ -27,7 +29,6 @@ namespace Tests\Feature\Examenes;
 
 use App\Models\Usuario;
 use App\Services\Ambiente\GestionarAmbientesService;
-use App\Services\Ambiente\ListarAmbientesService;
 use App\Services\Examen\CatalogosExamenService;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Cache;
@@ -65,7 +66,7 @@ class GestionarAmbientesTest extends TestCase
             ->assertCreated()
             ->assertExactJson([
                 'mensaje' => 'Ambiente agregado',
-                'datos' => ['id' => 4, 'nombre' => 'Aula 625', 'termino' => 'aula 625', 'en_uso' => false],
+                'datos' => ['id' => 4, 'nombre' => 'Aula 625', 'termino' => 'aula 625'],
             ]);
 
         $this->assertDatabaseHas('ambiente', ['id_ambiente' => 4, 'nombre_ambiente' => 'Aula 625']);
@@ -128,56 +129,19 @@ class GestionarAmbientesTest extends TestCase
             ->assertJsonPath('errors.nombre.0', GestionarAmbientesService::MENSAJE_LARGO);
     }
 
-    public function test_el_listado_marca_los_ambientes_usados(): void
-    {
-        $lista = collect(app(ListarAmbientesService::class)->ejecutar())->keyBy('id');
-
-        $this->assertTrue($lista[1]['en_uso']);
-        $this->assertTrue($lista[2]['en_uso']);
-        $this->assertFalse($lista[3]['en_uso']);
-    }
-
-    public function test_elimina_un_ambiente_sin_uso(): void
+    public function test_no_hay_ruta_para_eliminar_ambientes(): void
     {
         $this->comoDocente()
-            ->deleteJson(route('api.ambientes.eliminar', ['ambiente' => 3]))
-            ->assertOk()
-            ->assertJsonPath('mensaje', 'Ambiente eliminado');
-
-        $this->assertDatabaseMissing('ambiente', ['id_ambiente' => 3]);
-    }
-
-    public function test_no_elimina_un_ambiente_usado_en_un_examen(): void
-    {
-        $this->comoDocente()
-            ->deleteJson(route('api.ambientes.eliminar', ['ambiente' => 1]))
-            ->assertUnprocessable()
-            ->assertJsonPath('errors.ambiente.0', GestionarAmbientesService::MENSAJE_EN_USO);
-
-        // Usado solo en la asignacion de estudiantes tambien cuenta.
-        $this->comoDocente()
-            ->deleteJson(route('api.ambientes.eliminar', ['ambiente' => 2]))
-            ->assertUnprocessable();
+            ->deleteJson('/api/ambientes/3')
+            ->assertNotFound();
 
         $this->assertSame(3, DB::table('ambiente')->count());
     }
 
-    public function test_eliminar_uno_que_no_existe_avisa(): void
-    {
-        $this->comoDocente()
-            ->deleteJson(route('api.ambientes.eliminar', ['ambiente' => 99]))
-            ->assertUnprocessable()
-            ->assertJsonPath('errors.ambiente.0', GestionarAmbientesService::MENSAJE_NO_EXISTE);
-    }
-
-    public function test_solo_un_docente_gestiona_ambientes(): void
+    public function test_solo_un_docente_agrega_ambientes(): void
     {
         $this->actingAs(Usuario::findOrFail(self::AUXILIAR))
             ->postJson(route('api.ambientes.crear'), ['tipo' => 'aula', 'nombre' => '625'])
-            ->assertForbidden();
-
-        $this->actingAs(Usuario::findOrFail(self::AUXILIAR))
-            ->deleteJson(route('api.ambientes.eliminar', ['ambiente' => 3]))
             ->assertForbidden();
 
         $this->assertSame(3, DB::table('ambiente')->count());
@@ -209,14 +173,6 @@ class GestionarAmbientesTest extends TestCase
             $tabla->integer('id_ambiente')->primary();
             $tabla->string('nombre_ambiente', 50);
         });
-        Schema::create('examen_ambiente', function (Blueprint $tabla): void {
-            $tabla->integer('id_examen');
-            $tabla->integer('id_ambiente');
-        });
-        Schema::create('estudiante_examen_ambiente', function (Blueprint $tabla): void {
-            $tabla->integer('id_ee');
-            $tabla->integer('id_ambiente');
-        });
 
         DB::table('rol')->insert([['id_rol' => 1, 'nombre_rol' => 'docente'], ['id_rol' => 2, 'nombre_rol' => 'auxiliar']]);
         DB::table('usuario')->insert([
@@ -232,7 +188,5 @@ class GestionarAmbientesTest extends TestCase
             ['id_ambiente' => 2, 'nombre_ambiente' => 'Laboratorio 1'],
             ['id_ambiente' => 3, 'nombre_ambiente' => 'Aula 690B'],
         ]);
-        DB::table('examen_ambiente')->insert(['id_examen' => 10, 'id_ambiente' => 1]);
-        DB::table('estudiante_examen_ambiente')->insert(['id_ee' => 5, 'id_ambiente' => 2]);
     }
 }
