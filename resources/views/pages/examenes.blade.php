@@ -6,18 +6,18 @@
     @updated 2026-10-24
     @updated 2026-10-25
     @updated 2026-11-14
+    @updated 2026-11-18
 
     @description
-    Sección Exámenes del docente. Es una sola página con las cuatro pestañas de
-    gestión (lista, alta, edición y división) en el parcial examenes-curso. La
-    lista muestra todos los exámenes de los cursos del docente, con el curso en
-    el nombre, y el curso del alta se elige dentro del formulario. Los botones
-    que navegaban a otra página ya no existen.
+    Subopción "Ver lista de examenes" del docente. Monta el parcial
+    examenes-lista, que solo contiene el listado de exámenes de todos sus
+    cursos con el curso en el nombre. Crear, Editar y Dividir son páginas
+    independientes del submenú, así que acá no se montan sus formularios,
+    selectores, pestañas ni botones.
 
-    La página entrega los cursos activos para el selector del formulario. El
-    curso puede llegar por el query string (`?curso=ID`) o por el input viejo
-    cuando falló el alta, para que el formulario vuelva con esa selección y la
-    pestaña Crear Examen abierta.
+    La página entrega los cursos activos para el selector de curso del
+    listado. El curso puede llegar por el query string (`?curso=ID`) para
+    filtrar la lista.
 
     @changelog
     - 2026-09-29  [David E. Chavez T.]  feat: vista de exámenes.
@@ -36,10 +36,13 @@
     - 2026-11-14  [Alex Candia]  feat: se quita el selector de materia. La
       página siempre monta el parcial con el listado global y entrega los cursos
       activos para el selector de curso del formulario de alta.
+    - 2026-11-18  [Alex Candia]  refactor: deja de usar el parcial con pestañas;
+      ahora incluye examenes-lista, sin formularios ni botones de otras
+      subopciones del menú.
 
     @see  App\Http\Controllers\ExamenController
     @see  App\Services\Curso\ListarCursosDocenteService
-    @see  resources/views/partials/examenes-curso.blade.php
+    @see  resources/views/partials/examenes-lista.blade.php
 --}}
 
 @extends('layouts.app')
@@ -48,14 +51,9 @@
 
 @section('content')
     <div class="px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
-        @include('partials.examenes-curso', [
+        @include('partials.examenes-lista', [
             'cursos' => $cursos,
             'cursoInicial' => $cursoInicial,
-            'tabInicial' => $tabInicial,
-            'ambientes' => $ambientes,
-            'materiales' => $materiales,
-            'normas' => $normas,
-            'puedeCrearExamen' => $cursos->isNotEmpty(),
         ])
     </div>
 @endsection
