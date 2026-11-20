@@ -20,6 +20,8 @@
  * - 2026-11-19  [Valery D. Ortuno P]  test: creacion inicial.
  * - 2026-11-19  [Valery D. Ortuno P]  test: se quitan las pruebas de eliminar
  *   (los ambientes solo se agregan).
+ * - 2026-11-20  [Valery D. Ortuno P]  test: el duplicado se detecta aunque cambien
+ *   espacios, guiones, acentos o ceros a la izquierda, y el aviso dice cual es.
  *
  * @see App\Services\Ambiente\GestionarAmbientesService
  * @see App\Http\Controllers\Api\AmbienteController
@@ -101,9 +103,38 @@ class GestionarAmbientesTest extends TestCase
         $this->comoDocente()
             ->postJson(route('api.ambientes.crear'), ['tipo' => 'aula', 'nombre' => '623'])
             ->assertUnprocessable()
-            ->assertJsonPath('errors.nombre.0', GestionarAmbientesService::MENSAJE_DUPLICADO);
+            ->assertJsonPath('errors.nombre.0', GestionarAmbientesService::MENSAJE_DUPLICADO.': Aula 623.');
 
         $this->assertSame(3, DB::table('ambiente')->count());
+    }
+
+    public function test_no_repite_un_ambiente_escrito_distinto(): void
+    {
+        // Ya existen Aula 623 y Aula 690B.
+        foreach (['0623', '690 b', '690-B', '690b'] as $variante) {
+            $this->comoDocente()
+                ->postJson(route('api.ambientes.crear'), ['tipo' => 'aula', 'nombre' => $variante])
+                ->assertUnprocessable()
+                ->assertJsonPath('errors.nombre.0', fn (string $mensaje): bool => str_starts_with($mensaje, GestionarAmbientesService::MENSAJE_DUPLICADO));
+        }
+
+        $this->assertSame(3, DB::table('ambiente')->count());
+    }
+
+    public function test_numeros_distintos_si_son_ambientes_distintos(): void
+    {
+        // Laboratorio 10 no es Laboratorio 1.
+        $this->comoDocente()
+            ->postJson(route('api.ambientes.crear'), ['tipo' => 'laboratorio', 'nombre' => '10'])
+            ->assertCreated()
+            ->assertJsonPath('datos.nombre', 'Laboratorio 10');
+    }
+
+    public function test_la_clave_ignora_mayusculas_espacios_guiones_acentos_y_ceros(): void
+    {
+        $this->assertSame('aula692a', GestionarAmbientesService::clave('AULA 0692 - a'));
+        $this->assertSame('auditoriomusica', GestionarAmbientesService::clave('Auditorio Música'));
+        $this->assertNotSame(GestionarAmbientesService::clave('Laboratorio 1'), GestionarAmbientesService::clave('Laboratorio 10'));
     }
 
     public function test_valida_el_tipo_y_el_identificador(): void
