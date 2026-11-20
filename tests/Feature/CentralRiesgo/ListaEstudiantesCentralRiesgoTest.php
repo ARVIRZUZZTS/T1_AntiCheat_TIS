@@ -12,6 +12,7 @@
  * @updated 2026-10-25
  * @updated 2026-10-26
  * @updated 2026-11-07
+ * @updated 2026-11-19
  *
  * @description
  * Pruebas de la lista de estudiantes de la central de riesgos (HU 10), sobre el
@@ -57,6 +58,8 @@
  *   `central_riesgo_motivo` (el esquema corre la migración de motivos
  *   múltiples) y una incidencia con varios los muestra todos, en la lista y
  *   en el detalle.
+ * - 2026-11-19  [Valery D. Ortuno P]  test: el esquema suma la tabla de
+ *   invitaciones, que el sidebar consulta para su contador.
  */
 
 namespace Tests\Feature\CentralRiesgo;
@@ -650,6 +653,12 @@ class ListaEstudiantesCentralRiesgoTest extends TestCase
         Schema::create('rol_usuario', function (Blueprint $tabla): void {
             $tabla->integer('id_usuario');
             $tabla->integer('id_rol');
+        });
+        // El sidebar cuenta las invitaciones pendientes del docente.
+        Schema::create('invitacion_examen_compartido', function (Blueprint $tabla): void {
+            $tabla->integer('id_invitacion')->primary();
+            $tabla->integer('id_docente_invitado');
+            $tabla->string('estado');
         });
         Schema::create('estudiante', function (Blueprint $tabla): void {
             $tabla->string('sis_estudiante')->primary();

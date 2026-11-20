@@ -9,6 +9,7 @@
     @updated 2026-11-04
     @updated 2026-11-09
     @updated 2026-11-14
+    @updated 2026-11-19
 
     @description
     Componente UI Blade reutilizable con el formulario de alta de un examen en
@@ -179,6 +180,19 @@
       elige dentro del formulario. Recibe `cursos`, conserva el curso elegido
       tras un error de validación y mantiene el modo de solo lectura cuando no
       se pasa la lista (páginas de compatibilidad por curso).
+    - 2026-11-19  [Valery D. Ortuno P]  feat: si el ambiente buscado no esta en
+      la lista se puede agregar (aula, laboratorio o auditorio) y queda elegido;
+      los ambientes sugeridos que aun no se usaron en un examen se pueden
+      eliminar, con confirmacion. Usa POST y DELETE /api/ambientes.
+    - 2026-11-19  [Valery D. Ortuno P]  refactor: se quita eliminar ambientes;
+      solo se agregan los que no estan registrados.
+    - 2026-11-19  [Valery D. Ortuno P]  style: el boton para quitar un ambiente
+      elegido vuelve a ser el icono de papelera (el texto "Descartar" era de
+      bb6221b).
+    - 2026-11-20  [Valery D. Ortuno P]  fix: no se ofrece agregar un ambiente que
+      ya existe aunque este escrito distinto (espacios, guiones, acentos, ceros a
+      la izquierda): se avisa cual es y se puede elegir. La busqueda tambien lo
+      encuentra escrito asi.
 
     @see  resources/views/pages/examen-crear.blade.php
     @see  App\Enums\TipoExamen
@@ -260,6 +274,14 @@
         duracion: @js(old('duracion', '')),
         busquedaAmbiente: '',
         indiceAmbientes: [],
+        // Agregar un ambiente que no esta en la lista.
+        urlCrearAmbiente: @js(route('api.ambientes.crear')),
+        tiposAmbiente: @js(\App\Services\Ambiente\GestionarAmbientesService::TIPOS),
+        nuevoAmbienteAbierto: false,
+        nuevoAmbienteTipo: 'aula',
+        nuevoAmbienteNombre: '',
+        guardandoAmbiente: false,
+        errorAmbiente: '',
         ambientesElegidos: @js($ambientesElegidos),
         listaAbierta: false,
         indiceResaltado: -1,
@@ -606,12 +628,126 @@
 
         ambientesVisibles() {
             const termino = this.busquedaAmbiente.trim().toLowerCase();
+            const clave = this.claveAmbiente(termino);
             const elegidos = this.ambientesElegidos.map((ambiente) => ambiente.id);
 
+            // Tambien encuentra lo escrito con otros espacios o guiones
+            // (aula 692 a encuentra Aula 692A).
             return this.indiceAmbientes.filter((ambiente) =>
                 !elegidos.includes(ambiente.id)
-                && ambiente.termino.indexOf(termino) !== -1
+                && (ambiente.termino.indexOf(termino) !== -1 || this.claveAmbiente(ambiente.nombre).indexOf(clave) !== -1)
             );
+        },
+
+        // Misma regla que GestionarAmbientesService::clave(): minusculas, sin
+        // acentos, sin espacios ni guiones y sin ceros a la izquierda.
+        claveAmbiente(texto) {
+            return String(texto || '')
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .toLowerCase()
+                .replace(/[\s-]+/g, '')
+                .replace(/\d+/g, (numero) => numero.replace(/^0+(?=\d)/, ''));
+        },
+
+        // Ambiente ya registrado con ese nombre (escrito igual o distinto).
+        ambienteExistente(nombre) {
+            const clave = this.claveAmbiente(nombre);
+
+            return clave === '' ? null : (this.indiceAmbientes.find((ambiente) => this.claveAmbiente(ambiente.nombre) === clave) || null);
+        },
+
+        // Se ofrece agregar solo si lo buscado no es un ambiente registrado.
+        puedeAgregarAmbiente() {
+            const termino = this.busquedaAmbiente.trim();
+
+            return termino !== '' && this.ambienteExistente(termino) === null;
+        },
+
+        // El nuevo ambiente que se esta escribiendo ya existe.
+        nuevoAmbienteRepetido() {
+            const nombre = this.nombreNuevoAmbiente();
+
+            return nombre === '' ? null : this.ambienteExistente(nombre);
+        },
+
+        elegirRepetido() {
+            const repetido = this.nuevoAmbienteRepetido();
+
+            if (repetido) {
+                this.agregarAmbiente(repetido.id);
+                this.nuevoAmbienteAbierto = false;
+                this.nuevoAmbienteNombre = '';
+            }
+        },
+
+        nombreNuevoAmbiente() {
+            const identificador = this.nuevoAmbienteNombre.trim().replace(/\s+/g, ' ');
+
+            return identificador === '' ? '' : this.tiposAmbiente[this.nuevoAmbienteTipo] + ' ' + identificador;
+        },
+
+        // Si lo buscado empieza con el tipo (por ejemplo laboratorio 3) se
+        // separa: el tipo va al selector y el resto al identificador.
+        abrirNuevoAmbiente() {
+            const texto = this.busquedaAmbiente.trim().replace(/\s+/g, ' ');
+            const [primera, ...resto] = texto.split(' ');
+            const tipo = Object.keys(this.tiposAmbiente).find((clave) => clave === (primera || '').toLowerCase());
+
+            this.nuevoAmbienteTipo = tipo || 'aula';
+            this.nuevoAmbienteNombre = tipo ? resto.join(' ') : texto;
+            this.errorAmbiente = '';
+            this.nuevoAmbienteAbierto = true;
+            this.listaAbierta = false;
+            this.$nextTick(() => document.getElementById(this.idPrefijo + '_nuevo_ambiente_nombre')?.focus());
+        },
+
+        cerrarNuevoAmbiente() {
+            this.nuevoAmbienteAbierto = false;
+            this.errorAmbiente = '';
+        },
+
+        async guardarAmbiente() {
+            if (this.guardandoAmbiente || this.nombreNuevoAmbiente() === '' || this.nuevoAmbienteRepetido()) {
+                return;
+            }
+
+            this.guardandoAmbiente = true;
+            this.errorAmbiente = '';
+
+            try {
+                const respuesta = await fetch(this.urlCrearAmbiente, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': this.csrfToken,
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    body: JSON.stringify({ tipo: this.nuevoAmbienteTipo, nombre: this.nuevoAmbienteNombre }),
+                });
+                const cuerpo = await respuesta.json().catch(() => ({}));
+
+                if (! respuesta.ok) {
+                    const errores = cuerpo?.errors || {};
+                    this.errorAmbiente = errores.nombre?.[0] || errores.tipo?.[0] || cuerpo?.message || 'No se pudo agregar el ambiente.';
+
+                    return;
+                }
+
+                const nuevo = cuerpo.datos;
+                this.indiceAmbientes = this.indiceAmbientes
+                    .concat(nuevo)
+                    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { numeric: true }));
+                this.agregarAmbiente(nuevo.id);
+                this.nuevoAmbienteAbierto = false;
+                this.nuevoAmbienteNombre = '';
+            } catch (error) {
+                this.errorAmbiente = 'No se pudo conectar con el servidor.';
+            } finally {
+                this.guardandoAmbiente = false;
+            }
         },
 
         agregarAmbiente(id) {
@@ -647,6 +783,11 @@
             const ambiente = this.ambientesVisibles()[this.indiceResaltado];
 
             if (! ambiente) {
+                // Enter sin sugerencia elegida: ofrece agregar lo buscado.
+                if (this.puedeAgregarAmbiente()) {
+                    this.abrirNuevoAmbiente();
+                }
+
                 return;
             }
 
@@ -794,13 +935,68 @@
                             <span class="truncate" x-text="ambiente.nombre"></span>
                             <svg class="w-4 h-4 shrink-0 text-fg-brand" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v14m7-7H5"/></svg>
                         </button>
+
                     </li>
                 </template>
 
-                <li x-show="ambientesVisibles().length === 0" class="px-3 py-2.5 text-sm text-body">
+                <li x-show="ambientesVisibles().length === 0 && ! puedeAgregarAmbiente()" class="px-3 py-2.5 text-sm text-body">
                     No hay ambientes que coincidan con la busqueda.
                 </li>
+
+                {{-- Lo buscado no esta en la lista: se ofrece agregarlo. --}}
+                <li x-show="puedeAgregarAmbiente()">
+                    <button type="button" @click="abrirNuevoAmbiente()"
+                            class="flex w-full items-center gap-2 px-3 py-2.5 text-start text-sm font-medium text-fg-brand hover:bg-neutral-secondary-medium focus:outline-none focus:ring-2 focus:ring-brand-medium">
+                        <svg class="w-4 h-4 shrink-0" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v14m7-7H5"/></svg>
+                        <span class="truncate">Agregar <span class="font-semibold" x-text="busquedaAmbiente.trim()"></span> como nuevo ambiente</span>
+                    </button>
+                </li>
             </ul>
+
+            <p x-show="errorAmbiente !== '' && ! nuevoAmbienteAbierto" x-text="errorAmbiente" class="mt-1 text-sm text-fg-danger-strong"></p>
+
+            {{-- Alta de un ambiente que no esta en la lista. --}}
+            <div x-show="nuevoAmbienteAbierto" x-cloak class="mt-2 rounded-base border border-default bg-neutral-secondary-soft p-3">
+                <p class="text-sm font-medium text-heading">Nuevo ambiente</p>
+                <div class="mt-2 flex flex-col gap-2 sm:flex-row">
+                    <select x-model="nuevoAmbienteTipo" aria-label="Tipo de ambiente"
+                            class="block w-full sm:w-40 px-3 py-2.5 border text-sm rounded-base shadow-xs bg-neutral-secondary-medium border-default-medium text-heading focus:ring-brand focus:border-brand">
+                        <template x-for="(etiqueta, clave) in tiposAmbiente" :key="clave">
+                            <option :value="clave" x-text="etiqueta" :selected="clave === nuevoAmbienteTipo"></option>
+                        </template>
+                    </select>
+                    <input type="text" :id="idPrefijo + '_nuevo_ambiente_nombre'" x-model="nuevoAmbienteNombre"
+                           @keydown.enter.prevent="guardarAmbiente()" @keydown.escape="cerrarNuevoAmbiente()"
+                           maxlength="40" autocomplete="off" placeholder="Numero o nombre, ej. 625"
+                           aria-label="Numero o nombre del ambiente"
+                           class="block w-full min-w-0 flex-1 p-2.5 border border-default-medium bg-neutral-secondary-medium text-heading text-sm rounded-base focus:ring-brand focus:border-brand shadow-xs placeholder:text-body" />
+                </div>
+                <p class="mt-2 text-xs text-body" x-show="nombreNuevoAmbiente() !== '' && ! nuevoAmbienteRepetido()">
+                    Se guardara como: <span class="font-semibold text-heading" x-text="nombreNuevoAmbiente()"></span>
+                </p>
+                {{-- Ya registrado (aunque escrito distinto): no se crea otro,
+                     se ofrece elegir el que existe. --}}
+                <div x-show="nuevoAmbienteRepetido()" class="mt-2 flex flex-wrap items-center gap-2 text-sm">
+                    <span class="text-fg-danger-strong">
+                        Ese ambiente ya existe: <span class="font-semibold" x-text="nuevoAmbienteRepetido()?.nombre"></span>
+                    </span>
+                    <button type="button" @click="elegirRepetido()"
+                            class="rounded-base border border-default px-2 py-1 text-xs font-medium text-fg-brand hover:bg-neutral-secondary-medium">
+                        Elegir este
+                    </button>
+                </div>
+                <p x-show="errorAmbiente !== ''" x-text="errorAmbiente" class="mt-2 text-sm text-fg-danger-strong"></p>
+                <div class="mt-3 flex flex-col gap-2 sm:flex-row sm:justify-end">
+                    <button type="button" @click="cerrarNuevoAmbiente()"
+                            class="inline-flex items-center justify-center rounded-base border border-default px-4 py-2 text-sm font-medium text-body hover:bg-neutral-secondary-medium">
+                        Cancelar
+                    </button>
+                    <button type="button" @click="guardarAmbiente()" :disabled="guardandoAmbiente || nombreNuevoAmbiente() === '' || nuevoAmbienteRepetido() !== null"
+                            class="inline-flex items-center justify-center rounded-base bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-strong disabled:cursor-not-allowed disabled:opacity-50">
+                        <span x-text="guardandoAmbiente ? 'Agregando...' : 'Agregar ambiente'"></span>
+                    </button>
+                </div>
+            </div>
 
             {{-- Elegidos: cada uno con su papelera para sacarlo. --}}
             <ul class="mt-3 flex flex-col gap-2">
@@ -808,9 +1004,10 @@
                     <li class="flex items-center justify-between gap-2 px-3 py-2 rounded-base border border-default bg-neutral-secondary-soft">
                         <span class="truncate text-sm text-heading" x-text="ambiente.nombre"></span>
                         <button type="button" @click="quitarAmbiente(ambiente.id)"
-                                class="shrink-0 inline-flex items-center justify-center h-9 px-3 rounded-base text-body hover:text-fg-danger hover:bg-neutral-secondary-medium focus:outline-none focus:ring-2 focus:ring-danger-medium"
-                                :aria-label="'Descartar ' + ambiente.nombre">
-                            Descartar
+                                class="shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-base text-body hover:text-fg-danger hover:bg-neutral-secondary-medium focus:outline-none focus:ring-2 focus:ring-danger-medium"
+                                :aria-label="'Quitar ' + ambiente.nombre" title="Quitar ambiente">
+                            <svg class="w-4 h-4" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0 1 16.138 21H7.862a2 2 0 0 1-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 0 0-1-1H10a1 1 0 0 0-1 1v3M4 7h16"/></svg>
+                            <span class="sr-only" x-text="'Quitar ' + ambiente.nombre"></span>
                         </button>
                     </li>
                 </template>

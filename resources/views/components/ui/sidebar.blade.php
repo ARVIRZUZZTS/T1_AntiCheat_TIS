@@ -7,6 +7,7 @@
     @updated 2026-11-08
     @updated 2026-11-15
     @updated 2026-11-16
+    @updated 2026-11-19
 
     @description
     Sidebar de navegacion del panel, en formato acordeon. Cada seccion
@@ -62,6 +63,13 @@
       y "Habilitar estudiantes"; Reportes pasa a grupo con sus tres reportes.
     - 2026-11-16  [Alex Candia]  feat: subopción "Eliminar curso" debajo de
       "Editar curso".
+    - 2026-11-19  [Valery D. Ortuno P]  refactor: subopciones reordenadas con el
+      mismo patron (Ver, Crear, Editar, Eliminar y luego las acciones propias)
+      y etiquetas cortas y coherentes; Central de riesgos pasa a "Incidencias
+      confirmadas" e "Incidencias pendientes". Se agregan "Eliminar examen",
+      "Editar auxiliar" y "Eliminar auxiliar" (estos dos, marcadores en
+      desarrollo) y vuelve "Docentes" > "Validar registros" con el contador de
+      solicitudes de registro (HU 26), que se habia perdido en el acordeon.
 --}}
 
 @props([
@@ -110,22 +118,31 @@
         ? app(\App\Services\Invitacion\ListarInvitacionesRecibidasService::class)->contarPendientes($usuario)
         : 0;
 
+    // Orden coherente en todos los grupos: Ver, Crear, Editar, Eliminar y
+    // despues las acciones propias del grupo (en Cursos, Cargar CSV va antes
+    // de los estudiantes porque es como se los da de alta). Las etiquetas van cortas para
+    // que entren en una linea del sidebar.
+    $contarSolicitudesRegistro = $rolUsuario === \App\Models\Rol::NOMBRE_DOCENTE
+        ? \App\Services\Docente\ListarSolicitudesRegistroService::contarPendientes()
+        : 0;
+
     $defaultItems = [
         ['label' => 'Cursos', 'children' => [
-            ['label' => 'Ver lista de cursos', 'route' => 'cursos'],
-            // El detalle de un curso (/cursos/{curso}) muestra las dos secciones;
-            // se resalta "Ver estudiantes" como acceso principal.
-            ['label' => 'Ver estudiantes', 'route' => 'cursos.ver-estudiantes', 'match' => ['cursos.detalle', 'cursos.ver']],
-            ['label' => 'Habilitar estudiantes', 'route' => 'cursos.habilitar-estudiantes'],
+            ['label' => 'Ver cursos', 'route' => 'cursos'],
             ['label' => 'Crear curso', 'route' => 'cursos.crear'],
             ['label' => 'Editar curso', 'route' => 'cursos.editar'],
             ['label' => 'Eliminar curso', 'route' => 'cursos.eliminar'],
             ['label' => 'Cargar CSV', 'route' => 'cursos.cargar-csv'],
+            // El detalle de un curso (/cursos/{curso}) muestra las dos secciones;
+            // se resalta "Ver estudiantes" como acceso principal.
+            ['label' => 'Ver estudiantes', 'route' => 'cursos.ver-estudiantes', 'match' => ['cursos.detalle', 'cursos.ver']],
+            ['label' => 'Habilitar estudiantes', 'route' => 'cursos.habilitar-estudiantes'],
         ]],
         ['label' => 'Examenes', 'children' => [
-            ['label' => 'Ver lista de examenes', 'route' => 'examenes'],
+            ['label' => 'Ver examenes', 'route' => 'examenes'],
             ['label' => 'Crear examen', 'route' => 'examenes.crear'],
             ['label' => 'Editar examen', 'route' => 'examenes.editar'],
+            ['label' => 'Eliminar examen', 'route' => 'examenes.eliminar'],
             ['label' => 'Dividir examen', 'route' => 'examenes.dividir'],
         ]],
         ['label' => 'Monitor en vivo', 'children' => [
@@ -133,23 +150,31 @@
             ['label' => 'Monitor', 'route' => 'monitoreo'],
         ]],
         ['label' => 'Reportes', 'children' => [
-            ['label' => 'Reporte de asistencia', 'route' => 'reportes.asistencia'],
-            ['label' => 'Reporte de horario de ingreso', 'route' => 'reportes.horario-ingreso'],
-            ['label' => 'Reporte de intentos no autorizados', 'route' => 'reportes.intentos-no-autorizados'],
+            ['label' => 'Asistencia', 'route' => 'reportes.asistencia'],
+            ['label' => 'Horarios de ingreso', 'route' => 'reportes.horario-ingreso'],
+            ['label' => 'Intentos no autorizados', 'route' => 'reportes.intentos-no-autorizados'],
         ]],
         ['label' => 'Auxiliares', 'children' => [
-            ['label' => 'Ver lista de auxiliares', 'route' => 'auxiliares'],
-            ['label' => 'Asignar auxiliar', 'route' => 'auxiliares.asignar'],
+            ['label' => 'Ver auxiliares', 'route' => 'auxiliares'],
             ['label' => 'Crear auxiliar', 'route' => 'auxiliares.crear'],
+            ['label' => 'Editar auxiliar', 'route' => 'auxiliares.editar'],
+            ['label' => 'Eliminar auxiliar', 'route' => 'auxiliares.eliminar'],
+            ['label' => 'Asignar auxiliar', 'route' => 'auxiliares.asignar'],
+        ]],
+        // Validacion del registro de docentes (HU 26): el contador muestra las
+        // solicitudes pendientes y se actualiza al aprobar o rechazar.
+        ['label' => 'Docentes', 'countEvent' => 'solicitudes-registro',
+            'count' => $contarSolicitudesRegistro, 'children' => [
+            ['label' => 'Validar registros', 'route' => 'docentes'],
         ]],
         ['label' => 'Invitaciones', 'countEvent' => 'invitaciones-pendientes',
             'count' => $contarPendientesInvitaciones, 'children' => [
-            ['label' => 'Enviar', 'route' => 'invitaciones.enviar'],
+            ['label' => 'Enviar invitacion', 'route' => 'invitaciones.enviar'],
             ['label' => 'Aceptar invitacion', 'route' => 'invitaciones.aceptar'],
         ]],
         ['label' => 'Central de riesgos', 'children' => [
-            ['label' => 'Incidencias', 'route' => 'central-riesgo.incidencias'],
-            ['label' => 'Sospechosos', 'route' => 'central-riesgo.sospechosos'],
+            ['label' => 'Incidencias confirmadas', 'route' => 'central-riesgo.incidencias'],
+            ['label' => 'Incidencias pendientes', 'route' => 'central-riesgo.sospechosos'],
         ]],
     ];
 

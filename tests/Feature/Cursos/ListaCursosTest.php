@@ -9,6 +9,7 @@
  *
  * @updated 2026-11-08
  * @updated 2026-11-09
+ * @updated 2026-11-19
  *
  * @description
  * Pruebas de la lista de cursos del docente: solo cursos propios (las
@@ -26,6 +27,10 @@
  * - 2026-11-09  [Diegootm]  test: la lista ya no incluye los cursos
  *   invitados ni el filtro "Invitados" (las invitaciones son por examen) y
  *   se cubre el filtro "Finalizados" del criterio de aceptación.
+ * - 2026-11-19  [Valery D. Ortuno P]  test: los textos de la card van sin
+ *   acentos ("Proximo examen:", "No hay examenes programados") y las
+ *   incidencias del curso cuentan solo las confirmadas (una sospechosa no
+ *   suma). El filtro "Finalizados" pasa a "Archivados".
  *
  * @see  App\Services\Curso\ListarCursosDocenteService
  */
@@ -161,10 +166,19 @@ class ListaCursosTest extends TestCase
         DB::table('central_riesgo')->insert([
             'id_registro' => 996101,
             'id_registrador' => self::DOCENTE, 'id_curso' => self::CURSO_PROPIO,
-            'tipo_infraccion' => 'sospechoso',
+            'tipo_infraccion' => 'tramposo',
             // El esquema real (Supabase) no tiene id_ingreso en central_riesgo
             // y estas columnas son NOT NULL.
             'sis_estudiante' => '996101',
+            'id_examen' => self::EXAMEN_PROXIMO,
+            'fecha_registro' => now()->toDateTimeString(),
+        ]);
+        // Una sospechosa sin revisar no cuenta como incidencia del curso.
+        DB::table('central_riesgo')->insert([
+            'id_registro' => 996102,
+            'id_registrador' => self::DOCENTE, 'id_curso' => self::CURSO_PROPIO,
+            'tipo_infraccion' => 'sospechoso',
+            'sis_estudiante' => '996102',
             'id_examen' => self::EXAMEN_PROXIMO,
             'fecha_registro' => now()->toDateTimeString(),
         ]);
@@ -202,12 +216,12 @@ class ListaCursosTest extends TestCase
             ->assertOk()
             ->assertSee('Todos 2')
             ->assertSee('Activos 1')
-            ->assertSee('Finalizados 1')
+            ->assertSee('Archivados 1')
             ->assertDontSee('Invitados')
             ->assertDontSee('Física')
             ->assertDontSee('Literatura')
-            ->assertSee('Próximo examen:')
-            ->assertSee('No hay exámenes programados')
+            ->assertSee('Proximo examen:')
+            ->assertSee('No hay examenes programados')
             ->assertDontSee('Pendiente oculta')
             ->assertDontSee('Rechazada oculta');
 

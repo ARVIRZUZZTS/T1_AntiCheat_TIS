@@ -10,6 +10,7 @@
  * @updated 2026-11-04
  * @updated 2026-11-15
  * @updated 2026-11-16
+ * @updated 2026-11-19
  *
  * @description
  * Controlador HTTP de la sección Cursos del docente: la lista de sus cursos,
@@ -35,6 +36,9 @@
  *   de cursos para eliminar (sin modal de confirmación todavía).
  * - 2026-11-16  [Alex Candia]  feat: el borrado del curso elimina también sus
  *   exámenes con EliminarExamenCursoService.
+ * - 2026-11-19  [Valery D. Ortuno P]  refactor: "Ver estudiantes" y
+ *   "Habilitar estudiantes" ya no calculan los conteos del curso (las páginas
+ *   no muestran las tarjetas); solo el detalle los sigue usando.
  *
  * @see  App\Services\Curso\ContarAfectadosCursoService
  * @see  App\Services\Curso\EliminarCursoService
@@ -250,7 +254,6 @@ class CursoController extends Controller
      * debajo, la sección Estudiantes del curso elegido.
      *
      * @param  Request  $request  Request con el docente autenticado.
-     * @param  ListarEstudiantesCursoConEstadoService  $estudiantes  Servicio de conteos del curso.
      * @return View Vista pages.curso-ver.
      *
      * @throws AuthorizationException Si el curso no es del docente (403).
@@ -259,11 +262,9 @@ class CursoController extends Controller
      *
      * @since  2026-11-15
      */
-    public function verEstudiantes(
-        Request $request,
-        ListarEstudiantesCursoConEstadoService $estudiantes,
-    ): View {
-        return $this->vistaSeccionCurso($request, $estudiantes, 'estudiantes');
+    public function verEstudiantes(Request $request): View
+    {
+        return $this->vistaSeccionCurso($request, 'estudiantes');
     }
 
     /**
@@ -271,7 +272,6 @@ class CursoController extends Controller
      * Habilitaciones del elegido, con sus modales de cambio de estado.
      *
      * @param  Request  $request  Request con el docente autenticado.
-     * @param  ListarEstudiantesCursoConEstadoService  $estudiantes  Servicio de conteos del curso.
      * @return View Vista pages.curso-ver.
      *
      * @throws AuthorizationException Si el curso no es del docente (403).
@@ -280,29 +280,23 @@ class CursoController extends Controller
      *
      * @since  2026-11-15
      */
-    public function habilitarEstudiantes(
-        Request $request,
-        ListarEstudiantesCursoConEstadoService $estudiantes,
-    ): View {
-        return $this->vistaSeccionCurso($request, $estudiantes, 'habilitacion');
+    public function habilitarEstudiantes(Request $request): View
+    {
+        return $this->vistaSeccionCurso($request, 'habilitacion');
     }
 
     /**
      * Arma la página de una sola sección del curso: select de cursos del
-     * docente, curso inicial desde ?curso=ID y conteos del elegido.
+     * docente y curso inicial desde ?curso=ID.
      *
      * @param  Request  $request  Request con el docente autenticado.
-     * @param  ListarEstudiantesCursoConEstadoService  $estudiantes  Servicio de conteos del curso.
      * @param  string  $soloTab  Sección única a mostrar (estudiantes / habilitacion).
      * @return View Vista pages.curso-ver acotada a la sección.
      *
      * @throws AuthorizationException Si el curso no es del docente (403).
      */
-    private function vistaSeccionCurso(
-        Request $request,
-        ListarEstudiantesCursoConEstadoService $estudiantes,
-        string $soloTab,
-    ): View {
+    private function vistaSeccionCurso(Request $request, string $soloTab): View
+    {
         $cursos = Curso::query()
             ->where('sis_doc', $request->user()->id_usuario)
             ->orderBy('nombre_curso')
@@ -311,12 +305,10 @@ class CursoController extends Controller
         $cursoId = $request->integer('curso');
         $cursoSeleccionado = $cursoId > 0 ? $cursos->firstWhere('id_curso', $cursoId) : null;
 
-        $conteos = null;
         if ($cursoSeleccionado !== null) {
             // Red de seguridad: el select solo ofrece cursos propios, pero el id
             // llega por el query y se autoriza igual que el detalle.
             Gate::authorize('gestionar', $cursoSeleccionado);
-            $conteos = $estudiantes->conteosPorEstado($cursoSeleccionado->id_curso);
         }
 
         $esEstudiantes = $soloTab === 'estudiantes';
@@ -324,7 +316,6 @@ class CursoController extends Controller
         return view('pages.curso-ver', [
             'cursos' => $cursos,
             'cursoSeleccionado' => $cursoSeleccionado,
-            'conteos' => $conteos,
             'soloTab' => $soloTab,
             'titulo' => $esEstudiantes ? 'Ver estudiantes' : 'Habilitar estudiantes',
             'accionUrl' => $esEstudiantes
