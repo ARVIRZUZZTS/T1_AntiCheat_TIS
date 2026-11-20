@@ -11,7 +11,10 @@
  * Alta de ambientes desde el selector de Crear / Editar examen: `crear` arma
  * el nombre con el tipo y el identificador ("Aula 625", "Laboratorio 3",
  * "Auditorio Central"), igual que los ambientes que ya estan en la tabla, y
- * rechaza uno que ya exista (sin distinguir mayusculas ni espacios de mas).
+ * rechaza uno que ya exista aunque este escrito distinto: se comparan por
+ * `clave` (minusculas, sin acentos, sin espacios ni guiones y sin ceros a la
+ * izquierda), asi "Aula 692 A", "aula 692-a" y "Aula 692A" son el mismo. El
+ * formulario usa la misma regla para avisar antes de enviar.
  *
  * El tipo va dentro del nombre, como en los datos existentes, asi que no hace
  * falta columna nueva. Tras el alta se olvida el catalogo cacheado de
@@ -21,6 +24,9 @@
  * - 2026-11-19  [Valery D. Ortuno P]  feat: creacion inicial.
  * - 2026-11-19  [Valery D. Ortuno P]  refactor: se quita `eliminar`; los
  *   ambientes solo se agregan.
+ * - 2026-11-20  [Valery D. Ortuno P]  fix: el duplicado se detecta aunque cambien
+ *   espacios, guiones, acentos o ceros a la izquierda, y el aviso dice cual es
+ *   el ambiente que ya existe.
  *
  * @see  App\Http\Controllers\Api\AmbienteController
  * @see  App\Services\Ambiente\ListarAmbientesService
@@ -31,6 +37,7 @@ namespace App\Services\Ambiente;
 use App\Services\Examen\CatalogosExamenService;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class GestionarAmbientesService
@@ -53,7 +60,7 @@ class GestionarAmbientesService
 
     public const MENSAJE_LARGO = 'El nombre del ambiente admite hasta 50 caracteres.';
 
-    public const MENSAJE_DUPLICADO = 'Ese ambiente ya existe.';
+    public const MENSAJE_DUPLICADO = 'Ese ambiente ya existe';
 
     /**
      * @return array{id: int, nombre: string, termino: string}
@@ -89,12 +96,17 @@ class GestionarAmbientesService
                 DB::statement('LOCK TABLE ambiente IN SHARE ROW EXCLUSIVE MODE');
             }
 
-            $existe = DB::table('ambiente')
-                ->whereRaw('lower(trim(nombre_ambiente)) = lower(?)', [$nombre])
-                ->exists();
+            // El catalogo es chico: se compara en PHP con la misma clave que
+            // usa el formulario (SQLite y Postgres no normalizan igual).
+            $clave = self::clave($nombre);
+            $existente = DB::table('ambiente')
+                ->pluck('nombre_ambiente')
+                ->first(fn (string $registrado): bool => self::clave($registrado) === $clave);
 
-            if ($existe) {
-                throw ValidationException::withMessages(['nombre' => self::MENSAJE_DUPLICADO]);
+            if ($existente !== null) {
+                throw ValidationException::withMessages([
+                    'nombre' => self::MENSAJE_DUPLICADO.': '.trim($existente).'.',
+                ]);
             }
 
             $id = (int) DB::table('ambiente')->max('id_ambiente') + 1;
@@ -106,6 +118,19 @@ class GestionarAmbientesService
         $this->olvidarCatalogo();
 
         return ['id' => $id, 'nombre' => $nombre, 'termino' => mb_strtolower($nombre)];
+    }
+
+    /**
+     * Clave para comparar nombres de ambiente: minusculas, sin acentos, sin
+     * espacios ni guiones y sin ceros a la izquierda en los numeros.
+     * "Aula 0692 - A" y "aula 692a" dan la misma clave.
+     */
+    public static function clave(string $nombre): string
+    {
+        $texto = mb_strtolower(Str::ascii($nombre));
+        $texto = (string) preg_replace('/[\s\-]+/u', '', $texto);
+
+        return (string) preg_replace_callback('/\d+/', fn (array $numero): string => ltrim($numero[0], '0') ?: '0', $texto);
     }
 
     private function olvidarCatalogo(): void
