@@ -189,6 +189,10 @@
     - 2026-11-19  [Valery D. Ortuno P]  style: el boton para quitar un ambiente
       elegido vuelve a ser el icono de papelera (el texto "Descartar" era de
       bb6221b).
+    - 2026-11-20  [Valery D. Ortuno P]  fix: no se ofrece agregar un ambiente que
+      ya existe aunque este escrito distinto (espacios, guiones, acentos, ceros a
+      la izquierda): se avisa cual es y se puede elegir. La busqueda tambien lo
+      encuentra escrito asi.
 
     @see  resources/views/pages/examen-crear.blade.php
     @see  App\Enums\TipoExamen
@@ -624,19 +628,57 @@
 
         ambientesVisibles() {
             const termino = this.busquedaAmbiente.trim().toLowerCase();
+            const clave = this.claveAmbiente(termino);
             const elegidos = this.ambientesElegidos.map((ambiente) => ambiente.id);
 
+            // Tambien encuentra lo escrito con otros espacios o guiones
+            // (aula 692 a encuentra Aula 692A).
             return this.indiceAmbientes.filter((ambiente) =>
                 !elegidos.includes(ambiente.id)
-                && ambiente.termino.indexOf(termino) !== -1
+                && (ambiente.termino.indexOf(termino) !== -1 || this.claveAmbiente(ambiente.nombre).indexOf(clave) !== -1)
             );
         },
 
-        // Hay que ofrecer agregar si lo buscado no coincide exacto con ninguno.
-        puedeAgregarAmbiente() {
-            const termino = this.busquedaAmbiente.trim().toLowerCase();
+        // Misma regla que GestionarAmbientesService::clave(): minusculas, sin
+        // acentos, sin espacios ni guiones y sin ceros a la izquierda.
+        claveAmbiente(texto) {
+            return String(texto || '')
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .toLowerCase()
+                .replace(/[\s-]+/g, '')
+                .replace(/\d+/g, (numero) => numero.replace(/^0+(?=\d)/, ''));
+        },
 
-            return termino !== '' && ! this.indiceAmbientes.some((ambiente) => ambiente.termino === termino);
+        // Ambiente ya registrado con ese nombre (escrito igual o distinto).
+        ambienteExistente(nombre) {
+            const clave = this.claveAmbiente(nombre);
+
+            return clave === '' ? null : (this.indiceAmbientes.find((ambiente) => this.claveAmbiente(ambiente.nombre) === clave) || null);
+        },
+
+        // Se ofrece agregar solo si lo buscado no es un ambiente registrado.
+        puedeAgregarAmbiente() {
+            const termino = this.busquedaAmbiente.trim();
+
+            return termino !== '' && this.ambienteExistente(termino) === null;
+        },
+
+        // El nuevo ambiente que se esta escribiendo ya existe.
+        nuevoAmbienteRepetido() {
+            const nombre = this.nombreNuevoAmbiente();
+
+            return nombre === '' ? null : this.ambienteExistente(nombre);
+        },
+
+        elegirRepetido() {
+            const repetido = this.nuevoAmbienteRepetido();
+
+            if (repetido) {
+                this.agregarAmbiente(repetido.id);
+                this.nuevoAmbienteAbierto = false;
+                this.nuevoAmbienteNombre = '';
+            }
         },
 
         nombreNuevoAmbiente() {
@@ -666,7 +708,7 @@
         },
 
         async guardarAmbiente() {
-            if (this.guardandoAmbiente) {
+            if (this.guardandoAmbiente || this.nombreNuevoAmbiente() === '' || this.nuevoAmbienteRepetido()) {
                 return;
             }
 
@@ -929,16 +971,27 @@
                            aria-label="Numero o nombre del ambiente"
                            class="block w-full min-w-0 flex-1 p-2.5 border border-default-medium bg-neutral-secondary-medium text-heading text-sm rounded-base focus:ring-brand focus:border-brand shadow-xs placeholder:text-body" />
                 </div>
-                <p class="mt-2 text-xs text-body" x-show="nombreNuevoAmbiente() !== ''">
+                <p class="mt-2 text-xs text-body" x-show="nombreNuevoAmbiente() !== '' && ! nuevoAmbienteRepetido()">
                     Se guardara como: <span class="font-semibold text-heading" x-text="nombreNuevoAmbiente()"></span>
                 </p>
+                {{-- Ya registrado (aunque escrito distinto): no se crea otro,
+                     se ofrece elegir el que existe. --}}
+                <div x-show="nuevoAmbienteRepetido()" class="mt-2 flex flex-wrap items-center gap-2 text-sm">
+                    <span class="text-fg-danger-strong">
+                        Ese ambiente ya existe: <span class="font-semibold" x-text="nuevoAmbienteRepetido()?.nombre"></span>
+                    </span>
+                    <button type="button" @click="elegirRepetido()"
+                            class="rounded-base border border-default px-2 py-1 text-xs font-medium text-fg-brand hover:bg-neutral-secondary-medium">
+                        Elegir este
+                    </button>
+                </div>
                 <p x-show="errorAmbiente !== ''" x-text="errorAmbiente" class="mt-2 text-sm text-fg-danger-strong"></p>
                 <div class="mt-3 flex flex-col gap-2 sm:flex-row sm:justify-end">
                     <button type="button" @click="cerrarNuevoAmbiente()"
                             class="inline-flex items-center justify-center rounded-base border border-default px-4 py-2 text-sm font-medium text-body hover:bg-neutral-secondary-medium">
                         Cancelar
                     </button>
-                    <button type="button" @click="guardarAmbiente()" :disabled="guardandoAmbiente || nombreNuevoAmbiente() === ''"
+                    <button type="button" @click="guardarAmbiente()" :disabled="guardandoAmbiente || nombreNuevoAmbiente() === '' || nuevoAmbienteRepetido() !== null"
                             class="inline-flex items-center justify-center rounded-base bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-strong disabled:cursor-not-allowed disabled:opacity-50">
                         <span x-text="guardandoAmbiente ? 'Agregando...' : 'Agregar ambiente'"></span>
                     </button>
