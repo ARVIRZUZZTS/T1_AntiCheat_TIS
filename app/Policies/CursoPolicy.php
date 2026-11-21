@@ -24,6 +24,8 @@
  *   dueño del curso, sin incluir a los invitados.
  * - 2026-11-20  [Equipo T1]  feat: archivar() y bloqueo de escrituras para
  *   cursos archivados (HU #321 · Task #323).
+ * - 2026-11-20  [Equipo T1]  feat: restaurar() permite volver a `EnCurso` un
+ *   curso archivado del docente propietario (HU #322 · Task #325).
  *
  * @see  App\Http\Controllers\CursoController
  * @see  App\Http\Controllers\ExamenController
@@ -103,6 +105,24 @@ class CursoPolicy
     {
         return $this->esPropietario($usuario, $curso)
             && $curso->estado === CursoEstado::EnCurso->value;
+    }
+
+    /**
+     * Indica si el usuario puede restaurar el curso. Solo el docente propietario
+     * (`curso.sis_doc`) y únicamente cuando el curso está en estado `Archivado`.
+     *
+     * @param  Usuario  $usuario  Usuario autenticado.
+     * @param  Curso  $curso  Curso que se quiere restaurar.
+     * @return bool Si puede restaurar el curso.
+     *
+     * @author Equipo T1
+     *
+     * @since  2026-11-20
+     */
+    public function restaurar(Usuario $usuario, Curso $curso): bool
+    {
+        return $this->esPropietario($usuario, $curso)
+            && $curso->estado === CursoEstado::Archivado->value;
     }
 
     /**
