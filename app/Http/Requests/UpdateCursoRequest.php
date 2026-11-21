@@ -6,6 +6,8 @@ use App\Models\Curso;
 use App\Models\Usuario;
 use App\Services\Curso\ListarGestionesService;
 use App\Services\Curso\ObtenerCursoEditableService;
+use App\Support\DTO\ActualizarCursoDTO;
+use App\Support\DTO\GestionCursoDTO;
 use App\Support\Validadores;
 use Illuminate\Foundation\Http\FormRequest;
 use LogicException;
@@ -61,5 +63,17 @@ class UpdateCursoRequest extends FormRequest
     public function anioMinimo(): int
     {
         return now()->year;
+    }
+
+    public function datos(): ActualizarCursoDTO
+    {
+        return new ActualizarCursoDTO(
+            materia: (string) $this->validated('materia'),
+            grupo: (string) $this->validated('grupo'),
+            gestion: new GestionCursoDTO(
+                (int) $this->validated('gestion'),
+                (int) $this->validated('anio'),
+            ),
+        );
     }
 }
