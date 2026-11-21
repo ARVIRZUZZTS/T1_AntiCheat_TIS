@@ -30,7 +30,7 @@ class CursoEdicionController extends Controller
         }
 
         return response()->json([
-            'datos' => $datos->ejecutar($curso)->toArray(),
+            'datos' => $datos->ejecutar($actualizado)->toArray(),
         ]);
     }
 
