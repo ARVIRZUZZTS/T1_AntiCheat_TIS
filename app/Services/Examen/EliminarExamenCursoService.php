@@ -61,6 +61,10 @@ class EliminarExamenCursoService
     /** Mensaje cuando el examen tiene ingresos o incidencias. */
     public const MENSAJE_CON_DATOS = 'No se puede eliminar un examen con ingresos o incidencias registradas:';
 
+    public function __construct(
+        private readonly \App\Services\Curso\AsegurarCursoEditableService $editable,
+    ) {}
+
     /**
      * Desvincula el examen del curso y limpia las inscripciones de ese curso.
      *
@@ -78,6 +82,11 @@ class EliminarExamenCursoService
     public function ejecutar(Usuario $docente, Examen $examen, Curso $curso, bool $forzar = false): void
     {
         Gate::forUser($docente)->authorize('gestionar', $curso);
+
+        if (! $forzar) {
+            $this->editable->asegurarCursoEditable($curso, 'eliminar');
+            $this->editable->asegurarExamenEditable($examen, 'eliminar');
+        }
 
         $vinculado = $examen->cursos()
             ->where('curso.id_curso', $curso->id_curso)

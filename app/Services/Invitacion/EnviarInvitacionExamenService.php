@@ -21,6 +21,7 @@ class EnviarInvitacionExamenService
 
     public function __construct(
         private readonly NotificacionService $notificaciones,
+        private readonly \App\Services\Curso\AsegurarCursoEditableService $editable,
     ) {}
 
     /**
@@ -31,6 +32,7 @@ class EnviarInvitacionExamenService
     public function ejecutar(Usuario $invitador, Examen $examen, int $idDocenteInvitado): array
     {
         Gate::forUser($invitador)->authorize('invitarDocente', $examen);
+        $this->editable->asegurarExamenEditable($examen, 'id_examen');
 
         $invitado = Usuario::query()->find($idDocenteInvitado);
 
