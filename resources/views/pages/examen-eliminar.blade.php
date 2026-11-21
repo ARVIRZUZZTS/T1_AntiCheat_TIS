@@ -15,7 +15,8 @@
 
     Al tocar "Eliminar" se valida en pantalla: si el examen ya inició o
     finalizó, o tiene ingresos o incidencias, se muestra el aviso de bloqueo
-    y no se abre el modal. Si pasa, se abre el modal "Eliminar examen" que
+    dentro de la misma tarjeta y no se abre el modal. Si pasa, se abre el
+    modal "Eliminar examen" que
     confirma con los botones Eliminar / Cancelar y envía DELETE a
     `api.examenes.cursos.desvincular`, desvinculando el examen solo del curso
     elegido. El éxito se muestra en el modal "Examen eliminado con exito" y el
@@ -29,6 +30,9 @@
       su etiqueta de estado, con el botón "Eliminar" a la derecha; se quitan
       el icono de documento y los datos de fecha, horario, ambientes e
       ingresos.
+    - 2026-11-20  [OchoaCesar]  fix: el aviso de bloqueo se muestra dentro
+      de la tarjeta presionada; antes iba al final de la lista y no se veía
+      al hacer clic.
 
     @see  App\Http\Controllers\ExamenController::eliminarVista()
     @see  App\Services\Examen\ListarExamenesDocenteService
@@ -54,6 +58,7 @@
             modalEliminar: false,
             examenEliminar: null,
             avisoEliminacion: '',
+            avisoExamenId: '',
             errorEliminacion: '',
             exitoEliminacion: false,
             eliminando: false,
@@ -90,11 +95,15 @@
 
             abrirModalEliminar(datos) {
                 this.avisoEliminacion = '';
+                this.avisoExamenId = '';
                 this.errorEliminacion = '';
 
                 const motivo = this.motivoBloqueoEliminar(datos);
                 if (motivo !== '') {
+                    // El aviso se muestra dentro de la tarjeta presionada, no
+                    // al final de la lista: ahi lo ve quien hizo el clic.
                     this.avisoEliminacion = motivo;
+                    this.avisoExamenId = String(datos.examenId);
                     return;
                 }
 
@@ -249,6 +258,13 @@
                                 </div>
                             @endif
                         </div>
+
+                        {{-- Aviso de bloqueo dentro de la tarjeta presionada. --}}
+                        <div x-show="avisoExamenId === '{{ $examen['id'] }}'" x-cloak>
+                            <x-ui.alert type="danger" title="No se puede eliminar el examen">
+                                <span x-text="avisoEliminacion"></span>
+                            </x-ui.alert>
+                        </div>
                     </li>
                 @endforeach
 
@@ -261,13 +277,6 @@
                 </li>
             @endif
         </ul>
-
-        {{-- Aviso de bloqueo al presionar Eliminar. --}}
-        <div x-show="avisoEliminacion !== ''" x-cloak class="mx-auto mt-4 w-full max-w-4xl">
-            <x-ui.alert type="danger" title="No se puede eliminar el examen">
-                <span x-text="avisoEliminacion"></span>
-            </x-ui.alert>
-        </div>
 
         {{-- Modal de confirmación. --}}
         <div
