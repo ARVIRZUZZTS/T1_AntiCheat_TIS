@@ -15,10 +15,16 @@ use Illuminate\Support\Facades\Gate;
 
 class VincularCursoExamenCompartidoService
 {
+    public function __construct(
+        private readonly \App\Services\Curso\AsegurarCursoEditableService $editable,
+    ) {}
+
     public function ejecutar(Usuario $docente, Examen $examen, Curso $curso): int
     {
         Gate::forUser($docente)->authorize('configurar', $examen);
         Gate::forUser($docente)->authorize('gestionar', $curso);
+        $this->editable->asegurarExamenEditable($examen, 'examen');
+        $this->editable->asegurarCursoEditable($curso, 'curso');
 
         $configuracion = ConfiguracionExamenDocente::query()
             ->where('id_examen', $examen->id_examen)
