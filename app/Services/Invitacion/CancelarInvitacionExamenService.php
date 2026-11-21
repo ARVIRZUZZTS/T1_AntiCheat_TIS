@@ -25,6 +25,7 @@ class CancelarInvitacionExamenService
 
     public function __construct(
         private readonly NotificacionService $notificaciones,
+        private readonly \App\Services\Curso\AsegurarCursoEditableService $editable,
     ) {}
 
     /**
@@ -35,6 +36,8 @@ class CancelarInvitacionExamenService
     public function cancelar(Usuario $invitador, InvitacionExamenCompartido $invitacion): array
     {
         Gate::forUser($invitador)->authorize('cancelar', $invitacion);
+        $invitacion->loadMissing('examen');
+        $this->editable->asegurarExamenEditable($invitacion->examen, 'estado');
 
         $actualizada = DB::transaction(function () use ($invitacion): InvitacionExamenCompartido {
             $bloqueada = InvitacionExamenCompartido::query()

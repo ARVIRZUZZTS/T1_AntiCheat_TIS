@@ -28,6 +28,7 @@ class ResponderInvitacionExamenService
     public function __construct(
         private readonly NotificacionService $notificaciones,
         private readonly ConfiguracionExamenDocenteService $configuraciones,
+        private readonly \App\Services\Curso\AsegurarCursoEditableService $editable,
     ) {}
 
     /**
@@ -61,6 +62,8 @@ class ResponderInvitacionExamenService
         InvitacionEstado $nuevoEstado,
     ): array {
         Gate::forUser($invitado)->authorize('responder', $invitacion);
+        $invitacion->loadMissing('examen');
+        $this->editable->asegurarExamenEditable($invitacion->examen, 'estado');
 
         $actualizada = DB::transaction(function () use ($invitacion, $nuevoEstado): InvitacionExamenCompartido {
             $bloqueada = InvitacionExamenCompartido::query()
