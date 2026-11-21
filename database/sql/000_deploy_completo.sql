@@ -71,7 +71,8 @@ SET row_security = off;
 
 CREATE TYPE public.curso_estado AS ENUM (
     'EnCurso',
-    'Finalizo'
+    'Finalizo',
+    'Archivado'
 );
 
 
