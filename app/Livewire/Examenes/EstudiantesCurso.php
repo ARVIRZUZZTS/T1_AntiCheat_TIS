@@ -278,6 +278,8 @@ class EstudiantesCurso extends Component
             $this->mensajeExito = 'Estudiante habilitado correctamente.';
         } catch (InvalidArgumentException|RuntimeException $e) {
             $this->mensajeErrorModal = $e->getMessage();
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $this->mensajeErrorModal = (string) collect($e->errors())->flatten()->first();
         }
     }
 
@@ -300,6 +302,8 @@ class EstudiantesCurso extends Component
             $this->cerrarModal();
         } catch (InvalidArgumentException|RuntimeException $e) {
             $this->mensajeErrorModal = $e->getMessage();
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $this->mensajeErrorModal = (string) collect($e->errors())->flatten()->first();
         }
     }
 
