@@ -175,3 +175,17 @@ SELECT
     m.batch
 FROM migrations m
 ORDER BY m.id;
+
+
+-- ============================================================================
+--  BLOQUE 8 - Estado "Archivado" en curso_estado (HU #321 · Task #323)
+--  Debe devolver ok = 1.
+-- ============================================================================
+
+SELECT
+    'curso_estado incluye Archivado' AS chequeo,
+    COUNT(*)                         AS ok
+FROM pg_enum e
+JOIN pg_type t ON t.oid = e.enumtypid
+WHERE t.typname = 'curso_estado'
+  AND e.enumlabel = 'Archivado';
