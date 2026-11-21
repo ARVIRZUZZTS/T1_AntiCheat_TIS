@@ -43,6 +43,10 @@ class CambiarEstadoEstudianteService
 {
     public const MOTIVO_MAX = 150;
 
+    public function __construct(
+        private readonly \App\Services\Curso\AsegurarCursoEditableService $editable,
+    ) {}
+
     /**
      * Habilita a un estudiante para el examen actual del curso. Si ya está
      * habilitado, no hace nada (operación idempotente).
@@ -57,6 +61,8 @@ class CambiarEstadoEstudianteService
      */
     public function habilitar(Curso $curso, string $sisEstudiante, ?int $idUsuarioModificador = null): EstudianteExamen
     {
+        $this->editable->asegurarCursoEditable($curso, 'estado');
+
         return $this->cambiarEstado($curso, $sisEstudiante, EstadoEstudianteExamen::Habilitado, null, $idUsuarioModificador);
     }
 
@@ -79,6 +85,7 @@ class CambiarEstadoEstudianteService
         string $motivo,
         ?int $idUsuarioModificador = null,
     ): EstudianteExamen {
+        $this->editable->asegurarCursoEditable($curso, 'estado');
         $this->validarMotivo($motivo);
 
         return $this->cambiarEstado($curso, $sisEstudiante, EstadoEstudianteExamen::Deshabilitado, trim($motivo), $idUsuarioModificador);
