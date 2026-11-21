@@ -8,10 +8,10 @@
     Página "Eliminar examen" (subopción del sidebar, debajo de "Editar
     examen"): la lista de todos los exámenes del docente (propios y con
     invitación aceptada), con los programados primero y los finalizados al
-    final. Cada tarjeta muestra el estado, la fecha, el horario, los
-    ambientes y los ingresos, y el botón "Eliminar" por cada curso que el
-    docente gestiona; un examen compartido donde solo es invitado se muestra
-    sin botón.
+    final. Cada tarjeta muestra solo el título del examen con su etiqueta de
+    estado y el botón "Eliminar" a la derecha, por cada curso que el docente
+    gestiona; un examen compartido donde solo es invitado se muestra sin
+    botón.
 
     Al tocar "Eliminar" se valida en pantalla: si el examen ya inició o
     finalizó, o tiene ingresos o incidencias, se muestra el aviso de bloqueo
@@ -25,6 +25,10 @@
     - 2026-11-20  [OchoaCesar]  feat: página con la lista de exámenes, botón
       de eliminación por curso propio, bloqueo previo y modales de
       confirmación y éxito.
+    - 2026-11-20  [OchoaCesar]  fix: la tarjeta queda solo con el título y
+      su etiqueta de estado, con el botón "Eliminar" a la derecha; se quitan
+      el icono de documento y los datos de fecha, horario, ambientes e
+      ingresos.
 
     @see  App\Http\Controllers\ExamenController::eliminarVista()
     @see  App\Services\Examen\ListarExamenesDocenteService
@@ -180,11 +184,6 @@
                 @foreach ($examenes as $examen)
                     @php
                         $etiqueta = ($examen['tipo'] ?: 'Sin tipo').($examen['curso'] !== '' ? ' - '.$examen['curso'] : '');
-                        $fecha = $examen['fecha'] !== null ? implode('/', array_reverse(explode('-', $examen['fecha']))) : '—';
-                        $horario = collect([$examen['hora_inicio'], $examen['hora_fin']])->filter()->implode(' - ');
-                        $horario = $horario !== '' ? $horario : '—';
-                        $ambientes = collect($examen['ambientes'])->pluck('nombre')->implode(', ');
-                        $ambientes = $ambientes !== '' ? $ambientes : '—';
                         $claves = array_map(
                             fn (array $cursoPropio): string => $examen['id'].':'.$cursoPropio['id'],
                             $examen['cursos_propios'],
@@ -197,92 +196,59 @@
                         x-cloak
                         class="flex flex-col gap-4 rounded-base border border-default bg-neutral-primary-soft px-5 py-6 shadow-xs sm:px-8"
                     >
-                        {{-- Icono, nombre y etiquetas de estado. --}}
-                        <div class="flex min-w-0 items-start gap-4">
-                            <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-brand-softer text-fg-brand-strong">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-6 w-6" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>
-                            </div>
+                        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                            {{-- Titulo del examen y su etiqueta de estado. --}}
                             <div class="flex min-w-0 flex-col items-start gap-1">
                                 <h3 class="text-xl font-bold text-heading">{{ $etiqueta }}</h3>
-                                <div class="flex flex-wrap gap-1">
-                                    @if ($examen['es_propio'])
-                                        <span class="inline-flex items-center px-1.5 py-0.5 text-xs font-medium rounded-full border bg-brand-softer border-brand-subtle text-fg-brand-strong">Propio</span>
-                                    @elseif ($examen['es_anfitrion'])
-                                        <span class="inline-flex items-center px-1.5 py-0.5 text-xs font-medium rounded-full border bg-warning-soft border-warning-subtle text-fg-warning">Anfitrion</span>
-                                    @else
-                                        <span class="inline-flex items-center px-1.5 py-0.5 text-xs font-medium rounded-full border bg-success-soft border-success-subtle text-fg-success-strong">Invitado</span>
-                                    @endif
 
-                                    @if ($examen['estado'] === 'Programado')
-                                        <x-ui.badge type="gray">Programado</x-ui.badge>
-                                    @elseif ($examen['estado'] === 'En curso')
-                                        <x-ui.badge type="warning">En curso</x-ui.badge>
-                                    @else
-                                        <x-ui.badge type="brand" class="gap-1">
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-3 w-3 shrink-0" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
-                                            Finalizado
-                                        </x-ui.badge>
-                                    @endif
-                                </div>
-                            </div>
-                        </div>
-
-                        {{-- Datos de la tarjeta. --}}
-                        <div class="grid grid-cols-2 gap-4 sm:grid-cols-4">
-                            <div class="flex flex-col items-center gap-1.5 text-center">
-                                <span class="text-xs font-semibold uppercase text-muted">Fecha:</span>
-                                <time class="text-sm font-mono text-body" @if ($examen['fecha'] !== null) datetime="{{ $examen['fecha'] }}" @endif>{{ $fecha }}</time>
+                                @if ($examen['estado'] === 'Programado')
+                                    <x-ui.badge type="gray">Programado</x-ui.badge>
+                                @elseif ($examen['estado'] === 'En curso')
+                                    <x-ui.badge type="warning">En curso</x-ui.badge>
+                                @else
+                                    <x-ui.badge type="brand" class="gap-1">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-3 w-3 shrink-0" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+                                        Finalizado
+                                    </x-ui.badge>
+                                @endif
                             </div>
 
-                            <div class="flex flex-col items-center gap-1.5 text-center">
-                                <span class="text-xs font-semibold uppercase text-muted">Horario:</span>
-                                <span class="text-sm font-mono text-body">{{ $horario }}</span>
-                            </div>
-
-                            <div class="flex flex-col items-center gap-1.5 text-center">
-                                <span class="text-xs font-semibold uppercase text-muted">Ambientes:</span>
-                                <span class="text-sm font-mono text-body">{{ $ambientes }}</span>
-                            </div>
-
-                            <div class="flex flex-col items-center gap-1.5 text-center">
-                                <span class="text-xs font-semibold uppercase text-muted">Ingresos:</span>
-                                <span class="text-sm font-bold text-heading">{{ $examen['ingresados'] }}</span>
-                            </div>
-                        </div>
-
-                        {{-- Acciones: un botón por curso que el docente gestiona. --}}
-                        @if ($examen['cursos_propios'] !== [])
-                            <div class="flex flex-wrap items-center gap-3 border-t border-default pt-4">
-                                @foreach ($examen['cursos_propios'] as $cursoPropio)
-                                    <div
-                                        class="flex items-center gap-2"
-                                        x-show="! vinculosEliminados.includes('{{ $examen['id'] }}:{{ $cursoPropio['id'] }}')"
-                                        x-cloak
-                                    >
-                                        @if (count($examen['cursos_propios']) > 1)
-                                            <span class="text-sm font-medium text-heading">{{ $cursoPropio['nombre'] }}</span>
-                                        @endif
-                                        <x-ui.button
-                                            type="button"
-                                            variant="danger"
-                                            size="sm"
-                                            data-examen-id="{{ $examen['id'] }}"
-                                            data-examen-nombre="{{ $etiqueta }}"
-                                            data-curso-id="{{ $cursoPropio['id'] }}"
-                                            data-curso-nombre="{{ $cursoPropio['nombre'] }}"
-                                            data-fecha="{{ $examen['fecha'] ?? '' }}"
-                                            data-hora-inicio="{{ $examen['hora_inicio'] ?? '' }}"
-                                            data-ingresados="{{ $examen['ingresados'] }}"
-                                            data-incidencias="{{ $examen['incidencias'] }}"
-                                            aria-label="Eliminar examen del curso {{ $cursoPropio['nombre'] }}"
-                                            @click="abrirModalEliminar($el.dataset)"
+                            {{-- Acciones a la derecha: un boton por curso que
+                                 el docente gestiona. --}}
+                            @if ($examen['cursos_propios'] !== [])
+                                <div class="flex shrink-0 flex-col gap-2">
+                                    @foreach ($examen['cursos_propios'] as $cursoPropio)
+                                        <div
+                                            class="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-end sm:gap-2"
+                                            x-show="! vinculosEliminados.includes('{{ $examen['id'] }}:{{ $cursoPropio['id'] }}')"
+                                            x-cloak
                                         >
-                                            Eliminar
-                                        </x-ui.button>
-                                    </div>
-                                @endforeach
-                            </div>
-                        @endif
+                                            @if (count($examen['cursos_propios']) > 1)
+                                                <span class="text-sm font-medium text-heading sm:text-right">{{ $cursoPropio['nombre'] }}</span>
+                                            @endif
+                                            <x-ui.button
+                                                type="button"
+                                                variant="danger"
+                                                size="sm"
+                                                class="w-full justify-center sm:w-auto"
+                                                data-examen-id="{{ $examen['id'] }}"
+                                                data-examen-nombre="{{ $etiqueta }}"
+                                                data-curso-id="{{ $cursoPropio['id'] }}"
+                                                data-curso-nombre="{{ $cursoPropio['nombre'] }}"
+                                                data-fecha="{{ $examen['fecha'] ?? '' }}"
+                                                data-hora-inicio="{{ $examen['hora_inicio'] ?? '' }}"
+                                                data-ingresados="{{ $examen['ingresados'] }}"
+                                                data-incidencias="{{ $examen['incidencias'] }}"
+                                                aria-label="Eliminar examen del curso {{ $cursoPropio['nombre'] }}"
+                                                @click="abrirModalEliminar($el.dataset)"
+                                            >
+                                                Eliminar
+                                            </x-ui.button>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @endif
+                        </div>
                     </li>
                 @endforeach
 
