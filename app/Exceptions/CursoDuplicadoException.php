@@ -4,14 +4,15 @@ namespace App\Exceptions;
 
 use App\Support\DTO\ActualizarCursoDTO;
 use RuntimeException;
+use Throwable;
 
 class CursoDuplicadoException extends RuntimeException
 {
     public const MENSAJE = 'Este curso ya existe en la gestión y el año elegidos.';
 
-    public function __construct(private readonly ActualizarCursoDTO $datos)
+    public function __construct(private readonly ActualizarCursoDTO $datos, ?Throwable $previous = null)
     {
-        parent::__construct(self::MENSAJE);
+        parent::__construct(self::MENSAJE, 0, $previous);
     }
 
     /** @return array<string, int|string> */

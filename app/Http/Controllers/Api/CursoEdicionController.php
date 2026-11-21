@@ -20,17 +20,26 @@ class CursoEdicionController extends Controller
         $cambios = $request->datos();
 
         if ($actualizar->existeDuplicado($curso, $cambios)) {
-            $error = new CursoDuplicadoException($cambios);
+            return $this->conflicto(new CursoDuplicadoException($cambios));
+        }
 
-            return response()->json([
-                'message' => $error->getMessage(),
-                'errors' => $error->errores(),
-                'campos' => $error->campos(),
-            ], 409);
+        try {
+            $actualizado = $actualizar->ejecutar($curso, $cambios);
+        } catch (CursoDuplicadoException $error) {
+            return $this->conflicto($error);
         }
 
         return response()->json([
             'datos' => $datos->ejecutar($curso)->toArray(),
         ]);
+    }
+
+    private function conflicto(CursoDuplicadoException $error): JsonResponse
+    {
+        return response()->json([
+            'message' => $error->getMessage(),
+            'errors' => $error->errores(),
+            'campos' => $error->campos(),
+        ], 409);
     }
 }
