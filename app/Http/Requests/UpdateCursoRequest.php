@@ -32,12 +32,20 @@ class UpdateCursoRequest extends FormRequest
         return $this->curso ?? throw new LogicException('El curso no fue resuelto.');
     }
 
+    protected function prepareForValidation(): void
+    {
+        $this->merge([
+            'materia' => Validadores::normalizarMateria($this->input('materia')),
+            'grupo' => Validadores::normalizarGrupo($this->input('grupo')),
+        ]);
+    }
+
     /** @return array<string, mixed> */
     public function rules(): array
     {
         return [
             'materia' => ['required'],
-            'grupo' => ['required'],
+            'grupo' => Validadores::reglaGrupo(),
             'gestion' => ['required'],
             'anio' => ['required'],
         ];
