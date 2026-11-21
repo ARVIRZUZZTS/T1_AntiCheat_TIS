@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use App\Models\Curso;
 use App\Models\Usuario;
+use App\Services\Curso\ListarGestionesService;
 use App\Services\Curso\ObtenerCursoEditableService;
 use App\Support\Validadores;
 use Illuminate\Foundation\Http\FormRequest;
@@ -41,13 +42,13 @@ class UpdateCursoRequest extends FormRequest
     }
 
     /** @return array<string, mixed> */
-    public function rules(): array
+    public function rules(ListarGestionesService $gestiones): array
     {
         return [
-            'materia' => ['required'],
+            'materia' => Validadores::reglaMateria(),
             'grupo' => Validadores::reglaGrupo(),
-            'gestion' => ['required'],
-            'anio' => ['required'],
+            'gestion' => Validadores::reglaGestion(array_keys($gestiones->ejecutar())),
+            'anio' => Validadores::reglaAnio($this->anioMinimo()),
         ];
     }
 
