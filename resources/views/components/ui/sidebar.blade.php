@@ -7,6 +7,7 @@
     @updated 2026-11-08
     @updated 2026-11-15
     @updated 2026-11-16
+    @updated 2026-11-20
 
     @description
     Sidebar de navegacion del panel, en formato acordeon. Cada seccion
@@ -62,6 +63,8 @@
       y "Habilitar estudiantes"; Reportes pasa a grupo con sus tres reportes.
     - 2026-11-16  [Alex Candia]  feat: subopción "Eliminar curso" debajo de
       "Editar curso".
+    - 2026-11-20  [OchoaCesar]  feat: subopción "Eliminar examen" debajo de
+      "Editar examen".
 --}}
 
 @props([
@@ -126,6 +129,7 @@
             ['label' => 'Ver lista de examenes', 'route' => 'examenes'],
             ['label' => 'Crear examen', 'route' => 'examenes.crear'],
             ['label' => 'Editar examen', 'route' => 'examenes.editar'],
+            ['label' => 'Eliminar examen', 'route' => 'examenes.eliminar'],
             ['label' => 'Dividir examen', 'route' => 'examenes.dividir'],
         ]],
         ['label' => 'Monitor en vivo', 'children' => [

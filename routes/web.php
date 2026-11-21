@@ -17,6 +17,7 @@
  * @updated 2026-11-14
  * @updated 2026-11-15
  * @updated 2026-11-16
+ * @updated 2026-11-20
  *
  * @description
  * Definición de rutas web del panel. Incluye vistas estáticas y componentes Livewire.
@@ -90,61 +91,63 @@
  * - 2026-11-16  [Alex Candia]  feat: endpoints para eliminar un curso propio y
  *   consultar los auxiliares y estudiantes afectados antes de borrarlo; página
  *   "Eliminar curso" con la lista de cursos (sin modal todavía).
+ * - 2026-11-20  [OchoaCesar]  feat: /examenes/eliminar, la página propia de la
+ *   subopción "Eliminar examen" del sidebar: lista de todos los exámenes del
+ *   docente con el botón de eliminación por curso.
  */
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CursoController;
 use App\Http\Controllers\ExamenController;
+use App\Http\Controllers\Reporte\ExportarReporteAsistenciaController;
 use App\Http\Controllers\Reporte\ExportarReporteIngresosIlegalesController;
 use App\Http\Controllers\Reporte\ListarReporteIngresosIlegalesController;
 use App\Http\Controllers\Reporte\ReporteController;
-use App\Livewire\Examenes\EstudiantesCurso;
-use App\Livewire\Monitoreo\MonitorEnVivo;
-use App\Livewire\Monitoreo\AccesoMonitor;
 use App\Livewire\Auxiliares\CrearAuxiliar;
 use App\Livewire\Auxiliares\GestionAuxiliares;
+use App\Livewire\Examenes\EstudiantesCurso;
 use App\Livewire\Invitaciones\Index as InvitacionesIndex;
+use App\Livewire\Monitoreo\AccesoMonitor;
+use App\Livewire\Monitoreo\MonitorEnVivo;
 use App\Models\Usuario;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('auth')->group(function (): void {
-Route::view('/', 'pages.inicio')->name('inicio');
+    Route::view('/', 'pages.inicio')->name('inicio');
 
-Route::view('/inicio', 'pages.inicio');
-// Destino de "Cursos" en el sidebar del auxiliar. Su contenido (cursos a los
-// que está asignado y sus exámenes) se define en una HU posterior.
-Route::view('/mis-cursos', 'pages.auxiliar-cursos')->name('auxiliar.cursos');
-Route::get('/monitoreo', MonitorEnVivo::class)->name('monitoreo');
-// Monitor en vivo · Ingreso: la vista de proximos examenes y el boton
-// "Iniciar". Antes vivia en /monitoreo/acceso; la ruta vieja redirige.
-Route::get('/monitoreo/ingreso', AccesoMonitor::class)->name('monitoreo.ingreso');
-Route::redirect('/monitoreo/acceso', '/monitoreo/ingreso');
+    Route::view('/inicio', 'pages.inicio');
+    // Destino de "Cursos" en el sidebar del auxiliar. Su contenido (cursos a los
+    // que está asignado y sus exámenes) se define en una HU posterior.
+    Route::view('/mis-cursos', 'pages.auxiliar-cursos')->name('auxiliar.cursos');
+    Route::get('/monitoreo', MonitorEnVivo::class)->name('monitoreo');
+    // Monitor en vivo · Ingreso: la vista de proximos examenes y el boton
+    // "Iniciar". Antes vivia en /monitoreo/acceso; la ruta vieja redirige.
+    Route::get('/monitoreo/ingreso', AccesoMonitor::class)->name('monitoreo.ingreso');
+    Route::redirect('/monitoreo/acceso', '/monitoreo/ingreso');
 
-Route::get('/auxiliares', GestionAuxiliares::class)->name('auxiliares');
-// Auxiliares · Asignar: elegir un auxiliar activo y asignarlo a un examen
-// futuro. Requiere una tabla auxiliar_examen que aun no existe (Bloque 4),
-// por eso de momento es un marcador.
-Route::view('/auxiliares/asignar', 'pages.en-desarrollo', [
-    'titulo' => 'Asignar auxiliar',
-    'descripcion' => 'La asignacion de auxiliares a examenes esta en desarrollo.',
-])->name('auxiliares.asignar');
-// Auxiliares · Crear: el alta de auxiliar como pagina propia (antes era un
-// modal dentro de GestionAuxiliares). Al guardar vuelve a la lista.
-Route::get('/auxiliares/crear', CrearAuxiliar::class)->name('auxiliares.crear');
+    Route::get('/auxiliares', GestionAuxiliares::class)->name('auxiliares');
+    // Auxiliares · Asignar: elegir un auxiliar activo y asignarlo a un examen
+    // futuro. Requiere una tabla auxiliar_examen que aun no existe (Bloque 4),
+    // por eso de momento es un marcador.
+    Route::view('/auxiliares/asignar', 'pages.en-desarrollo', [
+        'titulo' => 'Asignar auxiliar',
+        'descripcion' => 'La asignacion de auxiliares a examenes esta en desarrollo.',
+    ])->name('auxiliares.asignar');
+    // Auxiliares · Crear: el alta de auxiliar como pagina propia (antes era un
+    // modal dentro de GestionAuxiliares). Al guardar vuelve a la lista.
+    Route::get('/auxiliares/crear', CrearAuxiliar::class)->name('auxiliares.crear');
 
-// Invitaciones: hoy un solo componente con pestanhas Enviar/Recibir. Se
-// separa en dos subopciones; ambas sirven el mismo componente de momento y
-// el Bloque 2 las divide en dos paginas. La ruta vieja /invitaciones redirige.
-Route::redirect('/invitaciones', '/invitaciones/enviar');
-// Mismo componente, dos paginas: el `tab` llega como default de ruta y fija la
-// vista (Enviar o Aceptar invitacion), sin conmutador interno.
-Route::get('/invitaciones/enviar', InvitacionesIndex::class)->defaults('tab', 'enviar')->name('invitaciones.enviar');
-Route::get('/invitaciones/aceptar', InvitacionesIndex::class)->defaults('tab', 'recibir')->name('invitaciones.aceptar');
+    // Invitaciones: hoy un solo componente con pestanhas Enviar/Recibir. Se
+    // separa en dos subopciones; ambas sirven el mismo componente de momento y
+    // el Bloque 2 las divide en dos paginas. La ruta vieja /invitaciones redirige.
+    Route::redirect('/invitaciones', '/invitaciones/enviar');
+    // Mismo componente, dos paginas: el `tab` llega como default de ruta y fija la
+    // vista (Enviar o Aceptar invitacion), sin conmutador interno.
+    Route::get('/invitaciones/enviar', InvitacionesIndex::class)->defaults('tab', 'enviar')->name('invitaciones.enviar');
+    Route::get('/invitaciones/aceptar', InvitacionesIndex::class)->defaults('tab', 'recibir')->name('invitaciones.aceptar');
 
-Route::view('/monitoreo/mock', 'livewire.monitoreo.mock')->name('monitoreo.mock');
+    Route::view('/monitoreo/mock', 'livewire.monitoreo.mock')->name('monitoreo.mock');
 
     // Reportes: cada tipo es una subopcion del sidebar y muestra solo su
     // seccion, reutilizando la vista con los selectores compartidos.
@@ -156,21 +159,21 @@ Route::view('/monitoreo/mock', 'livewire.monitoreo.mock')->name('monitoreo.mock'
     Route::get('/reportes/intentos-no-autorizados', [ReporteController::class, 'intentosNoAutorizados'])
         ->name('reportes.intentos-no-autorizados');
 
-Route::get('/reportes/ingresos-ilegales/exportar/{examen}', ExportarReporteIngresosIlegalesController::class)
-    ->name('reportes.ingresos-ilegales.exportar');
+    Route::get('/reportes/ingresos-ilegales/exportar/{examen}', ExportarReporteIngresosIlegalesController::class)
+        ->name('reportes.ingresos-ilegales.exportar');
 
-Route::get('/reportes/asistencia/exportar/{examen}', [\App\Http\Controllers\Reporte\ExportarReporteAsistenciaController::class, 'exportar'])
-    ->name('reportes.asistencia.exportar');
+    Route::get('/reportes/asistencia/exportar/{examen}', [ExportarReporteAsistenciaController::class, 'exportar'])
+        ->name('reportes.asistencia.exportar');
 
-Route::get('/reportes/ingresos-ilegales', ListarReporteIngresosIlegalesController::class)
-    ->name('reportes.ingresos-ilegales');
-Route::view('/notificaciones', 'pages.notificaciones')->name('notificaciones');
+    Route::get('/reportes/ingresos-ilegales', ListarReporteIngresosIlegalesController::class)
+        ->name('reportes.ingresos-ilegales');
+    Route::view('/notificaciones', 'pages.notificaciones')->name('notificaciones');
 
-// Destino de "Ver detalle" de las notificaciones (HU 12 · T4). La pantalla de
-// detalle aún no existe: se deja la ruta lista con un placeholder navegable.
-Route::get('/incidencias/{id}', fn (int $id) => view('pages.incidencia-detalle', ['id' => $id]))
-    ->whereNumber('id')
-    ->name('incidencias.detalle');
+    // Destino de "Ver detalle" de las notificaciones (HU 12 · T4). La pantalla de
+    // detalle aún no existe: se deja la ruta lista con un placeholder navegable.
+    Route::get('/incidencias/{id}', fn (int $id) => view('pages.incidencia-detalle', ['id' => $id]))
+        ->whereNumber('id')
+        ->name('incidencias.detalle');
 });
 
 // Autenticación real (reemplaza a /dev/login).
@@ -254,6 +257,10 @@ Route::middleware(['auth', 'docente'])->group(function (): void {
     // a su pestaña (selector de examen + formulario/edicion y division por API).
     Route::get('/examenes/editar', [ExamenController::class, 'editarVista'])->name('examenes.editar');
     Route::get('/examenes/dividir', [ExamenController::class, 'dividirVista'])->name('examenes.dividir');
+    // Examenes · Eliminar: página propia con la lista de todos los exámenes
+    // del docente y el botón de eliminación por curso (la eliminación deja de
+    // vivir en los listados existentes).
+    Route::get('/examenes/eliminar', [ExamenController::class, 'eliminarVista'])->name('examenes.eliminar');
 
     // Alta de examen desde su formulario. La validación vive en
     // StoreExamenRequest y el alta en RegistrarExamenService.
