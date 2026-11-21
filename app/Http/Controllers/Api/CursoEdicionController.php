@@ -19,10 +19,6 @@ class CursoEdicionController extends Controller
         $curso = $request->curso();
         $cambios = $request->datos();
 
-        if ($actualizar->existeDuplicado($curso, $cambios)) {
-            return $this->conflicto(new CursoDuplicadoException($cambios));
-        }
-
         try {
             $actualizado = $actualizar->ejecutar($curso, $cambios);
         } catch (CursoDuplicadoException $error) {

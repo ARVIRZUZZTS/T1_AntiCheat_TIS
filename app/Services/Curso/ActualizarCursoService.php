@@ -42,7 +42,7 @@ class ActualizarCursoService
         }
     }
 
-    public function existeDuplicado(Curso $curso, ActualizarCursoDTO $datos): bool
+    private function existeDuplicado(Curso $curso, ActualizarCursoDTO $datos): bool
     {
         return DB::table('curso as c')
             ->join('curso_tipo_gestion as ctg', 'ctg.id_curso', '=', 'c.id_curso')
