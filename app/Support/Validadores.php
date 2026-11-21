@@ -20,6 +20,8 @@
 
 namespace App\Support;
 
+use Illuminate\Validation\Rule;
+
 /**
  * Reglas y mensajes de validación reutilizables.
  *
@@ -98,5 +100,74 @@ class Validadores
             'password.max' => 'La contraseña no debe superar 50 caracteres.',
             'idCurso.required' => 'Debe seleccionar un curso.',
         ];
+    }
+
+    /**
+     * @param  list<int>  $idsGestion
+     * @return array<string, mixed>
+     */
+    public static function reglasCurso(array $idsGestion, int $anioMinimo): array
+    {
+        return [
+            'materia' => self::reglaMateria(),
+            'grupo' => self::reglaGrupo(),
+            'gestion' => self::reglaGestion($idsGestion),
+            'anio' => self::reglaAnio($anioMinimo),
+        ];
+    }
+
+    /** @return list<string> */
+    public static function reglaMateria(): array
+    {
+        return ['required', 'string', 'max:80'];
+    }
+
+    /** @return list<string> */
+    public static function reglaGrupo(): array
+    {
+        return ['required', 'regex:/^[A-Z0-9]{1,3}$/'];
+    }
+
+    /**
+     * @param  list<int>  $idsGestion
+     * @return list<mixed>
+     */
+    public static function reglaGestion(array $idsGestion): array
+    {
+        return ['required', 'integer', Rule::in($idsGestion)];
+    }
+
+    /** @return list<string> */
+    public static function reglaAnio(int $anioMinimo): array
+    {
+        return ['required', 'integer', 'digits:4', 'min:'.$anioMinimo];
+    }
+
+    /** @return array<string, string> */
+    public static function mensajesCurso(int $anioMinimo): array
+    {
+        return [
+            'materia.required' => 'Ingrese la materia.',
+            'materia.max' => 'La materia no debe superar los 80 caracteres.',
+            'grupo.required' => 'Ingrese el grupo.',
+            'grupo.regex' => 'El grupo solo admite letras y numeros, hasta 3 caracteres.',
+            'gestion.required' => 'Seleccione la gestion.',
+            'gestion.integer' => 'Seleccione una gestion valida.',
+            'gestion.in' => 'Seleccione una gestion valida.',
+            'anio.required' => 'Ingrese el año.',
+            'anio.integer' => 'Ingrese un año valido.',
+            'anio.digits' => 'Ingrese un año valido.',
+            'anio.min' => 'El año debe ser '.$anioMinimo.' o posterior.',
+        ];
+    }
+
+    public static function normalizarMateria(mixed $valor): string
+    {
+        return (string) preg_replace('/\s+/u', ' ', trim((string) $valor));
+    }
+
+    public static function normalizarGrupo(mixed $valor): string
+    {
+        return mb_strtoupper(trim((string) $valor));
     }
 }

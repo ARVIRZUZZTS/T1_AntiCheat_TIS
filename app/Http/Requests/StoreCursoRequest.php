@@ -40,8 +40,8 @@ namespace App\Http\Requests;
 
 use App\Services\Curso\ListarGestionesService;
 use App\Support\DTO\GestionCursoDTO;
+use App\Support\Validadores;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
 class StoreCursoRequest extends FormRequest
 {
@@ -69,8 +69,8 @@ class StoreCursoRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         $this->merge([
-            'materia' => preg_replace('/\s+/u', ' ', trim((string) $this->input('materia'))),
-            'grupo' => mb_strtoupper(trim((string) $this->input('grupo'))),
+            'materia' => Validadores::normalizarMateria($this->input('materia')),
+            'grupo' => Validadores::normalizarGrupo($this->input('grupo')),
         ]);
     }
 
@@ -79,14 +79,7 @@ class StoreCursoRequest extends FormRequest
      */
     public function rules(ListarGestionesService $gestiones): array
     {
-        return [
-            'materia' => ['required', 'string', 'max:80'],
-            'grupo' => ['required', 'regex:/^[A-Z0-9]{1,3}$/'],
-            'gestion' => ['required', 'integer', Rule::in(array_keys($gestiones->ejecutar()))],
-            // Cuatro cifras y desde el año actual: no se crean cursos de
-            // gestiones pasadas. Hacia adelante no hay tope.
-            'anio' => ['required', 'integer', 'digits:4', 'min:'.$this->anioMinimo()],
-        ];
+        return Validadores::reglasCurso(array_keys($gestiones->ejecutar()), $this->anioMinimo());
     }
 
     /**
@@ -127,19 +120,7 @@ class StoreCursoRequest extends FormRequest
      */
     public function messages(): array
     {
-        return [
-            'materia.required' => 'Ingrese la materia.',
-            'materia.max' => 'La materia no debe superar los 80 caracteres.',
-            'grupo.required' => 'Ingrese el grupo.',
-            'grupo.regex' => 'El grupo solo admite letras y numeros, hasta 3 caracteres.',
-            'gestion.required' => 'Seleccione la gestion.',
-            'gestion.integer' => 'Seleccione una gestion valida.',
-            'gestion.in' => 'Seleccione una gestion valida.',
-            'anio.required' => 'Ingrese el año.',
-            'anio.integer' => 'Ingrese un año valido.',
-            'anio.digits' => 'Ingrese un año valido.',
-            'anio.min' => 'El año debe ser '.$this->anioMinimo().' o posterior.',
-        ];
+        return Validadores::mensajesCurso($this->anioMinimo());
     }
 
     /**
