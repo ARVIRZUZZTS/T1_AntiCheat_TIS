@@ -40,6 +40,7 @@ use App\Http\Controllers\Api\AmbienteController;
 use App\Http\Controllers\Api\AuxiliaresDocenteController;
 use App\Http\Controllers\Api\CentralRiesgoController;
 use App\Http\Controllers\Api\ConfiguracionExamenDocenteController;
+use App\Http\Controllers\Api\CursoDetalleController;
 use App\Http\Controllers\Api\CursoEstudianteController;
 use App\Http\Controllers\Api\CursoExamenController;
 use App\Http\Controllers\Api\DetalleIncidenciaController;
@@ -182,6 +183,11 @@ Route::middleware(['web', 'auth:web'])->group(function (): void {
         ->whereNumber('curso')
         ->middleware('docente')
         ->name('api.examenes.cursos.desvincular');
+
+    Route::get('/cursos/{curso}', [CursoDetalleController::class, 'mostrar'])
+        ->whereNumber('curso')
+        ->middleware('docente')
+        ->name('api.cursos.detalle');
 
     Route::get('/cursos/{idCurso}/estudiantes', [CursoEstudianteController::class, 'index'])
         ->whereNumber('idCurso')
