@@ -40,6 +40,7 @@ namespace App\Http\Requests;
 
 use App\Services\Curso\ListarGestionesService;
 use App\Support\DTO\GestionCursoDTO;
+use App\Support\NombreCurso;
 use App\Support\Validadores;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -133,6 +134,6 @@ class StoreCursoRequest extends FormRequest
      */
     public function nombreCurso(): string
     {
-        return $this->validated('materia').' - Grupo '.$this->validated('grupo');
+        return NombreCurso::formatear($this->validated('materia'), $this->validated('grupo'));
     }
 }
