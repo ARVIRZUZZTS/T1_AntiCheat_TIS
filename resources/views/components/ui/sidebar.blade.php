@@ -132,6 +132,7 @@
             ['label' => 'Crear curso', 'route' => 'cursos.crear'],
             ['label' => 'Editar curso', 'route' => 'cursos.editar'],
             ['label' => 'Archivar curso', 'route' => 'cursos.archivar'],
+            ['label' => 'Restaurar curso', 'route' => 'cursos.restaurar'],
             ['label' => 'Eliminar curso', 'route' => 'cursos.eliminar'],
             ['label' => 'Cursos archivados', 'route' => 'cursos.archivados'],
             ['label' => 'Cargar CSV', 'route' => 'cursos.cargar-csv'],
