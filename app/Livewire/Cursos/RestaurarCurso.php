@@ -21,6 +21,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Cursos;
 
+use App\Enums\CursoEstado;
 use App\Models\Curso;
 use App\Models\Usuario;
 use App\Services\Curso\ListarCursosDocenteService;
@@ -62,10 +63,19 @@ class RestaurarCurso extends Component
         $curso = Curso::find($this->cursoId);
 
         if (! $docente instanceof Usuario || $curso === null) {
-            session()->flash('error', 'No se pudo restaurar el curso.');
-            $this->modalAbierto = false;
-            $this->cursoId = null;
-            $this->cursoNombre = '';
+            $this->cerrarConError('No se pudo restaurar el curso.');
+
+            return;
+        }
+
+        if ((int) $curso->sis_doc !== (int) $docente->id_usuario) {
+            $this->cerrarConError('No tienes permiso para restaurar este curso.');
+
+            return;
+        }
+
+        if ($curso->estado !== CursoEstado::Archivado->value) {
+            $this->cerrarConError('Solo se pueden restaurar cursos en estado Archivado.');
 
             return;
         }
@@ -73,17 +83,11 @@ class RestaurarCurso extends Component
         try {
             app(RestaurarCursoService::class)->ejecutar($docente, $curso);
         } catch (ValidationException $e) {
-            session()->flash('error', $e->errors()['curso'][0] ?? 'No se pudo restaurar el curso.');
-            $this->modalAbierto = false;
-            $this->cursoId = null;
-            $this->cursoNombre = '';
+            $this->cerrarConError($e->errors()['curso'][0] ?? 'No se pudo restaurar el curso.');
 
             return;
         } catch (AuthorizationException) {
-            session()->flash('error', 'No tienes permiso para restaurar este curso.');
-            $this->modalAbierto = false;
-            $this->cursoId = null;
-            $this->cursoNombre = '';
+            $this->cerrarConError('No tienes permiso para restaurar este curso.');
 
             return;
         }
@@ -100,5 +104,13 @@ class RestaurarCurso extends Component
         return view('livewire.cursos.restaurar-curso', [
             'cursos' => $servicio->archivados((int) auth()->id()),
         ])->extends('layouts.app');
+    }
+
+    private function cerrarConError(string $mensaje): void
+    {
+        session()->flash('error', $mensaje);
+        $this->modalAbierto = false;
+        $this->cursoId = null;
+        $this->cursoNombre = '';
     }
 }
