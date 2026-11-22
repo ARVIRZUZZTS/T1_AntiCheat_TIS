@@ -125,6 +125,11 @@ class CursoPolicy
             && $curso->estado === CursoEstado::Archivado->value;
     }
 
+    public function editar(Usuario $usuario, Curso $curso): bool
+    {
+        return (int) $curso->sis_doc === (int) $usuario->id_usuario;
+    }
+
     /**
      * Indica si el usuario puede crear exámenes en el curso: tiene que ser su
      * docente y el curso tiene que seguir en curso. La sección Exámenes solo
