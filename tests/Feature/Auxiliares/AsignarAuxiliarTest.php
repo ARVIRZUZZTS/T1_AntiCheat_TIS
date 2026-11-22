@@ -21,6 +21,8 @@
  * @changelog
  * - 2026-11-22  [Valery D. Ortuno P]  test: creacion inicial (HU 24).
  * - 2026-11-22  [Valery D. Ortuno P]  test: "Ver examenes" del auxiliar.
+ * - 2026-11-22  [Valery D. Ortuno P]  test: no se asignan examenes de cursos
+ *   archivados.
  *
  * @see App\Livewire\Auxiliares\AsignarAuxiliar
  * @see App\Services\Auxiliar\AsignarAuxiliarService
@@ -152,6 +154,22 @@ class AsignarAuxiliarTest extends TestCase
         $componente->call('asignarCurso', self::PATRICIA, self::ALGEBRA)->assertReturned(AsignarAuxiliarService::MENSAJE_NO_AUXILIAR);
 
         $this->assertSame(1, DB::table('auxiliar_curso')->count());
+    }
+
+    public function test_no_asigna_examenes_futuros_de_un_curso_archivado(): void
+    {
+        DB::table('examen')->insert([
+            'id_examen' => 505, 'fecha' => '2026-12-15', 'hora_inicio' => '08:00:00',
+            'duracion' => 90, 'creador' => self::ROBERTO, 'tipo_examen' => 1,
+        ]);
+        DB::table('examen_curso')->insert(['id_examen' => 505, 'id_curso' => self::ARCHIVADO]);
+
+        $componente = Livewire::actingAs($this->usuario(self::ROBERTO))->test(AsignarAuxiliar::class);
+
+        $this->assertNotContains(505, array_column($componente->instance()->datos['examenes'], 'id'));
+        $componente->call('asignarExamen', self::ANA, 505, true, true)
+            ->assertReturned(AsignarAuxiliarService::MENSAJE_EXAMEN_INVALIDO);
+        $this->assertSame(0, DB::table('auxiliar_examen')->count());
     }
 
     public function test_asigna_un_auxiliar_a_un_examen_con_las_paginas_elegidas(): void
