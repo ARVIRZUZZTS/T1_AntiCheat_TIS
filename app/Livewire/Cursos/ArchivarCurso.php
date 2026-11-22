@@ -13,6 +13,7 @@
  *
  * @changelog
  * - 2026-11-21  [Equipo T1]  feat: creación del componente y su ruta.
+ * - 2026-11-21  [Equipo T1]  feat: listado, modal, confirmación y aviso de éxito.
  */
 
 declare(strict_types=1);

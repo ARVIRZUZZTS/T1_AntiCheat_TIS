@@ -5,8 +5,7 @@
 
     @description
     Vista de la subsección «Archivar curso»: cursos activos del docente con un
-    botón «Archivar» por curso. El modal de confirmación y la notificación se
-    agregan en los siguientes pasos.
+    botón «Archivar» por curso, modal de confirmación y aviso de éxito.
 --}}
 
 @section('title', 'Archivar curso')
