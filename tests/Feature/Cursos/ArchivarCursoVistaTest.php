@@ -79,6 +79,16 @@ class ArchivarCursoVistaTest extends TestCase
             ->assertSee('min-h-11', false);
     }
 
+    public function test_vista_incluye_foco_inicial_retorno_y_trap_de_tab(): void
+    {
+        $codigo = (string) file_get_contents(resource_path('views/livewire/cursos/archivar-curso.blade.php'));
+
+        $this->assertStringContainsString("\$wire.\$watch('modalAbierto'", $codigo);
+        $this->assertStringContainsString("event.key !== 'Tab'", $codigo);
+        $this->assertStringContainsString("getElementById('archivar-curso-cancelar')", $codigo);
+        $this->assertStringContainsString('botonOrigenArchivar.focus()', $codigo);
+    }
+
     public function test_abrir_modal_muestra_el_nombre_del_curso_elegido(): void
     {
         $this->actingAs(Usuario::findOrFail(self::DOCENTE));
@@ -88,6 +98,7 @@ class ArchivarCursoVistaTest extends TestCase
             ->assertSet('modalAbierto', true)
             ->assertSet('cursoId', self::CURSO)
             ->assertSet('cursoNombre', 'Curso En Curso')
+            ->assertSee('id="modal-archivar-curso"', false)
             ->assertSee('Archivar curso')
             ->assertSee('Curso En Curso');
     }
@@ -121,6 +132,7 @@ class ArchivarCursoVistaTest extends TestCase
             ->assertSet('modalAbierto', false)
             ->assertSet('archivando', false)
             ->assertSet('mostrarExito', true)
+            ->assertSee('role="status"', false)
             ->assertSee('Curso archivado con éxito')
             ->assertDontSee('Curso En Curso');
 

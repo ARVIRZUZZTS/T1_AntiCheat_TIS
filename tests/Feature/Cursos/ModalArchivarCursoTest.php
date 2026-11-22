@@ -51,6 +51,12 @@ class ModalArchivarCursoTest extends TestCase
         $this->assertStringContainsString('flex flex-col gap-3 border-t border-default pt-4 sm:flex-row', $html);
         $this->assertStringContainsString('max-h-[calc(100vh-2rem)]', $html);
         $this->assertSame(2, substr_count($html, 'min-h-11'));
+        $this->assertStringContainsString('role="dialog"', $html);
+        $this->assertStringContainsString('aria-modal="true"', $html);
+        $this->assertStringContainsString('aria-labelledby="titulo-archivar-curso"', $html);
+        $this->assertStringContainsString('aria-describedby="archivar-curso-nombre"', $html);
+        $this->assertStringContainsString('id="archivar-curso-cancelar"', $html);
+        $this->assertStringContainsString('autofocus', $html);
     }
 
     public function test_cierra_sin_cambios_con_cancelar_x_escape_y_clic_fuera(): void
