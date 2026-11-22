@@ -18,6 +18,7 @@
  * @updated 2026-11-15
  * @updated 2026-11-16
  * @updated 2026-11-19
+ * @updated 2026-11-21
  *
  * @description
  * Definición de rutas web del panel. Incluye vistas estáticas y componentes Livewire.
@@ -94,10 +95,12 @@
  * - 2026-11-19  [Valery D. Ortuno P]  feat: marcadores "Editar auxiliar" y
  *   "Eliminar auxiliar" (pagina en desarrollo) para el menu de Auxiliares, y
  *   pagina "Eliminar examen" (/examenes/eliminar).
+ * - 2026-11-21  [Alisson D. Alvarado]  feat: conectar la página de edición de cursos.
  */
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CursoController;
+use App\Http\Controllers\EditarCursoVistaController;
 use App\Http\Controllers\ExamenController;
 use App\Http\Controllers\Reporte\ExportarReporteIngresosIlegalesController;
 use App\Http\Controllers\Reporte\ListarReporteIngresosIlegalesController;
@@ -223,10 +226,7 @@ Route::middleware(['auth', 'docente'])->group(function (): void {
         ->name('cursos.ver-estudiantes');
     Route::get('/cursos/habilitar-estudiantes', [CursoController::class, 'habilitarEstudiantes'])
         ->name('cursos.habilitar-estudiantes');
-    Route::view('/cursos/editar', 'pages.en-desarrollo', [
-        'titulo' => 'Editar curso',
-        'descripcion' => 'La edicion de curso esta en desarrollo.',
-    ])->name('cursos.editar');
+    Route::get('/cursos/editar', EditarCursoVistaController::class)->name('cursos.editar');
     Route::get('/cursos/cargar-csv', function (Request $request) {
         $cursoId = $request->integer('curso');
         if ($cursoId > 0) {
