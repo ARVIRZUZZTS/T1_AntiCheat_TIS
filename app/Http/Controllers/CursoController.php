@@ -225,17 +225,6 @@ class CursoController extends Controller
             ->with('mensaje', 'Curso eliminado con exito');
     }
 
-    public function archivarLista(Request $request): View
-    {
-        return view('pages.curso-archivar', [
-            'cursos' => Curso::query()
-                ->where('sis_doc', $request->user()->id_usuario)
-                ->where('estado', \App\Enums\CursoEstado::EnCurso->value)
-                ->orderBy('nombre_curso')
-                ->get(['id_curso', 'nombre_curso']),
-        ]);
-    }
-
     public function archivar(Request $request, Curso $curso, ArchivarCursoService $servicio): RedirectResponse|JsonResponse
     {
         $usuario = $request->user();

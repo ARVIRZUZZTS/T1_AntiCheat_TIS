@@ -14,6 +14,7 @@
  * @updated 2026-11-05
  * @updated 2026-11-14
  * @updated 2026-11-19
+ * @updated 2026-11-20
  *
  * @description
  * Controlador HTTP de la sección Exámenes del docente. Solo orquesta:
@@ -22,6 +23,8 @@
  *   sola página; el curso del alta se elige dentro del formulario.
  * - `curso`: página anterior de un curso (se mantiene por compatibilidad).
  * - `crear`: el formulario de alta de un examen, como página propia.
+ * - `eliminarVista`: la subopción "Eliminar examen" del sidebar, con la lista
+ *   de todos los exámenes del docente ordenada (programados primero).
  * - `store`: valida (StoreExamenRequest), delega el alta en
  *   RegistrarExamenService y vuelve a la página única con el curso elegido y
  *   un mensaje de éxito.
@@ -51,13 +54,15 @@
  * - 2026-11-15  [Diego Tejerina]  feat: `crearFormulario` sirve la subopción
  *   "Crear examen" del sidebar: selector de curso + el formulario de alta que
  *   ya existe, sin depender del SPA de la página Exámenes.
- * - 2026-11-19  [Valery D. Ortuno P]  feat: `eliminarVista` sirve la subopción
- *   "Eliminar examen": el parcial acotado a la lista, con selector de curso y
- *   el botón Eliminar de cada tarjeta.
+ * - 2026-11-20  [OchoaCesar]  feat: `eliminarVista` sirve la subopción
+ *   "Eliminar examen" del sidebar: lista de todos los exámenes del docente,
+ *   programados primero y finalizados al final, con los cursos que el docente
+ *   gestiona por examen para el botón de eliminación.
  *
  * @see  StoreExamenRequest
  * @see  App\Services\Examen\CatalogosExamenService
  * @see  App\Services\Examen\RegistrarExamenService
+ * @see  App\Services\Examen\ListarExamenesDocenteService
  * @see  App\Services\Curso\ListarCursosDocenteService
  * @see  App\Policies\CursoPolicy
  */
@@ -68,10 +73,15 @@ use App\Http\Requests\StoreExamenRequest;
 use App\Models\Curso;
 use App\Services\Curso\ListarCursosDocenteService;
 use App\Services\Examen\CatalogosExamenService;
+use App\Services\Examen\ListarExamenesCursoService;
+use App\Services\Examen\ListarExamenesDocenteService;
 use App\Services\Examen\RegistrarExamenService;
+use Carbon\Carbon;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 
 class ExamenController extends Controller
@@ -85,10 +95,10 @@ class ExamenController extends Controller
      * @param  Request  $request  Request con el docente autenticado.
      * @param  ListarCursosDocenteService  $cursos  Servicio de cursos del docente.
      * @param  CatalogosExamenService  $catalogos  Catálogos del formulario de alta.
-     *
-     * @return View  Vista pages.examenes.
+     * @return View Vista pages.examenes.
      *
      * @author Valery D. Ortuno P <valerydariana98@gmail.com>
+     *
      * @since  2026-10-24
      */
     public function index(
@@ -134,12 +144,12 @@ class ExamenController extends Controller
      *
      * @param  Curso  $curso  Curso de la URL.
      * @param  CatalogosExamenService  $catalogos  Catálogos del formulario.
+     * @return View Vista pages.examenes-curso.
      *
-     * @return View  Vista pages.examenes-curso.
-     *
-     * @throws \Illuminate\Auth\Access\AuthorizationException  Si el curso no es del docente (403).
+     * @throws AuthorizationException Si el curso no es del docente (403).
      *
      * @author Valery D. Ortuno P <valerydariana98@gmail.com>
+     *
      * @since  2026-10-24
      */
     public function curso(Curso $curso, CatalogosExamenService $catalogos): View
@@ -164,12 +174,12 @@ class ExamenController extends Controller
      * Formulario de alta de un examen en el curso.
      *
      * @param  Curso  $curso  Curso de la URL.
+     * @return View Vista pages.examen-crear.
      *
-     * @return View  Vista pages.examen-crear.
-     *
-     * @throws \Illuminate\Auth\Access\AuthorizationException  Si el curso no es del docente o ya finalizó (403).
+     * @throws AuthorizationException Si el curso no es del docente o ya finalizó (403).
      *
      * @author Valery D. Ortuno P <valerydariana98@gmail.com>
+     *
      * @since  2026-10-24
      */
     public function crear(Curso $curso, CatalogosExamenService $catalogos): View
@@ -196,10 +206,10 @@ class ExamenController extends Controller
      * @param  Request  $request  Request con el docente autenticado.
      * @param  ListarCursosDocenteService  $cursos  Cursos activos del docente.
      * @param  CatalogosExamenService  $catalogos  Catalogos del formulario.
-     *
-     * @return View  Vista pages.examen-crear-seleccion.
+     * @return View Vista pages.examen-crear-seleccion.
      *
      * @author Diego Tejerina <josediegotejerinamolina@gmail.com>
+     *
      * @since  2026-11-15
      */
     public function crearFormulario(
@@ -237,6 +247,7 @@ class ExamenController extends Controller
      * la pestaña Editar (selector de materia + examen a editar + formulario).
      *
      * @author Diego Tejerina <josediegotejerinamolina@gmail.com>
+     *
      * @since  2026-11-15
      */
     public function editarVista(
@@ -248,26 +259,11 @@ class ExamenController extends Controller
     }
 
     /**
-     * Subopción "Eliminar examen": el parcial acotado a la pestaña de lista,
-     * que con un curso elegido ofrece Eliminar en cada tarjeta (con su modal
-     * de confirmación y el bloqueo de exámenes ya iniciados).
-     *
-     * @author Valery D. Ortuno P <valerydariana98@gmail.com>
-     * @since  2026-11-19
-     */
-    public function eliminarVista(
-        Request $request,
-        ListarCursosDocenteService $cursos,
-        CatalogosExamenService $catalogos,
-    ): View {
-        return $this->seccionAcotada($request, $cursos, $catalogos, 'lista', 'pages.examenes-eliminar');
-    }
-
-    /**
      * Subopción "Dividir examen": el mismo parcial acotado a la pestaña Dividir
      * (selector de materia + examen con 2+ aulas + configuración de división).
      *
      * @author Diego Tejerina <josediegotejerinamolina@gmail.com>
+     *
      * @since  2026-11-15
      */
     public function dividirVista(
@@ -279,10 +275,88 @@ class ExamenController extends Controller
     }
 
     /**
+     * Subopción "Eliminar examen": la lista de todos los exámenes del docente
+     * (propios y con invitación aceptada), con los programados primero y los
+     * finalizados al final. Por cada examen entrega además los cursos que el
+     * docente gestiona (es el dueño), que son los únicos donde sale el botón
+     * "Eliminar": un examen compartido donde solo es invitado se muestra sin
+     * botón.
+     *
+     * @param  Request  $request  Request con el docente autenticado.
+     * @param  ListarExamenesDocenteService  $examenes  Listado del docente.
+     * @return View Vista pages.examen-eliminar.
+     *
+     * @author OchoaCesar <cesareduardonick@gmail.com>
+     *
+     * @since  2026-11-20
+     */
+    public function eliminarVista(Request $request, ListarExamenesDocenteService $examenes): View
+    {
+        $idDocente = (int) $request->user()->id_usuario;
+        $ahora = Carbon::now();
+
+        $listado = array_map(function (array $examen): array {
+            $examen['estado'] = match ($examen['estado']) {
+                ListarExamenesCursoService::ESTADO_EN_CURSO => 'En curso',
+                ListarExamenesCursoService::ESTADO_FINALIZADO => 'Finalizado',
+                default => 'Programado',
+            };
+
+            return $examen;
+        }, $examenes->ejecutar($idDocente, $ahora));
+
+        // Cursos del docente vinculados a cada examen: solo de esos cursos
+        // sale el botón "Eliminar" en la tarjeta.
+        $cursosPropios = DB::table('examen_curso as ec')
+            ->join('curso as c', 'c.id_curso', '=', 'ec.id_curso')
+            ->where('c.sis_doc', $idDocente)
+            ->whereIn('ec.id_examen', array_column($listado, 'id'))
+            ->get(['ec.id_examen', 'ec.id_curso', 'c.nombre_curso'])
+            ->groupBy('id_examen');
+
+        foreach ($listado as $indice => $examen) {
+            $listado[$indice]['cursos_propios'] = $cursosPropios
+                ->get($examen['id'])
+                ?->map(fn ($fila): array => [
+                    'id' => (int) $fila->id_curso,
+                    'nombre' => (string) $fila->nombre_curso,
+                ])
+                ->values()
+                ->all() ?? [];
+        }
+
+        // Programados y en curso primero (fecha ascendente: los más próximos
+        // arriba); finalizados al final (fecha descendente: los más recientes).
+        $activos = array_values(array_filter(
+            $listado,
+            fn (array $examen): bool => $examen['estado'] !== 'Finalizado',
+        ));
+        $finalizados = array_values(array_filter(
+            $listado,
+            fn (array $examen): bool => $examen['estado'] === 'Finalizado',
+        ));
+
+        usort($activos, static function (array $primero, array $segundo): int {
+            return [$primero['fecha'] ?? '9999-12-31', $primero['hora_inicio'] ?? '', $primero['id']]
+                <=> [$segundo['fecha'] ?? '9999-12-31', $segundo['hora_inicio'] ?? '', $segundo['id']];
+        });
+
+        usort($finalizados, static function (array $primero, array $segundo): int {
+            return [$segundo['fecha'] ?? '', $segundo['hora_inicio'] ?? '', $segundo['id']]
+                <=> [$primero['fecha'] ?? '', $primero['hora_inicio'] ?? '', $primero['id']];
+        });
+
+        return view('pages.examen-eliminar', [
+            'examenes' => array_merge($activos, $finalizados),
+            'ahora' => $ahora->format('Y-m-d H:i'),
+        ]);
+    }
+
+    /**
      * Arma los datos del parcial de exámenes acotado a una sola pestaña.
      *
      * @param  string  $soloTab  Pestaña única a mostrar (editar / dividir).
-     * @param  string  $vista    Vista contenedora.
+     * @param  string  $vista  Vista contenedora.
      */
     private function seccionAcotada(
         Request $request,
