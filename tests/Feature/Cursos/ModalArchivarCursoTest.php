@@ -48,6 +48,9 @@ class ModalArchivarCursoTest extends TestCase
         $this->assertStringContainsString('wire:click="archivar"', $html);
         $this->assertStringNotContainsString('Archivando…', $html);
         $this->assertSame(1, substr_count($html, 'Cancelar'));
+        $this->assertStringContainsString('flex flex-col gap-3 border-t border-default pt-4 sm:flex-row', $html);
+        $this->assertStringContainsString('max-h-[calc(100vh-2rem)]', $html);
+        $this->assertSame(2, substr_count($html, 'min-h-11'));
     }
 
     public function test_cierra_sin_cambios_con_cancelar_x_escape_y_clic_fuera(): void

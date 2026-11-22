@@ -74,7 +74,9 @@ class ArchivarCursoVistaTest extends TestCase
             ->assertSee('Curso En Curso')
             ->assertSee('Otro Curso')
             ->assertSee('wire:click="abrirModal('.self::CURSO.')"', false)
-            ->assertSee('Archivar');
+            ->assertSee('Archivar')
+            ->assertSee('flex-col gap-3 border-b border-default p-4 last:border-b-0 sm:flex-row', false)
+            ->assertSee('min-h-11', false);
     }
 
     public function test_abrir_modal_muestra_el_nombre_del_curso_elegido(): void
