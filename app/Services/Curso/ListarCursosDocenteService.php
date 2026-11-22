@@ -20,6 +20,8 @@
  *   son por examen y se manejan en la sección Exámenes (`activos()`).
  * - `activos()`: los cursos en curso propios y los de invitaciones aceptadas,
  *   para elegir uno en Exámenes.
+ * - `archivados()`: los cursos propios en estado `Archivado`, para la vista
+ *   «Restaurar curso» (HU #322 · Task #326).
  *
  * El orden se aplica acá y no en ListarMateriasConMetricasService porque ese
  * servicio también alimenta a Reportes, que depende de su orden por id.
@@ -34,6 +36,8 @@
  *   invitados ni las claves `invitado`/`es_anfitrion` — el criterio era
  *   incorrecto, las invitaciones son por examen y solo se manejan en Exámenes
  *   (ahí `activos()` sigue marcando el curso anfitrión).
+ * - 2026-11-21  [Equipo T1]  feat: agrega `archivados()` para la vista
+ *   Restaurar curso (Refs #326).
  *
  * @see  App\Services\Curso\ListarMateriasConMetricasService
  * @see  App\Http\Controllers\CursoController
@@ -113,6 +117,26 @@ class ListarCursosDocenteService
                     ? Str::ucfirst($fila->nombre_tipo_gestion).' '.$fila->anio
                     : null,
             ]);
+    }
+
+    /**
+     * Cursos archivados propios del docente, ordenados por nombre.
+     *
+     * @param  int  $idDocente  ID del docente (`curso.sis_doc`).
+     * @return EloquentCollection<int, Curso> Cursos en estado `Archivado`.
+     *
+     * @author Equipo T1
+     *
+     * @since  2026-11-21
+     */
+    public function archivados(int $idDocente): EloquentCollection
+    {
+        return Curso::query()
+            ->where('sis_doc', $idDocente)
+            ->where('estado', CursoEstado::Archivado->value)
+            ->orderBy('nombre_curso')
+            ->orderBy('id_curso')
+            ->get(['id_curso', 'nombre_curso', 'estado']);
     }
 
     /**
