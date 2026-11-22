@@ -38,6 +38,15 @@ class ArchivarCurso extends Component
 
     public string $errorArchivar = '';
 
+    public function cerrarModal(): void
+    {
+        if ($this->archivando) {
+            return;
+        }
+
+        $this->reset(['modalAbierto', 'cursoId', 'cursoNombre', 'archivando', 'errorArchivar']);
+    }
+
     public function abrirModal(int $cursoId): void
     {
         $curso = Curso::query()
