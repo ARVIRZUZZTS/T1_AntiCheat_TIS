@@ -15,11 +15,21 @@
 
 @if ($cursoId !== null)
     <div
-        x-data
-        x-show="$wire.modalAbierto"
+        x-data="{ abierto: $wire.entangle('modalAbierto') }"
+        x-show="abierto"
         x-cloak
+        x-effect="if (abierto) $nextTick(() => $refs.confirmarRestaurar?.focus())"
         x-on:keydown.escape.window="$wire.cancelar()"
         x-on:click.self="$wire.cancelar()"
+        x-on:keydown.tab="
+            if ($event.shiftKey && document.activeElement === $refs.confirmarRestaurar) {
+                $event.preventDefault();
+                $refs.cancelarRestaurar.focus();
+            } else if (!$event.shiftKey && document.activeElement === $refs.cancelarRestaurar) {
+                $event.preventDefault();
+                $refs.confirmarRestaurar.focus();
+            }
+        "
         class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-neutral-950/60 p-4"
     >
         <div
