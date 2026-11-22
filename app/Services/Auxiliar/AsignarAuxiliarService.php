@@ -14,7 +14,8 @@
  *  - Curso: fila en `auxiliar_curso` en estado Activo. El auxiliar ve todos
  *    los examenes del curso en Ingreso y en Monitor. Quitarla la pasa a Baja.
  *  - Examen: fila en `auxiliar_examen` con las paginas elegidas (Ingreso,
- *    Monitor o las dos). Solo examenes futuros de los cursos del docente.
+ *    Monitor o las dos). Solo examenes futuros de los cursos en curso del
+ *    docente (no de cursos archivados).
  *    Volver a asignar el mismo examen actualiza las paginas. Quitarla borra
  *    la fila.
  *
@@ -122,6 +123,7 @@ class AsignarAuxiliarService
                     ->join('curso as c', 'c.id_curso', '=', 'ec.id_curso')
                     ->whereColumn('ec.id_examen', 'e.id_examen')
                     ->where('c.sis_doc', $idDocente)
+                    ->where('c.estado', CursoEstado::EnCurso->value)
                     ->selectRaw('1'))
                 ->where(fn ($consulta) => $consulta
                     ->where('e.fecha', '>', $ahora->toDateString())

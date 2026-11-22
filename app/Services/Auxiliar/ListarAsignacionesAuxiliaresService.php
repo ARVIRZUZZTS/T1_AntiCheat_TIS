@@ -14,7 +14,8 @@
  *    asignaciones dentro de los cursos del docente (cursos y examenes
  *    sueltos, con las paginas que ve en cada examen).
  *  - `cursos`: los cursos en curso del docente, para asignar a un curso.
- *  - `examenes`: los examenes futuros de esos cursos, para asignar a uno.
+ *  - `examenes`: los examenes futuros de esos cursos en curso (no de cursos
+ *    archivados), para asignar a uno.
  *
  * Todo sale en tres consultas (la base remota pesa ~380 ms por viaje); las
  * etiquetas de los examenes se arman en PHP para no depender de funciones de
@@ -134,6 +135,7 @@ class ListarAsignacionesAuxiliaresService
             ->join('curso as c', 'c.id_curso', '=', 'ec.id_curso')
             ->leftJoin('tipo_examen as t', 't.id_tipo_examen', '=', 'e.tipo_examen')
             ->where('c.sis_doc', $idDocente)
+            ->where('c.estado', CursoEstado::EnCurso->value)
             ->where(fn ($consulta) => $consulta
                 ->where('e.fecha', '>', $ahora->toDateString())
                 ->orWhere(fn ($hoy) => $hoy
