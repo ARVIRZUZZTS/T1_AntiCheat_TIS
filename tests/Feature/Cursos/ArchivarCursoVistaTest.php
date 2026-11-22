@@ -107,4 +107,53 @@ class ArchivarCursoVistaTest extends TestCase
             DB::table('curso')->where('id_curso', self::CURSO)->value('estado'),
         );
     }
+
+    public function test_confirmar_archiva_el_curso_y_cierra_el_modal(): void
+    {
+        $this->actingAs(Usuario::findOrFail(self::DOCENTE));
+
+        Livewire::test(ArchivarCurso::class)
+            ->call('abrirModal', self::CURSO)
+            ->call('archivar')
+            ->assertSet('modalAbierto', false)
+            ->assertSet('archivando', false)
+            ->assertDontSee('Curso En Curso');
+
+        $this->assertSame(
+            CursoEstado::Archivado->value,
+            DB::table('curso')->where('id_curso', self::CURSO)->value('estado'),
+        );
+    }
+
+    public function test_no_archiva_dos_veces_mientras_esta_procesando(): void
+    {
+        $this->actingAs(Usuario::findOrFail(self::DOCENTE));
+
+        Livewire::test(ArchivarCurso::class)
+            ->call('abrirModal', self::CURSO)
+            ->set('archivando', true)
+            ->call('archivar')
+            ->assertSet('archivando', true);
+
+        $this->assertSame(
+            CursoEstado::EnCurso->value,
+            DB::table('curso')->where('id_curso', self::CURSO)->value('estado'),
+        );
+    }
+
+    public function test_muestra_error_si_el_curso_ya_no_esta_en_curso(): void
+    {
+        $this->actingAs(Usuario::findOrFail(self::DOCENTE));
+
+        $componente = Livewire::test(ArchivarCurso::class)
+            ->call('abrirModal', self::CURSO);
+
+        DB::table('curso')
+            ->where('id_curso', self::CURSO)
+            ->update(['estado' => CursoEstado::Archivado->value]);
+
+        $componente->call('archivar')
+            ->assertSet('modalAbierto', true)
+            ->assertSet('errorArchivar', 'No tienes permiso para archivar este curso.');
+    }
 }
