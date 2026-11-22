@@ -100,7 +100,8 @@ class ArchivarCursoVistaTest extends TestCase
             ->assertSet('modalAbierto', false)
             ->assertSet('cursoId', null)
             ->assertSet('cursoNombre', '')
-            ->assertDontSee('titulo-archivar-curso', false);
+            ->assertDontSee('titulo-archivar-curso', false)
+            ->assertDontSee('Curso archivado con éxito');
 
         $this->assertSame(
             CursoEstado::EnCurso->value,
@@ -117,6 +118,8 @@ class ArchivarCursoVistaTest extends TestCase
             ->call('archivar')
             ->assertSet('modalAbierto', false)
             ->assertSet('archivando', false)
+            ->assertSet('mostrarExito', true)
+            ->assertSee('Curso archivado con éxito')
             ->assertDontSee('Curso En Curso');
 
         $this->assertSame(
