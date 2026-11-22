@@ -144,6 +144,23 @@ class ArchivarCursoVistaTest extends TestCase
         );
     }
 
+    public function test_curso_archivado_desaparece_de_la_lista_al_recargar(): void
+    {
+        DB::table('curso')
+            ->where('id_curso', self::CURSO)
+            ->update(['estado' => CursoEstado::Archivado->value]);
+
+        $this->actingAs(Usuario::findOrFail(self::DOCENTE))
+            ->get(route('cursos.archivar'))
+            ->assertOk()
+            ->assertSee('Otro Curso')
+            ->assertDontSee('Curso En Curso');
+
+        Livewire::test(ArchivarCurso::class)
+            ->assertSee('Otro Curso')
+            ->assertDontSee('Curso En Curso');
+    }
+
     public function test_muestra_error_si_el_curso_ya_no_esta_en_curso(): void
     {
         $this->actingAs(Usuario::findOrFail(self::DOCENTE));
