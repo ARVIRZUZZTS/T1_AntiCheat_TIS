@@ -64,6 +64,8 @@ class RestaurarCurso extends Component
         if (! $docente instanceof Usuario || $curso === null) {
             session()->flash('error', 'No se pudo restaurar el curso.');
             $this->modalAbierto = false;
+            $this->cursoId = null;
+            $this->cursoNombre = '';
 
             return;
         }
@@ -73,11 +75,15 @@ class RestaurarCurso extends Component
         } catch (ValidationException $e) {
             session()->flash('error', $e->errors()['curso'][0] ?? 'No se pudo restaurar el curso.');
             $this->modalAbierto = false;
+            $this->cursoId = null;
+            $this->cursoNombre = '';
 
             return;
         } catch (AuthorizationException) {
             session()->flash('error', 'No tienes permiso para restaurar este curso.');
             $this->modalAbierto = false;
+            $this->cursoId = null;
+            $this->cursoNombre = '';
 
             return;
         }
