@@ -4,8 +4,8 @@ namespace App\Livewire\Monitoreo;
 
 use App\Models\Examen;
 use App\Models\Rol;
+use App\Services\Auxiliar\AccesoAuxiliarService;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 
@@ -48,7 +48,17 @@ class AccesoMonitor extends Component
         $ahora = $this->ahoraSimulada();
         $hoy = $ahora->toDateString();
 
-        return $examenes->map(function (Examen $examen) use ($ahora, $hoy): array {
+        // "Iniciar" abre el Monitor: un auxiliar asignado solo a Ingreso en un
+        // examen no lo ve (HU 24). Para el docente es null = todos.
+        $idsMonitor = $this->esAuxiliar()
+            ? app(AccesoAuxiliarService::class)
+                ->idsExamenes((int) auth()->id(), AccesoAuxiliarService::MONITOR)
+                ->pluck('id_examen')
+                ->map(fn ($id): int => (int) $id)
+                ->all()
+            : null;
+
+        return $examenes->map(function (Examen $examen) use ($ahora, $hoy, $idsMonitor): array {
             $inicio = Carbon::parse($examen->fecha.' '.$examen->hora_inicio);
             $fin = $examen->hora_fin
                 ? Carbon::parse($examen->fecha.' '.$examen->hora_fin)
@@ -76,6 +86,7 @@ class AccesoMonitor extends Component
                 'estado' => $estado,
                 'es_hoy' => $examen->fecha === $hoy,
                 'tiempo_restante' => $this->tiempoRestante((int) $ahora->diffInMinutes($inicio, false)),
+                'puede_monitor' => $idsMonitor === null || in_array((int) $examen->id_examen, $idsMonitor, true),
             ];
         });
     }
@@ -122,13 +133,16 @@ class AccesoMonitor extends Component
                     ->where('curso.sis_doc', auth()->id()));
         }
 
-        $cursosAsignados = DB::table('auxiliar_curso')
-            ->where('id_auxiliar', auth()->id())
-            ->pluck('id_curso');
-
-        return $consulta->whereHas(
-            'cursos',
-            fn ($cursos) => $cursos->whereIn('curso.id_curso', $cursosAsignados)
+        // Auxiliar: examenes de sus cursos activos y los asignados con Ingreso
+        // (HU 24).
+        return $consulta->whereIn(
+            'id_examen',
+            app(AccesoAuxiliarService::class)->idsExamenes((int) auth()->id(), AccesoAuxiliarService::INGRESO)
         );
+    }
+
+    private function esAuxiliar(): bool
+    {
+        return auth()->check() && ! auth()->user()->roles->contains('nombre_rol', Rol::NOMBRE_DOCENTE);
     }
 }

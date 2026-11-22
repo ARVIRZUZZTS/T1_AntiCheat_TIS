@@ -104,6 +104,9 @@
  * - 2026-11-22  [Valery D. Ortuno P]  fix: se quitan los `use` repetidos
  *   (EstudiantesCurso, MonitorEnVivo, AccesoMonitor) que dejaron los merges
  *   del 21/11; PHP no arrancaba por "name is already in use".
+ * - 2026-11-22  [Valery D. Ortuno P]  feat: "Asignar auxiliar" deja de ser un
+ *   marcador: pagina AsignarAuxiliar, solo para docentes (HU 24); y
+ *   /mis-examenes, "Ver examenes" del auxiliar.
  */
 
 use App\Http\Controllers\AuthController;
@@ -116,7 +119,9 @@ use App\Http\Controllers\Reporte\ListarReporteIngresosIlegalesController;
 use App\Http\Controllers\Reporte\ReporteController;
 use App\Livewire\Cursos\RestaurarCurso;
 use App\Livewire\Cursos\ArchivarCurso;
+use App\Livewire\Auxiliares\AsignarAuxiliar;
 use App\Livewire\Auxiliares\CrearAuxiliar;
+use App\Livewire\Auxiliares\ExamenesAuxiliar;
 use App\Livewire\Auxiliares\GestionAuxiliares;
 use App\Livewire\Examenes\EstudiantesCurso;
 use App\Livewire\Invitaciones\Index as InvitacionesIndex;
@@ -133,6 +138,9 @@ Route::middleware('auth')->group(function (): void {
     // Destino de "Cursos" en el sidebar del auxiliar. Su contenido (cursos a los
     // que está asignado y sus exámenes) se define en una HU posterior.
     Route::view('/mis-cursos', 'pages.auxiliar-cursos')->name('auxiliar.cursos');
+    // Examenes > Ver examenes del auxiliar (HU 24): solo los examenes a los
+    // que esta asignado (los de sus cursos y los sueltos). Solo auxiliares.
+    Route::get('/mis-examenes', ExamenesAuxiliar::class)->name('auxiliar.examenes');
     Route::get('/monitoreo', MonitorEnVivo::class)->name('monitoreo');
     // Monitor en vivo · Ingreso: la vista de proximos examenes y el boton
     // "Iniciar". Antes vivia en /monitoreo/acceso; la ruta vieja redirige.
@@ -140,13 +148,12 @@ Route::middleware('auth')->group(function (): void {
     Route::redirect('/monitoreo/acceso', '/monitoreo/ingreso');
 
     Route::get('/auxiliares', GestionAuxiliares::class)->name('auxiliares');
-    // Auxiliares · Asignar: elegir un auxiliar activo y asignarlo a un examen
-    // futuro. Requiere una tabla auxiliar_examen que aun no existe (Bloque 4),
-    // por eso de momento es un marcador.
-    Route::view('/auxiliares/asignar', 'pages.en-desarrollo', [
-        'titulo' => 'Asignar auxiliar',
-        'descripcion' => 'La asignacion de auxiliares a examenes esta en desarrollo.',
-    ])->name('auxiliares.asignar');
+    // Auxiliares · Asignar (HU 24): asignar un auxiliar ya creado a un curso o
+    // a un examen futuro del docente, eligiendo si ve Ingreso, Monitor o las
+    // dos. Solo docentes.
+    Route::get('/auxiliares/asignar', AsignarAuxiliar::class)
+        ->middleware('docente')
+        ->name('auxiliares.asignar');
     // Auxiliares · Crear: el alta de auxiliar como pagina propia (antes era un
     // modal dentro de GestionAuxiliares). Al guardar vuelve a la lista.
     Route::get('/auxiliares/crear', CrearAuxiliar::class)->name('auxiliares.crear');
