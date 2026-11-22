@@ -4,6 +4,7 @@
     @created 2026-11-18
     @updated 2026-11-18
     @updated 2026-11-19
+    @updated 2026-11-20
 
     @description
     Listado exclusivo de la subopción «Ver examenes». No contiene la barra de
@@ -27,6 +28,10 @@
     - 2026-11-19  [Valery D. Ortuno P]  perf: el detalle abre al instante con
       los datos de la tarjeta y solo espera docentes, reglas y materiales; se
       pide al pasar el mouse por "Ver detalle" y queda guardado para reabrirlo.
+    - 2026-11-20  [OchoaCesar]  refactor: la eliminación de examen pasa a la
+      página propia /examenes/eliminar (subopción del sidebar); se retiran de
+      aquí el botón "Eliminar" de la tarjeta, el aviso de bloqueo y sus
+      modales.
 
     @see  App\Http\Controllers\Api\ExamenDetalleController
     @see  resources/views/pages/examenes.blade.php

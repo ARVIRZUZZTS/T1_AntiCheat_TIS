@@ -8,6 +8,7 @@
     @updated 2026-11-15
     @updated 2026-11-16
     @updated 2026-11-19
+    @updated 2026-11-20
 
     @description
     Sidebar de navegacion del panel, en formato acordeon. Cada seccion
@@ -70,6 +71,8 @@
       "Editar auxiliar" y "Eliminar auxiliar" (estos dos, marcadores en
       desarrollo) y vuelve "Docentes" > "Validar registros" con el contador de
       solicitudes de registro (HU 26), que se habia perdido en el acordeon.
+    - 2026-11-20  [OchoaCesar]  feat: subopción "Eliminar examen" debajo de
+      "Editar examen".
 --}}
 
 @props([
