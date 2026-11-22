@@ -7,6 +7,8 @@
  *
  * @created 2026-11-08
  *
+ * @updated 2026-11-19
+ *
  * @description
  * Pruebas de la validación del registro de nuevos docentes (HU 26): la
  * pantalla "Docentes" (cards, contador "X de 2 verificaciones", aprobaciones,
@@ -18,6 +20,8 @@
  *
  * @changelog
  * - 2026-11-08  [Valery D. Ortuno P]  test: creación inicial (HU 26).
+ * - 2026-11-19  [Valery D. Ortuno P]  test: el esquema suma la tabla de
+ *   invitaciones, que el sidebar consulta para su contador.
  *
  * @see App\Livewire\Docentes\ValidarRegistros
  * @see App\Services\Docente\ValidarRegistroDocenteService
@@ -282,6 +286,12 @@ class ValidarRegistroDocenteTest extends TestCase
         Schema::create('rol_usuario', function (Blueprint $tabla): void {
             $tabla->integer('id_usuario');
             $tabla->integer('id_rol');
+        });
+        // El sidebar cuenta las invitaciones pendientes del docente.
+        Schema::create('invitacion_examen_compartido', function (Blueprint $tabla): void {
+            $tabla->integer('id_invitacion')->primary();
+            $tabla->integer('id_docente_invitado');
+            $tabla->string('estado');
         });
     }
 

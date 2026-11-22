@@ -4,6 +4,7 @@
     @created 2026-09-25
     @updated 2026-10-09
     @updated 2026-10-24
+    @updated 2026-11-19
 
     @description
     Vista de un curso (a la que se llega con "Ver curso"): muestra las cards
@@ -47,6 +48,8 @@
       llaman Estudiantes / Habilitaciones / Auxiliares. "Cargar CSV" pasa del
       encabezado a la fila de pestañas y solo se muestra en Estudiantes. La
       fila de pestañas pierde la línea inferior, igual que en Reportes.
+    - 2026-11-19  [Valery D. Ortuno P]  fix: el estado del curso dice
+      "Archivado" en vez de "Finalizado", como en Ver cursos.
 
     @see  App\Http\Controllers\CursoController
     @see  App\Livewire\Examenes\EstudiantesCurso
@@ -62,7 +65,7 @@
     $docenteNombre = trim(($curso->docente?->nombre_usuario ?? '') . ' ' . ($curso->docente?->apellido ?? ''));
     $subtituloHeader = collect([
         $docenteNombre !== '' ? 'Docente: ' . $docenteNombre : null,
-        $curso->estado === 'EnCurso' ? 'En curso' : 'Finalizado',
+        $curso->estado === 'EnCurso' ? 'En curso' : 'Archivado',
     ])->filter()->implode(' — ');
 @endphp
 

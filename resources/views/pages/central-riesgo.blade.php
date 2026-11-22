@@ -25,13 +25,14 @@
     - 2026-11-15  [Diego Tejerina]  refactor: es la pagina "Incidencias" de la
       central (solo las pestanhas Institucion / Mis materias); los sospechosos
       pasan a su propia pagina (central-riesgo-sospechosos).
+    - 2026-11-19  [Valery D. Ortuno P]  refactor: el titulo pasa a "Incidencias confirmadas", como en el sidebar.
 
     @see  App\Livewire\CentralRiesgo\ListaEstudiantes
 --}}
 
 @extends('layouts.app')
 
-@section('title', 'Incidencias')
+@section('title', 'Incidencias confirmadas')
 
 @section('content')
     @livewire(\App\Livewire\CentralRiesgo\ListaEstudiantes::class, ['modo' => 'incidencias'])

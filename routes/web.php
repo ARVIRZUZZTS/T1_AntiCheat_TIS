@@ -17,6 +17,7 @@
  * @updated 2026-11-14
  * @updated 2026-11-15
  * @updated 2026-11-16
+ * @updated 2026-11-19
  * @updated 2026-11-20
  *
  * @description
@@ -91,6 +92,9 @@
  * - 2026-11-16  [Alex Candia]  feat: endpoints para eliminar un curso propio y
  *   consultar los auxiliares y estudiantes afectados antes de borrarlo; página
  *   "Eliminar curso" con la lista de cursos (sin modal todavía).
+ * - 2026-11-19  [Valery D. Ortuno P]  feat: marcadores "Editar auxiliar" y
+ *   "Eliminar auxiliar" (pagina en desarrollo) para el menu de Auxiliares, y
+ *   pagina "Eliminar examen" (/examenes/eliminar).
  * - 2026-11-20  [OchoaCesar]  feat: /examenes/eliminar, la página propia de la
  *   subopción "Eliminar examen" del sidebar: lista de todos los exámenes del
  *   docente con el botón de eliminación por curso.
@@ -137,6 +141,15 @@ Route::middleware('auth')->group(function (): void {
     // Auxiliares · Crear: el alta de auxiliar como pagina propia (antes era un
     // modal dentro de GestionAuxiliares). Al guardar vuelve a la lista.
     Route::get('/auxiliares/crear', CrearAuxiliar::class)->name('auxiliares.crear');
+    // Auxiliares · Editar / Eliminar: marcadores hasta que se implementen.
+    Route::view('/auxiliares/editar', 'pages.en-desarrollo', [
+        'titulo' => 'Editar auxiliar',
+        'descripcion' => 'La edicion de auxiliares esta en desarrollo.',
+    ])->name('auxiliares.editar');
+    Route::view('/auxiliares/eliminar', 'pages.en-desarrollo', [
+        'titulo' => 'Eliminar auxiliar',
+        'descripcion' => 'La eliminacion de auxiliares esta en desarrollo.',
+    ])->name('auxiliares.eliminar');
 
     // Invitaciones: hoy un solo componente con pestanhas Enviar/Recibir. Se
     // separa en dos subopciones; ambas sirven el mismo componente de momento y

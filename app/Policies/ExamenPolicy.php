@@ -7,9 +7,19 @@
  *
  * @created 2026-10-23
  *
+ * @updated 2026-11-19
+ *
  * @description Autoriza el reporte de horarios de ingreso de un examen a su
  * docente responsable o a un docente invitado que acepto la invitacion, y la
  * edicion de los datos base del examen solo a su creador.
+ *
+ * @changelog
+ * - 2026-11-19  [Valery D. Ortuno P]  feat: `ver` autoriza el detalle de un
+ *   examen (Ver examenes) a quien lo creo, al docente de uno de sus cursos, al
+ *   invitado que acepto o a quien ya tiene su configuracion.
+ * - 2026-11-19  [Valery D. Ortuno P]  refactor: se quita `ver`; el permiso del
+ *   detalle se revisa dentro de la consulta de ObtenerDetalleExamenService
+ *   (ahorra tres consultas a la base remota).
  *
  * @see  App\Services\Reporte\ConsultarReporteHorarioIngresoService
  * @see  App\Http\Controllers\Api\ExamenEdicionController

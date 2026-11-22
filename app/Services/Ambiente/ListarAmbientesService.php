@@ -10,6 +10,7 @@
  * @updated 2026-10-05
  * @updated 2026-10-12
  * @updated 2026-10-25
+ * @updated 2026-11-19
  *
  * @description
  * Servicio que publica el índice de ambientes que el modal de alta de examen usa
@@ -31,6 +32,11 @@
  *   quien publica el índice de estudiantes (antes lo hacía BuscadorRegistro).
  * - 2026-10-25  [Valery D. Ortuno P]  docs: se quitan las referencias a
  *   RegistrarIncidencia, página retirada en la HU 5.
+ * - 2026-11-19  [Valery D. Ortuno P]  feat: cada ambiente trae `en_uso` (ya se
+ *   usó en un examen), en la misma consulta, para que el selector solo ofrezca
+ *   eliminar los que no se usaron.
+ * - 2026-11-19  [Valery D. Ortuno P]  refactor: se quita `en_uso` (ya no se
+ *   eliminan ambientes); la consulta vuelve a ser la de antes.
  */
 
 namespace App\Services\Ambiente;
