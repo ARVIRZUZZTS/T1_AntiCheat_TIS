@@ -112,4 +112,36 @@ class RestaurarCursoVistaTest extends TestCase
             DB::table('curso')->where('id_curso', self::ARCHIVADO)->value('estado'),
         );
     }
+
+    public function test_docente_no_dueno_recibe_error_al_restaurar(): void
+    {
+        $this->actingAs(Usuario::findOrFail(self::OTRO));
+
+        Livewire::test(RestaurarCurso::class)
+            ->call('abrirModal', self::ARCHIVADO, 'A Archivado Propio')
+            ->call('confirmarRestauracion')
+            ->assertSet('modalAbierto', false)
+            ->assertSee('No tienes permiso para restaurar este curso.');
+
+        $this->assertSame(
+            CursoEstado::Archivado->value,
+            DB::table('curso')->where('id_curso', self::ARCHIVADO)->value('estado'),
+        );
+    }
+
+    public function test_curso_no_archivado_recibe_error_al_restaurar(): void
+    {
+        $this->actingAs(Usuario::findOrFail(self::DOCENTE));
+
+        Livewire::test(RestaurarCurso::class)
+            ->call('abrirModal', self::EN_CURSO, 'B En Curso Propio')
+            ->call('confirmarRestauracion')
+            ->assertSet('modalAbierto', false)
+            ->assertSee('Solo se pueden restaurar cursos en estado Archivado.');
+
+        $this->assertSame(
+            CursoEstado::EnCurso->value,
+            DB::table('curso')->where('id_curso', self::EN_CURSO)->value('estado'),
+        );
+    }
 }
