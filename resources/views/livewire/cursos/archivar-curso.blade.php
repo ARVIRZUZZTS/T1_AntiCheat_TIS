@@ -25,7 +25,7 @@
                             type="button"
                             variant="secondary"
                             size="sm"
-                            class="w-full shrink-0 sm:w-auto"
+                            class="w-full min-h-11 shrink-0 sm:w-auto"
                             aria-label="Archivar curso {{ $curso->nombre_curso }}"
                             wire:click="abrirModal({{ $curso->id_curso }})"
                         >

@@ -31,7 +31,7 @@
         ]) }}
     >
         <div class="relative p-4 w-full max-w-md max-h-full">
-            <div class="relative bg-neutral-primary-soft border border-default rounded-base shadow-sm p-4 md:p-6">
+            <div class="relative max-h-[calc(100vh-2rem)] overflow-y-auto bg-neutral-primary-soft border border-default rounded-base shadow-sm p-4 md:p-6">
                 <div class="flex items-center justify-between border-b border-default pb-4 md:pb-5">
                     <h3 id="titulo-archivar-curso" class="text-lg font-medium text-heading">
                         Archivar curso
@@ -42,7 +42,7 @@
                         wire:click="cerrarModal"
                         wire:loading.attr="disabled"
                         wire:target="archivar"
-                        class="text-body bg-transparent hover:bg-neutral-tertiary hover:text-heading rounded-base text-sm w-9 h-9 ms-auto inline-flex justify-center items-center cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                        class="text-body bg-transparent hover:bg-neutral-tertiary hover:text-heading rounded-base text-sm w-11 h-11 ms-auto inline-flex justify-center items-center cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         <svg class="w-5 h-5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18 17.94 6M18 18 6.06 6"/></svg>
                         <span class="sr-only">Cerrar modal</span>
@@ -62,7 +62,7 @@
                 <div class="flex flex-col gap-3 border-t border-default pt-4 sm:flex-row sm:items-center">
                     <x-ui.button
                         variant="default"
-                        class="w-full justify-center disabled:opacity-50 disabled:cursor-not-allowed sm:w-auto"
+                        class="w-full min-h-11 justify-center disabled:opacity-50 disabled:cursor-not-allowed sm:w-auto"
                         wire:click="archivar"
                         wire:loading.attr="disabled"
                         wire:target="archivar"
@@ -71,7 +71,7 @@
                     </x-ui.button>
 
                     <x-ui.button-cancelar
-                        class="w-full justify-center disabled:opacity-50 disabled:cursor-not-allowed sm:w-auto"
+                        class="w-full min-h-11 justify-center disabled:opacity-50 disabled:cursor-not-allowed sm:w-auto"
                         wire:click="cerrarModal"
                         wire:loading.attr="disabled"
                         wire:target="archivar"
