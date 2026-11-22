@@ -27,6 +27,16 @@ use Livewire\Component;
 
 class ArchivarCurso extends Component
 {
+    public bool $modalAbierto = false;
+
+    public ?int $cursoId = null;
+
+    public string $cursoNombre = '';
+
+    public bool $archivando = false;
+
+    public string $errorArchivar = '';
+
     /**
      * Cursos propios en curso que todavía se pueden archivar.
      *

@@ -35,4 +35,11 @@
             </ul>
         @endif
     </div>
+
+    <x-ui.modal-archivar-curso
+        :abierto="$modalAbierto"
+        :nombre="$cursoNombre"
+        :archivando="$archivando"
+        :error="$errorArchivar"
+    />
 </div>
