@@ -21,10 +21,15 @@ namespace App\Livewire\Cursos;
 
 use App\Enums\CursoEstado;
 use App\Models\Curso;
+use App\Models\Usuario;
+use App\Services\Curso\ArchivarCursoService;
 use App\Services\Curso\ListarCursosDocenteService;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
+use Illuminate\Validation\ValidationException;
 use Livewire\Component;
+use Throwable;
 
 class ArchivarCurso extends Component
 {
@@ -60,6 +65,37 @@ class ArchivarCurso extends Component
         $this->errorArchivar = '';
         $this->archivando = false;
         $this->modalAbierto = true;
+    }
+
+    public function archivar(): void
+    {
+        if ($this->archivando || $this->cursoId === null) {
+            return;
+        }
+
+        $this->archivando = true;
+        $this->errorArchivar = '';
+
+        $docente = auth()->user();
+        abort_unless($docente instanceof Usuario, 401);
+
+        try {
+            $curso = Curso::query()->findOrFail($this->cursoId);
+            app(ArchivarCursoService::class)->ejecutar($docente, $curso);
+
+            $this->modalAbierto = false;
+            $this->cursoId = null;
+            $this->cursoNombre = '';
+        } catch (ValidationException $e) {
+            $this->errorArchivar = $e->errors()['curso'][0] ?? 'No se pudo archivar el curso.';
+        } catch (AuthorizationException) {
+            $this->errorArchivar = 'No tienes permiso para archivar este curso.';
+        } catch (Throwable $e) {
+            report($e);
+            $this->errorArchivar = 'No se pudo archivar el curso.';
+        } finally {
+            $this->archivando = false;
+        }
     }
 
     /**
