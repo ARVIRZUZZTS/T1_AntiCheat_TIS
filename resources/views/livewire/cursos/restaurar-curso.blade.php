@@ -11,6 +11,11 @@
 @section('title', 'Restaurar curso')
 
 <div class="px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
+    <header class="mx-auto mb-4 flex w-full max-w-2xl flex-col gap-1 sm:mb-5">
+        <h1 class="text-xl font-semibold text-heading sm:text-2xl">Restaurar curso</h1>
+        <p class="text-sm text-body">Recupera un curso archivado y vuelve a gestionarlo.</p>
+    </header>
+
     @if (session('error'))
         <div role="alert" class="mx-auto mb-4 w-full max-w-2xl rounded-base border border-danger bg-danger-soft px-4 py-3 text-sm text-heading">
             {{ session('error') }}
