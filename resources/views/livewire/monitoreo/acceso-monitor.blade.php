@@ -21,6 +21,9 @@
       próximos exámenes en tarjetas con la línea del monitor (mismo tamaño y
       componentes); el examen de hoy muestra "Iniciar". Se quitan el detalle
       suelto y la lista de auxiliares, que no eran de Ingreso.
+    - 2026-11-22  [Valery D. Ortuno P]  feat: "Iniciar" solo aparece si el
+      usuario puede ver el Monitor de ese examen (un auxiliar asignado solo a
+      Ingreso no lo ve, HU 24).
 
     @see  App\Livewire\Monitoreo\AccesoMonitor
     @see  resources/views/livewire/monitoreo/monitor-en-vivo.blade.php
@@ -62,7 +65,9 @@
             @foreach ($proximos as $examen)
                 @php
                     $destacado = $examen['estado'] === 'registro_abierto';
-                    $puedeIniciar = $examen['es_hoy'] && in_array($examen['estado'], ['registro_abierto', 'en_curso'], true);
+                    $puedeIniciar = $examen['es_hoy']
+                        && in_array($examen['estado'], ['registro_abierto', 'en_curso'], true)
+                        && ($examen['puede_monitor'] ?? true);
                 @endphp
                 <li @class([
                         'flex flex-col gap-4 border bg-neutral-primary-soft rounded-base shadow-xs px-5 py-6 sm:px-8',
