@@ -20,6 +20,7 @@ use App\Enums\CursoEstado;
 use App\Livewire\Cursos\RestaurarCurso;
 use App\Models\Usuario;
 use App\Services\Curso\ListarCursosDocenteService;
+use App\Services\Curso\RestaurarCursoService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
@@ -92,5 +93,23 @@ class RestaurarCursoVistaTest extends TestCase
             ->call('cancelar')
             ->assertSet('modalAbierto', false)
             ->assertDontSeeHtml('aria-modal');
+    }
+
+    public function test_confirmar_restaura_curso_y_actualiza_lista(): void
+    {
+        $this->actingAs(Usuario::findOrFail(self::DOCENTE));
+
+        Livewire::test(RestaurarCurso::class)
+            ->call('abrirModal', self::ARCHIVADO, 'A Archivado Propio')
+            ->call('confirmarRestauracion')
+            ->assertSet('modalAbierto', false)
+            ->assertSet('cursoId', null)
+            ->assertDispatched('restauracion-curso-exitosa', mensaje: RestaurarCursoService::MENSAJE_EXITO)
+            ->assertDontSee('A Archivado Propio');
+
+        $this->assertSame(
+            CursoEstado::EnCurso->value,
+            DB::table('curso')->where('id_curso', self::ARCHIVADO)->value('estado'),
+        );
     }
 }
