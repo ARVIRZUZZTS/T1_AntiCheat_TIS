@@ -9,6 +9,7 @@
 
     @changelog
     - 2026-11-21  [Alisson D. Alvarado]  feat: agregar la interfaz de edición de cursos.
+    - 2026-11-21  [Alisson D. Alvarado]  feat: mostrar errores y aviso al editar un curso.
 
     @see App\Http\Controllers\EditarCursoVistaController
     @see resources/views/pages/curso-crear.blade.php
@@ -17,8 +18,12 @@
 @extends('layouts.app')
 
 @section('title', 'Editar curso')
+@section('back-route', route('cursos.editar'))
 
 @section('content')
+    @php
+        $claseError = 'bg-danger-soft! border-danger-subtle! text-fg-danger-strong! focus:ring-danger! focus:border-danger!';
+    @endphp
     <div class="px-4 py-4 sm:px-6 sm:py-6 lg:px-8"
          x-data="{
              curso: null,
@@ -29,14 +34,18 @@
              cargando: false,
              guardando: false,
              error: '',
-             mensaje: '',
+             errores: {},
+             duplicado: false,
+             exito: false,
              solicitud: 0,
 
              async seleccionar(url) {
                  const solicitud = ++this.solicitud;
                  this.curso = null;
                  this.error = '';
-                 this.mensaje = '';
+                 this.errores = {};
+                 this.duplicado = false;
+                 this.exito = false;
                  this.cargando = true;
 
                  try {
@@ -63,6 +72,8 @@
                  if (! this.curso || this.guardando) return;
                  this.guardando = true;
                  this.error = '';
+                 this.errores = {};
+                 this.duplicado = false;
                  try {
                      const respuesta = await fetch(this.curso.url, {
                          method: 'PUT',
@@ -77,11 +88,19 @@
                          }),
                      });
                      const resultado = await respuesta.json().catch(() => ({}));
+                     if (respuesta.status === 409) {
+                         this.duplicado = true;
+                         return;
+                     }
+                     if (respuesta.status === 422 && resultado.errors) {
+                         this.errores = resultado.errors;
+                         return;
+                     }
                      if (! respuesta.ok) throw new Error(resultado.message || 'No se pudo guardar el curso.');
                      this.curso = null;
-                     this.mensaje = 'Curso actualizado con exito';
                      const nombre = document.getElementById('curso-nombre-' + resultado.datos.id);
                      if (nombre) nombre.textContent = resultado.datos.nombre;
+                     this.exito = true;
                  } catch (fallo) {
                      this.error = fallo.message || 'No se pudo guardar el curso.';
                  } finally {
@@ -94,6 +113,22 @@
                  this.curso = null;
                  this.cargando = false;
                  this.error = '';
+                 this.errores = {};
+                 this.duplicado = false;
+             },
+
+             // Cualquier cambio en la combinación puede resolver el duplicado.
+             limpiarError(campo) {
+                 delete this.errores[campo];
+                 this.duplicado = false;
+             },
+
+             errorDe(campo) {
+                 return this.errores[campo]?.[0] || '';
+             },
+
+             claseErrorDe(campo) {
+                 return this.duplicado || this.errorDe(campo) ? '{{ $claseError }}' : '';
              },
 
              nombreCurso() {
@@ -102,9 +137,12 @@
              },
          }">
         <div class="mx-auto w-full max-w-2xl">
-            <p x-show="mensaje" x-text="mensaje" x-cloak role="status" class="mb-4 text-sm text-fg-success-strong"></p>
             <p x-show="error" x-text="error" x-cloak role="alert" class="mb-4 text-sm text-fg-danger-strong"></p>
             <p x-show="cargando" x-cloak class="mb-4 text-sm text-body">Cargando curso...</p>
+
+            <template x-if="exito">
+                <x-ui.modal-aviso mensaje="Curso actualizado con éxito" />
+            </template>
 
             <ul x-show="! curso" class="overflow-hidden rounded-base border border-default bg-neutral-primary-soft shadow-xs">
                 @forelse ($cursos as $fila)
@@ -124,15 +162,52 @@
             </ul>
 
             <div x-show="curso" x-cloak class="rounded-base border border-default bg-neutral-primary-soft p-4 shadow-sm md:p-6">
-                <form @submit.prevent="guardar()" class="space-y-4">
-                    <x-ui.input label="Materia" id="materia_curso" name="materia"
-                        placeholder="Ingrese el nombre de la materia" x-model="materia" />
-                    <x-ui.input label="Grupo" id="grupo_curso" name="grupo"
-                        placeholder="Ingrese el grupo" x-model="grupo" />
-                    <x-ui.select label="Gestion" id="gestion_curso" name="gestion"
-                        :options="$gestiones" placeholder="Seleccione la gestion" x-model="gestion" />
-                    <x-ui.input label="Año" id="anio_curso" name="anio" inputmode="numeric"
-                        placeholder="Ingrese el año" x-model="anio" />
+                <form @submit.prevent="guardar()" novalidate class="space-y-4">
+                    <div x-show="duplicado" x-cloak role="alert">
+                        <x-ui.alert type="danger" class="mb-0!">
+                            Este curso ya existe en la gestión y el año elegidos.
+                        </x-ui.alert>
+                    </div>
+
+                    {{-- Se conservan los valores mientras el servidor valida la combinación completa. --}}
+                    <fieldset x-bind:disabled="guardando" class="space-y-4">
+                        <div>
+                            <x-ui.input label="Materia" id="materia_curso" name="materia"
+                                placeholder="Ingrese el nombre de la materia" x-model="materia"
+                                @input="limpiarError('materia')" x-bind:class="claseErrorDe('materia')"
+                                x-bind:aria-invalid="claseErrorDe('materia') ? 'true' : null"
+                                aria-describedby="error-materia" required />
+                            <p id="error-materia" x-show="errorDe('materia')" x-text="errorDe('materia')" x-cloak
+                               role="alert" class="mt-1 text-sm text-fg-danger-strong"></p>
+                        </div>
+                        <div>
+                            <x-ui.input label="Grupo" id="grupo_curso" name="grupo"
+                                placeholder="Ingrese el grupo" x-model="grupo"
+                                @input="limpiarError('grupo')" x-bind:class="claseErrorDe('grupo')"
+                                x-bind:aria-invalid="claseErrorDe('grupo') ? 'true' : null"
+                                aria-describedby="error-grupo" required />
+                            <p id="error-grupo" x-show="errorDe('grupo')" x-text="errorDe('grupo')" x-cloak
+                               role="alert" class="mt-1 text-sm text-fg-danger-strong"></p>
+                        </div>
+                        <div>
+                            <x-ui.select label="Gestion" id="gestion_curso" name="gestion"
+                                :options="$gestiones" placeholder="Seleccione la gestion" x-model="gestion"
+                                @change="limpiarError('gestion')" x-bind:class="claseErrorDe('gestion')"
+                                x-bind:aria-invalid="claseErrorDe('gestion') ? 'true' : null"
+                                aria-describedby="error-gestion" required />
+                            <p id="error-gestion" x-show="errorDe('gestion')" x-text="errorDe('gestion')" x-cloak
+                               role="alert" class="mt-1 text-sm text-fg-danger-strong"></p>
+                        </div>
+                        <div>
+                            <x-ui.input label="Año" id="anio_curso" name="anio" inputmode="numeric"
+                                placeholder="Ingrese el año" x-model="anio"
+                                @input="limpiarError('anio')" x-bind:class="claseErrorDe('anio')"
+                                x-bind:aria-invalid="claseErrorDe('anio') ? 'true' : null"
+                                aria-describedby="error-anio" required />
+                            <p id="error-anio" x-show="errorDe('anio')" x-text="errorDe('anio')" x-cloak
+                               role="alert" class="mt-1 text-sm text-fg-danger-strong"></p>
+                        </div>
+                    </fieldset>
 
                     <p class="text-sm text-body break-words" aria-live="polite">
                         Nombre del curso:
