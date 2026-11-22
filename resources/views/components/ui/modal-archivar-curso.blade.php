@@ -25,6 +25,7 @@
             'role' => 'dialog',
             'aria-modal' => 'true',
             'aria-labelledby' => 'titulo-archivar-curso',
+            'aria-describedby' => 'archivar-curso-nombre',
             'wire:click.self' => 'cerrarModal',
             'wire:keydown.escape.window' => 'cerrarModal',
             'class' => 'overflow-y-auto overflow-x-hidden fixed top-0 right-0 left-0 z-50 flex justify-center items-center w-full md:inset-0 h-full max-h-full bg-overlay-modal/50',
@@ -61,6 +62,7 @@
 
                 <div class="flex flex-col gap-3 border-t border-default pt-4 sm:flex-row sm:items-center">
                     <x-ui.button
+                        id="archivar-curso-confirmar"
                         variant="default"
                         class="w-full min-h-11 justify-center disabled:opacity-50 disabled:cursor-not-allowed sm:w-auto"
                         wire:click="archivar"
@@ -72,6 +74,8 @@
 
                     <x-ui.button-cancelar
                         class="w-full min-h-11 justify-center disabled:opacity-50 disabled:cursor-not-allowed sm:w-auto"
+                        id="archivar-curso-cancelar"
+                        autofocus
                         wire:click="cerrarModal"
                         wire:loading.attr="disabled"
                         wire:target="archivar"

@@ -63,9 +63,52 @@
     @endif
 
     <x-ui.modal-archivar-curso
+        id="modal-archivar-curso"
         :abierto="$modalAbierto"
         :nombre="$cursoNombre"
         :archivando="$archivando"
         :error="$errorArchivar"
     />
 </div>
+
+@script
+<script>
+    let botonOrigenArchivar = null;
+
+    $wire.$watch('modalAbierto', (abierto) => {
+        if (abierto) {
+            botonOrigenArchivar = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+            requestAnimationFrame(() => document.getElementById('archivar-curso-cancelar')?.focus());
+
+            return;
+        }
+
+        if (botonOrigenArchivar?.isConnected) {
+            botonOrigenArchivar.focus();
+        }
+        botonOrigenArchivar = null;
+    });
+
+    document.addEventListener('keydown', (event) => {
+        if (! $wire.modalAbierto || event.key !== 'Tab') {
+            return;
+        }
+
+        const modal = document.getElementById('modal-archivar-curso');
+        const botones = [...(modal?.querySelectorAll('button:not([disabled])') ?? [])];
+        if (botones.length === 0) {
+            return;
+        }
+
+        const primero = botones[0];
+        const ultimo = botones[botones.length - 1];
+        if (event.shiftKey && document.activeElement === primero) {
+            event.preventDefault();
+            ultimo.focus();
+        } else if (! event.shiftKey && document.activeElement === ultimo) {
+            event.preventDefault();
+            primero.focus();
+        }
+    });
+</script>
+@endscript
