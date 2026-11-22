@@ -216,16 +216,14 @@
                     <button type="button" @click="destino = 'curso'; error = ''"
                             :aria-pressed="destino === 'curso' ? 'true' : 'false'"
                             :class="destino === 'curso' ? 'border-brand ring-2 ring-brand' : 'border-default'"
-                            class="rounded-base border bg-neutral-primary-soft p-3 text-start">
+                            class="rounded-base border bg-neutral-primary-soft p-3 text-center">
                         <p class="font-semibold text-heading">A un curso</p>
-                        <p class="mt-1 text-xs text-body">Ve Ingreso y Monitor en todos los examenes del curso.</p>
                     </button>
                     <button type="button" @click="destino = 'examen'; error = ''"
                             :aria-pressed="destino === 'examen' ? 'true' : 'false'"
                             :class="destino === 'examen' ? 'border-brand ring-2 ring-brand' : 'border-default'"
-                            class="rounded-base border bg-neutral-primary-soft p-3 text-start">
+                            class="rounded-base border bg-neutral-primary-soft p-3 text-center">
                         <p class="font-semibold text-heading">A un examen</p>
-                        <p class="mt-1 text-xs text-body">Eliges si ve Ingreso, Monitor o las dos.</p>
                     </button>
                 </div>
 
