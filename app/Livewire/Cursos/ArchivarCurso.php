@@ -19,6 +19,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Cursos;
 
+use App\Enums\CursoEstado;
 use App\Models\Curso;
 use App\Services\Curso\ListarCursosDocenteService;
 use Illuminate\Contracts\View\View;
@@ -36,6 +37,21 @@ class ArchivarCurso extends Component
     public bool $archivando = false;
 
     public string $errorArchivar = '';
+
+    public function abrirModal(int $cursoId): void
+    {
+        $curso = Curso::query()
+            ->whereKey($cursoId)
+            ->where('sis_doc', auth()->id())
+            ->where('estado', CursoEstado::EnCurso->value)
+            ->firstOrFail();
+
+        $this->cursoId = (int) $curso->getKey();
+        $this->cursoNombre = (string) $curso->nombre_curso;
+        $this->errorArchivar = '';
+        $this->archivando = false;
+        $this->modalAbierto = true;
+    }
 
     /**
      * Cursos propios en curso que todavía se pueden archivar.

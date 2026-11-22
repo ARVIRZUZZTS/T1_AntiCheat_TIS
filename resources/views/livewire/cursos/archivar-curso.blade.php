@@ -27,6 +27,7 @@
                             size="sm"
                             class="w-full shrink-0 sm:w-auto"
                             aria-label="Archivar curso {{ $curso->nombre_curso }}"
+                            wire:click="abrirModal({{ $curso->id_curso }})"
                         >
                             Archivar
                         </x-ui.button>
