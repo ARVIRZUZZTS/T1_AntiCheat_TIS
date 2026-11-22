@@ -259,6 +259,10 @@ class ListaEstudiantes extends Component
         try {
             $servicio = app(ResolverIncidenciaService::class);
             $servicio->{$accion}($this->idSeleccionado, auth()->user());
+        } catch (\Illuminate\Validation\ValidationException $error) {
+            $this->errorRevision = (string) collect($error->errors())->flatten()->first();
+
+            return;
         } catch (ModelNotFoundException|InvalidArgumentException $error) {
             $this->idSeleccionado = null;
             $this->errorRevision = 'La incidencia ya no está pendiente de revisión.';

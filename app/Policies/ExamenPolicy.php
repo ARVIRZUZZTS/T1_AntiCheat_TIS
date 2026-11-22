@@ -7,19 +7,22 @@
  *
  * @created 2026-10-23
  *
- * @updated 2026-11-19
+ * @updated 2026-11-20
  *
  * @description Autoriza el reporte de horarios de ingreso de un examen a su
  * docente responsable o a un docente invitado que acepto la invitacion, y la
  * edicion de los datos base del examen solo a su creador.
  *
+ * Un examen vinculado a algún curso archivado es estrictamente de solo lectura:
+ * las capacidades de escritura/configuración/monitoreo (acciones que modifican
+ * estado) quedan bloqueadas, conservando el acceso de lectura según aplique.
+ *
  * @changelog
- * - 2026-11-19  [Valery D. Ortuno P]  feat: `ver` autoriza el detalle de un
- *   examen (Ver examenes) a quien lo creo, al docente de uno de sus cursos, al
- *   invitado que acepto o a quien ya tiene su configuracion.
  * - 2026-11-19  [Valery D. Ortuno P]  refactor: se quita `ver`; el permiso del
  *   detalle se revisa dentro de la consulta de ObtenerDetalleExamenService
  *   (ahorra tres consultas a la base remota).
+ * - 2026-11-20  [Equipo T1]  feat: bloqueo de escrituras si algún curso
+ *   vinculado al examen está archivado (HU #321 · Task #323).
  *
  * @see  App\Services\Reporte\ConsultarReporteHorarioIngresoService
  * @see  App\Http\Controllers\Api\ExamenEdicionController
@@ -37,6 +40,10 @@ class ExamenPolicy
 {
     public function configurar(Usuario $usuario, Examen $examen): bool
     {
+        if ($this->tieneCursoArchivado($examen)) {
+            return false;
+        }
+
         if (! $usuario->roles()->where('nombre_rol', Rol::NOMBRE_DOCENTE)->exists()) {
             return false;
         }
@@ -48,6 +55,10 @@ class ExamenPolicy
 
     public function monitorear(Usuario $usuario, Examen $examen): bool
     {
+        if ($this->tieneCursoArchivado($examen)) {
+            return false;
+        }
+
         if ($usuario->roles()->where('nombre_rol', Rol::NOMBRE_DOCENTE)->exists()) {
             return $this->configurar($usuario, $examen)
                 && $examen->cursos()->where('curso.sis_doc', $usuario->id_usuario)->exists();
@@ -70,6 +81,10 @@ class ExamenPolicy
      */
     public function editar(Usuario $usuario, Examen $examen): bool
     {
+        if ($this->tieneCursoArchivado($examen)) {
+            return false;
+        }
+
         if (! $usuario->roles()->where('nombre_rol', Rol::NOMBRE_DOCENTE)->exists()) {
             return false;
         }
@@ -79,6 +94,10 @@ class ExamenPolicy
 
     public function invitarDocente(Usuario $usuario, Examen $examen): bool
     {
+        if ($this->tieneCursoArchivado($examen)) {
+            return false;
+        }
+
         $esDocente = $usuario->roles()
             ->where('nombre_rol', Rol::NOMBRE_DOCENTE)
             ->exists();
@@ -129,5 +148,17 @@ class ExamenPolicy
             ->where('id_docente_invitado', $usuario->id_usuario)
             ->where('estado', 'aceptado')
             ->exists();
+    }
+
+    /**
+     * Indica si el examen tiene al menos un curso vinculado en estado archivado.
+     * En exámenes compartidos, basta con que uno de los cursos esté archivado
+     * para bloquear las operaciones de escritura.
+     */
+    private function tieneCursoArchivado(Examen $examen): bool
+    {
+        $examen->loadMissing('cursos');
+
+        return $examen->cursos->contains(fn (Curso $curso): bool => $curso->estaArchivado());
     }
 }

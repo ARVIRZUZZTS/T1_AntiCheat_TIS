@@ -106,6 +106,7 @@ class ListarCursosDocenteService
             ->leftJoin('curso_tipo_gestion as ctg', 'ctg.id_curso', '=', 'c.id_curso')
             ->leftJoin('tipo_gestion as tg', 'tg.id_tipo_gestion', '=', 'ctg.id_tg')
             ->where('c.sis_doc', $idDocente)
+            ->where('c.estado', '!=', CursoEstado::Archivado->value)
             ->get(['c.id_curso', 'tg.nombre_tipo_gestion', 'ctg.anio'])
             ->mapWithKeys(fn (object $fila): array => [
                 (int) $fila->id_curso => $fila->nombre_tipo_gestion !== null

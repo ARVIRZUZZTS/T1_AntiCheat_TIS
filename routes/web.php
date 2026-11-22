@@ -227,11 +227,29 @@ Route::middleware(['auth', 'docente'])->group(function (): void {
         'titulo' => 'Editar curso',
         'descripcion' => 'La edicion de curso esta en desarrollo.',
     ])->name('cursos.editar');
-    Route::view('/cursos/cargar-csv', 'pages.en-desarrollo', [
-        'titulo' => 'Cargar CSV',
-        'descripcion' => 'La carga de estudiantes por CSV esta en desarrollo.',
-    ])->name('cursos.cargar-csv');
+    Route::get('/cursos/cargar-csv', function (Request $request) {
+        $cursoId = $request->integer('curso');
+        if ($cursoId > 0) {
+            $curso = \App\Models\Curso::query()->findOrFail($cursoId);
+            \Illuminate\Support\Facades\Gate::authorize('gestionar', $curso);
+            app(\App\Services\Curso\AsegurarCursoEditableService::class)->asegurarCursoEditable($curso, 'curso');
+        }
+
+        return view('pages.en-desarrollo', [
+            'titulo' => 'Cargar CSV',
+            'descripcion' => 'La carga de estudiantes por CSV esta en desarrollo.',
+        ]);
+    })->name('cursos.cargar-csv');
     Route::get('/cursos/eliminar', [CursoController::class, 'eliminar'])->name('cursos.eliminar');
+    Route::get('/cursos/archivar', [CursoController::class, 'archivarLista'])->name('cursos.archivar');
+    Route::post('/cursos/{curso}/archivar', [CursoController::class, 'archivar'])
+        ->whereNumber('curso')
+        ->name('cursos.archivar.store');
+    Route::get('/cursos/restaurar', [CursoController::class, 'restaurarLista'])->name('cursos.restaurar');
+    Route::post('/cursos/{curso}/restaurar', [CursoController::class, 'restaurar'])
+        ->whereNumber('curso')
+        ->name('cursos.restaurar.store');
+    Route::get('/archivados', [CursoController::class, 'archivados'])->name('cursos.archivados');
     Route::post('/cursos', [CursoController::class, 'store'])->name('cursos.store');
     // Cursos · Eliminar curso: conteo previo para el modal y borrado definitivo.
     // Solo el docente dueño puede hacerlo (CursoPolicy::eliminar).

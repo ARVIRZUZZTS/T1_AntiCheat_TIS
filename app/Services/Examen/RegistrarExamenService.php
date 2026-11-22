@@ -100,6 +100,7 @@ class RegistrarExamenService
         private readonly DividirExamenService $dividirExamenService,
         private readonly ConfiguracionExamenDocenteService $configuraciones,
         private readonly ValidarDisponibilidadExamenService $disponibilidad,
+        private readonly \App\Services\Curso\AsegurarCursoEditableService $editable,
     ) {}
 
     /**
@@ -114,6 +115,7 @@ class RegistrarExamenService
      */
     public function ejecutar(Curso $curso, array $datos): Examen
     {
+        $this->editable->asegurarCursoEditable($curso, 'tipo_examen');
         $creador = $this->idCreador($curso);
 
         return DB::transaction(function () use ($curso, $datos, $creador): Examen {

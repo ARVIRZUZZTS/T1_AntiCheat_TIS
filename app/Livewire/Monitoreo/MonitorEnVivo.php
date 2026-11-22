@@ -391,6 +391,8 @@ class MonitorEnVivo extends Component
     public function ajustarExamenPrueba(int $minutos): void
     {
         $examen = $this->examen;
+        app(\App\Services\Curso\AsegurarCursoEditableService::class)->asegurarExamenEditable($examen, 'examen');
+
         $nuevaHora = now()->addMinutes($minutos);
 
         $examen->fecha = $nuevaHora->toDateString();
@@ -789,9 +791,15 @@ class MonitorEnVivo extends Component
                 );
             } catch (InvalidArgumentException $e) {
                 // Estudiante no inscrito: no hay fila que deshabilitar.
+            } catch (\Illuminate\Validation\ValidationException $e) {
+                // No bloquear el registro ya realizado si no se puede deshabilitar.
             }
         } catch (InvalidArgumentException $e) {
             $this->mensajeError = $e->getMessage();
+
+            return;
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $this->mensajeError = (string) collect($e->errors())->flatten()->first();
 
             return;
         }
@@ -866,6 +874,8 @@ class MonitorEnVivo extends Component
             $this->filtro = 'todos';
         } catch (InvalidArgumentException $e) {
             $this->mensajeError = $e->getMessage();
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $this->mensajeError = (string) collect($e->errors())->flatten()->first();
         }
     }
 

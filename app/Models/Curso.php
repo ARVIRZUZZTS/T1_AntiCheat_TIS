@@ -1,7 +1,21 @@
 <?php
 
+/**
+ * @file    Curso.php
+ *
+ * @description
+ * Modelo Eloquent del curso. El estado se almacena como string compatible con
+ * el enum `curso_estado` de PostgreSQL/Supabase.
+ *
+ * @changelog
+ * - 2026-11-20  [Equipo T1]  feat: helpers de estado y scopes para cursos
+ *   archivados (HU #321 · Task #323).
+ */
+
 namespace App\Models;
 
+use App\Enums\CursoEstado;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -67,6 +81,42 @@ class Curso extends Model
     public function ambiente(): BelongsTo
     {
         return $this->belongsTo(Ambiente::class, 'id_ambiente');
+    }
+
+    public function estaArchivado(): bool
+    {
+        return $this->estado === CursoEstado::Archivado->value;
+    }
+
+    public function estaEnCurso(): bool
+    {
+        return $this->estado === CursoEstado::EnCurso->value;
+    }
+
+    public function estaFinalizado(): bool
+    {
+        return $this->estado === CursoEstado::Finalizo->value;
+    }
+
+    /**
+     * Un curso archivado es estrictamente de solo lectura; los estados
+     * `EnCurso` y `Finalizo` conservan sus reglas existentes.
+     */
+    public function permiteEscritura(): bool
+    {
+        return ! $this->estaArchivado();
+    }
+
+    /** @param Builder<Curso> $query */
+    public function scopeArchivados(Builder $query): Builder
+    {
+        return $query->where('estado', CursoEstado::Archivado->value);
+    }
+
+    /** @param Builder<Curso> $query */
+    public function scopeNoArchivados(Builder $query): Builder
+    {
+        return $query->where('estado', '!=', CursoEstado::Archivado->value);
     }
 
     /**
