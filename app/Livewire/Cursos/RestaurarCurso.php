@@ -14,14 +14,20 @@
  * @changelog
  * - 2026-11-21  [Equipo T1]  feat: creación del componente y su ruta (Refs #326).
  * - 2026-11-21  [Equipo T1]  feat: lista los archivados desde el servicio (Refs #326).
+ * - 2026-11-21  [Equipo T1]  feat: confirma la restauración con el servicio (Refs #326).
  */
 
 declare(strict_types=1);
 
 namespace App\Livewire\Cursos;
 
+use App\Models\Curso;
+use App\Models\Usuario;
 use App\Services\Curso\ListarCursosDocenteService;
+use App\Services\Curso\RestaurarCursoService;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\View\View;
+use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 
 class RestaurarCurso extends Component
@@ -42,6 +48,40 @@ class RestaurarCurso extends Component
     public function cancelar(): void
     {
         $this->modalAbierto = false;
+    }
+
+    public function confirmarRestauracion(): void
+    {
+        if (! $this->modalAbierto || $this->cursoId === null) {
+            return;
+        }
+
+        $docente = auth()->user();
+        $curso = Curso::find($this->cursoId);
+
+        if (! $docente instanceof Usuario || $curso === null) {
+            session()->flash('error', 'No se pudo restaurar el curso.');
+            $this->modalAbierto = false;
+
+            return;
+        }
+
+        try {
+            app(RestaurarCursoService::class)->ejecutar($docente, $curso);
+        } catch (ValidationException $e) {
+            session()->flash('error', $e->errors()['curso'][0] ?? 'No se pudo restaurar el curso.');
+            $this->modalAbierto = false;
+
+            return;
+        } catch (AuthorizationException) {
+            session()->flash('error', 'No tienes permiso para restaurar este curso.');
+            $this->modalAbierto = false;
+
+            return;
+        }
+
+        $this->modalAbierto = false;
+        $this->dispatch('restauracion-curso-exitosa', mensaje: RestaurarCursoService::MENSAJE_EXITO);
     }
 
     public function render(ListarCursosDocenteService $servicio): View

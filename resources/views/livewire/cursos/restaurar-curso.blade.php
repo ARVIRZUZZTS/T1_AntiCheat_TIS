@@ -11,6 +11,12 @@
 @section('title', 'Restaurar curso')
 
 <div class="px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
+    @if (session('error'))
+        <div role="alert" class="mx-auto mb-4 w-full max-w-2xl rounded-base border border-danger bg-danger-soft px-4 py-3 text-sm text-heading">
+            {{ session('error') }}
+        </div>
+    @endif
+
     <div class="mx-auto w-full max-w-2xl overflow-hidden rounded-base border border-default bg-neutral-primary-soft shadow-xs">
         @if ($cursos->isEmpty())
             <div class="flex flex-col items-center gap-3 p-8 text-center">
