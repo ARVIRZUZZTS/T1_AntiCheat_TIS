@@ -24,9 +24,21 @@
                 @foreach ($cursos as $curso)
                     <li class="flex flex-col gap-3 border-b border-default p-4 last:border-b-0 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:p-5">
                         <p class="min-w-0 font-medium text-heading break-words">{{ $curso->nombre_curso }}</p>
+                        <x-ui.button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            class="w-full sm:w-auto"
+                            wire:click='abrirModal({{ $curso->id_curso }}, @js($curso->nombre_curso))'
+                            aria-haspopup="dialog"
+                        >
+                            Restaurar
+                        </x-ui.button>
                     </li>
                 @endforeach
             </ul>
         @endif
     </div>
+
+    <x-ui.modal-restaurar-curso :curso-id="$cursoId" :nombre-curso="$cursoNombre" />
 </div>

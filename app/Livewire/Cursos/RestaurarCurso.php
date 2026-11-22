@@ -26,6 +26,24 @@ use Livewire\Component;
 
 class RestaurarCurso extends Component
 {
+    public bool $modalAbierto = false;
+
+    public ?int $cursoId = null;
+
+    public string $cursoNombre = '';
+
+    public function abrirModal(int $cursoId, string $cursoNombre): void
+    {
+        $this->cursoId = $cursoId;
+        $this->cursoNombre = $cursoNombre;
+        $this->modalAbierto = true;
+    }
+
+    public function cancelar(): void
+    {
+        $this->modalAbierto = false;
+    }
+
     public function render(ListarCursosDocenteService $servicio): View
     {
         return view('livewire.cursos.restaurar-curso', [
