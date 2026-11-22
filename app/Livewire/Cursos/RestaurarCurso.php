@@ -81,6 +81,9 @@ class RestaurarCurso extends Component
         }
 
         $this->modalAbierto = false;
+        $this->cursoId = null;
+        $this->cursoNombre = '';
+        $this->dispatch('$refresh');
         $this->dispatch('restauracion-curso-exitosa', mensaje: RestaurarCursoService::MENSAJE_EXITO);
     }
 
