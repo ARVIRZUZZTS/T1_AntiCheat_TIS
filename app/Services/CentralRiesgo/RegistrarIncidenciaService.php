@@ -56,6 +56,7 @@ use App\Enums\TipoInfraccion;
 use App\Models\CentralRiesgo;
 use App\Models\Estudiante;
 use App\Models\EstudianteExamen;
+use App\Models\Examen;
 use App\Models\Rol;
 use App\Models\Usuario;
 use App\Services\Notificacion\NotificacionService;
@@ -85,6 +86,7 @@ class RegistrarIncidenciaService
 
     public function __construct(
         private readonly NotificacionService $notificaciones,
+        private readonly \App\Services\Curso\AsegurarCursoEditableService $editable,
     ) {}
 
     /**
@@ -103,6 +105,9 @@ class RegistrarIncidenciaService
      */
     public function ejecutar(RegistroIncidenciaDTO $datos, Usuario $registrador, int $idDocente): CentralRiesgo
     {
+        $examen = Examen::query()->findOrFail($datos->idExamen);
+        $this->editable->asegurarExamenEditable($examen, 'examen');
+
         $sis = trim($datos->sis);
         $motivos = $this->validarMotivos($datos);
         $detalle = $this->validarDetalle($motivos, $datos->detalle);

@@ -56,6 +56,10 @@ class RegistroIngresoService
      */
     public const MOTIVO_RECHAZO = 'Rechazado en el control de ingreso';
 
+    public function __construct(
+        private readonly \App\Services\Curso\AsegurarCursoEditableService $editable,
+    ) {}
+
     /**
      * Registra el ingreso de un estudiante habilitado a un examen.
      *
@@ -73,6 +77,8 @@ class RegistroIngresoService
         int $idRegistrador,
         ?int $idDocente = null,
     ): RegistroAsistencia {
+        $this->editable->asegurarExamenEditable(\App\Models\Examen::query()->findOrFail($idExamen), 'examen');
+
         return DB::transaction(function () use ($sisEstudiante, $idExamen, $idRegistrador, $idDocente) {
             $inscripcion = $this->obtenerInscripcion($sisEstudiante, $idExamen, $idDocente);
 
@@ -163,6 +169,8 @@ class RegistroIngresoService
         int $idRegistrador,
         ?int $idDocente,
     ): EstudianteExamen {
+        $this->editable->asegurarExamenEditable(\App\Models\Examen::query()->findOrFail($idExamen), 'examen');
+
         return DB::transaction(function () use ($sisEstudiante, $idExamen, $estado, $motivo, $idRegistrador, $idDocente) {
             $inscripcion = $this->obtenerInscripcion($sisEstudiante, $idExamen, $idDocente);
 

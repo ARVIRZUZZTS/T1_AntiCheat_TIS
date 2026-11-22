@@ -134,7 +134,10 @@
             ['label' => 'Ver cursos', 'route' => 'cursos'],
             ['label' => 'Crear curso', 'route' => 'cursos.crear'],
             ['label' => 'Editar curso', 'route' => 'cursos.editar'],
+            ['label' => 'Archivar curso', 'route' => 'cursos.archivar'],
+            ['label' => 'Restaurar curso', 'route' => 'cursos.restaurar'],
             ['label' => 'Eliminar curso', 'route' => 'cursos.eliminar'],
+            ['label' => 'Cursos archivados', 'route' => 'cursos.archivados'],
             ['label' => 'Cargar CSV', 'route' => 'cursos.cargar-csv'],
             // El detalle de un curso (/cursos/{curso}) muestra las dos secciones;
             // se resalta "Ver estudiantes" como acceso principal.

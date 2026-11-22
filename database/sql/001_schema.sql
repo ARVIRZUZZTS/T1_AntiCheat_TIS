@@ -55,7 +55,8 @@ CREATE TYPE estado_incidencia AS ENUM (
 
 CREATE TYPE curso_estado AS ENUM (
   'EnCurso',
-  'Finalizo'
+  'Finalizo',
+  'Archivado'
 );
 
 CREATE TYPE nombre_tipo_gestion AS ENUM (

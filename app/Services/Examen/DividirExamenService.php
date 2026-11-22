@@ -34,6 +34,10 @@ use InvalidArgumentException;
 
 class DividirExamenService
 {
+    public function __construct(
+        private readonly \App\Services\Curso\AsegurarCursoEditableService $editable,
+    ) {}
+
     /**
      * Divide a los estudiantes del examen entre los ambientes seleccionados
      * por apellido o por carrera.
@@ -48,6 +52,8 @@ class DividirExamenService
      */
     public function dividir(Examen $examen, array $ambientes, string $divisionPor): void
     {
+        $this->editable->asegurarExamenEditable($examen, 'examen');
+
         if ($ambientes === []) {
             return;
         }

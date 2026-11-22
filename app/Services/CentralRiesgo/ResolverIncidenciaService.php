@@ -33,6 +33,7 @@ namespace App\Services\CentralRiesgo;
 use App\Enums\TipoInfraccion;
 use App\Models\CentralRiesgo;
 use App\Models\Usuario;
+use App\Services\Curso\AsegurarCursoEditableService;
 use App\Services\Notificacion\NotificacionService;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -42,6 +43,9 @@ use InvalidArgumentException;
 
 class ResolverIncidenciaService
 {
+    public function __construct(
+        private readonly AsegurarCursoEditableService $editable,
+    ) {}
     /**
      * @param  int  $idIncidencia  Identificador de una incidencia existente.
      * @param  Usuario  $docente  Usuario autenticado que realiza la revisión.
@@ -94,6 +98,11 @@ class ResolverIncidenciaService
     {
         $incidencia = CentralRiesgo::query()->lockForUpdate()->findOrFail($idIncidencia);
         Gate::forUser($docente)->authorize('resolver', $incidencia);
+
+        $incidencia->loadMissing('examen.cursos');
+        if ($incidencia->examen !== null) {
+            $this->editable->asegurarExamenEditable($incidencia->examen, 'incidencia');
+        }
 
         if ($incidencia->tipo_infraccion !== TipoInfraccion::Sospechoso) {
             throw new InvalidArgumentException('Solo se pueden resolver incidencias pendientes de revisión.');

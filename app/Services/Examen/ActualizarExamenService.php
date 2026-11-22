@@ -52,7 +52,10 @@ class ActualizarExamenService
 {
     use NormalizaDatosExamen;
 
-    public function __construct(private readonly ValidarDisponibilidadExamenService $disponibilidad) {}
+    public function __construct(
+        private readonly ValidarDisponibilidadExamenService $disponibilidad,
+        private readonly \App\Services\Curso\AsegurarCursoEditableService $editable,
+    ) {}
 
     /**
      * Guarda los cambios del examen y de sus relaciones.
@@ -66,6 +69,8 @@ class ActualizarExamenService
      */
     public function ejecutar(Examen $examen, array $datos): Examen
     {
+        $this->editable->asegurarExamenEditable($examen, 'examen');
+
         return DB::transaction(function () use ($examen, $datos): Examen {
             $this->disponibilidad->bloquearProgramacion();
             $this->validarDisponibilidad($examen, $datos);

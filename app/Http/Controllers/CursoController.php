@@ -57,11 +57,13 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StoreCursoRequest;
 use App\Models\Curso;
 use App\Models\Usuario;
+use App\Services\Curso\ArchivarCursoService;
 use App\Services\Curso\ContarAfectadosCursoService;
 use App\Services\Curso\EliminarCursoService;
 use App\Services\Curso\ListarCursosDocenteService;
 use App\Services\Curso\ListarGestionesService;
 use App\Services\Curso\RegistrarCursoService;
+use App\Services\Curso\RestaurarCursoService;
 use App\Services\Examen\ListarEstudiantesCursoConEstadoService;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\View\View;
@@ -127,6 +129,7 @@ class CursoController extends Controller
         return view('pages.curso-eliminar', [
             'cursos' => Curso::query()
                 ->where('sis_doc', $request->user()->id_usuario)
+                ->where('estado', '!=', \App\Enums\CursoEstado::Archivado->value)
                 ->orderBy('nombre_curso')
                 ->get(['id_curso', 'nombre_curso']),
         ]);
@@ -222,6 +225,82 @@ class CursoController extends Controller
             ->with('mensaje', 'Curso eliminado con exito');
     }
 
+    public function archivar(Request $request, Curso $curso, ArchivarCursoService $servicio): RedirectResponse|JsonResponse
+    {
+        $usuario = $request->user();
+        abort_unless($usuario instanceof Usuario, 401);
+
+        try {
+            $servicio->ejecutar($usuario, $curso);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            if ($request->expectsJson()) {
+                return response()->json(['errors' => $e->errors()], 422);
+            }
+
+            throw $e;
+        }
+
+        if ($request->expectsJson()) {
+            return response()->json(['mensaje' => ArchivarCursoService::MENSAJE_EXITO]);
+        }
+
+        return redirect()->route('cursos.archivar')->with('mensaje', ArchivarCursoService::MENSAJE_EXITO);
+    }
+
+    public function restaurarLista(Request $request): View
+    {
+        return view('pages.curso-restaurar', [
+            'cursos' => Curso::query()
+                ->where('sis_doc', $request->user()->id_usuario)
+                ->where('estado', \App\Enums\CursoEstado::Archivado->value)
+                ->orderBy('nombre_curso')
+                ->get(['id_curso', 'nombre_curso']),
+        ]);
+    }
+
+    public function restaurar(Request $request, Curso $curso, RestaurarCursoService $servicio): RedirectResponse|JsonResponse
+    {
+        $usuario = $request->user();
+        abort_unless($usuario instanceof Usuario, 401);
+
+        try {
+            $servicio->ejecutar($usuario, $curso);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            if ($request->expectsJson()) {
+                return response()->json(['errors' => $e->errors()], 422);
+            }
+
+            throw $e;
+        }
+
+        if ($request->expectsJson()) {
+            return response()->json(['mensaje' => RestaurarCursoService::MENSAJE_EXITO]);
+        }
+
+        return redirect()->route('cursos.restaurar')->with('mensaje', RestaurarCursoService::MENSAJE_EXITO);
+    }
+
+    public function archivados(Request $request): View
+    {
+        $cursos = Curso::query()
+            ->where('sis_doc', $request->user()->id_usuario)
+            ->where('estado', \App\Enums\CursoEstado::Archivado->value)
+            ->with([
+                'estudiantes',
+                'examenes.tipoExamen',
+                'examenes.cursos',
+                'examenes.incidencias.estudiante',
+            ])
+            ->withCount(['estudiantes', 'examenes'])
+            ->orderByDesc('fecha_creacion')
+            ->orderByDesc('id_curso')
+            ->get();
+
+        return view('pages.cursos-archivados', [
+            'cursos' => $cursos,
+        ]);
+    }
+
     /**
      * Vista de un curso: tarjetas de conteo y las secciones Estudiantes,
      * Habilitaciones y Auxiliares.
@@ -299,6 +378,7 @@ class CursoController extends Controller
     {
         $cursos = Curso::query()
             ->where('sis_doc', $request->user()->id_usuario)
+            ->where('estado', '!=', \App\Enums\CursoEstado::Archivado->value)
             ->orderBy('nombre_curso')
             ->get();
 

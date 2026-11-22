@@ -17,7 +17,7 @@
 
 | Enum | Valores |
 |---|---|
-| `curso_estado` | `EnCurso`, `Finalizo` |
+| `curso_estado` | `EnCurso`, `Finalizo`, `Archivado` |
 | `estado_incidencia` | `Confirmado`, `Pendiente` |
 | `estado_notificacion` | `visto`, `recibido` |
 | `estado_usuario` | `Activo`, `Baja` |
@@ -73,6 +73,8 @@
 | sis_doc | integer | NO | NULL |
 | fecha_creacion | date | YES | NULL |
 | estado | enum `curso_estado` | NO | NULL |
+
+`estado` admite `EnCurso`, `Finalizo` y `Archivado`. `Archivado` es independiente de `Finalizo`: un curso archivado queda en solo lectura, conserva su historial y deja de aparecer en los listados/selecciones activas.
 
 **Datos:**
 | id_curso | nombre_curso | sis_doc | fecha_creacion | estado |

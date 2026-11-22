@@ -12,10 +12,12 @@ use Illuminate\Support\Facades\Gate;
 
 class ConfiguracionExamenDocenteService
 {
+    public function __construct(
+        private readonly \App\Services\Curso\AsegurarCursoEditableService $editable,
+    ) {}
+
     public function obtener(Usuario $docente, Examen $examen): ConfiguracionExamenDocente
     {
-        Gate::forUser($docente)->authorize('configurar', $examen);
-
         return ConfiguracionExamenDocente::query()
             ->delDocente((int) $docente->id_usuario)
             ->where('id_examen', $examen->id_examen)
@@ -26,6 +28,9 @@ class ConfiguracionExamenDocenteService
     /** @param array<string, mixed> $datos */
     public function guardar(Usuario $docente, Examen $examen, array $datos): ConfiguracionExamenDocente
     {
+        Gate::forUser($docente)->authorize('configurar', $examen);
+        $this->editable->asegurarExamenEditable($examen, 'examen');
+
         $configuracion = $this->obtener($docente, $examen);
 
         return DB::transaction(function () use ($configuracion, $datos): ConfiguracionExamenDocente {
