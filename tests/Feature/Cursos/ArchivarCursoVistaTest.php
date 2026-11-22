@@ -89,4 +89,22 @@ class ArchivarCursoVistaTest extends TestCase
             ->assertSee('Archivar curso')
             ->assertSee('Curso En Curso');
     }
+
+    public function test_cancelar_cierra_el_modal_sin_cambiar_el_estado(): void
+    {
+        $this->actingAs(Usuario::findOrFail(self::DOCENTE));
+
+        Livewire::test(ArchivarCurso::class)
+            ->call('abrirModal', self::CURSO)
+            ->call('cerrarModal')
+            ->assertSet('modalAbierto', false)
+            ->assertSet('cursoId', null)
+            ->assertSet('cursoNombre', '')
+            ->assertDontSee('titulo-archivar-curso', false);
+
+        $this->assertSame(
+            CursoEstado::EnCurso->value,
+            DB::table('curso')->where('id_curso', self::CURSO)->value('estado'),
+        );
+    }
 }
