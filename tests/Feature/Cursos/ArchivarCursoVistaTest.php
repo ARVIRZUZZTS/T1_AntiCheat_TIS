@@ -66,6 +66,17 @@ class ArchivarCursoVistaTest extends TestCase
         ]);
     }
 
+    public function test_muestra_estado_vacio_sin_cursos_activos(): void
+    {
+        DB::table('curso')->update(['estado' => CursoEstado::Archivado->value]);
+
+        $this->actingAs(Usuario::findOrFail(self::DOCENTE));
+
+        Livewire::test(ArchivarCurso::class)
+            ->assertSee('No tienes cursos en curso para archivar.')
+            ->assertDontSee('wire:click="abrirModal(', false);
+    }
+
     public function test_lista_cursos_activos_con_boton_archivar(): void
     {
         $this->actingAs(Usuario::findOrFail(self::DOCENTE));
