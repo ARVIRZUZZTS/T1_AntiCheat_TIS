@@ -20,6 +20,7 @@
  * @updated 2026-11-19
  * @updated 2026-11-21
  * @updated 2026-11-20
+ * @updated 2026-11-22
  *
  * @description
  * Definición de rutas web del panel. Incluye vistas estáticas y componentes Livewire.
@@ -100,6 +101,9 @@
  * - 2026-11-20  [OchoaCesar]  feat: /examenes/eliminar, la página propia de la
  *   subopción "Eliminar examen" del sidebar: lista de todos los exámenes del
  *   docente con el botón de eliminación por curso.
+ * - 2026-11-22  [Valery D. Ortuno P]  fix: se quitan los `use` repetidos
+ *   (EstudiantesCurso, MonitorEnVivo, AccesoMonitor) que dejaron los merges
+ *   del 21/11; PHP no arrancaba por "name is already in use".
  */
 
 use App\Http\Controllers\AuthController;
@@ -112,9 +116,6 @@ use App\Http\Controllers\Reporte\ListarReporteIngresosIlegalesController;
 use App\Http\Controllers\Reporte\ReporteController;
 use App\Livewire\Cursos\RestaurarCurso;
 use App\Livewire\Cursos\ArchivarCurso;
-use App\Livewire\Examenes\EstudiantesCurso;
-use App\Livewire\Monitoreo\MonitorEnVivo;
-use App\Livewire\Monitoreo\AccesoMonitor;
 use App\Livewire\Auxiliares\CrearAuxiliar;
 use App\Livewire\Auxiliares\GestionAuxiliares;
 use App\Livewire\Examenes\EstudiantesCurso;
