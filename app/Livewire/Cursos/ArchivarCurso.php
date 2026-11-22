@@ -43,6 +43,10 @@ class ArchivarCurso extends Component
 
     public string $errorArchivar = '';
 
+    public bool $mostrarExito = false;
+
+    public string $mensajeExito = '';
+
     public function cerrarModal(): void
     {
         if ($this->archivando) {
@@ -86,6 +90,8 @@ class ArchivarCurso extends Component
             $this->modalAbierto = false;
             $this->cursoId = null;
             $this->cursoNombre = '';
+            $this->mensajeExito = ArchivarCursoService::MENSAJE_EXITO;
+            $this->mostrarExito = true;
         } catch (ValidationException $e) {
             $this->errorArchivar = $e->errors()['curso'][0] ?? 'No se pudo archivar el curso.';
         } catch (AuthorizationException) {

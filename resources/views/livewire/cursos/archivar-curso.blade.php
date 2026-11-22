@@ -37,6 +37,31 @@
         @endif
     </div>
 
+    @if ($mostrarExito)
+        <div
+            role="status"
+            aria-live="polite"
+            class="fixed top-4 end-4 z-[60] w-[calc(100%-2rem)] max-w-sm"
+        >
+            <div class="flex items-center gap-3 rounded-base border border-default bg-neutral-primary-soft p-4 shadow-xs">
+                <span class="inline-flex shrink-0 items-center justify-center w-8 h-8 rounded bg-success-soft text-fg-success-strong">
+                    <svg class="w-5 h-5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 11.917 9.724 16.5 19 7.5"/></svg>
+                </span>
+
+                <p class="min-w-0 flex-1 text-sm text-heading">{{ $mensajeExito }}</p>
+
+                <button
+                    type="button"
+                    wire:click="$set('mostrarExito', false)"
+                    class="inline-flex shrink-0 items-center justify-center w-8 h-8 rounded-base text-body hover:bg-neutral-secondary-medium hover:text-heading"
+                >
+                    <span class="sr-only">Cerrar aviso</span>
+                    <svg class="w-5 h-5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18 17.94 6M18 18 6.06 6"/></svg>
+                </button>
+            </div>
+        </div>
+    @endif
+
     <x-ui.modal-archivar-curso
         :abierto="$modalAbierto"
         :nombre="$cursoNombre"
