@@ -47,4 +47,18 @@
     </div>
 
     <x-ui.modal-restaurar-curso :curso-id="$cursoId" :nombre-curso="$cursoNombre" />
+
+    <div
+        x-data="{ mensaje: @js(session('mensaje') ?? '') }"
+        x-on:restauracion-curso-exitosa.window="mensaje = $event.detail.mensaje"
+        x-show="mensaje"
+        x-cloak
+        x-transition.opacity
+        class="fixed inset-x-4 bottom-4 z-50 flex justify-center sm:inset-x-auto sm:right-6 sm:justify-end"
+        aria-live="polite"
+    >
+        <x-ui.toast id="toast-restaurar-curso" variant="success" title="Restauración">
+            <span x-text="mensaje"></span>
+        </x-ui.toast>
+    </div>
 </div>
