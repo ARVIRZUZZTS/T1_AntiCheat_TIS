@@ -17,9 +17,12 @@ declare(strict_types=1);
 namespace Tests\Feature\Cursos;
 
 use App\Enums\CursoEstado;
+use App\Livewire\Cursos\RestaurarCurso;
+use App\Models\Usuario;
 use App\Services\Curso\ListarCursosDocenteService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
+use Livewire\Livewire;
 use Tests\TestCase;
 
 class RestaurarCursoVistaTest extends TestCase
@@ -72,5 +75,22 @@ class RestaurarCursoVistaTest extends TestCase
 
         $this->assertSame([self::ARCHIVADO], array_map('intval', $cursos->pluck('id_curso')->all()));
         $this->assertSame(CursoEstado::Archivado->value, $cursos->first()->estado);
+    }
+
+    public function test_boton_abre_modal_y_cancelar_lo_cierra(): void
+    {
+        $this->actingAs(Usuario::findOrFail(self::DOCENTE));
+
+        Livewire::test(RestaurarCurso::class)
+            ->assertSee('A Archivado Propio')
+            ->assertDontSeeHtml('aria-modal')
+            ->call('abrirModal', self::ARCHIVADO, 'A Archivado Propio')
+            ->assertSet('modalAbierto', true)
+            ->assertSet('cursoNombre', 'A Archivado Propio')
+            ->assertSeeHtml('aria-modal')
+            ->assertSee('¿Restaurar el curso')
+            ->call('cancelar')
+            ->assertSet('modalAbierto', false)
+            ->assertDontSeeHtml('aria-modal');
     }
 }
