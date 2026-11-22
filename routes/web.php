@@ -107,6 +107,7 @@ use App\Http\Controllers\Reporte\ExportarReporteAsistenciaController;
 use App\Http\Controllers\Reporte\ExportarReporteIngresosIlegalesController;
 use App\Http\Controllers\Reporte\ListarReporteIngresosIlegalesController;
 use App\Http\Controllers\Reporte\ReporteController;
+use App\Livewire\Cursos\RestaurarCurso;
 use App\Livewire\Cursos\ArchivarCurso;
 use App\Livewire\Examenes\EstudiantesCurso;
 use App\Livewire\Monitoreo\MonitorEnVivo;
@@ -258,7 +259,7 @@ Route::middleware(['auth', 'docente'])->group(function (): void {
     Route::post('/cursos/{curso}/archivar', [CursoController::class, 'archivar'])
         ->whereNumber('curso')
         ->name('cursos.archivar.store');
-    Route::get('/cursos/restaurar', [CursoController::class, 'restaurarLista'])->name('cursos.restaurar');
+    Route::get('/cursos/restaurar', RestaurarCurso::class)->name('cursos.restaurar');
     Route::post('/cursos/{curso}/restaurar', [CursoController::class, 'restaurar'])
         ->whereNumber('curso')
         ->name('cursos.restaurar.store');
