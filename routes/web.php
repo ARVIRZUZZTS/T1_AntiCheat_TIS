@@ -229,16 +229,22 @@ Route::middleware(['auth', 'docente'])->group(function (): void {
     ])->name('cursos.editar');
     Route::get('/cursos/cargar-csv', function (Request $request) {
         $cursoId = $request->integer('curso');
-        if ($cursoId > 0) {
-            $curso = \App\Models\Curso::query()->findOrFail($cursoId);
-            \Illuminate\Support\Facades\Gate::authorize('gestionar', $curso);
-            app(\App\Services\Curso\AsegurarCursoEditableService::class)->asegurarCursoEditable($curso, 'curso');
+
+        if ($cursoId <= 0) {
+            $cursos = \App\Models\Curso::query()
+                ->where('sis_doc', $request->user()->id_usuario)
+                ->where('estado', '!=', \App\Enums\CursoEstado::Archivado->value)
+                ->orderBy('nombre_curso')
+                ->get();
+
+            return view('pages.cursos-cargar-csv', ['curso' => null, 'cursos' => $cursos]);
         }
 
-        return view('pages.en-desarrollo', [
-            'titulo' => 'Cargar CSV',
-            'descripcion' => 'La carga de estudiantes por CSV esta en desarrollo.',
-        ]);
+        $curso = \App\Models\Curso::query()->findOrFail($cursoId);
+        \Illuminate\Support\Facades\Gate::authorize('gestionar', $curso);
+        app(\App\Services\Curso\AsegurarCursoEditableService::class)->asegurarCursoEditable($curso, 'curso');
+
+        return view('pages.cursos-cargar-csv', ['curso' => $curso, 'cursos' => collect()]);
     })->name('cursos.cargar-csv');
     Route::get('/cursos/eliminar', [CursoController::class, 'eliminar'])->name('cursos.eliminar');
     Route::get('/cursos/archivar', [CursoController::class, 'archivarLista'])->name('cursos.archivar');
