@@ -19,13 +19,28 @@ declare(strict_types=1);
 
 namespace App\Livewire\Cursos;
 
+use App\Models\Curso;
+use App\Services\Curso\ListarCursosDocenteService;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Livewire\Component;
 
 class ArchivarCurso extends Component
 {
+    /**
+     * Cursos propios en curso que todavía se pueden archivar.
+     *
+     * @return EloquentCollection<int, Curso>
+     */
+    public function cursos(): EloquentCollection
+    {
+        return app(ListarCursosDocenteService::class)->archivables((int) auth()->id());
+    }
+
     public function render(): View
     {
-        return view('livewire.cursos.archivar-curso')->extends('layouts.app');
+        return view('livewire.cursos.archivar-curso', [
+            'cursos' => $this->cursos(),
+        ])->extends('layouts.app');
     }
 }
