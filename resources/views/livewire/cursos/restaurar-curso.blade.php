@@ -13,7 +13,12 @@
 <div class="px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
     <div class="mx-auto w-full max-w-2xl overflow-hidden rounded-base border border-default bg-neutral-primary-soft shadow-xs">
         @if ($cursos->isEmpty())
-            <p class="p-8 text-center text-sm text-body">No tienes cursos archivados</p>
+            <div class="flex flex-col items-center gap-3 p-8 text-center">
+                <svg class="size-10 text-body-subtle" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5v9a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 16.5v-9m16.5 0A2.25 2.25 0 0 0 18 5.25H6A2.25 2.25 0 0 0 3.75 7.5m16.5 0v-.75A2.25 2.25 0 0 0 18 4.5H6a2.25 2.25 0 0 0-2.25 2.25v.75m7.5 4.5h3" />
+                </svg>
+                <p class="text-sm text-body">No tienes cursos archivados</p>
+            </div>
         @else
             <ul>
                 @foreach ($cursos as $curso)
