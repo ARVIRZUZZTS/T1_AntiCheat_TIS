@@ -13,27 +13,23 @@
  *
  * @changelog
  * - 2026-11-21  [Equipo T1]  feat: creación del componente y su ruta (Refs #326).
+ * - 2026-11-21  [Equipo T1]  feat: lista los archivados desde el servicio (Refs #326).
  */
 
 declare(strict_types=1);
 
 namespace App\Livewire\Cursos;
 
-use App\Enums\CursoEstado;
-use App\Models\Curso;
+use App\Services\Curso\ListarCursosDocenteService;
 use Illuminate\Contracts\View\View;
 use Livewire\Component;
 
 class RestaurarCurso extends Component
 {
-    public function render(): View
+    public function render(ListarCursosDocenteService $servicio): View
     {
         return view('livewire.cursos.restaurar-curso', [
-            'cursos' => Curso::query()
-                ->where('sis_doc', auth()->id())
-                ->where('estado', CursoEstado::Archivado->value)
-                ->orderBy('nombre_curso')
-                ->get(['id_curso', 'nombre_curso']),
+            'cursos' => $servicio->archivados((int) auth()->id()),
         ])->extends('layouts.app');
     }
 }
