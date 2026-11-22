@@ -40,7 +40,7 @@
                             variant="secondary"
                             size="sm"
                             class="w-full sm:w-auto"
-                            wire:click='abrirModal({{ $curso->id_curso }}, @js($curso->nombre_curso))'
+                            wire:click='abrirModal({{ $curso->id_curso }}, {!! \Illuminate\Support\Js::from($curso->nombre_curso) !!})'
                             aria-haspopup="dialog"
                         >
                             Restaurar
