@@ -29,6 +29,11 @@ final class NombreCurso
 {
     private const SEPARADOR = ' - Grupo ';
 
+    public static function formatear(string $materia, string $grupo): string
+    {
+        return $materia.self::SEPARADOR.$grupo;
+    }
+
     /**
      * Materia del curso: "Calculo I - Grupo 2" -> "Calculo I".
      *
