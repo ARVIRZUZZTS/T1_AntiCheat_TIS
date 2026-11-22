@@ -9,6 +9,7 @@
     @updated 2026-11-16
     @updated 2026-11-19
     @updated 2026-11-20
+    @updated 2026-11-22
 
     @description
     Sidebar de navegacion del panel, en formato acordeon. Cada seccion
@@ -73,6 +74,10 @@
       solicitudes de registro (HU 26), que se habia perdido en el acordeon.
     - 2026-11-20  [OchoaCesar]  feat: subopción "Eliminar examen" debajo de
       "Editar examen".
+    - 2026-11-22  [Valery D. Ortuno P]  feat: el auxiliar ve en "Monitor en
+      vivo" solo las paginas que tiene habilitadas (Ingreso, Monitor o las dos)
+      por sus cursos o examenes asignados; sin ninguna, el grupo no aparece.
+      Nuevo grupo "Examenes > Ver examenes" del auxiliar (HU 24).
 --}}
 
 @props([
@@ -184,14 +189,26 @@
         ]],
     ];
 
-    $auxiliarItems = [
+    // Paginas de Monitor en vivo que el auxiliar tiene habilitadas por sus
+    // cursos o examenes asignados (HU 24). Una sola consulta.
+    $paginasAuxiliar = $rolUsuario === \App\Models\Rol::NOMBRE_AUXILIAR && $usuario
+        ? app(\App\Services\Auxiliar\AccesoAuxiliarService::class)->paginas((int) $usuario->id_usuario)
+        : ['ingreso' => false, 'monitor' => false];
+
+    $monitorAuxiliar = array_values(array_filter([
+        $paginasAuxiliar['ingreso'] ? ['label' => 'Ingreso', 'route' => 'monitoreo.ingreso'] : null,
+        $paginasAuxiliar['monitor'] ? ['label' => 'Monitor', 'route' => 'monitoreo'] : null,
+    ]));
+
+    $auxiliarItems = array_values(array_filter([
         // Sus cursos no son los del docente: tiene su propia ruta (HU aparte).
         ['label' => 'Cursos', 'route' => 'auxiliar.cursos'],
-        ['label' => 'Monitor en vivo', 'children' => [
-            ['label' => 'Ingreso', 'route' => 'monitoreo.ingreso'],
-            ['label' => 'Monitor', 'route' => 'monitoreo'],
+        // Solo los examenes a los que esta asignado (HU 24).
+        ['label' => 'Examenes', 'children' => [
+            ['label' => 'Ver examenes', 'route' => 'auxiliar.examenes'],
         ]],
-    ];
+        $monitorAuxiliar !== [] ? ['label' => 'Monitor en vivo', 'children' => $monitorAuxiliar] : null,
+    ]));
 
     if ($items) {
         $nav = $items;

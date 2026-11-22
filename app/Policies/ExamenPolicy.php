@@ -21,6 +21,8 @@
  * - 2026-11-19  [Valery D. Ortuno P]  refactor: se quita `ver`; el permiso del
  *   detalle se revisa dentro de la consulta de ObtenerDetalleExamenService
  *   (ahorra tres consultas a la base remota).
+ * - 2026-11-22  [Valery D. Ortuno P]  feat: `monitorear` deja pasar al auxiliar
+ *   con el curso activo o con el examen asignado con Monitor (HU 24).
  * - 2026-11-20  [Equipo T1]  feat: bloqueo de escrituras si algún curso
  *   vinculado al examen está archivado (HU #321 · Task #323).
  *
@@ -34,6 +36,7 @@ use App\Models\Curso;
 use App\Models\Examen;
 use App\Models\Rol;
 use App\Models\Usuario;
+use App\Services\Auxiliar\AccesoAuxiliarService;
 use Illuminate\Support\Facades\DB;
 
 class ExamenPolicy
@@ -68,11 +71,9 @@ class ExamenPolicy
             return false;
         }
 
-        return DB::table('auxiliar_curso')
-            ->join('examen_curso', 'examen_curso.id_curso', '=', 'auxiliar_curso.id_curso')
-            ->where('auxiliar_curso.id_auxiliar', $usuario->id_usuario)
-            ->where('examen_curso.id_examen', $examen->id_examen)
-            ->exists();
+        // Curso activo asignado o el examen asignado con Monitor (HU 24).
+        return app(AccesoAuxiliarService::class)
+            ->puede((int) $usuario->id_usuario, (int) $examen->id_examen, AccesoAuxiliarService::MONITOR);
     }
 
     /**

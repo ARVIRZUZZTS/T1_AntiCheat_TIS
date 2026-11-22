@@ -10,6 +10,7 @@
  * @updated 2026-10-10
  * @updated 2026-10-25
  * @updated 2026-11-07
+ * @updated 2026-11-22
  *
  * @description
  * Componente Livewire de página completa del monitor en vivo: resuelve el
@@ -70,6 +71,9 @@
  * - 2026-11-07  [Valery D. Ortuno P]  feat: registrarTramposo() y
  *   registrarNoInscrito() reciben `motivos` (una lista): una incidencia puede
  *   tener varios.
+ * - 2026-11-22  [Valery D. Ortuno P]  feat: un auxiliar ve en el monitor los
+ *   examenes de sus cursos activos y los asignados con Monitor, y sigue la
+ *   configuracion del docente de su curso o de quien lo asigno (HU 24).
  */
 
 namespace App\Livewire\Monitoreo;
@@ -80,6 +84,7 @@ use App\Models\Examen;
 use App\Models\Rol;
 use App\Models\Usuario;
 use App\Services\Asistencia\RegistroIngresoService;
+use App\Services\Auxiliar\AccesoAuxiliarService;
 use App\Services\CentralRiesgo\RegistrarIncidenciaService;
 use App\Services\Monitoreo\GenerarReporteAsistenciaService;
 use App\Support\DTO\RegistroIncidenciaDTO;
@@ -926,13 +931,11 @@ class MonitorEnVivo extends Component
                     ->where('curso.sis_doc', $usuario->id_usuario));
         }
 
-        $cursosAsignados = DB::table('auxiliar_curso')
-            ->where('id_auxiliar', $usuario->id_usuario)
-            ->pluck('id_curso');
-
-        return $consulta->whereHas(
-            'cursos',
-            fn ($cursos) => $cursos->whereIn('curso.id_curso', $cursosAsignados)
+        // Auxiliar: examenes de sus cursos activos y los asignados con Monitor
+        // (HU 24).
+        return $consulta->whereIn(
+            'id_examen',
+            app(AccesoAuxiliarService::class)->idsExamenes((int) $usuario->id_usuario, AccesoAuxiliarService::MONITOR)
         );
     }
 
@@ -943,16 +946,12 @@ class MonitorEnVivo extends Component
         }
 
         if (auth()->check()) {
-            $docente = DB::table('examen_curso as ec')
-                ->join('auxiliar_curso as ac', 'ac.id_curso', '=', 'ec.id_curso')
-                ->join('curso as c', 'c.id_curso', '=', 'ec.id_curso')
-                ->where('ec.id_examen', $examen->id_examen)
-                ->where('ac.id_auxiliar', auth()->id())
-                ->orderBy('c.id_curso')
-                ->value('c.sis_doc');
+            // Docente del curso que tiene asignado o quien lo asigno al examen.
+            $docente = app(AccesoAuxiliarService::class)
+                ->docenteConfiguracion((int) auth()->id(), (int) $examen->id_examen);
 
             if ($docente !== null) {
-                return (int) $docente;
+                return $docente;
             }
         }
 
