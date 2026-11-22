@@ -20,6 +20,8 @@
  *   son por examen y se manejan en la sección Exámenes (`activos()`).
  * - `activos()`: los cursos en curso propios y los de invitaciones aceptadas,
  *   para elegir uno en Exámenes.
+ * - `archivables()`: solo los cursos en curso propios, para la subsección
+ *   «Archivar curso» (no se pueden archivar cursos compartidos).
  *
  * El orden se aplica acá y no en ListarMateriasConMetricasService porque ese
  * servicio también alimenta a Reportes, que depende de su orden por id.
@@ -34,6 +36,7 @@
  *   invitados ni las claves `invitado`/`es_anfitrion` — el criterio era
  *   incorrecto, las invitaciones son por examen y solo se manejan en Exámenes
  *   (ahí `activos()` sigue marcando el curso anfitrión).
+ * - 2026-11-21  [Equipo T1]  feat: `archivables()` para la vista de archivado.
  *
  * @see  App\Services\Curso\ListarMateriasConMetricasService
  * @see  App\Http\Controllers\CursoController
@@ -157,6 +160,24 @@ class ListarCursosDocenteService
         }
 
         return $cursos;
+    }
+
+    /**
+     * Cursos propios en estado `EnCurso`, en orden alfabético, listos para
+     * archivar. Los cursos compartidos por invitación quedan afuera: el
+     * servicio de archivado solo autoriza al docente propietario.
+     *
+     * @param  int  $idDocente  ID del docente (`curso.sis_doc`).
+     * @return EloquentCollection<int, Curso> Cursos con id, nombre y estado.
+     */
+    public function archivables(int $idDocente): EloquentCollection
+    {
+        return Curso::query()
+            ->where('sis_doc', $idDocente)
+            ->where('estado', CursoEstado::EnCurso->value)
+            ->orderBy('nombre_curso')
+            ->orderBy('id_curso')
+            ->get(['id_curso', 'nombre_curso', 'estado']);
     }
 
     /**

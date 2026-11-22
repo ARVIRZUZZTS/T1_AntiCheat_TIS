@@ -102,6 +102,7 @@ use App\Http\Controllers\ExamenController;
 use App\Http\Controllers\Reporte\ExportarReporteIngresosIlegalesController;
 use App\Http\Controllers\Reporte\ListarReporteIngresosIlegalesController;
 use App\Http\Controllers\Reporte\ReporteController;
+use App\Livewire\Cursos\ArchivarCurso;
 use App\Livewire\Examenes\EstudiantesCurso;
 use App\Livewire\Monitoreo\MonitorEnVivo;
 use App\Livewire\Monitoreo\AccesoMonitor;
@@ -247,7 +248,7 @@ Route::middleware(['auth', 'docente'])->group(function (): void {
         return view('pages.cursos-cargar-csv', ['curso' => $curso, 'cursos' => collect()]);
     })->name('cursos.cargar-csv');
     Route::get('/cursos/eliminar', [CursoController::class, 'eliminar'])->name('cursos.eliminar');
-    Route::get('/cursos/archivar', [CursoController::class, 'archivarLista'])->name('cursos.archivar');
+    Route::get('/cursos/archivar', ArchivarCurso::class)->name('cursos.archivar');
     Route::post('/cursos/{curso}/archivar', [CursoController::class, 'archivar'])
         ->whereNumber('curso')
         ->name('cursos.archivar.store');
