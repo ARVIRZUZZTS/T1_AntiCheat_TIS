@@ -20,6 +20,7 @@ namespace Tests\Feature\Cursos;
 use App\Enums\CursoEstado;
 use App\Livewire\Cursos\ArchivarCurso;
 use App\Models\Usuario;
+use App\Services\Curso\ListarCursosDocenteService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
@@ -64,6 +65,26 @@ class ArchivarCursoVistaTest extends TestCase
             'estado' => $estado->value,
             'fecha_creacion' => now()->toDateString(),
         ]);
+    }
+
+    public function test_servicio_devuelve_solo_cursos_propios_en_curso_ordenados(): void
+    {
+        $servicio = app(ListarCursosDocenteService::class);
+
+        $this->assertSame(
+            ['Curso En Curso', 'Otro Curso'],
+            $servicio->archivables(self::DOCENTE)->pluck('nombre_curso')->all(),
+        );
+
+        DB::table('curso')
+            ->where('id_curso', self::CURSO)
+            ->update(['estado' => CursoEstado::Archivado->value]);
+
+        $this->assertSame(
+            ['Otro Curso'],
+            $servicio->archivables(self::DOCENTE)->pluck('nombre_curso')->all(),
+        );
+        $this->assertTrue($servicio->archivables(999999)->isEmpty());
     }
 
     public function test_muestra_estado_vacio_sin_cursos_activos(): void
