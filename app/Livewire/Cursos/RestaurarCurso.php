@@ -48,6 +48,8 @@ class RestaurarCurso extends Component
     public function cancelar(): void
     {
         $this->modalAbierto = false;
+        $this->cursoId = null;
+        $this->cursoNombre = '';
     }
 
     public function confirmarRestauracion(): void
