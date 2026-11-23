@@ -42,6 +42,9 @@
  *   del mismo modal (aceptar y despues elegir el curso, o "Mas tarde"), con
  *   mensajes de lo que pasa; los examenes del curso salen en una sola
  *   consulta.
+ * - 2026-11-23  [Valery D. Ortuno P]  fix: el selector de curso de Enviar
+ *   muestra solo cursos activos con examenes programados (los demas no
+ *   llevaban a ningun examen y parecia que no cargaba).
  *
  * @see  App\Services\Invitacion\ListarInvitacionesRecibidasService
  * @see  App\Services\Invitacion\AsociarCursosInvitacionService
@@ -49,6 +52,7 @@
 
 namespace App\Livewire\Invitaciones;
 
+use App\Enums\CursoEstado;
 use App\Enums\TipoExamen;
 use App\Models\Examen;
 use App\Models\InvitacionExamenCompartido;
@@ -111,9 +115,12 @@ class Index extends Component
         // 'recibir' (ver los `->defaults('tab', ...)` de las rutas).
         $this->tab = $tab === 'enviar' ? 'enviar' : 'recibir';
 
-        // Solo los cursos activos propios: un examen compartido aparece en
-        // el curso del invitado cuando lo asocia al aceptar.
-        $this->cursos = $asociar->cursosDisponibles(auth()->user());
+        // Enviar: solo cursos activos propios con algun examen programado (los
+        // demas no llevan a ningun examen al que invitar). Aceptar: todos los
+        // cursos activos propios, para asociar el examen compartido.
+        $this->cursos = $this->tab === 'enviar'
+            ? $this->cursosConExamenesProgramados()
+            : $asociar->cursosDisponibles(auth()->user());
 
         if ($this->tab === 'recibir') {
             $this->invitacionesRecibidas = $recibidas->ejecutar(auth()->user())->all();
@@ -369,6 +376,34 @@ class Index extends Component
         if ($examen !== null && auth()->user()->can('invitarDocente', $examen)) {
             $this->enviadas = app(ListarInvitacionesExamenService::class)->ejecutar(auth()->user(), $examen)->values()->all();
         }
+    }
+
+    /**
+     * Cursos activos propios (no archivados ni finalizados) con al menos un
+     * examen futuro, en una sola consulta.
+     *
+     * @return list<array{id: int, nombre: string}>
+     */
+    private function cursosConExamenesProgramados(): array
+    {
+        $ahora = now();
+
+        return DB::table('curso as c')
+            ->where('c.sis_doc', auth()->id())
+            ->where('c.estado', CursoEstado::EnCurso->value)
+            ->whereExists(fn ($consulta) => $consulta->from('examen_curso as ec')
+                ->join('examen as e', 'e.id_examen', '=', 'ec.id_examen')
+                ->whereColumn('ec.id_curso', 'c.id_curso')
+                ->where(fn ($futuro) => $futuro
+                    ->where('e.fecha', '>', $ahora->toDateString())
+                    ->orWhere(fn ($hoy) => $hoy
+                        ->where('e.fecha', $ahora->toDateString())
+                        ->where('e.hora_inicio', '>', $ahora->format('H:i:s'))))
+                ->selectRaw('1'))
+            ->orderBy('c.nombre_curso')
+            ->get(['c.id_curso', 'c.nombre_curso'])
+            ->map(fn (object $curso): array => ['id' => (int) $curso->id_curso, 'nombre' => (string) $curso->nombre_curso])
+            ->all();
     }
 
     private function reiniciarDocente(): void

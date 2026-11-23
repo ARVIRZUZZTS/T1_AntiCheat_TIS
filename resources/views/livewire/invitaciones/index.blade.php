@@ -30,6 +30,8 @@
       fechados, busqueda en vivo, resumen del envio e invitaciones enviadas con
       Cancelar (HU 131); Aceptar pide los cursos del examen y permite asociar
       las aceptadas sin curso (HU 132). Textos sin acentos y diseño responsive.
+    - 2026-11-23  [Valery D. Ortuno P]  fix: Enviar lista solo cursos activos con
+      examenes programados; sin ninguno, lo avisa.
     - 2026-11-22  [Valery D. Ortuno P]  refactor: "Aceptar" abre un modal en pasos
       (confirmar, asociar el examen a un curso o "Mas tarde", y listo) con
       mensajes de lo que esta pasando; "Rechazar" pide confirmacion. Las
@@ -214,7 +216,7 @@
                         @endforeach
                     </select>
                     @if ($cursos === [])
-                        <p class="mt-1 text-xs text-body">No tienes cursos activos.</p>
+                        <p class="mt-1 text-xs text-body">No tienes cursos activos con examenes programados.</p>
                     @endif
                 </div>
 
