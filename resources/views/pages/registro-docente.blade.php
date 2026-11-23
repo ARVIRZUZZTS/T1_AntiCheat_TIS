@@ -41,7 +41,7 @@
               x-data="{
                   nombre: '', apellido: '', usuario: '', correo: '', codSis: '', password: '', password2: '',
                   ver1: false, ver2: false,
-                  errores: {}, intento: false, creado: false, mensajeCreado: '', enviando: false, errorGeneral: '',
+                  errores: {}, intento: false, creado: false, mensajeCreado: '', verificacion: '', enviando: false, errorGeneral: '',
                   usuarioEditado: false, solicitudUsuario: 0, esperaUsuario: null, avisoUsuario: '',
                   actualizarSugerencia(evento) {
                       const campo = evento.target.name;
@@ -99,7 +99,7 @@
                           this.errores.usuario = 'El nombre de usuario no puede ser un correo electrónico';
                       }
                       if (!this.correo.trim()) this.errores.correo = 'El correo es obligatorio';
-                      else if (!/^[^\s@]+@umss\.edu$/i.test(this.correo.trim())) {
+                      else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(this.correo.trim())) {
                           this.errores.correo = 'El correo electrónico no es válido';
                       }
                       if (!this.codSis.trim()) this.errores.codSis = 'El código SIS es obligatorio';
@@ -143,7 +143,9 @@
                               if (!Object.keys(this.errores).length) this.errorGeneral = 'No se pudo crear la cuenta.';
                               return;
                           }
-                          // Queda pendiente de validacion (HU 26): todavia no puede ingresar.
+                          // Institucional: verificacion por correo (HU 27).
+                          // Externo: validacion manual de dos docentes (HU 26).
+                          this.verificacion = datos.verificacion || 'manual';
                           this.mensajeCreado = datos.mensaje || 'Cuenta creada exitosamente.';
                           this.nombre = this.apellido = this.usuario = this.correo = this.codSis = this.password = this.password2 = '';
                           this.usuarioEditado = false;
@@ -161,7 +163,6 @@
               }"
               @input="actualizarSugerencia($event); if (intento) validar(); creado = false"
               @submit.prevent="registrar()">
-            <p x-cloak x-show="creado" x-text="mensajeCreado" role="status" class="mb-4 text-sm text-fg-brand"></p>
             <p x-cloak x-show="errorGeneral" x-text="errorGeneral" role="alert"
                class="mb-4 text-sm text-fg-danger-strong"></p>
 
@@ -232,6 +233,31 @@
                 ¿Ya tienes cuenta?
                 <a href="{{ route('login') }}" class="font-semibold text-fg-brand">Inicia sesión</a>
             </p>
+
+            {{-- Confirmación del registro: verificación por correo (institucional) o
+                 validación manual (externo), según la respuesta del servidor (HU 26 / HU 27). --}}
+            <div x-cloak x-show="creado" role="dialog" aria-modal="true" aria-labelledby="titulo-registro-creado"
+                 @keydown.escape.window="creado = false"
+                 class="fixed inset-0 z-50 flex items-center justify-center bg-overlay-modal/50 p-4">
+                <div class="w-full max-w-md rounded-base border border-default bg-neutral-primary-soft p-5 shadow-sm sm:p-6">
+                    <div class="mb-4 flex items-center justify-between border-b border-default pb-3">
+                        <h3 id="titulo-registro-creado" class="text-lg font-semibold text-heading"
+                            x-text="verificacion === 'correo' ? 'Confirma tu correo electrónico' : 'Registro en revisión'"></h3>
+                        <button type="button" class="text-body cursor-pointer" @click="creado = false" aria-label="Cerrar">✕</button>
+                    </div>
+                    <div class="mb-5 flex gap-3">
+                        <span class="text-2xl" aria-hidden="true" x-text="verificacion === 'correo' ? '✉️' : '⏳'"></span>
+                        <p class="text-sm leading-relaxed text-body" x-text="mensajeCreado"></p>
+                    </div>
+                    <div class="flex flex-col gap-3 sm:flex-row-reverse">
+                        <a href="{{ route('login') }}"
+                           class="inline-flex w-full items-center justify-center rounded-base bg-brand px-4 py-2.5 text-sm font-semibold text-neutral-primary sm:w-auto">
+                            Ir a iniciar sesión
+                        </a>
+                        <x-ui.button-cancelar type="button" class="w-full sm:w-auto" @click="creado = false">Cerrar</x-ui.button-cancelar>
+                    </div>
+                </div>
+            </div>
         </form>
     </div>
 @endsection
