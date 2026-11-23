@@ -22,6 +22,8 @@
  * - 2026-11-08  [Valery D. Ortuno P]  test: creación inicial (HU 26).
  * - 2026-11-19  [Valery D. Ortuno P]  test: el esquema suma la tabla de
  *   invitaciones, que el sidebar consulta para su contador.
+ * - 2026-11-23  [Diego Tejerina]  test: una cuenta pendiente de confirmación por correo
+ *   (HU 27) no entra a la bandeja ni al conteo de HU 26.
  *
  * @see App\Livewire\Docentes\ValidarRegistros
  * @see App\Services\Docente\ValidarRegistroDocenteService
@@ -243,6 +245,25 @@ class ValidarRegistroDocenteTest extends TestCase
             ->assertOk();
 
         $this->assertAuthenticatedAs(Usuario::findOrFail(self::MARIA));
+    }
+
+    public function test_una_cuenta_pendiente_de_correo_no_entra_a_la_bandeja_ni_ingresa(): void
+    {
+        // Correo institucional (HU 27): espera confirmación por correo, no la
+        // validación manual de dos docentes.
+        DB::table('usuario')->where('id_usuario', self::MARIA)->update(['estado_cuenta' => EstadoCuenta::PendienteCorreo->value]);
+        ListarSolicitudesRegistroService::olvidarPendientes();
+
+        $this->comoDocente(self::ROBERTO)
+            ->assertDontSee('maria.lopez@umss.edu')
+            ->assertSee('Carlos Rojas')
+            ->assertSee('1 pendiente');
+
+        // Roberto sigue autenticado (lo usó la bandeja); basta con que el login
+        // de la cuenta pendiente de correo quede bloqueado con su mensaje.
+        $this->postJson(route('api.auth.login'), ['nombreUsuario' => 'mlopez', 'contrasena' => self::CONTRASENA])
+            ->assertForbidden()
+            ->assertJson(['mensaje' => EstadoCuenta::mensajeAcceso(EstadoCuenta::PendienteCorreo)]);
     }
 
     public function test_el_login_por_codigo_sis_tambien_bloquea_la_cuenta_pendiente(): void
