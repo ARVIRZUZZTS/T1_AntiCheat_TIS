@@ -5,6 +5,7 @@
     @updated 2026-11-18
     @updated 2026-11-19
     @updated 2026-11-20
+    @updated 2026-11-22
 
     @description
     Listado exclusivo de la subopción «Ver examenes». No contiene la barra de
@@ -28,6 +29,9 @@
     - 2026-11-19  [Valery D. Ortuno P]  perf: el detalle abre al instante con
       los datos de la tarjeta y solo espera docentes, reglas y materiales; se
       pide al pasar el mouse por "Ver detalle" y queda guardado para reabrirlo.
+    - 2026-11-22  [Valery D. Ortuno P]  fix: el selector de curso muestra solo el
+      nombre; se quita "(Anfitrion)", que es de un examen compartido y no de un
+      curso.
     - 2026-11-20  [OchoaCesar]  refactor: la eliminación de examen pasa a la
       página propia /examenes/eliminar (subopción del sidebar); se retiran de
       aquí el botón "Eliminar" de la tarjeta, el aviso de bloqueo y sus
@@ -46,15 +50,9 @@
     $urlListaGlobal = route('api.examenes.listar');
     $urlListaCurso = route('api.cursos.examenes.listar', ['idCurso' => '__CURSO__']);
 
-    $opcionesCursos = $cursos->mapWithKeys(function ($curso) {
-        $etiqueta = $curso->nombre_curso;
-
-        if (!empty($curso->es_anfitrion)) {
-            $etiqueta .= ' (Anfitrion)';
-        }
-
-        return [$curso->id_curso => $etiqueta];
-    })->all();
+    // Solo el nombre: "Anfitrion" / "Invitado" es de un examen compartido,
+    // no de un curso (lo muestran las tarjetas de cada examen).
+    $opcionesCursos = $cursos->mapWithKeys(fn ($curso) => [$curso->id_curso => $curso->nombre_curso])->all();
 @endphp
 
 <div class="flex flex-col gap-4"
