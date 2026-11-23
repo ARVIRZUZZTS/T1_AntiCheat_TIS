@@ -78,6 +78,9 @@
       vivo" solo las paginas que tiene habilitadas (Ingreso, Monitor o las dos)
       por sus cursos o examenes asignados; sin ninguna, el grupo no aparece.
       Nuevo grupo "Examenes > Ver examenes" del auxiliar (HU 24).
+    - 2026-11-22  [OchoaCesar]  refactor: "Archivar curso" y "Restaurar curso"
+      dejan de ser dos subopciones del grupo Cursos y pasan a una sola
+      subopcion "Archivar/Restaurar cursos" (pagina unica con dos pestanas).
 --}}
 
 @props([
@@ -139,8 +142,8 @@
             ['label' => 'Ver cursos', 'route' => 'cursos'],
             ['label' => 'Crear curso', 'route' => 'cursos.crear'],
             ['label' => 'Editar curso', 'route' => 'cursos.editar'],
-            ['label' => 'Archivar curso', 'route' => 'cursos.archivar'],
-            ['label' => 'Restaurar curso', 'route' => 'cursos.restaurar'],
+            // Archivar y restaurar son dos pestanas de una sola pagina.
+            ['label' => 'Archivar/Restaurar cursos', 'route' => 'cursos.archivar-restaurar'],
             ['label' => 'Eliminar curso', 'route' => 'cursos.eliminar'],
             ['label' => 'Cursos archivados', 'route' => 'cursos.archivados'],
             ['label' => 'Cargar CSV', 'route' => 'cursos.cargar-csv'],
