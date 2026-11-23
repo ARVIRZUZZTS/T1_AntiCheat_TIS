@@ -61,6 +61,12 @@
     }">
         <h2 class="mb-6 text-2xl font-semibold text-heading">Iniciar sesión</h2>
 
+        @if (session('status'))
+            <x-ui.alert type="success" title="Listo">
+                {{ session('status') }}
+            </x-ui.alert>
+        @endif
+
         @if ($errors->any())
             <x-ui.alert type="danger" title="Error">
                 {{ $errors->first() }}
