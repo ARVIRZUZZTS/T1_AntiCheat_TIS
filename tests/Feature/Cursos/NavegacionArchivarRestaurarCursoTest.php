@@ -1,15 +1,16 @@
 <?php
 
 /**
- * @file    NavegacionArchivarCursoTest.php
+ * @file    NavegacionArchivarRestaurarCursoTest.php
  *
- * @author  Equipo T1
+ * @author  OchoaCesar <cesareduardonick@gmail.com>
  *
- * @created 2026-11-21
+ * @created 2026-11-22
  *
  * @description
- * Pruebas de la navegación a «Archivar curso» desde el sidebar del grupo
- * Cursos, incluido el estado activo de la subsección.
+ * Prueba de la navegación a la subopción «Archivar/Restaurar cursos» del
+ * grupo Cursos del sidebar, incluido el estado activo de la página única con
+ * dos pestañas.
  */
 
 declare(strict_types=1);
@@ -21,11 +22,11 @@ use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
-class NavegacionArchivarCursoTest extends TestCase
+class NavegacionArchivarRestaurarCursoTest extends TestCase
 {
     use DatabaseTransactions;
 
-    public function test_sidebar_muestra_archivar_curso_como_subseccion_activa(): void
+    public function test_sidebar_muestra_archivar_restaurar_como_item_activo(): void
     {
         $rol = DB::table('rol')->where('nombre_rol', 'docente')->value('id_rol');
         $this->assertNotNull($rol);
@@ -40,13 +41,13 @@ class NavegacionArchivarCursoTest extends TestCase
         DB::table('rol_usuario')->insert(['id_usuario' => 997301, 'id_rol' => $rol]);
 
         $html = $this->actingAs(Usuario::findOrFail(997301))
-            ->get(route('cursos.archivar'))
+            ->get(route('cursos.archivar-restaurar'))
             ->assertOk()
             ->getContent();
 
         $this->assertIsString($html);
         $this->assertMatchesRegularExpression(
-            '/<a[^>]+href="'.preg_quote(route('cursos.archivar'), '/').'"[^>]*aria-current="page"\s*>\s*<span[^>]*>Archivar curso<\/span>/',
+            '/<a[^>]+href="'.preg_quote(route('cursos.archivar-restaurar'), '/').'"[^>]*aria-current="page"\s*>\s*<span[^>]*>Archivar\/Restaurar cursos<\/span>/',
             $html,
         );
     }
