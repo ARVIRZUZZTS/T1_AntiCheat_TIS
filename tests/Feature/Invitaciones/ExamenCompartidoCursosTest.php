@@ -10,7 +10,8 @@
  * @description
  * Pruebas de las HU 131 y 132 sobre la pantalla de invitaciones:
  *
- *  - Enviar: solo cursos activos propios, solo examenes futuros con fecha y
+ *  - Enviar: solo cursos activos propios con examenes programados, solo
+ *    examenes futuros con fecha y
  *    hora (incluido uno recien creado), busqueda en vivo, resumen del envio,
  *    duplicado y cancelar una pendiente.
  *  - Aceptar en dos pasos: primero se acepta y despues se eligen los cursos
@@ -25,6 +26,8 @@
  * @changelog
  * - 2026-11-22  [Valery D. Ortuno P]  test: creacion inicial (HU 131 y 132).
  * - 2026-11-22  [Valery D. Ortuno P]  test: aceptar y asociar en dos pasos.
+ * - 2026-11-23  [Valery D. Ortuno P]  test: Enviar solo lista cursos activos con
+ *   examenes programados.
  *
  * @see App\Livewire\Invitaciones\Index
  * @see App\Services\Invitacion\AsociarCursosInvitacionService
@@ -83,8 +86,15 @@ class ExamenCompartidoCursosTest extends TestCase
         parent::tearDown();
     }
 
-    public function test_enviar_lista_solo_mis_cursos_activos(): void
+    public function test_enviar_lista_solo_mis_cursos_activos_con_examenes_programados(): void
     {
+        // Activo pero sin examenes, y activo con solo un examen pasado: no salen.
+        DB::table('curso')->insert([
+            ['id_curso' => 12, 'nombre_curso' => 'Algebra - Grupo 3', 'sis_doc' => self::ROBERTO, 'estado' => 'EnCurso'],
+            ['id_curso' => 13, 'nombre_curso' => 'Fisica II', 'sis_doc' => self::ROBERTO, 'estado' => 'EnCurso'],
+        ]);
+        DB::table('examen_curso')->insert(['id_examen' => self::PASADO, 'id_curso' => 13]);
+
         Livewire::actingAs($this->usuario(self::ROBERTO))
             ->test(Index::class, ['tab' => 'enviar'])
             ->assertSet('cursos', [['id' => self::CALCULO_ROBERTO, 'nombre' => 'Calculo I - Grupo 1']]);
