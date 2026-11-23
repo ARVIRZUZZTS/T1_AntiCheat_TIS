@@ -16,7 +16,7 @@
  *    duplicado y cancelar una pendiente.
  *  - Aceptar eligiendo los cursos del invitado en el mismo paso: el examen
  *    queda en esos cursos (`examen_curso`) con sus estudiantes inscritos bajo
- *    su configuracion (copiada de quien invito). Sin cursos o con cursos
+ *    su configuracion (sin copiar reglas: valen las del examen). Sin cursos o con cursos
  *    ajenos no se acepta. Rechazar avisa a quien invito.
  *  - El detalle del examen muestra el curso de cada docente.
  *
@@ -30,6 +30,8 @@
  *   examenes programados.
  * - 2026-11-23  [Valery D. Ortuno P]  test: aceptar con cursos en un solo paso,
  *   una sola lista, rechazar y copia de reglas y materiales.
+ * - 2026-11-23  [Valery D. Ortuno P]  test: ambos docentes ven las mismas reglas
+ *   y materiales (las del examen); aceptar ya no las copia.
  *
  * @see App\Livewire\Invitaciones\Index
  * @see App\Services\Invitacion\AsociarCursosInvitacionService
@@ -249,12 +251,16 @@ class ExamenCompartidoCursosTest extends TestCase
         $this->assertSame(1, DB::table('examen_curso')->where('id_examen', self::NUEVO)->count());
     }
 
-    public function test_aceptar_copia_las_reglas_y_materiales_de_quien_invito(): void
+    public function test_al_aceptar_ambos_docentes_ven_las_mismas_reglas_y_materiales(): void
     {
         DB::table('norma')->insert(['id_norma' => 1, 'detalle_norma' => 'Prohibido hablar']);
-        DB::table('configuracion_examen_norma')->insert(['id_configuracion_examen' => 900, 'id_norma' => 1]);
+        DB::table('examen_norma')->insert(['id_examen' => self::NUEVO, 'id_norma' => 1]);
+        DB::table('material_personalizado')->insert([
+            'id_examen' => self::NUEVO, 'numero_material' => 1, 'descripcion_material' => 'Calculadora',
+        ]);
+        // Aunque quien invito tenga otras en su configuracion, valen las del examen.
         DB::table('configuracion_material_personalizado')->insert([
-            'id_configuracion_examen' => 900, 'numero_material' => 1, 'descripcion_material' => 'Calculadora',
+            'id_configuracion_examen' => 900, 'numero_material' => 1, 'descripcion_material' => 'Celular',
         ]);
         $this->invitar();
 
@@ -262,9 +268,13 @@ class ExamenCompartidoCursosTest extends TestCase
             ->test(Index::class, ['tab' => 'recibir'])
             ->call('aceptar', self::INVITACION, [self::FISICA_PATRICIA]);
 
-        $detalle = app(ObtenerDetalleExamenService::class)->ejecutar(self::NUEVO, self::PATRICIA);
-        $this->assertSame(['Prohibido hablar'], $detalle['normas']);
-        $this->assertSame(['Calculadora'], $detalle['materiales']);
+        $detalle = app(ObtenerDetalleExamenService::class);
+        foreach ([self::ROBERTO, self::PATRICIA] as $docente) {
+            $this->assertSame(['Prohibido hablar'], $detalle->ejecutar(self::NUEVO, $docente)['normas']);
+            $this->assertSame(['Calculadora'], $detalle->ejecutar(self::NUEVO, $docente)['materiales']);
+        }
+        // No se copian reglas a la configuracion del invitado.
+        $this->assertSame(1, DB::table('configuracion_material_personalizado')->count());
     }
 
     public function test_el_detalle_muestra_el_curso_de_cada_docente(): void

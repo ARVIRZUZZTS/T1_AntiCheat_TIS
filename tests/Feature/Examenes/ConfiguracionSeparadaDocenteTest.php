@@ -150,8 +150,13 @@ class ConfiguracionSeparadaDocenteTest extends TestCase
             ->assertJsonPath('datos.normas_personalizadas.0', 'Personalizada B');
     }
 
-    public function test_el_informe_del_monitor_filtra_estudiantes_y_configuracion_por_docente(): void
+    public function test_el_informe_del_monitor_filtra_estudiantes_y_usa_las_reglas_del_examen(): void
     {
+        // Las reglas y materiales son los del examen, iguales para ambos docentes.
+        DB::table('examen_material_permitido')->insert([
+            'id_examen' => self::EXAMEN,
+            'id_material_permitido' => self::MATERIAL_A,
+        ]);
         $servicio = app(GenerarReporteAsistenciaService::class);
 
         $informeA = $servicio->ejecutar(self::EXAMEN, idDocente: self::DOCENTE_A);
@@ -160,7 +165,7 @@ class ConfiguracionSeparadaDocenteTest extends TestCase
         $this->assertSame([self::ESTUDIANTE_A], $informeA['estudiantes']->pluck('sis')->all());
         $this->assertSame([self::ESTUDIANTE_B], $informeB['estudiantes']->pluck('sis')->all());
         $this->assertSame(['Calculadora A'], $informeA['examen']->materialesPermitidos->pluck('descripcion')->all());
-        $this->assertSame(['Formulario B'], $informeB['examen']->materialesPermitidos->pluck('descripcion')->all());
+        $this->assertSame(['Calculadora A'], $informeB['examen']->materialesPermitidos->pluck('descripcion')->all());
     }
 
     public function test_la_cache_del_monitor_no_se_comparte_entre_docentes(): void
