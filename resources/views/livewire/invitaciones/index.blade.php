@@ -4,22 +4,22 @@
     @created 2026-11-08
     @updated 2026-11-08
     @updated 2026-11-22
+    @updated 2026-11-23
 
     @description
     Vista del componente Livewire Invitaciones\Index. Cada subopción del sidebar
     (Enviar / Aceptar invitación) es su propia ruta y fija `$tab`; no hay
     conmutador.
 
-     - Enviar (HU 131): curso activo propio, examen futuro (con fecha y hora),
-       busqueda del docente mientras se escribe (el elegido queda con borde
-       azul), "Enviar invitacion", el aviso "Invitacion enviada con exito" con
-       el resumen y la lista de invitaciones del examen con "Cancelar" en las
-       pendientes.
-     - Aceptar (HU 132): recibidas pendientes con orden reciente / antigua.
-       "Aceptar" abre un modal en pasos: confirmar, asociar el examen a uno o
-       varios cursos activos propios (o "Mas tarde") y listo. Las aceptadas que
-       quedaron sin curso se listan en "Examenes por asociar a un curso" con el
-       mismo paso de asociar.
+     - Enviar (HU 131): curso activo propio con examenes programados, examen
+       futuro (con fecha y hora), busqueda del docente mientras se escribe (el
+       elegido queda con borde azul), "Enviar invitacion", el aviso
+       "Invitacion enviada con exito" con el resumen y la lista de invitaciones
+       del examen con "Cancelar" en las pendientes.
+     - Aceptar (HU 132): una sola lista. Las pendientes tienen Aceptar /
+       Rechazar; Aceptar abre directo el modal para elegir los cursos activos a
+       los que se asocia el examen. Las aceptadas que aun no tienen curso
+       muestran "Asociar a un curso" con el mismo modal.
 
     @changelog
     - 2026-11-08  [David E. Chavez T.]  feat: creación inicial de la vista.
@@ -32,10 +32,9 @@
       las aceptadas sin curso (HU 132). Textos sin acentos y diseño responsive.
     - 2026-11-23  [Valery D. Ortuno P]  fix: Enviar lista solo cursos activos con
       examenes programados; sin ninguno, lo avisa.
-    - 2026-11-22  [Valery D. Ortuno P]  refactor: "Aceptar" abre un modal en pasos
-      (confirmar, asociar el examen a un curso o "Mas tarde", y listo) con
-      mensajes de lo que esta pasando; "Rechazar" pide confirmacion. Las
-      recibidas muestran la fecha del examen.
+    - 2026-11-23  [Valery D. Ortuno P]  refactor: una sola lista en Aceptar
+      (pendientes y aceptadas sin curso); Aceptar pide el curso en el mismo
+      paso y se quitan las explicaciones largas.
 
     @see  app/Livewire/Invitaciones/Index.php
 --}}
@@ -53,65 +52,39 @@
 
 <div class="space-y-4 px-4 pt-[2vh] pb-8 sm:px-6 lg:px-[2vh]"
      x-data="{
-         // Modal de aceptar en pasos: confirmar -> cursos -> listo.
          modal: false,
-         paso: 'confirmar',
+         modo: 'aceptar',
          invitacion: null,
          elegidos: [],
-         cursosAsociados: '',
          error: '',
-         trabajando: false,
-         abrirAceptar(invitacion) {
+         guardando: false,
+         abrir(modo, invitacion) {
+             this.modo = modo;
              this.invitacion = invitacion;
-             this.paso = 'confirmar';
              this.elegidos = [];
              this.error = '';
              this.modal = true;
          },
-         abrirAsociar(invitacion) {
-             this.invitacion = { ...invitacion, yaAceptada: true };
-             this.paso = 'cursos';
-             this.elegidos = [];
-             this.error = '';
-             this.modal = true;
-         },
-         async aceptar() {
-             if (this.trabajando) {
+         async confirmar() {
+             if (this.guardando || this.elegidos.length === 0) {
                  return;
              }
-             this.trabajando = true;
+             this.guardando = true;
              this.error = '';
              try {
-                 const error = await $wire.aceptar(this.invitacion.id);
+                 const ids = this.elegidos.map(Number);
+                 const error = this.modo === 'aceptar'
+                     ? await $wire.aceptar(this.invitacion.id, ids)
+                     : await $wire.asociar(this.invitacion.id, ids);
                  if (error) {
                      this.error = error;
                  } else {
-                     this.paso = 'cursos';
+                     this.modal = false;
                  }
              } catch (e) {
                  this.error = 'No se pudo conectar con el servidor.';
              } finally {
-                 this.trabajando = false;
-             }
-         },
-         async asociar() {
-             if (this.trabajando || this.elegidos.length === 0) {
-                 return;
-             }
-             this.trabajando = true;
-             this.error = '';
-             try {
-                 const resultado = await $wire.asociarCursos(this.invitacion.id, this.elegidos.map(Number));
-                 if (resultado.error) {
-                     this.error = resultado.error;
-                 } else {
-                     this.cursosAsociados = resultado.cursos;
-                     this.paso = 'listo';
-                 }
-             } catch (e) {
-                 this.error = 'No se pudo conectar con el servidor.';
-             } finally {
-                 this.trabajando = false;
+                 this.guardando = false;
              }
          },
      }">
@@ -133,77 +106,55 @@
 
     @if ($tab === 'recibir')
         <div class="space-y-4 rounded-base border border-default bg-neutral-primary-soft p-4 shadow-xs sm:p-6">
-            <div class="flex flex-wrap items-center justify-between gap-3">
-                <h3 class="text-lg font-semibold text-heading">Invitaciones pendientes</h3>
-                @if (count($invitacionesRecibidas) > 1)
-                    <div class="flex gap-2" role="group" aria-label="Ordenar invitaciones">
-                        <x-ui.button type="button" variant="{{ $ordenRecibidas === 'reciente' ? 'default' : 'secondary' }}" wire:click="ordenarRecibidas('reciente')">
-                            Mas reciente
-                        </x-ui.button>
-                        <x-ui.button type="button" variant="{{ $ordenRecibidas === 'antigua' ? 'default' : 'secondary' }}" wire:click="ordenarRecibidas('antigua')">
-                            Mas antigua
-                        </x-ui.button>
-                    </div>
-                @endif
-            </div>
+            <h3 class="text-lg font-semibold text-heading">Invitaciones recibidas</h3>
 
-            @if (count($invitacionesRecibidas) === 0)
+            @if ($invitaciones === [])
                 <p class="text-sm text-body">No tienes invitaciones pendientes.</p>
             @else
                 <div class="grid grid-cols-1 gap-3 lg:grid-cols-2">
-                    @foreach ($invitacionesRecibidas as $invitacion)
-                        <div wire:key="recibida-{{ $invitacion['id'] }}" class="flex flex-col gap-3 rounded-base border border-default p-4">
+                    @foreach ($invitaciones as $invitacion)
+                        @php
+                            $pendiente = $invitacion['estado'] === 'pendiente';
+                            $datosModal = \Illuminate\Support\Js::from([
+                                'id' => $invitacion['id'],
+                                'examen' => $invitacion['examen'].($invitacion['fecha_examen'] ? ' · '.$invitacion['fecha_examen'] : ''),
+                            ]);
+                        @endphp
+                        <div wire:key="invitacion-{{ $invitacion['id'] }}" class="flex flex-col gap-3 rounded-base border border-default p-4">
                             <div class="space-y-1 text-sm">
-                                <p class="font-semibold text-heading wrap-break-word">{{ $invitacion['examen']['nombre'] }}</p>
-                                <p class="text-body">Fecha del examen: {{ $invitacion['examen']['fecha'] ?? '—' }}{{ ! empty($invitacion['examen']['hora_inicio']) ? ' '.$invitacion['examen']['hora_inicio'] : '' }}</p>
-                                <p class="text-body">Curso del que invita: {{ $invitacion['curso'] ?? '—' }}</p>
-                                <p class="text-body">Invitado por: {{ $invitacion['invitador']['nombre'] }}</p>
-                                <p class="text-muted">Enviada el {{ $invitacion['enviada_en'] ? \Carbon\Carbon::parse($invitacion['enviada_en'])->format('d/m/Y') : '—' }}</p>
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <p class="font-semibold text-heading wrap-break-word">{{ $invitacion['examen'] }}</p>
+                                    @unless ($pendiente)
+                                        <x-ui.badge type="success">Aceptada</x-ui.badge>
+                                    @endunless
+                                </div>
+                                <p class="text-body">Fecha del examen: {{ $invitacion['fecha_examen'] ?? '—' }}</p>
+                                <p class="text-body">Invitado por: {{ $invitacion['invitador'] }}{{ $invitacion['curso'] ? ' ('.$invitacion['curso'].')' : '' }}</p>
+                                <p class="text-muted">Enviada el {{ $invitacion['enviada_en'] ?? '—' }}</p>
                             </div>
                             <div class="flex flex-col gap-2 sm:flex-row">
-                                <x-ui.button type="button" variant="default" class="justify-center"
-                                             @click="abrirAceptar({{ \Illuminate\Support\Js::from([
-                                                 'id' => $invitacion['id'],
-                                                 'examen' => $invitacion['examen']['nombre'].(! empty($invitacion['examen']['fecha']) ? ' · '.$invitacion['examen']['fecha'] : ''),
-                                                 'invitador' => $invitacion['invitador']['nombre'],
-                                             ]) }})">
-                                    Aceptar
-                                </x-ui.button>
-                                <x-ui.button-cancelar type="button" class="justify-center" wire:click="rechazar({{ $invitacion['id'] }})"
-                                                      wire:confirm="Rechazar la invitacion? El docente que te invito sera notificado.">
-                                    Rechazar
-                                </x-ui.button-cancelar>
+                                @if ($pendiente)
+                                    <x-ui.button type="button" variant="default" class="justify-center"
+                                                 @click="abrir('aceptar', {{ $datosModal }})">
+                                        Aceptar
+                                    </x-ui.button>
+                                    <x-ui.button-cancelar type="button" class="justify-center"
+                                                          wire:click="rechazar({{ $invitacion['id'] }})"
+                                                          wire:confirm="Rechazar la invitacion?">
+                                        Rechazar
+                                    </x-ui.button-cancelar>
+                                @else
+                                    <x-ui.button type="button" variant="default" class="justify-center"
+                                                 @click="abrir('asociar', {{ $datosModal }})">
+                                        Asociar a un curso
+                                    </x-ui.button>
+                                @endif
                             </div>
                         </div>
                     @endforeach
                 </div>
             @endif
         </div>
-
-        @if ($aceptadasSinCurso !== [])
-            {{-- Aceptadas antes de que se pidiera el curso: sin curso propio el
-                 examen no tiene a tus estudiantes. --}}
-            <div class="space-y-3 rounded-base border border-warning-subtle bg-neutral-primary-soft p-4 shadow-xs sm:p-6">
-                <div>
-                    <h3 class="text-lg font-semibold text-heading">Examenes por asociar a un curso</h3>
-                    <p class="text-sm text-body">Aceptaste estas invitaciones, pero el examen todavia no esta en ninguno de tus cursos. Asocialo a un curso para que tus estudiantes puedan rendirlo.</p>
-                </div>
-                <ul class="space-y-2">
-                    @foreach ($aceptadasSinCurso as $aceptada)
-                        <li wire:key="sin-curso-{{ $aceptada['id'] }}" class="flex flex-col gap-2 rounded-base border border-default px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
-                            <div class="min-w-0 text-sm">
-                                <p class="font-medium text-heading wrap-break-word">{{ $aceptada['examen'] }}</p>
-                                <p class="text-xs text-body">Invitado por: {{ $aceptada['invitador'] }}</p>
-                            </div>
-                            <x-ui.button type="button" variant="secondary" class="shrink-0 justify-center"
-                                         @click="abrirAsociar({{ \Illuminate\Support\Js::from(['id' => $aceptada['id'], 'examen' => $aceptada['examen'], 'invitador' => $aceptada['invitador']]) }})">
-                                Asociar curso
-                            </x-ui.button>
-                        </li>
-                    @endforeach
-                </ul>
-            </div>
-        @endif
     @else
         <div class="space-y-4 rounded-base border border-default bg-neutral-primary-soft p-4 shadow-xs sm:p-6">
             <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -229,9 +180,6 @@
                             <option value="{{ $examen['id'] }}">{{ $examen['nombre'] }}</option>
                         @endforeach
                     </select>
-                    @if ($idCurso > 0 && $examenes === [])
-                        <p class="mt-1 text-xs text-body">Este curso no tiene examenes futuros.</p>
-                    @endif
                 </div>
             </div>
 
@@ -263,8 +211,9 @@
 
             <div class="flex justify-end">
                 <x-ui.button type="button" variant="default" class="w-full justify-center sm:w-auto" wire:click="enviar"
-                             wire:loading.attr="disabled" :disabled="$docenteSeleccionado === null">
-                    Enviar invitacion
+                             wire:loading.attr="disabled" wire:target="enviar" :disabled="$docenteSeleccionado === null">
+                    <span wire:loading.remove wire:target="enviar">Enviar invitacion</span>
+                    <span wire:loading wire:target="enviar">Enviando...</span>
                 </x-ui.button>
             </div>
         </div>
@@ -280,8 +229,8 @@
                             @php [$etiqueta, $tipoBadge] = $estados[$enviada['estado']] ?? [$enviada['estado'], 'gray']; @endphp
                             <li wire:key="enviada-{{ $enviada['id'] }}" class="flex flex-col gap-2 rounded-base border border-default px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
                                 <div class="min-w-0 text-sm">
-                                    <p class="font-medium text-heading wrap-break-word">{{ $enviada['invitado']['nombre'] }}</p>
-                                    <p class="text-xs text-body">Enviada el {{ \Carbon\Carbon::parse($enviada['enviada_en'])->format('d/m/Y') }}</p>
+                                    <p class="font-medium text-heading wrap-break-word">{{ $enviada['invitado'] }}</p>
+                                    <p class="text-xs text-body">Enviada el {{ $enviada['enviada_en'] }}</p>
                                 </div>
                                 <div class="flex shrink-0 items-center gap-3">
                                     <x-ui.badge :type="$tipoBadge">{{ $etiqueta }}</x-ui.badge>
@@ -300,93 +249,42 @@
         @endif
     @endif
 
-    {{-- Modal de aceptar: 1) confirmar, 2) elegir los cursos (o "Mas tarde"),
-         3) listo. Cada paso dice que esta pasando. --}}
+    {{-- Modal: elegir los cursos a los que se asocia el examen. --}}
     <div x-show="modal" x-cloak
          class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/50 p-4"
-         role="dialog" aria-modal="true" aria-labelledby="titulo-aceptar-invitacion"
-         @click.self="! trabajando && (modal = false)" @keydown.escape.window="! trabajando && (modal = false)">
+         role="dialog" aria-modal="true" aria-labelledby="titulo-asociar-curso"
+         @click.self="! guardando && (modal = false)" @keydown.escape.window="! guardando && (modal = false)">
         <div class="w-full max-w-lg rounded-xl border border-neutral-quaternary bg-neutral-primary-soft shadow-lg">
             <div class="border-b border-neutral-quaternary px-4 py-3">
-                <h2 id="titulo-aceptar-invitacion" class="text-[15px] font-semibold text-fg-brand"
-                    x-text="paso === 'confirmar' ? 'Aceptar invitacion' : (paso === 'cursos' ? 'Asociar el examen a un curso' : 'Listo')"></h2>
+                <h2 id="titulo-asociar-curso" class="text-[15px] font-semibold text-fg-brand">Asociar a un curso</h2>
                 <p class="mt-1 text-sm text-body wrap-break-word" x-text="invitacion?.examen"></p>
-                <p class="text-xs text-muted" x-show="invitacion?.invitador" x-text="'Invitado por ' + (invitacion?.invitador || '')"></p>
             </div>
 
-            <div class="max-h-[60vh] space-y-3 overflow-y-auto p-4 text-sm">
-                {{-- Paso 1: confirmar. --}}
-                <div x-show="paso === 'confirmar'" class="space-y-2 text-body">
-                    <p>Al aceptar, este examen se compartira contigo. Tendras tu propia configuracion de reglas y materiales, sin cambiar la del otro docente.</p>
-                    <p>Despues te pediremos a que curso tuyo pertenece el examen, para inscribir a tus estudiantes.</p>
-                </div>
-
-                {{-- Paso 2: cursos. --}}
-                <div x-show="paso === 'cursos'" class="space-y-3">
-                    <div class="rounded-base border border-success-subtle bg-success-soft px-3 py-2 text-fg-success-strong" x-show="invitacion && ! invitacion.yaAceptada">
-                        Invitacion aceptada.
-                    </div>
-                    @if ($cursos === [])
-                        <p class="text-body">No tienes cursos activos. Podras asociar el examen cuando tengas uno; queda en "Examenes por asociar a un curso".</p>
-                    @else
-                        <p class="text-body">Elige a que cursos tuyos pertenece este examen. Sus estudiantes quedaran inscritos y apareceran en el Monitor y el Ingreso del examen.</p>
-                        <div class="space-y-2">
-                            @foreach ($cursos as $curso)
-                                <label class="flex items-center gap-3 rounded-base border border-default px-3 py-2 text-heading"
-                                       :class="elegidos.includes('{{ $curso['id'] }}') ? 'border-brand ring-2 ring-brand' : ''">
-                                    <input type="checkbox" value="{{ $curso['id'] }}" x-model="elegidos"
-                                           class="h-4 w-4 rounded-sm border-default-medium text-brand focus:ring-brand">
-                                    <span class="wrap-break-word">{{ $curso['nombre'] }}</span>
-                                </label>
-                            @endforeach
-                        </div>
-                    @endif
-                </div>
-
-                {{-- Paso 3: listo. --}}
-                <div x-show="paso === 'listo'" class="space-y-2">
-                    <div class="rounded-base border border-success-subtle bg-success-soft px-3 py-2 text-fg-success-strong">
-                        El examen quedo en: <span class="font-semibold" x-text="cursosAsociados"></span>.
-                    </div>
-                    <p class="text-body">Tus estudiantes ya estan inscritos. Ya puedes verlo en Ver examenes y controlarlo desde Monitor en vivo.</p>
-                </div>
-
-                <p x-show="trabajando" class="text-body"
-                   x-text="paso === 'confirmar' ? 'Aceptando la invitacion...' : 'Asociando el examen e inscribiendo a tus estudiantes, esto puede tardar unos segundos...'"></p>
+            <div class="max-h-[60vh] space-y-2 overflow-y-auto p-4 text-sm">
+                @if ($cursos === [])
+                    <p class="text-body">No tienes cursos activos.</p>
+                @else
+                    @foreach ($cursos as $curso)
+                        <label class="flex items-center gap-3 rounded-base border border-default px-3 py-2 text-heading"
+                               :class="elegidos.includes('{{ $curso['id'] }}') ? 'border-brand ring-2 ring-brand' : ''">
+                            <input type="checkbox" value="{{ $curso['id'] }}" x-model="elegidos"
+                                   class="h-4 w-4 rounded-sm border-default-medium text-brand focus:ring-brand">
+                            <span class="wrap-break-word">{{ $curso['nombre'] }}</span>
+                        </label>
+                    @endforeach
+                @endif
                 <p x-show="error !== ''" x-text="error" class="text-fg-danger-strong"></p>
             </div>
 
             <div class="flex flex-col gap-2 border-t border-neutral-quaternary px-4 py-3 sm:flex-row sm:justify-end">
-                <template x-if="paso === 'confirmar'">
-                    <div class="flex flex-col gap-2 sm:flex-row">
-                        <button type="button" @click="modal = false" :disabled="trabajando"
-                                class="inline-flex items-center justify-center rounded-base border border-default px-4 py-2 text-sm font-medium text-body hover:bg-neutral-secondary-medium disabled:opacity-50">
-                            Cancelar
-                        </button>
-                        <button type="button" @click="aceptar()" :disabled="trabajando"
-                                class="inline-flex items-center justify-center rounded-base bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-strong disabled:cursor-not-allowed disabled:opacity-50">
-                            <span x-text="trabajando ? 'Aceptando...' : 'Aceptar invitacion'"></span>
-                        </button>
-                    </div>
-                </template>
-                <template x-if="paso === 'cursos'">
-                    <div class="flex flex-col gap-2 sm:flex-row">
-                        <button type="button" @click="modal = false" :disabled="trabajando"
-                                class="inline-flex items-center justify-center rounded-base border border-default px-4 py-2 text-sm font-medium text-body hover:bg-neutral-secondary-medium disabled:opacity-50">
-                            Mas tarde
-                        </button>
-                        <button type="button" @click="asociar()" :disabled="trabajando || elegidos.length === 0"
-                                class="inline-flex items-center justify-center rounded-base bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-strong disabled:cursor-not-allowed disabled:opacity-50">
-                            <span x-text="trabajando ? 'Asociando...' : 'Asociar curso'"></span>
-                        </button>
-                    </div>
-                </template>
-                <template x-if="paso === 'listo'">
-                    <button type="button" @click="modal = false"
-                            class="inline-flex items-center justify-center rounded-base bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-strong">
-                        Entendido
-                    </button>
-                </template>
+                <button type="button" @click="modal = false" :disabled="guardando"
+                        class="inline-flex items-center justify-center rounded-base border border-default px-4 py-2 text-sm font-medium text-body hover:bg-neutral-secondary-medium disabled:opacity-50">
+                    Cancelar
+                </button>
+                <button type="button" @click="confirmar()" :disabled="guardando || elegidos.length === 0"
+                        class="inline-flex items-center justify-center rounded-base bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-strong disabled:cursor-not-allowed disabled:opacity-50">
+                    <span x-text="guardando ? 'Guardando...' : (modo === 'aceptar' ? 'Aceptar invitacion' : 'Asociar')"></span>
+                </button>
             </div>
         </div>
     </div>
