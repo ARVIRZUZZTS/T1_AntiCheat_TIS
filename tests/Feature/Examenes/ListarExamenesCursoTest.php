@@ -8,6 +8,7 @@
  * @created 2026-10-09
  *
  * @updated 2026-10-09
+ * @updated 2026-11-23
  *
  * @description
  * Pruebas HTTP de la task #138 con Eloquent y una base SQLite en memoria.
@@ -20,6 +21,8 @@
  *   catálogo real (examen parcial / examen final) tras alinear el enum.
  * - 2026-10-10  [Alex Candia]  test: quitar la columna `hora_fin` (ahora es un
  *   dato derivado de la hora de inicio y la duración).
+ * - 2026-11-23  [OchoaCesar]  test: crear `central_riesgo` en el esquema sqlite
+ *   y esperar `incidencias` en el payload del listado.
  *
  * @see App\Http\Controllers\Api\CursoExamenController
  * @see App\Services\Examen\ListarExamenesCursoService
@@ -29,6 +32,7 @@ namespace Tests\Feature\Examenes;
 
 use App\Services\Examen\ListarExamenesCursoService;
 use Carbon\Carbon;
+use Illuminate\Auth\Middleware\Authenticate;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -48,7 +52,7 @@ class ListarExamenesCursoTest extends TestCase
             'foreign_key_constraints' => true,
         ]]);
         DB::setDefaultConnection('examenes_pruebas');
-        $this->withoutMiddleware(\Illuminate\Auth\Middleware\Authenticate::class);
+        $this->withoutMiddleware(Authenticate::class);
         $this->travelTo(Carbon::parse('2026-10-09 12:00:00'));
         $this->crearEsquema();
 
@@ -96,6 +100,10 @@ class ListarExamenesCursoTest extends TestCase
             ['id_ingreso' => 3, 'id_examen' => 1, 'id_estudiante' => '10001'],
             ['id_ingreso' => 4, 'id_examen' => 2, 'id_estudiante' => '10003'],
         ]);
+        DB::table('central_riesgo')->insert([
+            ['id_registro' => 1, 'id_examen' => 1],
+            ['id_registro' => 2, 'id_examen' => 2],
+        ]);
 
         $this->getJson('/api/cursos/1/examenes')->assertOk()->assertExactJson([
             'datos' => [[
@@ -114,6 +122,7 @@ class ListarExamenesCursoTest extends TestCase
                 'curso' => 'Sistemas',
                 'inscritos' => 3,
                 'ingresados' => 2,
+                'incidencias' => 1,
                 'ambientes' => [
                     ['id' => 1, 'nombre' => 'Aula 101'],
                     ['id' => 2, 'nombre' => 'Laboratorio'],
@@ -176,6 +185,7 @@ class ListarExamenesCursoTest extends TestCase
             ->assertJsonPath('datos.0.tipo', 'Examen parcial')
             ->assertJsonPath('datos.0.inscritos', 0)
             ->assertJsonPath('datos.0.ingresados', 0)
+            ->assertJsonPath('datos.0.incidencias', 0)
             ->assertJsonPath('datos.0.ambientes', []);
     }
 
@@ -264,6 +274,10 @@ class ListarExamenesCursoTest extends TestCase
             $tabla->integer('id_examen');
             $tabla->string('id_estudiante');
             $tabla->foreign('id_examen')->references('id_examen')->on('examen');
+        });
+        Schema::create('central_riesgo', function (Blueprint $tabla): void {
+            $tabla->integer('id_registro')->primary();
+            $tabla->integer('id_examen')->nullable();
         });
     }
 
