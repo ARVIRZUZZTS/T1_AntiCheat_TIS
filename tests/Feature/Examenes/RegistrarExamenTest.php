@@ -411,6 +411,10 @@ class RegistrarExamenTest extends TestCase
         ]))->assertSessionHasErrors([
             'hora_inicio' => 'Este curso ya tiene un examen programado en ese horario.',
         ]);
+
+        $this->get(route('examenes.crear', ['curso' => self::ID_CURSO]))
+            ->assertSee('No se pudo crear el examen')
+            ->assertSee('Este curso ya tiene un examen programado en ese horario.');
     }
 
     /** Un docente no puede programarse en dos cursos durante la misma franja. */
@@ -450,7 +454,7 @@ class RegistrarExamenTest extends TestCase
 
         $this->get(route('examenes.curso.crear', self::ID_CURSO))->assertForbidden();
         $this->post(route('cursos.examenes.store', self::ID_CURSO), $this->datosValidos())
-            ->assertForbidden();
+            ->assertSessionHasErrors(['general' => 'No se pueden crear examenes en un curso finalizado.']);
     }
 
     /**
