@@ -11,6 +11,7 @@
  * @updated 2026-11-15
  * @updated 2026-11-16
  * @updated 2026-11-19
+ * @updated 2026-11-22
  *
  * @description
  * Controlador HTTP de la sección Cursos del docente: la lista de sus cursos,
@@ -39,6 +40,10 @@
  * - 2026-11-19  [Valery D. Ortuno P]  refactor: "Ver estudiantes" y
  *   "Habilitar estudiantes" ya no calculan los conteos del curso (las páginas
  *   no muestran las tarjetas); solo el detalle los sigue usando.
+ * - 2026-11-22  [OchoaCesar]  refactor: los redirects de archivar/restaurar
+ *   apuntan a la página única /cursos/archivar-restaurar (con la pestaña
+ *   correspondiente); se retira restaurarLista() y su vista obsoleta
+ *   pages/curso-restaurar (sin ruta).
  *
  * @see  App\Services\Curso\ContarAfectadosCursoService
  * @see  App\Services\Curso\EliminarCursoService
@@ -54,6 +59,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\CursoEstado;
 use App\Http\Requests\StoreCursoRequest;
 use App\Models\Curso;
 use App\Models\Usuario;
@@ -71,6 +77,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 
 class CursoController extends Controller
@@ -129,7 +136,7 @@ class CursoController extends Controller
         return view('pages.curso-eliminar', [
             'cursos' => Curso::query()
                 ->where('sis_doc', $request->user()->id_usuario)
-                ->where('estado', '!=', \App\Enums\CursoEstado::Archivado->value)
+                ->where('estado', '!=', CursoEstado::Archivado->value)
                 ->orderBy('nombre_curso')
                 ->get(['id_curso', 'nombre_curso']),
         ]);
@@ -232,7 +239,7 @@ class CursoController extends Controller
 
         try {
             $servicio->ejecutar($usuario, $curso);
-        } catch (\Illuminate\Validation\ValidationException $e) {
+        } catch (ValidationException $e) {
             if ($request->expectsJson()) {
                 return response()->json(['errors' => $e->errors()], 422);
             }
@@ -244,18 +251,7 @@ class CursoController extends Controller
             return response()->json(['mensaje' => ArchivarCursoService::MENSAJE_EXITO]);
         }
 
-        return redirect()->route('cursos.archivar')->with('mensaje', ArchivarCursoService::MENSAJE_EXITO);
-    }
-
-    public function restaurarLista(Request $request): View
-    {
-        return view('pages.curso-restaurar', [
-            'cursos' => Curso::query()
-                ->where('sis_doc', $request->user()->id_usuario)
-                ->where('estado', \App\Enums\CursoEstado::Archivado->value)
-                ->orderBy('nombre_curso')
-                ->get(['id_curso', 'nombre_curso']),
-        ]);
+        return redirect()->route('cursos.archivar-restaurar')->with('mensaje', ArchivarCursoService::MENSAJE_EXITO);
     }
 
     public function restaurar(Request $request, Curso $curso, RestaurarCursoService $servicio): RedirectResponse|JsonResponse
@@ -265,7 +261,7 @@ class CursoController extends Controller
 
         try {
             $servicio->ejecutar($usuario, $curso);
-        } catch (\Illuminate\Validation\ValidationException $e) {
+        } catch (ValidationException $e) {
             if ($request->expectsJson()) {
                 return response()->json(['errors' => $e->errors()], 422);
             }
@@ -277,14 +273,14 @@ class CursoController extends Controller
             return response()->json(['mensaje' => RestaurarCursoService::MENSAJE_EXITO]);
         }
 
-        return redirect()->route('cursos.restaurar')->with('mensaje', RestaurarCursoService::MENSAJE_EXITO);
+        return redirect()->route('cursos.archivar-restaurar', ['pestana' => 'restaurar'])->with('mensaje', RestaurarCursoService::MENSAJE_EXITO);
     }
 
     public function archivados(Request $request): View
     {
         $cursos = Curso::query()
             ->where('sis_doc', $request->user()->id_usuario)
-            ->where('estado', \App\Enums\CursoEstado::Archivado->value)
+            ->where('estado', CursoEstado::Archivado->value)
             ->with([
                 'estudiantes',
                 'examenes.tipoExamen',
@@ -378,7 +374,7 @@ class CursoController extends Controller
     {
         $cursos = Curso::query()
             ->where('sis_doc', $request->user()->id_usuario)
-            ->where('estado', '!=', \App\Enums\CursoEstado::Archivado->value)
+            ->where('estado', '!=', CursoEstado::Archivado->value)
             ->orderBy('nombre_curso')
             ->get();
 

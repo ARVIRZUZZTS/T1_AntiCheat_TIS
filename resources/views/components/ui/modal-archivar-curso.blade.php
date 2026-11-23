@@ -2,13 +2,15 @@
     @file    modal-archivar-curso.blade.php
     @author  Equipo T1
     @created 2026-11-21
+    @updated 2026-11-22
 
     @description
-    Modal de confirmación de la vista «Archivar curso». Muestra el nombre del
-    curso elegido y los botones Archivar / Cancelar. Cierra sin cambios con
-    Cancelar, la X, Esc o un clic fuera. El componente se usa dentro de
-    `livewire.cursos.archivar-curso`, que aporta las acciones `archivar()` y
-    `cerrarModal()`.
+    Modal de confirmación de la pestaña «Archivar» de la página única
+    Archivar/Restaurar cursos. Muestra el nombre del curso elegido y los
+    botones Archivar / Cancelar. Cierra sin cambios con Cancelar, la X, Esc o
+    un clic fuera. El componente se usa dentro de
+    `livewire.cursos.archivar-restaurar-curso`, que aporta las acciones
+    `archivar()` y `cerrarModal()`.
 --}}
 
 @props([

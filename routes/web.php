@@ -107,8 +107,12 @@
  * - 2026-11-22  [Valery D. Ortuno P]  feat: "Asignar auxiliar" deja de ser un
  *   marcador: pagina AsignarAuxiliar, solo para docentes (HU 24); y
  *   /mis-examenes, "Ver examenes" del auxiliar.
+ * - 2026-11-22  [OchoaCesar]  refactor: las rutas GET /cursos/archivar y
+ *   /cursos/restaurar pasan a una sola /cursos/archivar-restaurar (pagina con
+ *   dos pestanas); se conservan los POST *.store de cada accion.
  */
 
+use App\Enums\CursoEstado;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CursoController;
 use App\Http\Controllers\EditarCursoVistaController;
@@ -117,18 +121,20 @@ use App\Http\Controllers\Reporte\ExportarReporteAsistenciaController;
 use App\Http\Controllers\Reporte\ExportarReporteIngresosIlegalesController;
 use App\Http\Controllers\Reporte\ListarReporteIngresosIlegalesController;
 use App\Http\Controllers\Reporte\ReporteController;
-use App\Livewire\Cursos\RestaurarCurso;
-use App\Livewire\Cursos\ArchivarCurso;
 use App\Livewire\Auxiliares\AsignarAuxiliar;
 use App\Livewire\Auxiliares\CrearAuxiliar;
 use App\Livewire\Auxiliares\ExamenesAuxiliar;
 use App\Livewire\Auxiliares\GestionAuxiliares;
+use App\Livewire\Cursos\ArchivarRestaurarCurso;
 use App\Livewire\Examenes\EstudiantesCurso;
 use App\Livewire\Invitaciones\Index as InvitacionesIndex;
 use App\Livewire\Monitoreo\AccesoMonitor;
 use App\Livewire\Monitoreo\MonitorEnVivo;
+use App\Models\Curso;
 use App\Models\Usuario;
+use App\Services\Curso\AsegurarCursoEditableService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('auth')->group(function (): void {
@@ -247,27 +253,28 @@ Route::middleware(['auth', 'docente'])->group(function (): void {
         $cursoId = $request->integer('curso');
 
         if ($cursoId <= 0) {
-            $cursos = \App\Models\Curso::query()
+            $cursos = Curso::query()
                 ->where('sis_doc', $request->user()->id_usuario)
-                ->where('estado', '!=', \App\Enums\CursoEstado::Archivado->value)
+                ->where('estado', '!=', CursoEstado::Archivado->value)
                 ->orderBy('nombre_curso')
                 ->get();
 
             return view('pages.cursos-cargar-csv', ['curso' => null, 'cursos' => $cursos]);
         }
 
-        $curso = \App\Models\Curso::query()->findOrFail($cursoId);
-        \Illuminate\Support\Facades\Gate::authorize('gestionar', $curso);
-        app(\App\Services\Curso\AsegurarCursoEditableService::class)->asegurarCursoEditable($curso, 'curso');
+        $curso = Curso::query()->findOrFail($cursoId);
+        Gate::authorize('gestionar', $curso);
+        app(AsegurarCursoEditableService::class)->asegurarCursoEditable($curso, 'curso');
 
         return view('pages.cursos-cargar-csv', ['curso' => $curso, 'cursos' => collect()]);
     })->name('cursos.cargar-csv');
     Route::get('/cursos/eliminar', [CursoController::class, 'eliminar'])->name('cursos.eliminar');
-    Route::get('/cursos/archivar', ArchivarCurso::class)->name('cursos.archivar');
+    // Archivar / Restaurar: una sola página con dos pestañas. Los POST son el
+    // endpoint canónico de cada acción (los confirma el componente Livewire).
+    Route::get('/cursos/archivar-restaurar', ArchivarRestaurarCurso::class)->name('cursos.archivar-restaurar');
     Route::post('/cursos/{curso}/archivar', [CursoController::class, 'archivar'])
         ->whereNumber('curso')
         ->name('cursos.archivar.store');
-    Route::get('/cursos/restaurar', RestaurarCurso::class)->name('cursos.restaurar');
     Route::post('/cursos/{curso}/restaurar', [CursoController::class, 'restaurar'])
         ->whereNumber('curso')
         ->name('cursos.restaurar.store');
