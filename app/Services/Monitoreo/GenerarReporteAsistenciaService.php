@@ -10,6 +10,8 @@
  * @updated 2026-10-11
  * @updated 2026-10-26
  * @updated 2026-11-07
+ * @updated 2026-11-22
+ * @updated 2026-11-23
  *
  * @description
  * Servicio de dominio que genera el reporte de asistencia de un examen.
@@ -74,6 +76,14 @@
  * - 2026-11-07  [Valery D. Ortuno P]  feat: una incidencia puede tener varios
  *   motivos (`central_riesgo_motivo`): cada incidencia trae `motivos` (lista)
  *   y `motivo_etiqueta` con todos ("Motivo 1 · Motivo 2").
+ * - 2026-11-22  [Valery D. Ortuno P]  feat: `$todosLosEstudiantes` (monitor de
+ *   un examen compartido, HU 132): trae los estudiantes, registros y cursos de
+ *   todos los docentes del examen, pero las reglas y materiales siguen siendo
+ *   los del docente que mira.
+ * - 2026-11-23  [Valery D. Ortuno P]  fix: las reglas y materiales salen siempre
+ *   del examen, no de la configuracion del docente: un examen compartido es el
+ *   mismo para todos, y al editarlo el monitor muestra lo nuevo (la copia por
+ *   docente quedaba desactualizada).
  *
  * @see  \App\Livewire\Monitoreo\MonitorEnVivo
  * @see  App\Services\Asistencia\RegistroIngresoService
@@ -88,7 +98,6 @@ namespace App\Services\Monitoreo;
 use App\Enums\EstadoEstudianteExamen;
 use App\Enums\Motivo;
 use App\Models\CentralRiesgo;
-use App\Models\ConfiguracionExamenDocente;
 use App\Models\EstudianteExamen;
 use App\Models\Examen;
 use App\Models\RegistroAsistencia;
@@ -111,15 +120,22 @@ class GenerarReporteAsistenciaService
      * @param  int  $idExamen  ID del examen
      * @param  Carbon|null  $ahora  Se conserva por compatibilidad con la firma
      *                              original; el estado ya no depende de la hora, sino de lo persistido.
+     * @param  int|null  $idDocente  Docente que mira (filtra estudiantes e incidencias si no son todos).
+     * @param  bool  $todosLosEstudiantes  true: estudiantes, registros y cursos de
+     *                                     todos los docentes del examen (control de aula de un examen compartido).
      * @return array{examen: Examen, estudiantes: Collection}
      */
-    public function ejecutar(int $idExamen, ?Carbon $ahora = null, ?int $idDocente = null): array
+    public function ejecutar(int $idExamen, ?Carbon $ahora = null, ?int $idDocente = null, bool $todosLosEstudiantes = false): array
     {
+        // Docente por el que se filtran estudiantes, registros y cursos. Las
+        // reglas y materiales son las del examen, iguales para todos.
+        $filtroDocente = $todosLosEstudiantes ? null : $idDocente;
+
         $examen = Examen::query()
             ->with([
                 'cursos' => fn ($query) => $query->when(
-                    $idDocente !== null,
-                    fn ($cursos) => $cursos->where('curso.sis_doc', $idDocente)
+                    $filtroDocente !== null,
+                    fn ($cursos) => $cursos->where('curso.sis_doc', $filtroDocente)
                 ),
                 'ambientes',
                 'materialesPermitidos',
@@ -130,17 +146,9 @@ class GenerarReporteAsistenciaService
             ])
             ->findOrFail($idExamen);
 
-        $configuracion = $this->configuracion($examen, $idDocente);
-        if ($configuracion !== null) {
-            $examen->setRelation('materialesPermitidos', $configuracion->materialesPermitidos);
-            $examen->setRelation('normas', $configuracion->normas);
-            $examen->setRelation('materialesPersonalizados', $configuracion->materialesPersonalizados);
-            $examen->setRelation('normasPersonalizadas', $configuracion->normasPersonalizadas);
-        }
-
         $registros = RegistroAsistencia::query()
             ->where('id_examen', $examen->id_examen)
-            ->when($idDocente !== null, fn ($query) => $query->delDocente($idDocente))
+            ->when($filtroDocente !== null, fn ($query) => $query->delDocente($filtroDocente))
             ->with('registrador')
             ->get()
             ->keyBy(fn (RegistroAsistencia $registro): string => $this->clave(
@@ -167,7 +175,7 @@ class GenerarReporteAsistenciaService
 
         $estudiantes = EstudianteExamen::query()
             ->where('id_examen', $examen->id_examen)
-            ->when($idDocente !== null, fn ($query) => $query->delDocente($idDocente))
+            ->when($filtroDocente !== null, fn ($query) => $query->delDocente($filtroDocente))
             ->with('estudiante')
             ->get()
             ->map(function (EstudianteExamen $inscripcion) use ($registros, $incidencias, $aulasPorInscripcion, $aulasDelExamen, $docentesPorInscripcion, $creadorDelExamen) {
@@ -274,28 +282,6 @@ class GenerarReporteAsistenciaService
                 // Todos los motivos en una línea: "Motivo 1 · Motivo 2".
                 'motivo_etiqueta' => Motivo::etiquetas($riesgo->getAttribute('motivos_texto')),
             ]);
-    }
-
-    private function configuracion(Examen $examen, ?int $idDocente): ?ConfiguracionExamenDocente
-    {
-        if ($idDocente === null) {
-            return null;
-        }
-
-        $configuracion = ConfiguracionExamenDocente::query()
-            ->where('id_examen', $examen->id_examen)
-            ->delDocente($idDocente)
-            ->with(['normas', 'materialesPermitidos', 'normasPersonalizadas', 'materialesPersonalizados'])
-            ->first();
-
-        if ($configuracion === null) {
-            \Illuminate\Support\Facades\Log::warning('Configuración de examen no encontrada para el docente.', [
-                'id_examen' => $examen->id_examen,
-                'id_docente' => $idDocente,
-            ]);
-        }
-
-        return $configuracion;
     }
 
     private function clave(mixed $idInscripcion, mixed $sis): string

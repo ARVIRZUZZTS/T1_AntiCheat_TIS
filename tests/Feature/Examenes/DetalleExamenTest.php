@@ -7,12 +7,14 @@
  *
  * @created 2026-11-19
  *
+ * @updated 2026-11-23
+ *
  * @description
  * Pruebas del "Ver detalle" de Ver examenes: el endpoint devuelve los datos
  * del examen (tipo con mayuscula), sus ambientes, los docentes del examen con
  * los cursos que vincularon, y las reglas y materiales permitidos
- * (catalogo y escritos a mano) de la configuracion del docente que consulta,
- * o los del examen si aun no tiene una. Solo lo ve quien lo creo, el docente
+ * (catalogo y escritos a mano) del examen, los mismos para todos sus
+ * docentes. Solo lo ve quien lo creo, el docente
  * de uno de sus cursos o el invitado que acepto.
  *
  * Usan SQLite en memoria con un esquema minimo, asi que no leen ni escriben en
@@ -22,6 +24,8 @@
  * - 2026-11-19  [Valery D. Ortuno P]  test: creacion inicial.
  * - 2026-11-19  [Valery D. Ortuno P]  test: docentes del examen con sus cursos,
  *   examen inexistente (404) y permiso revisado por el servicio.
+ * - 2026-11-23  [Valery D. Ortuno P]  test: las reglas y materiales son los del
+ *   examen para todos sus docentes, no los de la configuracion de cada uno.
  *
  * @see App\Http\Controllers\Api\ExamenDetalleController
  * @see App\Services\Examen\ObtenerDetalleExamenService
@@ -64,7 +68,7 @@ class DetalleExamenTest extends TestCase
         parent::tearDown();
     }
 
-    public function test_el_creador_ve_los_datos_cursos_ambientes_y_su_configuracion(): void
+    public function test_el_creador_ve_los_datos_cursos_ambientes_y_reglas(): void
     {
         $this->actingAs(Usuario::findOrFail(self::ROBERTO))
             ->getJson(route('api.examenes.detalle', ['examen' => self::EXAMEN]))
@@ -83,26 +87,16 @@ class DetalleExamenTest extends TestCase
                     ['docente' => 'Patricia Rojas', 'rol' => 'Docente del curso', 'cursos' => ['Calculo I - Grupo 2']],
                 ],
                 'ambientes' => ['Aula 623', 'Aula 691B'],
-                // Catalogo primero y despues lo escrito a mano.
-                'normas' => ['Prohibido hablar', 'Celular apagado', 'Sin salir del aula'],
-                'materiales' => ['Calculadora', 'Hoja de formulas'],
+                // Las del examen: catalogo primero y despues lo escrito a mano.
+                'normas' => ['Prohibido hablar', 'Traer carnet'],
+                'materiales' => ['Calculadora', 'Lapiz'],
             ]]);
     }
 
-    public function test_cada_docente_ve_las_reglas_de_su_propia_configuracion(): void
+    public function test_todos_los_docentes_ven_las_reglas_del_examen_aunque_tengan_configuracion(): void
     {
+        // Patricia tiene su configuracion con otras reglas: no cuentan.
         $this->actingAs(Usuario::findOrFail(self::PATRICIA))
-            ->getJson(route('api.examenes.detalle', ['examen' => self::EXAMEN]))
-            ->assertOk()
-            ->assertJsonPath('datos.normas', ['Prohibido hablar'])
-            ->assertJsonPath('datos.materiales', ['Calculadora', 'Regla']);
-    }
-
-    public function test_sin_configuracion_propia_usa_las_reglas_del_examen(): void
-    {
-        DB::table('configuracion_examen_docente')->where('id_docente', self::ROBERTO)->delete();
-
-        $this->actingAs(Usuario::findOrFail(self::ROBERTO))
             ->getJson(route('api.examenes.detalle', ['examen' => self::EXAMEN]))
             ->assertOk()
             ->assertJsonPath('datos.normas', ['Prohibido hablar', 'Traer carnet'])

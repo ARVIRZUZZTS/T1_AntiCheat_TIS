@@ -7,6 +7,8 @@
  *
  * @created 2026-11-19
  *
+ * @updated 2026-11-23
+ *
  * @description
  * Arma el detalle de solo lectura de un examen para "Ver examenes": tipo,
  * fecha, horario y duracion, ambientes, quien lo creo, los docentes del examen
@@ -14,9 +16,8 @@
  * cada uno vinculo, y las reglas y los materiales permitidos (del catalogo y los
  * escritos a mano).
  *
- * Las reglas y los materiales salen de la configuracion del docente que
- * consulta (cada docente del examen tiene la suya), como en el monitor en
- * vivo; si todavia no tiene una, se usan las del examen.
+ * Las reglas y los materiales son los del examen, los mismos para todos sus
+ * docentes (un examen compartido es uno solo), como en el monitor en vivo.
  *
  * Cada consulta a la base remota pesa (~380 ms), asi que todo sale en dos:
  * una para los datos del examen, que de paso dice si el docente puede verlo
@@ -26,6 +27,8 @@
  *
  * @changelog
  * - 2026-11-19  [Valery D. Ortuno P]  feat: creacion inicial.
+ * - 2026-11-23  [Valery D. Ortuno P]  fix: reglas y materiales del examen, no de
+ *   la configuracion de cada docente: en un examen compartido son los mismos.
  *
  * @see  App\Http\Controllers\Api\ExamenDetalleController
  * @see  App\Services\Monitoreo\GenerarReporteAsistenciaService
@@ -49,7 +52,7 @@ class ObtenerDetalleExamenService
 
     /**
      * @param  int  $idExamen  Examen a mostrar.
-     * @param  int  $idDocente  Docente que consulta (define la configuracion).
+     * @param  int  $idDocente  Docente que consulta (define si puede verlo).
      * @return array{
      *     id: int,
      *     tipo: string|null,
@@ -95,7 +98,7 @@ class ObtenerDetalleExamenService
         $inicio = $cabecera->hora_inicio === null ? null : Carbon::parse('2000-01-01 '.$cabecera->hora_inicio);
         $duracion = $cabecera->duracion === null ? null : (int) $cabecera->duracion;
 
-        $filas = $this->listas($idExamen, $idDocente)->get();
+        $filas = $this->listas($idExamen)->get();
         $de = fn (string $tipo) => $filas->where('tipo', $tipo)->sortBy('orden', SORT_NATURAL);
 
         return [
@@ -120,24 +123,12 @@ class ObtenerDetalleExamenService
 
     /**
      * Todas las listas del detalle en una sola consulta. Cada rama trae
-     * (tipo, texto, extra, orden, id_docente). Las reglas y materiales del
-     * catalogo van antes que los escritos a mano (prefijo del orden).
+     * (tipo, texto, extra, orden, id_docente). Las reglas y materiales son
+     * los del examen, iguales para todos sus docentes; los del catalogo van
+     * antes que los escritos a mano (prefijo del orden).
      */
-    private function listas(int $idExamen, int $idDocente): Builder
+    private function listas(int $idExamen): Builder
     {
-        $configuracion = fn (Builder $consulta, string $columna) => $consulta
-            ->join('configuracion_examen_docente as ced', 'ced.id_configuracion_examen', '=', $columna)
-            ->where('ced.id_examen', $idExamen)
-            ->where('ced.id_docente', $idDocente);
-
-        // Sin configuracion propia del docente se usa la del examen.
-        $sinConfiguracion = fn (Builder $consulta) => $consulta->whereNotExists(
-            fn (Builder $existe) => $existe->from('configuracion_examen_docente')
-                ->where('id_examen', $idExamen)
-                ->where('id_docente', $idDocente)
-                ->selectRaw('1')
-        );
-
         $cursos = DB::table('examen_curso as ec')
             ->join('curso as c', 'c.id_curso', '=', 'ec.id_curso')
             ->leftJoin('usuario as d', 'd.id_usuario', '=', 'c.sis_doc')
@@ -156,45 +147,27 @@ class ObtenerDetalleExamenService
             ->where('ea.id_examen', $idExamen)
             ->selectRaw("'ambiente' as tipo, a.nombre_ambiente as texto, null as extra, a.nombre_ambiente as orden, null as id_docente");
 
-        $normasConfig = $configuracion(DB::table('configuracion_examen_norma as cn'), 'cn.id_configuracion_examen')
-            ->join('norma as n', 'n.id_norma', '=', 'cn.id_norma')
-            ->selectRaw("'norma' as tipo, n.detalle_norma as texto, null as extra, '1-' || n.id_norma as orden, null as id_docente");
-
-        $normasPropiasConfig = $configuracion(DB::table('configuracion_norma_personalizada as cnp'), 'cnp.id_configuracion_examen')
-            ->selectRaw("'norma' as tipo, cnp.descripcion_norma as texto, null as extra, '2-' || cnp.numero_norma as orden, null as id_docente");
-
-        $materialesConfig = $configuracion(DB::table('configuracion_examen_material as cm'), 'cm.id_configuracion_examen')
-            ->join('material as m', 'm.id_material', '=', 'cm.id_material')
-            ->selectRaw("'material' as tipo, m.descripcion as texto, null as extra, '1-' || m.id_material as orden, null as id_docente");
-
-        $materialesPropiosConfig = $configuracion(DB::table('configuracion_material_personalizado as cmp'), 'cmp.id_configuracion_examen')
-            ->selectRaw("'material' as tipo, cmp.descripcion_material as texto, null as extra, '2-' || cmp.numero_material as orden, null as id_docente");
-
-        $normasExamen = $sinConfiguracion(DB::table('examen_norma as en')
+        $normasExamen = DB::table('examen_norma as en')
             ->join('norma as n', 'n.id_norma', '=', 'en.id_norma')
             ->where('en.id_examen', $idExamen)
-            ->selectRaw("'norma' as tipo, n.detalle_norma as texto, null as extra, '1-' || n.id_norma as orden, null as id_docente"));
+            ->selectRaw("'norma' as tipo, n.detalle_norma as texto, null as extra, '1-' || n.id_norma as orden, null as id_docente");
 
-        $normasPropiasExamen = $sinConfiguracion(DB::table('norma_personalizada as np')
+        $normasPropiasExamen = DB::table('norma_personalizada as np')
             ->where('np.id_examen', $idExamen)
-            ->selectRaw("'norma' as tipo, np.descripcion_norma as texto, null as extra, '2-' || np.numero_norma as orden, null as id_docente"));
+            ->selectRaw("'norma' as tipo, np.descripcion_norma as texto, null as extra, '2-' || np.numero_norma as orden, null as id_docente");
 
-        $materialesExamen = $sinConfiguracion(DB::table('examen_material_permitido as emp')
+        $materialesExamen = DB::table('examen_material_permitido as emp')
             ->join('material as m', 'm.id_material', '=', 'emp.id_material_permitido')
             ->where('emp.id_examen', $idExamen)
-            ->selectRaw("'material' as tipo, m.descripcion as texto, null as extra, '1-' || m.id_material as orden, null as id_docente"));
+            ->selectRaw("'material' as tipo, m.descripcion as texto, null as extra, '1-' || m.id_material as orden, null as id_docente");
 
-        $materialesPropiosExamen = $sinConfiguracion(DB::table('material_personalizado as mp')
+        $materialesPropiosExamen = DB::table('material_personalizado as mp')
             ->where('mp.id_examen', $idExamen)
-            ->selectRaw("'material' as tipo, mp.descripcion_material as texto, null as extra, '2-' || mp.numero_material as orden, null as id_docente"));
+            ->selectRaw("'material' as tipo, mp.descripcion_material as texto, null as extra, '2-' || mp.numero_material as orden, null as id_docente");
 
         return $cursos
             ->unionAll($invitados)
             ->unionAll($ambientes)
-            ->unionAll($normasConfig)
-            ->unionAll($normasPropiasConfig)
-            ->unionAll($materialesConfig)
-            ->unionAll($materialesPropiosConfig)
             ->unionAll($normasExamen)
             ->unionAll($normasPropiasExamen)
             ->unionAll($materialesExamen)

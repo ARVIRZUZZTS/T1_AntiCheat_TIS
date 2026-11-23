@@ -10,6 +10,7 @@
  * @updated 2026-10-10
  * @updated 2026-10-24
  * @updated 2026-10-25
+ * @updated 2026-11-22
  *
  * @description
  * Servicio del control de ingreso del monitor en vivo. Persiste las tres
@@ -33,6 +34,9 @@
  *   aparecía con materia en la central de riesgos (HU 10).
  * - 2026-10-25  [Valery D. Ortuno P]  refactor: se quita registrarIncidencia();
  *   el registro de incidencias pasa a RegistrarIncidenciaService (HU 5).
+ * - 2026-11-22  [Valery D. Ortuno P]  feat: en un examen compartido vale la
+ *   inscripcion del estudiante en cualquier curso del examen (control de
+ *   aula, HU 132); si esta en dos, se prefiere la del docente que registra.
  *
  * @see  App\Livewire\Monitoreo\MonitorEnVivo
  * @see  App\Services\Examen\CambiarEstadoEstudianteService
@@ -204,10 +208,19 @@ class RegistroIngresoService
         int $idExamen,
         ?int $idDocente = null,
     ): EstudianteExamen {
+        // En un examen compartido el control es de aula (HU 132): vale la
+        // inscripcion del estudiante en cualquier curso del examen. Si esta en
+        // dos, se prefiere la del docente que registra.
         $inscripcion = EstudianteExamen::query()
             ->where('sis_estudiante', $sisEstudiante)
             ->where('id_examen', $idExamen)
-            ->when($idDocente !== null, fn ($query) => $query->delDocente($idDocente))
+            ->when($idDocente !== null, fn ($query) => $query->orderByRaw(
+                'case when exists (select 1 from configuracion_examen_docente ced'
+                .' where ced.id_configuracion_examen = estudiante_examen.id_configuracion_examen'
+                .' and ced.id_docente = ?) then 0 else 1 end',
+                [$idDocente],
+            ))
+            ->orderBy('id_estudiante_examen')
             ->lockForUpdate()
             ->first();
 
