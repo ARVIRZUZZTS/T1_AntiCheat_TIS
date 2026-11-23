@@ -12,6 +12,7 @@
     @updated 2026-11-16
     @updated 2026-11-19
     @updated 2026-11-20
+    @updated 2026-11-22
 
     @description
     Parcial de la sección Exámenes. En la página única lista todos los exámenes
@@ -99,6 +100,9 @@
       el estado vacío dice "No hay exámenes programados".
     - 2026-11-19  [Valery D. Ortuno P]  style: las tarjetas de la lista (página
       Eliminar examen) pierden el icono; nombre y etiquetas quedan solos.
+    - 2026-11-22  [Valery D. Ortuno P]  fix: el selector de curso muestra solo el
+      nombre; se quita "(Anfitrion)", que es de un examen compartido y no de un
+      curso.
     - 2026-11-20  [OchoaCesar]  refactor: la eliminación de examen pasa a la
       página propia /examenes/eliminar (subopción del sidebar); se retiran de
       aquí el botón "Eliminar" de la tarjeta, el aviso de bloqueo y sus
@@ -139,15 +143,9 @@
         'apellido' => 'Por orden alfabetico',
     ];
 
-    $opcionesCursos = $cursos->mapWithKeys(function ($curso) {
-        $etiqueta = $curso->nombre_curso;
-
-        if (!empty($curso->es_anfitrion)) {
-            $etiqueta .= ' (Anfitrion)';
-        }
-
-        return [$curso->id_curso => $etiqueta];
-    })->all();
+    // Solo el nombre: "Anfitrion" / "Invitado" es de un examen compartido,
+    // no de un curso (lo muestran las tarjetas de cada examen).
+    $opcionesCursos = $cursos->mapWithKeys(fn ($curso) => [$curso->id_curso => $curso->nombre_curso])->all();
 
     // Si el alta falló, se vuelve a abrir la pestaña del formulario.
     $tabInicial = $tabInicial ?? (($errors->any() && $puedeCrearExamen) ? 'crear' : 'lista');
