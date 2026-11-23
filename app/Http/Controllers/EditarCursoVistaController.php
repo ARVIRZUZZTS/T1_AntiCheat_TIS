@@ -4,13 +4,14 @@
  * @file    EditarCursoVistaController.php
  * @author  Alisson D. Alvarado <alvaradoalissondalet@gmail.com>
  * @created 2026-11-21
- * @updated 2026-11-21
+ * @updated 2026-11-23
  *
  * @description
  * Prepara la página de edición con los cursos propios y el catálogo de gestiones.
  *
  * @changelog
  * - 2026-11-21  [Alisson D. Alvarado]  feat: preparar la vista de edición de cursos.
+ * - 2026-11-23  [Alisson D. Alvarado]  feat: mostrar solo cursos propios activos.
  */
 
 namespace App\Http\Controllers;
@@ -35,7 +36,9 @@ class EditarCursoVistaController extends Controller
     public function __invoke(Request $request, ListarCursosDocenteService $cursos, ListarGestionesService $gestiones): View
     {
         return view('pages.curso-editar', [
-            'cursos' => $cursos->conMetricas((int) $request->user()->id_usuario),
+            'cursos' => $cursos->conMetricas((int) $request->user()->id_usuario)
+                ->filter(fn (array $fila): bool => $fila['curso']->estaEnCurso())
+                ->values(),
             'gestiones' => $gestiones->ejecutar(),
         ]);
     }
