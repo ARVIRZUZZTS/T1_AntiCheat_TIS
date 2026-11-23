@@ -33,6 +33,8 @@
  * - 2026-10-11  [T1]  feat: creación inicial del modelo (#HU12).
  * - 2026-10-11  [David E. Chavez T.]  feat: columna `tipo` para distinguir los
  *   avisos "central_riesgo" de la HU 6 (#HU6).
+ * - 2026-11-22  [T1]  feat: columna `fecha_evento` para avisos autogenerados sin
+ *   entidad de origen, como el respaldo automático de la base de datos (#HU33).
  */
 
 namespace App\Models;
@@ -49,6 +51,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $tipo
  * @property string $estado
  * @property bool $oculta
+ * @property ?\Illuminate\Support\Carbon $fecha_evento
  */
 class NotificacionDocente extends Model
 {
@@ -72,12 +75,14 @@ class NotificacionDocente extends Model
         'tipo',
         'estado',
         'oculta',
+        'fecha_evento',
     ];
 
     protected function casts(): array
     {
         return [
             'oculta' => 'boolean',
+            'fecha_evento' => 'datetime',
         ];
     }
 

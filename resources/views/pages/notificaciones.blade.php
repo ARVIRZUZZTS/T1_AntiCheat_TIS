@@ -93,6 +93,19 @@
             </div>
         </template>
 
+        <template id="notificacion-template-respaldo">
+            <div class="js-notificacion relative flex items-start gap-3 sm:gap-4 rounded-2xl border border-light bg-neutral-primary-soft p-4 sm:p-5 shadow-xs">
+                <span class="shrink-0 inline-flex items-center justify-center w-11 h-11 bg-brand-softer rounded-xl">
+                    <svg class="w-6 h-6 text-fg-brand-strong" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><ellipse cx="12" cy="6" rx="8" ry="3" stroke="currentColor" stroke-width="2"/><path stroke="currentColor" stroke-linecap="round" stroke-width="2" d="M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg>
+                </span>
+                <div class="flex-1 min-w-0">
+                    <h3 class="js-titulo text-sm font-bold leading-snug text-heading break-words"></h3>
+                    <p class="js-descripcion mt-1 text-sm text-body break-words"></p>
+                    <span class="js-hace mt-3 block text-xs text-muted"></span>
+                </div>
+            </div>
+        </template>
+
         <template id="notificacion-template-respuesta">
             <div class="js-notificacion relative flex items-start gap-3 sm:gap-4 rounded-2xl border border-light bg-neutral-primary-soft p-4 sm:p-5 shadow-xs">
                 <span class="shrink-0 inline-flex items-center justify-center w-11 h-11 bg-success-soft rounded-xl">
@@ -137,14 +150,16 @@
                 posible_tramposo: document.getElementById('notificacion-template-tramposo'),
                 central_riesgo: document.getElementById('notificacion-template-central'),
                 invitacion_examen: document.getElementById('notificacion-template-invitacion'),
-                respuesta_invitacion: document.getElementById('notificacion-template-respuesta')
+                respuesta_invitacion: document.getElementById('notificacion-template-respuesta'),
+                respaldo_bd: document.getElementById('notificacion-template-respaldo')
             };
 
             var titulos = {
                 posible_tramposo: 'Posible Tramposo',
                 central_riesgo: 'Estudiante ingresado a central de riesgo',
                 invitacion_examen: 'Invitacion para compartir un examen',
-                respuesta_invitacion: 'Respuesta a tu invitacion de examen'
+                respuesta_invitacion: 'Respuesta a tu invitacion de examen',
+                respaldo_bd: 'Respaldo automático de la base de datos'
             };
 
             function actualizarVacio() {
