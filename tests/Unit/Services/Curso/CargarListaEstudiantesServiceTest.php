@@ -123,7 +123,7 @@ class CargarListaEstudiantesServiceTest extends TestCase
         $this->assertDatabaseHas('estudiante_examen', ['sis_estudiante' => '100000001', 'id_examen' => self::EXAMEN]);
     }
 
-    public function test_tramposo_global_se_cuenta_pero_no_deshabilita(): void
+    public function test_tramposo_se_cuenta_y_queda_deshabilitado(): void
     {
         DB::table('estudiante')->insert([
             'sis_estudiante' => '100000003',
@@ -144,10 +144,12 @@ class CargarListaEstudiantesServiceTest extends TestCase
         $resultado = $this->servicio()->ejecutar($this->curso(), $archivo, self::DOCENTE);
 
         $this->assertSame(1, $resultado->tramposos);
+        $this->assertSame(1, $resultado->deshabilitados);
+        $this->assertSame(0, $resultado->habilitados);
         $this->assertDatabaseHas('estudiante_examen', [
             'sis_estudiante' => '100000003',
             'id_examen' => self::EXAMEN,
-            'estado' => 'habilitado',
+            'estado' => 'deshabilitado',
         ]);
     }
 

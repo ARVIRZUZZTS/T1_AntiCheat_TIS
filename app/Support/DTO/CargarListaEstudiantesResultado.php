@@ -16,6 +16,8 @@ namespace App\Support\DTO;
  *
  * @changelog
  * - 2026-11-21  [Equipo T1]  feat: DTO de resultado de carga (HU 25).
+ * - 2026-11-23  [Equipo T1]  feat: `habilitados`, `deshabilitados` y `reemplazo`
+ *   para el resumen del banner de éxito y el cruce con la central de riesgos (HU 25).
  */
 final class CargarListaEstudiantesResultado
 {
@@ -26,6 +28,9 @@ final class CargarListaEstudiantesResultado
      * @param  int  $yaInscritos  Saltados por ya estar inscritos en el curso.
      * @param  int  $tramposos  Estudiantes que aparecen en la central de riesgos como tramposos.
      * @param  int  $estudianteExamenesCreados  Filas creadas en `estudiante_examen`.
+     * @param  int  $habilitados  Estudiantes inscritos sin antecedentes (habilitados).
+     * @param  int  $deshabilitados  Estudiantes inscritos reportados como tramposos (deshabilitados).
+     * @param  bool  $reemplazo  Si la carga reemplazó la lista anterior del curso.
      * @param  list<string>  $sisDuplicadosEnArchivo  SIS repetidos dentro del archivo.
      * @param  list<string>  $sisInvalidos  Filas omitidas por SIS inválido.
      */
@@ -36,6 +41,9 @@ final class CargarListaEstudiantesResultado
         public readonly int $yaInscritos,
         public readonly int $tramposos,
         public readonly int $estudianteExamenesCreados,
+        public readonly int $habilitados = 0,
+        public readonly int $deshabilitados = 0,
+        public readonly bool $reemplazo = false,
         public readonly array $sisDuplicadosEnArchivo = [],
         public readonly array $sisInvalidos = [],
     ) {}
