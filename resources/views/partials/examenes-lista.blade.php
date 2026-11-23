@@ -40,8 +40,7 @@
 @php
     $curso = $curso ?? null;
     $cursos = $cursos ?? ($curso !== null ? collect([$curso]) : collect());
-    // La página siempre lista todos los cursos del docente; el selector de
-    // curso de la vista acota el resultado.
+    // La página lista solo cursos activos con examenes; el selector de la vista acota el resultado.
     $listadoGlobal = $curso === null;
     $urlListaGlobal = route('api.examenes.listar');
     $urlListaCurso = route('api.cursos.examenes.listar', ['idCurso' => '__CURSO__']);
@@ -55,6 +54,10 @@
 
         return [$curso->id_curso => $etiqueta];
     })->all();
+
+    $pillBase = 'shrink-0 whitespace-nowrap inline-flex items-center justify-center box-border border focus:ring-4 shadow-xs font-medium leading-5 rounded-full focus:outline-none px-4 py-2.5 text-sm';
+    $pillActiva = 'text-white bg-brand border-transparent hover:bg-brand-strong focus:ring-brand-medium';
+    $pillInactiva = 'text-body bg-neutral-primary-soft border-default hover:bg-neutral-secondary-medium hover:text-heading focus:ring-neutral-tertiary-soft';
 @endphp
 
 <div class="flex flex-col gap-4"
@@ -68,6 +71,27 @@
          examenes: [],
          estado: 'listo',
          peticion: 0,
+         filtroTiempo: 'todos',
+         esPasado(examen) {
+             return examen?.estado === 'Finalizado';
+         },
+         get conteo() {
+             const pasados = this.examenes.filter((examen) => this.esPasado(examen)).length;
+
+             return { todos: this.examenes.length, proximos: this.examenes.length - pasados, pasados };
+         },
+         get examenesFiltrados() {
+             return this.examenes.filter((examen) => {
+                 if (this.filtroTiempo === 'pasados') {
+                     return this.esPasado(examen);
+                 }
+                 if (this.filtroTiempo === 'proximos') {
+                     return ! this.esPasado(examen);
+                 }
+
+                 return true;
+             });
+         },
          // Modal Ver detalle.
          modalDetalle: false,
          examenDetalle: null,
@@ -201,34 +225,51 @@
         <x-ui.modal-aviso :mensaje="session('mensaje')" />
     @endif
 
-    {{-- Selector de curso: "Todos los cursos" o uno concreto. --}}
-    @if ($listadoGlobal)
-        <div class="min-w-0 sm:max-w-xs">
-            <label for="examen-curso-lista" class="block mb-2.5 text-sm font-medium text-heading">Curso</label>
-            <select id="examen-curso-lista"
-                    x-model="cursoLista"
-                    @change="cargar()"
-                    class="block w-full px-3 py-2.5 border text-sm rounded-base shadow-xs bg-neutral-secondary-medium border-default-medium text-heading focus:ring-brand focus:border-brand">
-                <option value="">Todos los cursos</option>
-                @foreach ($opcionesCursos as $idCursoLista => $nombreCursoLista)
-                    <option value="{{ $idCursoLista }}">{{ $nombreCursoLista }}</option>
-                @endforeach
-            </select>
+    {{-- Barra blanca: selector y píldoras de filtro. --}}
+    <div class="mt-4 bg-neutral-primary-soft border border-default rounded-base shadow-xs p-3 flex flex-col gap-3 sm:flex-row sm:items-center">
+        @if ($listadoGlobal)
+            <div class="min-w-0 sm:w-56">
+                <label for="examen-curso-lista" class="block mb-2.5 text-sm font-medium text-heading sm:sr-only">Curso</label>
+                <select id="examen-curso-lista"
+                        x-model="cursoLista"
+                        @change="cargar()"
+                        class="block w-full px-3 py-2.5 border text-sm rounded-base shadow-xs bg-neutral-secondary-medium border-default-medium text-heading focus:ring-brand focus:border-brand">
+                    <option value="">Todos los cursos</option>
+                    @foreach ($opcionesCursos as $idCursoLista => $nombreCursoLista)
+                        <option value="{{ $idCursoLista }}">{{ $nombreCursoLista }}</option>
+                    @endforeach
+                </select>
+            </div>
+        @endif
+
+        <div class="flex gap-2 overflow-x-auto sm:ml-auto sm:shrink-0">
+            <button type="button" class="{{ $pillBase }}" :aria-pressed="filtroTiempo === 'todos'" :class="filtroTiempo === 'todos' ? '{{ $pillActiva }}' : '{{ $pillInactiva }}'" @click="filtroTiempo = 'todos'">
+                Todos <span x-text="conteo.todos"></span>
+            </button>
+            <button type="button" class="{{ $pillBase }}" :aria-pressed="filtroTiempo === 'proximos'" :class="filtroTiempo === 'proximos' ? '{{ $pillActiva }}' : '{{ $pillInactiva }}'" @click="filtroTiempo = 'proximos'">
+                Proximos <span x-text="conteo.proximos"></span>
+            </button>
+            <button type="button" class="{{ $pillBase }}" :aria-pressed="filtroTiempo === 'pasados'" :class="filtroTiempo === 'pasados' ? '{{ $pillActiva }}' : '{{ $pillInactiva }}'" @click="filtroTiempo = 'pasados'">
+                Pasados <span x-text="conteo.pasados"></span>
+            </button>
         </div>
-    @endif
+    </div>
 
     <div x-show="estado === 'cargando'" x-cloak class="flex flex-col gap-4">
         @foreach ([1, 2] as $placeholder)
-            <div class="animate-pulse border border-default bg-neutral-primary-soft rounded-base shadow-xs px-5 py-6 sm:px-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:gap-6" aria-hidden="true">
-                <div class="flex flex-col gap-2 lg:w-72">
-                    <div class="h-5 w-40 rounded bg-neutral-secondary-medium"></div>
+            <div class="animate-pulse border border-default bg-neutral-primary-soft rounded-base shadow-xs p-4 sm:p-5 grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1fr)] lg:items-center lg:gap-0 lg:divide-x lg:divide-default" aria-hidden="true">
+                <div class="flex flex-col gap-2 lg:pr-6">
+                    <div class="h-5 w-52 rounded bg-neutral-secondary-medium"></div>
                     <div class="h-4 w-24 rounded-full bg-neutral-secondary-medium"></div>
                 </div>
-                <div class="grid flex-1 grid-cols-2 gap-4 sm:grid-cols-4">
+                <div class="grid grid-cols-2 gap-4 border-t border-default pt-4 lg:border-t-0 lg:pt-0 lg:px-6">
                     <div class="h-9 w-24 rounded bg-neutral-secondary-medium mx-auto"></div>
                     <div class="h-9 w-24 rounded bg-neutral-secondary-medium mx-auto"></div>
                     <div class="h-9 w-24 rounded bg-neutral-secondary-medium mx-auto"></div>
                     <div class="h-9 w-24 rounded bg-neutral-secondary-medium mx-auto"></div>
+                </div>
+                <div class="border-t border-default pt-4 lg:border-t-0 lg:pt-0 lg:pl-6">
+                    <div class="h-9 w-32 rounded bg-neutral-secondary-medium ml-auto"></div>
                 </div>
             </div>
         @endforeach
@@ -243,13 +284,13 @@
         </x-ui.alert>
     </div>
 
-    <ul class="flex flex-col gap-4" x-show="estado === 'listo'" x-cloak>
-        <template x-for="examen in examenes" :key="examen.id">
-            <li class="flex flex-col gap-4 border border-default bg-neutral-primary-soft rounded-base shadow-xs px-5 py-6 sm:px-8 lg:flex-row lg:items-center lg:gap-6">
+    <ul class="mt-4 flex flex-col gap-3" x-show="estado === 'listo'" x-cloak>
+        <template x-for="examen in examenesFiltrados" :key="examen.id">
+            <li class="rounded-base bg-neutral-primary-soft shadow-xs border border-default p-4 sm:p-5 grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1fr)] lg:items-center lg:gap-0 lg:divide-x lg:divide-default">
                 {{-- Nombre con curso y etiquetas. --}}
-                <div class="flex min-w-0 flex-col items-start gap-1 lg:w-72 lg:shrink-0">
-                    <h3 class="text-xl font-bold text-heading wrap-break-word" x-text="etiquetaExamen(examen)"></h3>
-                    <div class="flex flex-wrap gap-2">
+                <div class="min-w-0 lg:pr-6">
+                    <h3 class="text-lg font-semibold text-heading wrap-break-word" x-text="etiquetaExamen(examen)"></h3>
+                    <div class="mt-1.5 flex flex-wrap gap-2">
                         <span x-show="examen.es_propio" class="inline-flex items-center px-1.5 py-0.5 text-xs font-medium rounded-full border bg-brand-softer border-brand-subtle text-fg-brand-strong">Propio</span>
                         <span x-show="examen.es_anfitrion" class="inline-flex items-center px-1.5 py-0.5 text-xs font-medium rounded-full border bg-warning-soft border-warning-subtle text-fg-warning">Anfitrion</span>
                         <span x-show="!examen.es_propio" class="inline-flex items-center px-1.5 py-0.5 text-xs font-medium rounded-full border bg-success-soft border-success-subtle text-fg-success-strong">Invitado</span>
@@ -266,7 +307,7 @@
                 </div>
 
                 {{-- Datos de la tarjeta. --}}
-                <div class="grid flex-1 grid-cols-2 gap-4 sm:grid-cols-4">
+                <div class="grid grid-cols-2 gap-4 border-t border-default pt-4 lg:border-t-0 lg:pt-0 lg:px-6">
                     <div class="flex flex-col items-center gap-1.5 text-center">
                         <span class="text-xs font-semibold uppercase text-muted">Fecha:</span>
                         <time class="text-sm font-mono text-body" :datetime="examen.fecha" x-text="fechaDe(examen)"></time>
@@ -281,12 +322,12 @@
                     </div>
                     <div class="flex flex-col items-center gap-1.5 text-center">
                         <span class="text-xs font-semibold uppercase text-muted">Ingresos:</span>
-                        <span class="text-sm font-bold text-heading" x-text="examen.ingresados"></span>
+                        <span class="text-xl sm:text-2xl font-semibold text-heading" x-text="examen.ingresados"></span>
                     </div>
                 </div>
 
                 {{-- Mismo enlace que "Ver detalle" de la central de riesgos. --}}
-                <div class="flex shrink-0 justify-end">
+                <div class="border-t border-default pt-4 lg:border-t-0 lg:pt-0 lg:pl-6 flex justify-end">
                     <button type="button" @click="abrirDetalle(examen)" @mouseenter="precargar(examen)" @focus="precargar(examen)"
                             class="cursor-pointer whitespace-nowrap border-0 bg-transparent p-0 text-xs font-bold text-fg-brand-strong hover:underline">
                         Ver detalle ›
@@ -298,6 +339,10 @@
         <li x-show="examenes.length === 0"
             class="flex flex-col items-center gap-2 p-8 text-center bg-neutral-primary-soft border border-default rounded-base shadow-xs">
             <p class="text-sm text-body" x-text="cursoContexto !== '' ? 'No hay examenes programados' : 'No hay examenes registrados.'"></p>
+        </li>
+        <li x-show="examenes.length > 0 && examenesFiltrados.length === 0"
+            class="flex flex-col items-center gap-2 p-8 text-center bg-neutral-primary-soft border border-default rounded-base shadow-xs">
+            <p class="text-sm text-body">No se encontraron examenes</p>
         </li>
     </ul>
 

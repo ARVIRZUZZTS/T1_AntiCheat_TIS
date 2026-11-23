@@ -81,6 +81,11 @@ class ListadoExamenesVistaTest extends TestCase
         return $this->fuente(resource_path('views/partials/examenes-curso.blade.php'));
     }
 
+    private function fuenteLista(): string
+    {
+        return $this->fuente(resource_path('views/partials/examenes-lista.blade.php'));
+    }
+
     public function test_el_parcial_consulta_el_endpoint_de_examenes(): void
     {
         $parcial = $this->fuenteParcial();
@@ -266,5 +271,50 @@ class ListadoExamenesVistaTest extends TestCase
 
         $this->assertStringNotContainsString('ListarExamenesCursoService', $rutas);
         $this->assertStringNotContainsString("'examenes' =>", $rutas);
+    }
+
+    public function test_el_selector_de_la_lista_usa_solo_cursos_con_examenes(): void
+    {
+        $controlador = $this->fuente(app_path('Http/Controllers/ExamenController.php'));
+        $servicio = $this->fuente(app_path('Services/Curso/ListarCursosDocenteService.php'));
+
+        $this->assertStringContainsString('->conExamenes((int) $request->user()->id_usuario)', $controlador);
+        $this->assertStringContainsString('public function conExamenes(int $idDocente): EloquentCollection', $servicio);
+        $this->assertStringContainsString('(int) $curso->examenes_count > 0', $servicio);
+    }
+
+    public function test_la_lista_de_examenes_tiene_filtro_de_tiempo(): void
+    {
+        $lista = $this->fuenteLista();
+
+        $this->assertStringContainsString('filtroTiempo', $lista);
+        $this->assertStringContainsString('esPasado(examen) {', $lista);
+        $this->assertStringContainsString("examen?.estado === 'Finalizado'", $lista);
+        $this->assertStringContainsString('get examenesFiltrados()', $lista);
+        $this->assertStringContainsString('<template x-for="examen in examenesFiltrados"', $lista);
+        $this->assertStringContainsString('Proximos <span x-text="conteo.proximos">', $lista);
+        $this->assertStringContainsString('Pasados <span x-text="conteo.pasados">', $lista);
+        $this->assertStringNotContainsString('busqueda-examen', $lista);
+    }
+
+    public function test_las_listas_comparten_solo_lineas_y_tamanos_de_letra(): void
+    {
+        $clase = 'lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1fr)]';
+        $lista = $this->fuenteLista();
+        $cursos = $this->fuente(resource_path('views/pages/cursos.blade.php'));
+
+        $this->assertStringContainsString($clase, $lista);
+        $this->assertStringContainsString($clase, $cursos);
+        $this->assertStringContainsString('lg:divide-x lg:divide-default', $lista);
+        $this->assertStringContainsString('lg:divide-x lg:divide-default', $cursos);
+        $this->assertStringContainsString('text-lg font-semibold text-heading', $lista);
+        $this->assertStringContainsString('text-lg font-semibold text-heading', $cursos);
+        $this->assertStringContainsString('text-xl sm:text-2xl font-semibold', $lista);
+        $this->assertStringContainsString('text-xl sm:text-2xl font-semibold', $cursos);
+        $this->assertStringContainsString('Fecha:', $lista);
+        $this->assertStringContainsString('Proximo examen:', $cursos);
+        $this->assertStringNotContainsString('Ver curso ›', $cursos);
+        $this->assertStringNotContainsString('examen.inscritos', $lista);
+        $this->assertStringNotContainsString('examen.incidencias', $lista);
     }
 }

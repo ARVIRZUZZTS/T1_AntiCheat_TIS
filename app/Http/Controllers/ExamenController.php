@@ -106,7 +106,7 @@ class ExamenController extends Controller
         ListarCursosDocenteService $cursos,
         CatalogosExamenService $catalogos,
     ): View {
-        $cursos = $cursos->activos((int) $request->user()->id_usuario);
+        $cursos = $cursos->conExamenes((int) $request->user()->id_usuario);
 
         // El curso puede venir de la URL (recarga o enlace directo) o quedar en
         // el input viejo cuando falló el alta. Solo se acepta si es del docente.

@@ -69,8 +69,7 @@ class ListarCursosDocenteService
      * por examen y el docente invitado los gestiona desde Exámenes.
      *
      * @param  int  $idDocente  ID del docente (`curso.sis_doc`).
-     * @return Collection<int, array<string, mixed>> Filas de ListarMateriasConMetricasService
-     *                                               ordenadas, cada una con `gestion` ("Segundo semestre 2026" o null).
+     * @return Collection<int, array{gestion: string|null, curso: Curso, inscritos: int, estudiantes: int, habilitados: int, deshabilitados: int, incidencias: int, examen_activo: bool}> Filas ordenadas de ListarMateriasConMetricasService.
      *
      * @author Valery D. Ortuno P <valerydariana98@gmail.com>
      *
@@ -182,6 +181,13 @@ class ListarCursosDocenteService
         }
 
         return $cursos;
+    }
+
+    public function conExamenes(int $idDocente): EloquentCollection
+    {
+        return $this->activos($idDocente)
+            ->filter(fn (Curso $curso): bool => (int) $curso->examenes_count > 0)
+            ->values();
     }
 
     /**
