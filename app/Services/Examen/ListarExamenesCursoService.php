@@ -10,6 +10,7 @@
  * @updated 2026-10-09
  * @updated 2026-11-14
  * @updated 2026-11-16
+ * @updated 2026-11-23
  *
  * @description
  * Servicio de la feature Examen que lista los exámenes de un curso con la
@@ -48,6 +49,9 @@
  * - 2026-11-16  [OchoaCesar]  feat: el payload suma `incidencias` (conteo de
  *   central_riesgo del examen) para que la vista bloquee la eliminacion sin
  *   un viaje extra al servidor.
+ * - 2026-11-23  [Valery D. Ortuno P]  fix: `curso` (la etiqueta del examen) lleva
+ *   solo los cursos del docente que mira; en un examen compartido ya no salen
+ *   los cursos del otro docente. `cursos` sigue trayendo todos.
  */
 
 namespace App\Services\Examen;
@@ -171,7 +175,10 @@ class ListarExamenesCursoService
             'hora_fin' => $this->recortarHora($examen->hora_fin),
             'duracion' => $examen->duracion,
             'cursos' => $cursos,
-            'curso' => implode(', ', array_column($cursos, 'nombre')),
+            // Etiqueta del examen para quien mira: solo sus propios cursos (en
+            // un examen compartido el otro docente tiene los suyos). Sin
+            // sesion o sin curso propio, todos los del examen.
+            'curso' => $this->cursosPropios($examen) ?? implode(', ', array_column($cursos, 'nombre')),
             'inscritos' => (int) $examen->getAttribute('estudiante_examenes_count'),
             'ingresados' => (int) $examen->getAttribute('ingresados'),
             'incidencias' => (int) $examen->getAttribute('incidencias_count'),
@@ -185,6 +192,26 @@ class ListarExamenesCursoService
                 ->all(),
             'estado' => $this->resolverEstado($examen, $ahora),
         ];
+    }
+
+    /**
+     * Nombres de los cursos del examen que son del docente autenticado, o
+     * null si no hay sesion o ninguno es suyo.
+     */
+    private function cursosPropios(Examen $examen): ?string
+    {
+        $idDocente = (int) (auth()->id() ?? 0);
+
+        if ($idDocente === 0 || ! $examen->relationLoaded('cursos')) {
+            return null;
+        }
+
+        $propios = $examen->cursos
+            ->filter(fn (Curso $curso): bool => (int) $curso->sis_doc === $idDocente)
+            ->sortBy('nombre_curso')
+            ->pluck('nombre_curso');
+
+        return $propios->isEmpty() ? null : $propios->implode(', ');
     }
 
     /**

@@ -92,12 +92,12 @@ class EnviarInvitacionExamenService
             throw $excepcion;
         }
 
-        $invitacion->load([
-            'invitador:id_usuario,nombre_usuario,apellido',
-            'invitado:id_usuario,nombre_usuario,apellido,correo',
-            'examen.tipoExamen',
-            'examen.cursos:id_curso,nombre_curso',
-        ]);
+        // El invitador, el invitado y el examen ya estan cargados: se reusan en
+        // vez de volver a consultarlos (cada viaje a la base remota pesa).
+        $invitacion->setRelation('invitador', $invitador);
+        $invitacion->setRelation('invitado', $invitado);
+        $invitacion->setRelation('examen', $examen);
+        $examen->loadMissing(['tipoExamen', 'cursos:id_curso,nombre_curso']);
 
         return $this->resumen($invitacion);
     }
