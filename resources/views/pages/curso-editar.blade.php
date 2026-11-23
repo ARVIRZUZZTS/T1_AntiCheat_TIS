@@ -2,7 +2,7 @@
     @file    curso-editar.blade.php
     @author  Alisson D. Alvarado <alvaradoalissondalet@gmail.com>
     @created 2026-11-21
-    @updated 2026-11-21
+    @updated 2026-11-23
 
     @description
     Lista los cursos propios y permite cargar y guardar su edición mediante la API existente.
@@ -10,6 +10,7 @@
     @changelog
     - 2026-11-21  [Alisson D. Alvarado]  feat: agregar la interfaz de edición de cursos.
     - 2026-11-21  [Alisson D. Alvarado]  feat: mostrar errores y aviso al editar un curso.
+    - 2026-11-23  [Alisson D. Alvarado]  feat: seleccionar curso activo con su gestión y conservar el sidebar.
 
     @see App\Http\Controllers\EditarCursoVistaController
     @see resources/views/pages/curso-crear.blade.php
@@ -18,7 +19,6 @@
 @extends('layouts.app')
 
 @section('title', 'Editar curso')
-@section('back-route', route('cursos.editar'))
 
 @section('content')
     @php
@@ -27,6 +27,7 @@
     <div class="px-4 py-4 sm:px-6 sm:py-6 lg:px-8"
          x-data="{
              curso: null,
+             seleccion: '',
              materia: '',
              grupo: '',
              gestion: '',
@@ -46,6 +47,11 @@
                  this.errores = {};
                  this.duplicado = false;
                  this.exito = false;
+                 // Una selección vacía también invalida cualquier carga anterior.
+                 if (! url) {
+                     this.cargando = false;
+                     return;
+                 }
                  this.cargando = true;
 
                  try {
@@ -98,8 +104,11 @@
                      }
                      if (! respuesta.ok) throw new Error(resultado.message || 'No se pudo guardar el curso.');
                      this.curso = null;
-                     const nombre = document.getElementById('curso-nombre-' + resultado.datos.id);
-                     if (nombre) nombre.textContent = resultado.datos.nombre;
+                     // La etiqueta debe reflejar también la gestión recién guardada.
+                     const opcion = document.getElementById('seleccionar-curso').selectedOptions[0];
+                     const gestion = document.getElementById('gestion_curso').selectedOptions[0];
+                     if (opcion && gestion) opcion.textContent = resultado.datos.nombre + ' - ' + gestion.textContent.trim() + ' ' + this.anio;
+                     this.seleccion = '';
                      this.exito = true;
                  } catch (fallo) {
                      this.error = fallo.message || 'No se pudo guardar el curso.';
@@ -111,6 +120,7 @@
              cancelar() {
                  this.solicitud++;
                  this.curso = null;
+                 this.seleccion = '';
                  this.cargando = false;
                  this.error = '';
                  this.errores = {};
@@ -144,22 +154,27 @@
                 <x-ui.modal-aviso mensaje="Curso actualizado con éxito" />
             </template>
 
-            <ul x-show="! curso" class="overflow-hidden rounded-base border border-default bg-neutral-primary-soft shadow-xs">
-                @forelse ($cursos as $fila)
-                    @php $curso = $fila['curso']; @endphp
-                    <li class="flex flex-col gap-3 border-b border-default p-4 last:border-b-0 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:p-5">
-                        <p id="curso-nombre-{{ $curso->id_curso }}" class="min-w-0 font-medium text-heading break-words">{{ $curso->nombre_curso }}</p>
-                        <x-ui.button type="button" size="sm" class="w-full shrink-0 sm:w-auto"
-                            :data-url="route('api.cursos.detalle', $curso->id_curso)"
-                            :aria-label="'Editar curso '.$curso->nombre_curso"
-                            @click="seleccionar($el.dataset.url)">
-                            Editar curso
-                        </x-ui.button>
-                    </li>
-                @empty
-                    <li class="p-8 text-center text-sm text-body">No tienes cursos registrados</li>
-                @endforelse
-            </ul>
+            @if ($cursos->isEmpty())
+                <p class="rounded-base border border-default bg-neutral-primary-soft p-8 text-center text-sm text-body shadow-xs">
+                    No tienes cursos activos.
+                </p>
+            @else
+                {{-- La gestión distingue cursos con el mismo nombre en distintos periodos. --}}
+                <div class="mb-4">
+                    <label for="seleccionar-curso" class="mb-2.5 block text-sm font-medium text-heading">Curso y gestión</label>
+                    <select id="seleccionar-curso" x-model="seleccion" @change="seleccionar(seleccion)"
+                        x-bind:disabled="guardando"
+                        class="block w-full rounded-base border border-default-medium bg-neutral-secondary-medium px-3 py-2.5 text-sm text-heading shadow-xs focus:border-brand focus:ring-brand">
+                        <option value="">Seleccione un curso</option>
+                        @foreach ($cursos as $fila)
+                            @php $curso = $fila['curso']; @endphp
+                            <option value="{{ route('api.cursos.detalle', $curso->id_curso) }}">
+                                {{ $curso->nombre_curso }}{{ $fila['gestion'] ? ' - '.$fila['gestion'] : '' }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+            @endif
 
             <div x-show="curso" x-cloak class="rounded-base border border-default bg-neutral-primary-soft p-4 shadow-sm md:p-6">
                 <form @submit.prevent="guardar()" novalidate class="space-y-4">
