@@ -110,9 +110,10 @@
  * - 2026-11-22  [OchoaCesar]  refactor: las rutas GET /cursos/archivar y
  *   /cursos/restaurar pasan a una sola /cursos/archivar-restaurar (pagina con
  *   dos pestanas); se conservan los POST *.store de cada accion.
+ * - 2026-11-23  [OchoaCesar]  refactor: la pagina unica deja las pestanas y
+ *   muestra una sola lista con los archivados al final.
  */
 
-use App\Enums\CursoEstado;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CursoController;
 use App\Http\Controllers\EditarCursoVistaController;
@@ -263,8 +264,8 @@ Route::middleware(['auth', 'docente'])->group(function (): void {
         return view('pages.cursos-cargar-csv', ['curso' => $curso]);
     })->name('cursos.cargar-csv');
     Route::get('/cursos/eliminar', [CursoController::class, 'eliminar'])->name('cursos.eliminar');
-    // Archivar / Restaurar: una sola página con dos pestañas. Los POST son el
-    // endpoint canónico de cada acción (los confirma el componente Livewire).
+    // Archivar / Restaurar: una sola lista de cursos, archivados al final. Los
+    // POST son el endpoint canónico de cada acción (los confirma el componente).
     Route::get('/cursos/archivar-restaurar', ArchivarRestaurarCurso::class)->name('cursos.archivar-restaurar');
     Route::post('/cursos/{curso}/archivar', [CursoController::class, 'archivar'])
         ->whereNumber('curso')
