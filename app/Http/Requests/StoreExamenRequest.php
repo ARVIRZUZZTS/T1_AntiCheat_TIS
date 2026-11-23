@@ -59,6 +59,7 @@ namespace App\Http\Requests;
 
 use App\Enums\TipoExamen;
 use App\Models\Curso;
+use App\Services\Curso\AsegurarCursoEditableService;
 use App\Services\Examen\CatalogosExamenService;
 use App\Services\Examen\RegistrarExamenService;
 use App\Services\Examen\ValidarDisponibilidadExamenService;
@@ -66,6 +67,7 @@ use Carbon\Carbon;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\Validation\Validator;
 
 class StoreExamenRequest extends FormRequest
@@ -84,6 +86,21 @@ class StoreExamenRequest extends FormRequest
     public function authorize(): bool
     {
         return $this->user()?->can('crearExamen', $this->route('curso')) ?? false;
+    }
+
+    protected function failedAuthorization(): void
+    {
+        $curso = $this->route('curso');
+
+        if ($curso instanceof Curso && $this->user()?->can('gestionar', $curso)) {
+            throw ValidationException::withMessages([
+                'general' => $curso->estaArchivado()
+                    ? AsegurarCursoEditableService::MENSAJE_CURSO_ARCHIVADO
+                    : 'No se pueden crear examenes en un curso finalizado.',
+            ]);
+        }
+
+        parent::failedAuthorization();
     }
 
     /**
@@ -160,8 +177,7 @@ class StoreExamenRequest extends FormRequest
                 $validator->errors()->add('hora_inicio', 'Ingrese una hora valida.');
             }
 
-            // No se calculan cruces con datos que ya fallaron otra regla.
-            if ($validator->errors()->isNotEmpty()) {
+            if (preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $hora) !== 1 || (int) $this->input('duracion') <= 0) {
                 return;
             }
 

@@ -199,6 +199,8 @@ class ListadoExamenesVistaTest extends TestCase
         $this->assertStringContainsString('x-on:editar-examen-datos.window="cargarEdicion($event.detail)"', $formulario);
         $this->assertStringContainsString('x-on:submit.prevent', $formulario);
         $this->assertStringContainsString("type=\"{{ \$esEdicion ? 'button' : 'submit' }}\"", $formulario);
+        $this->assertStringContainsString('todosLosErrores().length > 0', $formulario);
+        $this->assertStringContainsString("'No se pudo crear el examen'", $formulario);
         $this->assertStringNotContainsString('examenes.update', $parcial);
     }
 
@@ -206,7 +208,7 @@ class ListadoExamenesVistaTest extends TestCase
     {
         $pagina = $this->fuente(resource_path('views/pages/examenes.blade.php'));
 
-        $this->assertStringContainsString("@include('partials.examenes-curso', [", $pagina);
+        $this->assertStringContainsString("@include('partials.examenes-lista', [", $pagina);
         $this->assertStringContainsString("'cursos' => \$cursos", $pagina);
         $this->assertStringContainsString("'cursoInicial' => \$cursoInicial", $pagina);
         $this->assertStringNotContainsString('>Ver examenes<', $pagina);
@@ -232,7 +234,7 @@ class ListadoExamenesVistaTest extends TestCase
 
         $this->assertStringContainsString("route('api.cursos.examenes.listar', ['idCurso' => '__CURSO__'])", $parcial);
         $this->assertStringContainsString('$listadoGlobal = $curso === null;', $parcial);
-        $this->assertStringContainsString("'puedeCrearExamen' => \$cursos->isNotEmpty()", $pagina);
+        $this->assertStringNotContainsString("'puedeCrearExamen'", $pagina);
         $this->assertStringNotContainsString('@if ($cursos->isEmpty())', $pagina);
     }
 
@@ -247,7 +249,7 @@ class ListadoExamenesVistaTest extends TestCase
         $this->assertStringContainsString('@change="cambiarCurso()"', $formulario);
         $this->assertStringContainsString('this.nombreCurso = this.cursos[this.cursoId] ?? \'\';', $formulario);
         $this->assertStringContainsString("old('curso_id', \$cursoId)", $formulario);
-        $this->assertStringContainsString(":cursos=\"\$listadoGlobal ? \$opcionesCursos : []\"", $this->fuenteParcial());
+        $this->assertStringContainsString(':cursos="$listadoGlobal ? $opcionesCursos : []"', $this->fuenteParcial());
     }
 
     public function test_el_detalle_del_curso_ya_no_tiene_pestana_examenes(): void
