@@ -33,6 +33,10 @@
 @section('title', $titulo)
 
 @section('content')
+    @if (session('mensaje'))
+        <x-ui.modal-aviso :mensaje="session('mensaje')" />
+    @endif
+
     <div class="px-4 pt-4 sm:px-6 sm:pt-6 lg:px-8">
         @if ($cursos->isEmpty())
             <p class="mx-auto max-w-2xl rounded-base border border-default bg-neutral-primary-soft p-8 text-center text-sm text-body shadow-xs">

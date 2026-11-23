@@ -253,20 +253,14 @@ Route::middleware(['auth', 'docente'])->group(function (): void {
         $cursoId = $request->integer('curso');
 
         if ($cursoId <= 0) {
-            $cursos = Curso::query()
-                ->where('sis_doc', $request->user()->id_usuario)
-                ->where('estado', '!=', CursoEstado::Archivado->value)
-                ->orderBy('nombre_curso')
-                ->get();
-
-            return view('pages.cursos-cargar-csv', ['curso' => null, 'cursos' => $cursos]);
+            return view('pages.cursos-cargar-csv', ['curso' => null]);
         }
 
         $curso = Curso::query()->findOrFail($cursoId);
         Gate::authorize('gestionar', $curso);
         app(AsegurarCursoEditableService::class)->asegurarCursoEditable($curso, 'curso');
 
-        return view('pages.cursos-cargar-csv', ['curso' => $curso, 'cursos' => collect()]);
+        return view('pages.cursos-cargar-csv', ['curso' => $curso]);
     })->name('cursos.cargar-csv');
     Route::get('/cursos/eliminar', [CursoController::class, 'eliminar'])->name('cursos.eliminar');
     // Archivar / Restaurar: una sola página con dos pestañas. Los POST son el
