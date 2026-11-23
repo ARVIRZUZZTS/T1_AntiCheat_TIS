@@ -10,7 +10,7 @@
  * @description
  * Prueba de la navegación a la subopción «Archivar/Restaurar cursos» del
  * grupo Cursos del sidebar, incluido el estado activo de la página única con
- * dos pestañas.
+ * una sola lista de cursos.
  */
 
 declare(strict_types=1);
