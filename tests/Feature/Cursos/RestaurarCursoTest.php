@@ -18,6 +18,7 @@ namespace Tests\Feature\Cursos;
 
 use App\Enums\CursoEstado;
 use App\Models\Curso;
+use App\Models\Examen;
 use App\Models\Usuario;
 use App\Services\Curso\AsegurarCursoEditableService;
 use App\Services\Curso\ListarCursosDocenteService;
@@ -25,7 +26,6 @@ use App\Services\Curso\RestaurarCursoService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
 class RestaurarCursoTest extends TestCase
@@ -33,14 +33,19 @@ class RestaurarCursoTest extends TestCase
     use DatabaseTransactions;
 
     private const DOCENTE = 998101;
+
     private const OTRO = 998102;
 
     private const CURSO_ARCHIVADO = 998101;
+
     private const CURSO_EN_CURSO = 998102;
+
     private const CURSO_FINALIZADO = 998103;
+
     private const CURSO_OTRO_ARCHIVADO = 998104;
 
     private const ESTUDIANTE = '998101';
+
     private const EXAMEN = 998101;
 
     protected function setUp(): void
@@ -126,7 +131,7 @@ class RestaurarCursoTest extends TestCase
         $docente = Usuario::findOrFail(self::DOCENTE);
 
         $this->actingAs($docente)
-            ->get(route('cursos.restaurar'))
+            ->get(route('cursos.archivar-restaurar', ['pestana' => 'restaurar']))
             ->assertOk()
             ->assertSee('Curso Archivado Propio')
             ->assertDontSee('Curso En Curso Propio')
@@ -141,7 +146,7 @@ class RestaurarCursoTest extends TestCase
 
         $this->actingAs($docente)
             ->post(route('cursos.restaurar.store', $curso))
-            ->assertRedirect(route('cursos.restaurar'))
+            ->assertRedirect(route('cursos.archivar-restaurar', ['pestana' => 'restaurar']))
             ->assertSessionHas('mensaje', RestaurarCursoService::MENSAJE_EXITO);
 
         $this->assertSame(CursoEstado::EnCurso->value, Curso::findOrFail(self::CURSO_ARCHIVADO)->estado);
@@ -155,7 +160,7 @@ class RestaurarCursoTest extends TestCase
         $this->actingAs($docente)->post(route('cursos.restaurar.store', $curso));
 
         $restaurado = Curso::findOrFail(self::CURSO_ARCHIVADO);
-        $examen = \App\Models\Examen::findOrFail(self::EXAMEN);
+        $examen = Examen::findOrFail(self::EXAMEN);
 
         $this->assertTrue($restaurado->permiteEscritura());
         $this->assertTrue(Gate::forUser($docente)->allows('crearExamen', $restaurado));
@@ -233,7 +238,7 @@ class RestaurarCursoTest extends TestCase
         $docente = Usuario::findOrFail(self::DOCENTE);
 
         $this->actingAs($docente)
-            ->get(route('cursos.restaurar'))
+            ->get(route('cursos.archivar-restaurar', ['pestana' => 'restaurar']))
             ->assertOk()
             ->assertSee('No tienes cursos archivados');
     }
