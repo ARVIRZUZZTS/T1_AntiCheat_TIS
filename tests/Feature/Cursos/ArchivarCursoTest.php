@@ -18,6 +18,7 @@ namespace Tests\Feature\Cursos;
 
 use App\Enums\CursoEstado;
 use App\Models\Curso;
+use App\Models\Examen;
 use App\Models\Usuario;
 use App\Services\Curso\ArchivarCursoService;
 use App\Services\Curso\AsegurarCursoEditableService;
@@ -32,15 +33,21 @@ class ArchivarCursoTest extends TestCase
     use DatabaseTransactions;
 
     private const DOCENTE = 997101;
+
     private const OTRO = 997102;
 
     private const CURSO_EN_CURSO = 997101;
+
     private const CURSO_FINALIZADO = 997102;
+
     private const CURSO_OTRO = 997103;
 
     private const ESTUDIANTE = '997101';
+
     private const EXAMEN = 997101;
+
     private const EXAMEN_COMPARTIDO = 997102;
+
     private const CURSO_COMPARTIDO = 997104;
 
     protected function setUp(): void
@@ -140,7 +147,7 @@ class ArchivarCursoTest extends TestCase
 
         $this->actingAs($docente)
             ->post(route('cursos.archivar.store', $curso))
-            ->assertRedirect(route('cursos.archivar'))
+            ->assertRedirect(route('cursos.archivar-restaurar'))
             ->assertSessionHas('mensaje', ArchivarCursoService::MENSAJE_EXITO);
 
         $this->assertSame(CursoEstado::Archivado->value, Curso::findOrFail(self::CURSO_EN_CURSO)->estado);
@@ -214,7 +221,7 @@ class ArchivarCursoTest extends TestCase
     public function test_bloquea_escritura_en_examen_compartido_si_un_curso_vinculado_esta_archivado(): void
     {
         DB::table('curso')->where('id_curso', self::CURSO_EN_CURSO)->update(['estado' => CursoEstado::Archivado->value]);
-        $examen = \App\Models\Examen::findOrFail(self::EXAMEN_COMPARTIDO);
+        $examen = Examen::findOrFail(self::EXAMEN_COMPARTIDO);
         $servicio = app(AsegurarCursoEditableService::class);
 
         $this->assertFalse($servicio->examenEditable($examen));
