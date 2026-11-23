@@ -9,6 +9,7 @@
  *
  * @updated 2026-10-26
  * @updated 2026-11-07
+ * @updated 2026-11-22
  *
  * @description
  * Registro de una incidencia en la central de riesgos desde el monitor en vivo
@@ -43,6 +44,9 @@
  *   (`central_riesgo_motivo`, vía MotivosIncidencia).
  * - 2026-11-07  [Valery D. Ortuno P]  fix: el SIS de un estudiante que se da
  *   de alta desde el registro tiene 9 dígitos (antes se aceptaban 8 o 9).
+ * - 2026-11-22  [Valery D. Ortuno P]  feat: en un examen compartido la incidencia
+ *   usa la inscripcion del estudiante en cualquier curso del examen (control
+ *   de aula, HU 132), prefiriendo la del docente que mira.
  *
  * @see  App\Support\DTO\RegistroIncidenciaDTO
  * @see  App\Livewire\Monitoreo\MonitorEnVivo
@@ -230,9 +234,11 @@ class RegistrarIncidenciaService
     }
 
     /**
-     * El estudiante con su inscripción en el examen (la del docente cuya
-     * configuración se usa), en una sola consulta: la inscripción viaja como
-     * `inscripcion_id` e `inscripcion_curso`, null si no está inscrito.
+     * El estudiante con su inscripción en el examen, en una sola consulta: la
+     * inscripción viaja como `inscripcion_id` e `inscripcion_curso`, null si
+     * no está inscrito. En un examen compartido vale la de cualquier curso del
+     * examen (control de aula, HU 132); si está en dos, se prefiere la del
+     * docente cuya configuración se usa.
      *
      * @return ?Estudiante  Null si el SIS no está en la base.
      */
@@ -242,7 +248,13 @@ class RegistrarIncidenciaService
             ->select($columna)
             ->whereColumn('estudiante_examen.sis_estudiante', 'estudiante.sis_estudiante')
             ->where('estudiante_examen.id_examen', $idExamen)
-            ->delDocente($idDocente)
+            ->orderByRaw(
+                'case when exists (select 1 from configuracion_examen_docente ced'
+                .' where ced.id_configuracion_examen = estudiante_examen.id_configuracion_examen'
+                .' and ced.id_docente = ?) then 0 else 1 end',
+                [$idDocente],
+            )
+            ->orderBy('estudiante_examen.id_estudiante_examen')
             ->limit(1);
 
         return Estudiante::query()

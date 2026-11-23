@@ -10,6 +10,7 @@
  * @updated 2026-10-11
  * @updated 2026-10-26
  * @updated 2026-11-07
+ * @updated 2026-11-22
  *
  * @description
  * Servicio de dominio que genera el reporte de asistencia de un examen.
@@ -74,6 +75,10 @@
  * - 2026-11-07  [Valery D. Ortuno P]  feat: una incidencia puede tener varios
  *   motivos (`central_riesgo_motivo`): cada incidencia trae `motivos` (lista)
  *   y `motivo_etiqueta` con todos ("Motivo 1 · Motivo 2").
+ * - 2026-11-22  [Valery D. Ortuno P]  feat: `$todosLosEstudiantes` (monitor de
+ *   un examen compartido, HU 132): trae los estudiantes, registros y cursos de
+ *   todos los docentes del examen, pero las reglas y materiales siguen siendo
+ *   los del docente que mira.
  *
  * @see  \App\Livewire\Monitoreo\MonitorEnVivo
  * @see  App\Services\Asistencia\RegistroIngresoService
@@ -111,15 +116,22 @@ class GenerarReporteAsistenciaService
      * @param  int  $idExamen  ID del examen
      * @param  Carbon|null  $ahora  Se conserva por compatibilidad con la firma
      *                              original; el estado ya no depende de la hora, sino de lo persistido.
+     * @param  int|null  $idDocente  Docente cuya configuracion (reglas y materiales) se muestra.
+     * @param  bool  $todosLosEstudiantes  true: estudiantes, registros y cursos de
+     *                                     todos los docentes del examen (control de aula de un examen compartido).
      * @return array{examen: Examen, estudiantes: Collection}
      */
-    public function ejecutar(int $idExamen, ?Carbon $ahora = null, ?int $idDocente = null): array
+    public function ejecutar(int $idExamen, ?Carbon $ahora = null, ?int $idDocente = null, bool $todosLosEstudiantes = false): array
     {
+        // Docente por el que se filtran estudiantes, registros y cursos; la
+        // configuracion se sigue tomando de $idDocente.
+        $filtroDocente = $todosLosEstudiantes ? null : $idDocente;
+
         $examen = Examen::query()
             ->with([
                 'cursos' => fn ($query) => $query->when(
-                    $idDocente !== null,
-                    fn ($cursos) => $cursos->where('curso.sis_doc', $idDocente)
+                    $filtroDocente !== null,
+                    fn ($cursos) => $cursos->where('curso.sis_doc', $filtroDocente)
                 ),
                 'ambientes',
                 'materialesPermitidos',
@@ -140,7 +152,7 @@ class GenerarReporteAsistenciaService
 
         $registros = RegistroAsistencia::query()
             ->where('id_examen', $examen->id_examen)
-            ->when($idDocente !== null, fn ($query) => $query->delDocente($idDocente))
+            ->when($filtroDocente !== null, fn ($query) => $query->delDocente($filtroDocente))
             ->with('registrador')
             ->get()
             ->keyBy(fn (RegistroAsistencia $registro): string => $this->clave(
@@ -167,7 +179,7 @@ class GenerarReporteAsistenciaService
 
         $estudiantes = EstudianteExamen::query()
             ->where('id_examen', $examen->id_examen)
-            ->when($idDocente !== null, fn ($query) => $query->delDocente($idDocente))
+            ->when($filtroDocente !== null, fn ($query) => $query->delDocente($filtroDocente))
             ->with('estudiante')
             ->get()
             ->map(function (EstudianteExamen $inscripcion) use ($registros, $incidencias, $aulasPorInscripcion, $aulasDelExamen, $docentesPorInscripcion, $creadorDelExamen) {

@@ -74,6 +74,11 @@
  * - 2026-11-22  [Valery D. Ortuno P]  feat: un auxiliar ve en el monitor los
  *   examenes de sus cursos activos y los asignados con Monitor, y sigue la
  *   configuracion del docente de su curso o de quien lo asigno (HU 24).
+ * - 2026-11-22  [Valery D. Ortuno P]  feat: examen compartido como control de
+ *   aula (HU 132): la lista trae a los estudiantes de todos los cursos del
+ *   examen (con su docente a cargo) y las acciones valen para cualquiera de
+ *   ellos; las reglas y materiales siguen siendo los del docente que mira.
+ *   Una accion limpia la cache del monitor de todos los docentes del examen.
  */
 
 namespace App\Livewire\Monitoreo;
@@ -247,6 +252,7 @@ class MonitorEnVivo extends Component
             fn (): array => $this->servicioReporte->ejecutar(
                 $this->idExamen,
                 idDocente: $this->idDocenteConfiguracion,
+                todosLosEstudiantes: true,
             ),
         );
     }
@@ -809,7 +815,7 @@ class MonitorEnVivo extends Component
             return;
         }
 
-        Cache::forget($this->claveCacheInforme());
+        $this->olvidarInformes();
         $this->incidenciaRegistrada = true;
         $this->busqueda = '';
         $this->pagina = 1;
@@ -872,7 +878,7 @@ class MonitorEnVivo extends Component
 
         try {
             $accion();
-            Cache::forget($this->claveCacheInforme());
+            $this->olvidarInformes();
             $this->mensajeExito = $exito;
             $this->busqueda = '';
             $this->pagina = 1;
@@ -956,6 +962,24 @@ class MonitorEnVivo extends Component
         }
 
         return (int) $examen->creador;
+    }
+
+    /**
+     * Limpia el informe cacheado de todos los docentes del examen: en un
+     * examen compartido todos ven a los mismos estudiantes, asi que una accion
+     * de uno debe verse en el monitor de los demas.
+     */
+    private function olvidarInformes(): void
+    {
+        $docentes = DB::table('configuracion_examen_docente')
+            ->where('id_examen', $this->idExamen)
+            ->pluck('id_docente')
+            ->push($this->idDocenteConfiguracion)
+            ->unique();
+
+        foreach ($docentes as $idDocente) {
+            Cache::forget(self::CACHE_INFORME_PREFIJO.$this->idExamen.'.docente.'.$idDocente);
+        }
     }
 
     private function claveCacheInforme(): string
