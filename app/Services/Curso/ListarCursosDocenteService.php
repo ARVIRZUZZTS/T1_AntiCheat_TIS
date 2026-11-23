@@ -9,6 +9,7 @@
  *
  * @updated 2026-10-26
  * @updated 2026-11-09
+ * @updated 2026-11-23
  *
  * @description
  * Lista los cursos de un docente para las secciones Cursos y Exámenes.
@@ -18,8 +19,9 @@
  *   finalizados (cursos pasados), cada grupo del más reciente al más antiguo.
  *   Los cursos compartidos por invitación ya no se listan: las invitaciones
  *   son por examen y se manejan en la sección Exámenes (`activos()`).
- * - `activos()`: los cursos en curso propios y los de invitaciones aceptadas,
- *   para elegir uno en Exámenes.
+ * - `activos()`: solo los cursos en curso propios, para elegir uno en
+ *   Exámenes. Un examen compartido aparece en el curso propio del invitado
+ *   (al aceptar lo asocia a sus cursos), no en el curso del otro docente.
  * - `archivables()`: solo los cursos en curso propios, para la subsección
  *   «Archivar curso» (no se pueden archivar cursos compartidos).
  *
@@ -39,6 +41,11 @@
  * - 2026-11-21  [Equipo T1]  feat: agrega `archivados()` para la vista
  *   Restaurar curso (Refs #326).
  * - 2026-11-21  [Equipo T1]  feat: `archivables()` para la vista de archivado.
+ * - 2026-11-23  [Valery D. Ortuno P]  fix: `activos()` ya no suma los cursos del
+ *   otro docente de un examen compartido: el invitado veia en Exámenes todos
+ *   los exámenes de esos cursos, incluso los que no le compartieron. El
+ *   examen compartido sale en su propio curso. Se quita `es_anfitrion` del
+ *   curso (la vista ya no lo usaba).
  *
  * @see  App\Services\Curso\ListarMateriasConMetricasService
  * @see  App\Http\Controllers\CursoController
@@ -141,10 +148,9 @@ class ListarCursosDocenteService
     }
 
     /**
-     * Cursos en curso propios y de invitaciones aceptadas (la sección
-     * Exámenes es donde el docente invitado gestiona los exámenes
-     * compartidos), del más reciente al más antiguo, con la cantidad de
-     * estudiantes y de exámenes de cada uno.
+     * Cursos en curso propios, del más reciente al más antiguo, con la
+     * cantidad de estudiantes y de exámenes de cada uno. Los exámenes
+     * compartidos ya están en el curso propio del invitado.
      *
      * @param  int  $idDocente  ID del docente (`curso.sis_doc`).
      * @return EloquentCollection<int, Curso> Cursos con `estudiantes_count` y `examenes_count`.
@@ -155,33 +161,13 @@ class ListarCursosDocenteService
      */
     public function activos(int $idDocente): EloquentCollection
     {
-        $ids = Curso::query()
+        return Curso::query()
             ->where('sis_doc', $idDocente)
-            ->where('estado', CursoEstado::EnCurso->value)
-            ->pluck('id_curso')
-            ->merge($this->idsCursosInvitados($idDocente))
-            ->unique()
-            ->values();
-
-        if ($ids->isEmpty()) {
-            return new EloquentCollection;
-        }
-
-        $idsAnfitrion = $this->idsCursosAnfitrion($idDocente);
-
-        $cursos = Curso::query()
-            ->whereIn('id_curso', $ids)
             ->where('estado', CursoEstado::EnCurso->value)
             ->withCount(['estudiantes', 'examenes'])
             ->orderByRaw('fecha_creacion desc nulls last')
             ->orderByDesc('id_curso')
             ->get();
-
-        foreach ($cursos as $curso) {
-            $curso->setAttribute('es_anfitrion', in_array($curso->id_curso, $idsAnfitrion, true));
-        }
-
-        return $cursos;
     }
 
     /**
@@ -200,41 +186,6 @@ class ListarCursosDocenteService
             ->orderBy('nombre_curso')
             ->orderBy('id_curso')
             ->get(['id_curso', 'nombre_curso', 'estado']);
-    }
-
-    /**
-     * Cursos ajenos vinculados a exámenes con invitación aceptada.
-     *
-     * @return array<int, int>
-     */
-    private function idsCursosInvitados(int $idDocente): array
-    {
-        return DB::table('invitacion_examen_compartido as iec')
-            ->join('examen_curso as ec', 'ec.id_examen', '=', 'iec.id_examen')
-            ->join('curso as c', 'c.id_curso', '=', 'ec.id_curso')
-            ->where('iec.id_docente_invitado', $idDocente)
-            ->where('iec.estado', InvitacionEstado::Aceptada->value)
-            ->where('c.sis_doc', '!=', $idDocente)
-            ->pluck('ec.id_curso')
-            ->unique()
-            ->values()
-            ->all();
-    }
-
-    /**
-     * Cursos en los que el docente ha enviado invitaciones a otros docentes.
-     *
-     * @return array<int, int>
-     */
-    private function idsCursosAnfitrion(int $idDocente): array
-    {
-        return DB::table('invitacion_examen_compartido as iec')
-            ->join('examen_curso as ec', 'ec.id_examen', '=', 'iec.id_examen')
-            ->where('iec.id_docente_invitador', $idDocente)
-            ->pluck('ec.id_curso')
-            ->unique()
-            ->values()
-            ->all();
     }
 
     /**
