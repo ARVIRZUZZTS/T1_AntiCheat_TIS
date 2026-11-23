@@ -14,10 +14,10 @@
  *    examenes futuros con fecha y
  *    hora (incluido uno recien creado), busqueda en vivo, resumen del envio,
  *    duplicado y cancelar una pendiente.
- *  - Aceptar en dos pasos: primero se acepta y despues se eligen los cursos
- *    del invitado; el examen queda en esos cursos (`examen_curso`) con sus
- *    estudiantes inscritos bajo su configuracion. Sin cursos o con cursos
- *    ajenos no se asocia. Si elige "Mas tarde", queda por asociar.
+ *  - Aceptar eligiendo los cursos del invitado en el mismo paso: el examen
+ *    queda en esos cursos (`examen_curso`) con sus estudiantes inscritos bajo
+ *    su configuracion (copiada de quien invito). Sin cursos o con cursos
+ *    ajenos no se acepta. Rechazar avisa a quien invito.
  *  - El detalle del examen muestra el curso de cada docente.
  *
  * Usan SQLite en memoria con un esquema minimo, asi que no leen ni escriben en
@@ -28,6 +28,8 @@
  * - 2026-11-22  [Valery D. Ortuno P]  test: aceptar y asociar en dos pasos.
  * - 2026-11-23  [Valery D. Ortuno P]  test: Enviar solo lista cursos activos con
  *   examenes programados.
+ * - 2026-11-23  [Valery D. Ortuno P]  test: aceptar con cursos en un solo paso,
+ *   una sola lista, rechazar y copia de reglas y materiales.
  *
  * @see App\Livewire\Invitaciones\Index
  * @see App\Services\Invitacion\AsociarCursosInvitacionService
@@ -105,7 +107,10 @@ class ExamenCompartidoCursosTest extends TestCase
         Livewire::actingAs($this->usuario(self::ROBERTO))
             ->test(Index::class, ['tab' => 'enviar'])
             ->set('idCurso', self::CALCULO_ROBERTO)
-            ->assertSet('examenes', [['id' => self::NUEVO, 'nombre' => 'Examen parcial · 05/12/2026 08:15']]);
+            ->assertSet('examenes', fn (array $examenes): bool => array_map(
+                fn (array $examen): array => ['id' => $examen['id'], 'nombre' => $examen['nombre']],
+                $examenes,
+            ) === [['id' => self::NUEVO, 'nombre' => 'Examen parcial · 05/12/2026 08:15']]);
     }
 
     public function test_busca_en_vivo_envia_y_muestra_el_resumen(): void
@@ -167,17 +172,14 @@ class ExamenCompartidoCursosTest extends TestCase
         $this->invitar();
 
         $componente = Livewire::actingAs($this->usuario(self::PATRICIA))->test(Index::class, ['tab' => 'recibir']);
+        $this->assertSame([self::INVITACION], array_column($componente->get('invitaciones'), 'id'));
 
-        // Paso 1: acepta. Queda por asociar a un curso.
-        $componente->call('aceptar', self::INVITACION)
+        // Acepta eligiendo sus cursos en el mismo paso.
+        $componente->call('aceptar', self::INVITACION, [self::FISICA_PATRICIA, self::QUIMICA_PATRICIA])
             ->assertReturned('')
-            ->assertSet('invitacionesRecibidas', []);
-        $this->assertSame([self::INVITACION], array_column($componente->get('aceptadasSinCurso'), 'id'));
-
-        // Paso 2: elige sus cursos.
-        $componente->call('asociarCursos', self::INVITACION, [self::FISICA_PATRICIA, self::QUIMICA_PATRICIA])
-            ->assertReturned(['error' => '', 'cursos' => 'Fisica I, Quimica General'])
-            ->assertSet('aceptadasSinCurso', []);
+            ->assertSet('mensajeExito', 'Invitacion aceptada. El examen quedo en Fisica I, Quimica General.')
+            ->assertSet('invitaciones', [])
+            ->assertDispatched('invitaciones-pendientes', pendientes: 0);
 
         $this->assertDatabaseHas('invitacion_examen_compartido', ['id_invitacion' => self::INVITACION, 'estado' => 'aceptado']);
         $this->assertEqualsCanonicalizing(
@@ -196,21 +198,21 @@ class ExamenCompartidoCursosTest extends TestCase
         $this->assertDatabaseHas('notificacion_docente', ['id_docente_destinatario' => self::ROBERTO]);
     }
 
-    public function test_sin_cursos_o_con_cursos_ajenos_no_asocia(): void
+    public function test_sin_cursos_o_con_cursos_ajenos_no_acepta(): void
     {
         $this->invitar();
         $componente = Livewire::actingAs($this->usuario(self::PATRICIA))->test(Index::class, ['tab' => 'recibir']);
-        $componente->call('aceptar', self::INVITACION)->assertReturned('');
 
-        $componente->call('asociarCursos', self::INVITACION, [])
-            ->assertReturned(['error' => AsociarCursosInvitacionService::MENSAJE_SIN_CURSOS, 'cursos' => '']);
-        $componente->call('asociarCursos', self::INVITACION, [self::CALCULO_ROBERTO])
-            ->assertReturned(['error' => AsociarCursosInvitacionService::MENSAJE_CURSO_INVALIDO, 'cursos' => '']);
+        $componente->call('aceptar', self::INVITACION, [])
+            ->assertReturned(AsociarCursosInvitacionService::MENSAJE_SIN_CURSOS);
+        $componente->call('aceptar', self::INVITACION, [self::CALCULO_ROBERTO])
+            ->assertReturned(AsociarCursosInvitacionService::MENSAJE_CURSO_INVALIDO);
 
-        // Aceptada pero sin curso: el examen sigue solo en el curso de Roberto.
-        $this->assertDatabaseHas('invitacion_examen_compartido', ['id_invitacion' => self::INVITACION, 'estado' => 'aceptado']);
+        // Nada cambia: sigue pendiente y el examen solo en el curso de Roberto.
+        $this->assertDatabaseHas('invitacion_examen_compartido', ['id_invitacion' => self::INVITACION, 'estado' => 'pendiente']);
         $this->assertSame(1, DB::table('examen_curso')->where('id_examen', self::NUEVO)->count());
-        $this->assertSame([self::INVITACION], array_column($componente->get('aceptadasSinCurso'), 'id'));
+        $this->assertSame(0, DB::table('configuracion_examen_docente')->where('id_docente', self::PATRICIA)->count());
+        $this->assertSame([self::INVITACION], array_column($componente->get('invitaciones'), 'id'));
     }
 
     public function test_una_aceptada_sin_curso_se_asocia_despues(): void
@@ -221,13 +223,48 @@ class ExamenCompartidoCursosTest extends TestCase
         ]);
 
         $componente = Livewire::actingAs($this->usuario(self::PATRICIA))->test(Index::class, ['tab' => 'recibir']);
-        $this->assertSame([self::INVITACION], array_column($componente->get('aceptadasSinCurso'), 'id'));
+        // Sale en la misma lista, como aceptada.
+        $this->assertSame(['aceptado'], array_column($componente->get('invitaciones'), 'estado'));
 
-        $componente->call('asociarCursos', self::INVITACION, [self::FISICA_PATRICIA])
-            ->assertReturned(['error' => '', 'cursos' => 'Fisica I'])
-            ->assertSet('aceptadasSinCurso', []);
+        $componente->call('asociar', self::INVITACION, [self::FISICA_PATRICIA])
+            ->assertReturned('')
+            ->assertSet('mensajeExito', 'El examen quedo en Fisica I.')
+            ->assertSet('invitaciones', []);
 
         $this->assertDatabaseHas('examen_curso', ['id_examen' => self::NUEVO, 'id_curso' => self::FISICA_PATRICIA]);
+    }
+
+    public function test_rechazar_avisa_a_quien_invito(): void
+    {
+        $this->invitar();
+
+        Livewire::actingAs($this->usuario(self::PATRICIA))
+            ->test(Index::class, ['tab' => 'recibir'])
+            ->call('rechazar', self::INVITACION)
+            ->assertSet('mensajeExito', 'Invitacion rechazada.')
+            ->assertSet('invitaciones', []);
+
+        $this->assertDatabaseHas('invitacion_examen_compartido', ['id_invitacion' => self::INVITACION, 'estado' => 'rechazado']);
+        $this->assertDatabaseHas('notificacion_docente', ['id_docente_destinatario' => self::ROBERTO]);
+        $this->assertSame(1, DB::table('examen_curso')->where('id_examen', self::NUEVO)->count());
+    }
+
+    public function test_aceptar_copia_las_reglas_y_materiales_de_quien_invito(): void
+    {
+        DB::table('norma')->insert(['id_norma' => 1, 'detalle_norma' => 'Prohibido hablar']);
+        DB::table('configuracion_examen_norma')->insert(['id_configuracion_examen' => 900, 'id_norma' => 1]);
+        DB::table('configuracion_material_personalizado')->insert([
+            'id_configuracion_examen' => 900, 'numero_material' => 1, 'descripcion_material' => 'Calculadora',
+        ]);
+        $this->invitar();
+
+        Livewire::actingAs($this->usuario(self::PATRICIA))
+            ->test(Index::class, ['tab' => 'recibir'])
+            ->call('aceptar', self::INVITACION, [self::FISICA_PATRICIA]);
+
+        $detalle = app(ObtenerDetalleExamenService::class)->ejecutar(self::NUEVO, self::PATRICIA);
+        $this->assertSame(['Prohibido hablar'], $detalle['normas']);
+        $this->assertSame(['Calculadora'], $detalle['materiales']);
     }
 
     public function test_el_detalle_muestra_el_curso_de_cada_docente(): void
@@ -235,8 +272,7 @@ class ExamenCompartidoCursosTest extends TestCase
         $this->invitar();
         Livewire::actingAs($this->usuario(self::PATRICIA))
             ->test(Index::class, ['tab' => 'recibir'])
-            ->call('aceptar', self::INVITACION)
-            ->call('asociarCursos', self::INVITACION, [self::FISICA_PATRICIA]);
+            ->call('aceptar', self::INVITACION, [self::FISICA_PATRICIA]);
 
         $detalle = app(ObtenerDetalleExamenService::class)->ejecutar(self::NUEVO, self::PATRICIA);
 
