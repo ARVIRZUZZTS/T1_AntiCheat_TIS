@@ -65,6 +65,9 @@ class NotificacionService
     /** Título del aviso que recibe el invitador cuando responden su invitación. */
     public const TITULO_RESPUESTA_INVITACION = 'Respuesta a tu invitación de examen';
 
+    /** Título del aviso informativo del respaldo automático de la base de datos (HU 33). */
+    public const TITULO_RESPALDO_BD = 'Respaldo automático de la base de datos';
+
     /**
      * Tipos de aviso (columna `tipo` de `notificacion_docente`). La pantalla
      * pinta una tarjeta distinta según el valor.
@@ -77,6 +80,9 @@ class NotificacionService
 
     /** Aviso para el invitador: el invitado aceptó o rechazó su invitación. */
     public const TIPO_RESPUESTA_INVITACION = 'respuesta_invitacion';
+
+    /** Aviso informativo (solo lectura) del respaldo automático de la base de datos. */
+    public const TIPO_RESPALDO_BD = 'respaldo_bd';
 
     /** Estado inicial con el que nace un aviso, del enum `estado_notificacion`. */
     public const ESTADO_RECIBIDO = 'recibido';
@@ -247,6 +253,83 @@ class NotificacionService
     }
 
     /**
+     * Avisa a todos los docentes que se realizó un respaldo automático de la
+     * base de datos (HU 33).
+     *
+     * El aviso es exclusivo para el rol «Docente»: un auxiliar (u otro rol que no
+     * sea docente) nunca lo recibe. Es puramente informativo y de solo lectura:
+     * no lleva acción, enlace ni botón; solo el mensaje con la fecha y hora
+     * exactas del respaldo, que se guarda en `fecha_evento`.
+     *
+     * Reutiliza la tabla y el cálculo de `id_notificacion` (max + 1 bajo bloqueo)
+     * del resto de avisos, por lo que se integra sin tocar el esquema más allá de
+     * la columna `fecha_evento`.
+     *
+     * @param  CarbonInterface  $momento  Fecha y hora de finalización del respaldo.
+     *
+     * @return array<int, NotificacionDocente>  Avisos creados, uno por docente.
+     *
+     * @author T1 - Tech One SRL
+     *
+     * @since  2026-11-22
+     */
+    public function notificarRespaldoBaseDatos(CarbonInterface $momento): array
+    {
+        $docentes = Usuario::query()
+            ->whereHas('roles', fn (Builder $rol): Builder => $rol->where('nombre_rol', Rol::NOMBRE_DOCENTE))
+            ->get();
+
+        if ($docentes->isEmpty()) {
+            return [];
+        }
+
+        return DB::transaction(function () use ($docentes, $momento): array {
+            $this->bloquearTabla();
+
+            $siguiente = (int) NotificacionDocente::query()->max('id_notificacion');
+            $creados = [];
+
+            foreach ($docentes as $docente) {
+                $siguiente++;
+
+                $creados[] = NotificacionDocente::create([
+                    'id_notificacion' => $siguiente,
+                    'id_docente_destinatario' => $docente->id_usuario,
+                    'tipo' => self::TIPO_RESPALDO_BD,
+                    'estado' => self::ESTADO_RECIBIDO,
+                    'fecha_evento' => $momento,
+                ]);
+            }
+
+            return $creados;
+        });
+    }
+
+    /**
+     * Texto del aviso de respaldo con la fecha y hora exactas.
+     *
+     * @param  ?CarbonInterface  $fecha  Momento del respaldo.
+     *
+     * @return string  Mensaje informativo para la tarjeta.
+     *
+     * @author T1 - Tech One SRL
+     *
+     * @since  2026-11-22
+     */
+    public static function mensajeRespaldo(?CarbonInterface $fecha): string
+    {
+        if ($fecha === null) {
+            return 'Se realizó un respaldo automático de la base de datos.';
+        }
+
+        return sprintf(
+            'Se realizó un respaldo automático de la base de datos el %s a las %s.',
+            $fecha->format('d/m/Y'),
+            $fecha->format('H:i'),
+        );
+    }
+
+    /**
      * Oculta el aviso de una invitación (borrado lógico). Se usa al cancelar:
      * el invitado deja de ver en su bandeja una invitación que ya no puede
      * responder.
@@ -389,6 +472,10 @@ class NotificacionService
             return $this->mapearRespuestaInvitacion($notificacion);
         }
 
+        if ($notificacion->tipo === self::TIPO_RESPALDO_BD) {
+            return $this->mapearRespaldo($notificacion);
+        }
+
         $registro = $notificacion->centralRiesgo;
         $fecha = $registro?->fecha_registro;
         $auxiliar = $registro?->registrador;
@@ -515,11 +602,35 @@ class NotificacionService
         ];
     }
 
+    /**
+     * Mapea el aviso del respaldo automático: solo mensaje informativo con la
+     * fecha y hora exactas. No incluye `detalle_href`, enlace ni datos de acción,
+     * porque la notificación es estrictamente de solo lectura.
+     *
+     * @param  NotificacionDocente  $notificacion  Aviso de tipo `respaldo_bd`.
+     *
+     * @return array<string, mixed>  Datos para la pantalla/API.
+     */
+    private function mapearRespaldo(NotificacionDocente $notificacion): array
+    {
+        $fecha = $notificacion->fecha_evento;
+
+        return [
+            'id' => (int) $notificacion->id_notificacion,
+            'tipo' => self::TIPO_RESPALDO_BD,
+            'titulo' => self::TITULO_RESPALDO_BD,
+            'descripcion' => self::mensajeRespaldo($fecha),
+            'fecha_registro' => $fecha?->toDateTimeString(),
+            'hace' => $fecha !== null ? $this->tiempo->enEspanol($fecha) : '',
+        ];
+    }
+
     private function fechaDe(NotificacionDocente $notificacion): ?CarbonInterface
     {
         return match ($notificacion->tipo) {
             self::TIPO_INVITACION_EXAMEN => $notificacion->invitacion?->created_at,
             self::TIPO_RESPUESTA_INVITACION => $notificacion->invitacion?->updated_at,
+            self::TIPO_RESPALDO_BD => $notificacion->fecha_evento,
             default => $notificacion->centralRiesgo?->fecha_registro,
         };
     }
