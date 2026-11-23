@@ -19,9 +19,9 @@
  * esos cursos. Al aceptar:
  *
  *  1. la invitacion pasa a "aceptado";
- *  2. el invitado recibe su configuracion del examen, copiada de la de quien
- *     invito (o la del creador, o la del examen), como hacia
- *     ConfiguracionExamenDocenteService::crearPara();
+ *  2. el invitado recibe su configuracion del examen (la fila que agrupa a
+ *     sus estudiantes inscritos). No se copian reglas ni materiales: son los
+ *     del examen, los mismos para todos sus docentes;
  *  3. el examen queda en los cursos elegidos (`examen_curso`) y se inscriben
  *     sus estudiantes (`estudiante_examen`);
  *  4. se notifica a quien invito.
@@ -36,6 +36,8 @@
  * - 2026-11-23  [Valery D. Ortuno P]  perf: aceptar y asociar en un solo paso y
  *   con consultas de conjunto; rechazar liviano; una sola lista con las
  *   pendientes y las aceptadas que aun no tienen curso.
+ * - 2026-11-23  [Valery D. Ortuno P]  fix: aceptar ya no copia reglas ni
+ *   materiales al invitado; el examen compartido usa los del examen.
  *
  * @see  App\Livewire\Invitaciones\Index
  * @see  App\Services\Examen\ConfiguracionExamenDocenteService::crearPara()
@@ -165,7 +167,7 @@ class AsociarCursosInvitacionService
 
             $idConfiguracion = $invitacion->config_propia !== null
                 ? (int) $invitacion->config_propia
-                : $this->crearConfiguracion($invitacion, (int) $docente->id_usuario);
+                : $this->crearConfiguracion((int) $invitacion->id_examen, (int) $docente->id_usuario);
 
             $this->vincular((int) $invitacion->id_examen, $idConfiguracion, $idsCursos);
 
@@ -204,7 +206,7 @@ class AsociarCursosInvitacionService
 
             $idConfiguracion = $invitacion->config_propia !== null
                 ? (int) $invitacion->config_propia
-                : $this->crearConfiguracion($invitacion, (int) $docente->id_usuario);
+                : $this->crearConfiguracion((int) $invitacion->id_examen, (int) $docente->id_usuario);
 
             $this->vincular((int) $invitacion->id_examen, $idConfiguracion, $idsCursos);
             $this->olvidarMonitor((int) $invitacion->id_examen, (int) $docente->id_usuario);
@@ -242,22 +244,19 @@ class AsociarCursosInvitacionService
 
     /**
      * La invitacion del docente, bloqueada, con lo necesario para responder en
-     * la misma consulta: configuracion propia, la de quien invito, la del
-     * creador y si el examen tiene un curso archivado.
+     * la misma consulta: su configuracion (si ya la tiene) y si el examen
+     * tiene un curso archivado.
      *
      * @throws ValidationException
      */
     private function invitacionBloqueada(Usuario $docente, int $idInvitacion): object
     {
         $invitacion = DB::table('invitacion_examen_compartido as i')
-            ->join('examen as e', 'e.id_examen', '=', 'i.id_examen')
             ->where('i.id_invitacion', $idInvitacion)
             ->where('i.id_docente_invitado', $docente->id_usuario)
             ->selectRaw(
                 'i.id_invitacion, i.id_examen, i.id_docente_invitador, i.estado,'
                 .' (select id_configuracion_examen from configuracion_examen_docente where id_examen = i.id_examen and id_docente = i.id_docente_invitado) as config_propia,'
-                .' (select id_configuracion_examen from configuracion_examen_docente where id_examen = i.id_examen and id_docente = i.id_docente_invitador) as config_invitador,'
-                .' (select id_configuracion_examen from configuracion_examen_docente where id_examen = i.id_examen and id_docente = e.creador) as config_creador,'
                 .' exists (select 1 from examen_curso ec join curso c on c.id_curso = ec.id_curso where ec.id_examen = i.id_examen and c.estado = ?) as archivado',
                 [CursoEstado::Archivado->value],
             )
@@ -276,57 +275,17 @@ class AsociarCursosInvitacionService
     }
 
     /**
-     * Crea la configuracion del invitado copiando la de quien invito (o la
-     * del creador, o la del examen): reglas, materiales y los escritos a mano.
+     * Crea la configuracion del invitado: solo la fila, sin reglas ni
+     * materiales propios (el examen compartido usa los del examen).
      */
-    private function crearConfiguracion(object $invitacion, int $idDocente): int
+    private function crearConfiguracion(int $idExamen, int $idDocente): int
     {
-        $idExamen = (int) $invitacion->id_examen;
-        $idConfiguracion = (int) DB::table('configuracion_examen_docente')->insertGetId([
+        return (int) DB::table('configuracion_examen_docente')->insertGetId([
             'id_examen' => $idExamen,
             'id_docente' => $idDocente,
             'created_at' => now(),
             'updated_at' => now(),
         ], 'id_configuracion_examen');
-
-        $origen = $invitacion->config_invitador ?? $invitacion->config_creador;
-
-        if ($origen !== null) {
-            $origen = (int) $origen;
-            $this->copiar('configuracion_examen_norma', ['id_configuracion_examen', 'id_norma'],
-                DB::table('configuracion_examen_norma')->where('id_configuracion_examen', $origen)
-                    ->selectRaw('?, id_norma', [$idConfiguracion]));
-            $this->copiar('configuracion_examen_material', ['id_configuracion_examen', 'id_material'],
-                DB::table('configuracion_examen_material')->where('id_configuracion_examen', $origen)
-                    ->selectRaw('?, id_material', [$idConfiguracion]));
-            $this->copiar('configuracion_norma_personalizada', ['id_configuracion_examen', 'numero_norma', 'descripcion_norma'],
-                DB::table('configuracion_norma_personalizada')->where('id_configuracion_examen', $origen)
-                    ->selectRaw('?, numero_norma, descripcion_norma', [$idConfiguracion]));
-            $this->copiar('configuracion_material_personalizado', ['id_configuracion_examen', 'numero_material', 'descripcion_material'],
-                DB::table('configuracion_material_personalizado')->where('id_configuracion_examen', $origen)
-                    ->selectRaw('?, numero_material, descripcion_material', [$idConfiguracion]));
-        } else {
-            $this->copiar('configuracion_examen_norma', ['id_configuracion_examen', 'id_norma'],
-                DB::table('examen_norma')->where('id_examen', $idExamen)
-                    ->selectRaw('?, id_norma', [$idConfiguracion]));
-            $this->copiar('configuracion_examen_material', ['id_configuracion_examen', 'id_material'],
-                DB::table('examen_material_permitido')->where('id_examen', $idExamen)
-                    ->selectRaw('?, id_material_permitido', [$idConfiguracion]));
-            $this->copiar('configuracion_norma_personalizada', ['id_configuracion_examen', 'numero_norma', 'descripcion_norma'],
-                DB::table('norma_personalizada')->where('id_examen', $idExamen)
-                    ->selectRaw('?, numero_norma, descripcion_norma', [$idConfiguracion]));
-            $this->copiar('configuracion_material_personalizado', ['id_configuracion_examen', 'numero_material', 'descripcion_material'],
-                DB::table('material_personalizado')->where('id_examen', $idExamen)
-                    ->selectRaw('?, numero_material, descripcion_material', [$idConfiguracion]));
-        }
-
-        return $idConfiguracion;
-    }
-
-    /** @param list<string> $columnas */
-    private function copiar(string $tabla, array $columnas, $consulta): void
-    {
-        DB::table($tabla)->insertUsing($columnas, $consulta);
     }
 
     /**
