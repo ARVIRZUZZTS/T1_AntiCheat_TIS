@@ -869,65 +869,69 @@
             </x-ui.alert>
         </div>
 
-        <p class="px-3 text-sm text-body" x-show="estado === 'listo' && examenesDisponibles.length === 0">
-            No hay examenes futuros para mostrar.
+        <p class="px-3 text-sm text-body" x-show="estado === 'listo' && examenesProgramados.length === 0">
+            No hay examenes programados para dividir.
         </p>
 
-        <div x-show="estado === 'listo' && examenesDisponibles.length > 0" class="flex flex-col gap-4">
-            <div class="min-w-0 max-w-md">
-                <label for="examen-dividir" class="block mb-2.5 text-sm font-medium text-heading">Examen</label>
-                <select id="examen-dividir" x-model="examenDivisionId"
-                        @change="criterioDivision = ''; errorDivision = ''"
-                        class="block w-full px-3 py-2.5 border text-sm rounded-base shadow-xs bg-neutral-secondary-medium border-default-medium text-heading focus:ring-brand focus:border-brand">
-                    <option value="" disabled>Selecciona un examen</option>
-                    <template x-for="examen in examenesDisponibles" :key="'dividir-' + examen.id">
-                        <option :value="examen.id" x-text="etiquetaExamen(examen)"></option>
-                    </template>
-                </select>
-            </div>
+        <div x-show="estado === 'listo' && examenesProgramados.length > 0"
+             class="rounded-base border border-default bg-neutral-primary-soft p-4 shadow-xs sm:p-6">
+            <div class="flex flex-col gap-4">
+                <div class="min-w-0 max-w-md">
+                    <label for="examen-dividir" class="mb-2.5 block text-sm font-medium text-heading">Examen</label>
+                    <select id="examen-dividir" x-model="examenDivisionId"
+                            @change="criterioDivision = ''; errorDivision = ''"
+                            x-bind:disabled="estado !== 'listo'"
+                            class="block w-full rounded-base border border-default-medium bg-neutral-secondary-medium px-3 py-2.5 text-sm text-heading shadow-xs focus:border-brand focus:ring-brand">
+                        <option value="" disabled>Seleccione un examen</option>
+                        <template x-for="examen in examenesProgramados" :key="'dividir-' + examen.id">
+                            <option :value="examen.id" x-text="etiquetaExamen(examen)"></option>
+                        </template>
+                    </select>
+                </div>
 
-            <template x-if="examenDivisionSeleccionado && ! puedeDividir">
-                <p class="px-3 text-sm text-body">
-                    No se puede dividir el examen, solo se cuenta con un aula
-                </p>
-            </template>
+                <template x-if="examenDivisionSeleccionado && ! puedeDividir">
+                    <p class="text-sm text-body">
+                        No se puede dividir el examen, solo se cuenta con un aula
+                    </p>
+                </template>
 
-            <template x-if="puedeDividir">
-                <div class="flex flex-col gap-4">
-                    <div class="flex flex-wrap items-baseline gap-x-2 px-3">
-                        <h3 class="text-xl font-bold text-heading" x-text="examenDivisionSeleccionado?.tipo || 'Sin tipo'"></h3>
-                        <p class="text-sm font-medium text-body" x-show="examenDivisionSeleccionado?.curso" x-text="'— ' + examenDivisionSeleccionado?.curso"></p>
-                    </div>
-
-                    <div class="flex flex-col gap-3 sm:flex-row sm:items-end">
-                        <div class="min-w-0 flex-1 sm:max-w-xs">
-                            <x-ui.select
-                                label="Dividir por"
-                                name="division_por"
-                                x-model="criterioDivision"
-                                @change="errorDivision = ''"
-                                :options="$opcionesDivision"
-                                placeholder="Selecciona un criterio"
-                            />
+                <template x-if="puedeDividir">
+                    <div class="flex flex-col gap-4">
+                        <div class="flex flex-wrap items-baseline gap-x-2">
+                            <h3 class="text-xl font-bold text-heading" x-text="examenDivisionSeleccionado?.tipo || 'Sin tipo'"></h3>
+                            <p class="text-sm font-medium text-body" x-show="examenDivisionSeleccionado?.curso" x-text="'— ' + examenDivisionSeleccionado?.curso"></p>
                         </div>
 
-                        <x-ui.button
-                            variant="default"
-                            @click="abrirModalDivision()"
-                            x-bind:disabled="criterioDivision === ''"
-                            x-bind:class="criterioDivision === '' ? 'opacity-50 cursor-not-allowed' : ''"
-                        >
-                            Dividir
-                        </x-ui.button>
-                    </div>
+                        <div class="flex flex-col gap-3 sm:flex-row sm:items-end">
+                            <div class="min-w-0 flex-1 sm:max-w-xs">
+                                <x-ui.select
+                                    label="Dividir por"
+                                    name="division_por"
+                                    x-model="criterioDivision"
+                                    @change="errorDivision = ''"
+                                    :options="$opcionesDivision"
+                                    placeholder="Seleccione un criterio"
+                                />
+                            </div>
 
-                    <div x-show="errorDivision !== ''" x-cloak>
-                        <x-ui.alert type="danger" title="No se pudo preparar la division">
-                            <span x-text="errorDivision"></span>
-                        </x-ui.alert>
+                            <x-ui.button
+                                variant="default"
+                                @click="abrirModalDivision()"
+                                x-bind:disabled="criterioDivision === ''"
+                                x-bind:class="criterioDivision === '' ? 'opacity-50 cursor-not-allowed' : ''"
+                            >
+                                Dividir
+                            </x-ui.button>
+                        </div>
+
+                        <div x-show="errorDivision !== ''" x-cloak>
+                            <x-ui.alert type="danger" title="No se pudo preparar la division">
+                                <span x-text="errorDivision"></span>
+                            </x-ui.alert>
+                        </div>
                     </div>
-                </div>
-            </template>
+                </template>
+            </div>
         </div>
     </section>
     </div>

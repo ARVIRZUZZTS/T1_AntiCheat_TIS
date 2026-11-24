@@ -183,10 +183,13 @@ class ListadoExamenesVistaTest extends TestCase
         $this->assertStringContainsString("const inicio = examen.fecha + ' ' + (examen.hora_inicio || '00:00');", $parcial);
         $this->assertStringContainsString('return inicio > this.ahora;', $parcial);
         $this->assertStringContainsString('x-for="examen in examenesDisponibles"', $parcial);
+        $this->assertStringContainsString('x-for="examen in examenesProgramados"', $parcial);
+        $this->assertStringContainsString('No hay examenes programados para dividir.', $parcial);
         $this->assertStringContainsString('No hay examenes futuros para mostrar.', $parcial);
         $this->assertStringContainsString('<template x-for="examen in examenes" :key="examen.id">', $parcial);
         $this->assertStringContainsString("tab === 'editar'", $parcial);
         $this->assertStringContainsString('id="examen-editar"', $parcial);
+        $this->assertStringContainsString('id="examen-dividir"', $parcial);
 
         $this->assertStringContainsString('gestionesPorCurso: @js($gestionesPorCurso->all())', $parcial);
         $this->assertStringContainsString('this.fechaDe(examen), gestion || \'\'', $parcial);
