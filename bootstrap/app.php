@@ -24,6 +24,12 @@ $app = Application::configure(basePath: $basePath)
         $middleware->alias([
             'docente' => \App\Http\Middleware\EnsureDocente::class,
         ]);
+
+        // En produccion la app corre detras del proxy HTTPS de la UMSS: sin
+        // confiar en el proxy, Laravel veria la peticion como http y la firma
+        // del enlace de confirmacion (HU 27) no coincidiria. En local no hay
+        // proxy, asi que esto no tiene efecto.
+        $middleware->trustProxies(at: '*');
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //
