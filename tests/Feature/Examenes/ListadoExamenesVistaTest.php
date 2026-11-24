@@ -188,9 +188,10 @@ class ListadoExamenesVistaTest extends TestCase
         $this->assertStringContainsString("tab === 'editar'", $parcial);
         $this->assertStringContainsString('id="examen-editar"', $parcial);
 
-        // Las etiquetas de los selectores muestran tipo y curso, sin fecha.
-        $this->assertStringContainsString("return [examen.tipo || 'Sin tipo', examen.curso || '']", $parcial);
-        $this->assertStringNotContainsString('this.fechaDe(examen), this.horario(examen)', $parcial);
+        $this->assertStringContainsString('gestionesPorCurso: @js($gestionesPorCurso->all())', $parcial);
+        $this->assertStringContainsString('this.fechaDe(examen), gestion || \'\'', $parcial);
+        $this->assertStringContainsString('class="mb-2.5 block text-sm font-medium text-heading"', $parcial);
+        $this->assertStringContainsString('class="block w-full rounded-base border border-default-medium bg-neutral-secondary-medium px-3 py-2.5 text-sm text-heading shadow-xs focus:border-brand focus:ring-brand"', $parcial);
     }
 
     public function test_editar_carga_el_formulario_sin_enviar_cambios(): void

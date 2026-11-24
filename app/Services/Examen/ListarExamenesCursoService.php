@@ -68,7 +68,6 @@ use App\Models\Ambiente;
 use App\Models\Curso;
 use App\Models\Examen;
 use Carbon\Carbon;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\DB;
 

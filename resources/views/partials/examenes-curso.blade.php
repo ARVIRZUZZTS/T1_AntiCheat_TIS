@@ -147,6 +147,10 @@
     // no de un curso (lo muestran las tarjetas de cada examen).
     $opcionesCursos = $cursos->mapWithKeys(fn ($curso) => [$curso->id_curso => $curso->nombre_curso])->all();
 
+    $gestionesPorCurso = $gestionesPorCurso ?? $cursos->mapWithKeys(
+        fn ($curso) => [(int) $curso->id_curso => $curso->gestion ?? null]
+    );
+
     // Si el alta falló, se vuelve a abrir la pestaña del formulario.
     $tabInicial = $tabInicial ?? (($errors->any() && $puedeCrearExamen) ? 'crear' : 'lista');
 
@@ -164,8 +168,9 @@
          cursoFijo: @js((string) ($curso?->id_curso ?? '')),
          urlListaGlobal: @js($urlListaGlobal),
          urlListaCurso: @js($urlListaCurso),
-         // Contexto de la pestana de lista: vacio = todos los cursos.
+          // Contexto de la pestana de lista: vacio = todos los cursos.
          cursoLista: @js($listadoGlobal ? '' : (string) ($curso?->id_curso ?? '')),
+         gestionesPorCurso: @js($gestionesPorCurso->all()),
          examenes: [],
          ahora: @js(now()->format('Y-m-d H:i')),
          estado: 'listo',
@@ -269,7 +274,10 @@
              return inicio > this.ahora;
          },
          etiquetaExamen(examen) {
-             return [examen.tipo || 'Sin tipo', examen.curso || '']
+             const idCurso = examen.cursos?.[0]?.id;
+             const gestion = idCurso === undefined ? null : this.gestionesPorCurso[idCurso];
+
+             return [examen.tipo || 'Sin tipo', examen.curso || '', this.fechaDe(examen), gestion || '']
                  .filter(Boolean)
                  .join(' - ');
          },
@@ -740,8 +748,8 @@
 
     {{-- Editar Examen: se elige uno propio y se precarga el mismo formulario
          del alta. Al cambiar la seleccion se consulta el detalle del examen. --}}
-    <section x-show="tab === 'editar'" x-cloak class="flex flex-col gap-4">
-        <p class="px-3 text-sm text-body" x-show="estado === 'cargando'">Cargando examenes...</p>
+    <section x-show="tab === 'editar'" x-cloak class="mx-auto w-full max-w-2xl flex flex-col gap-4">
+        <p class="text-sm text-body" x-show="estado === 'cargando'">Cargando examenes...</p>
 
         <div x-show="estado === 'error'" x-cloak>
             <x-ui.alert type="danger" title="No se pudieron cargar los examenes">
@@ -752,18 +760,18 @@
             </x-ui.alert>
         </div>
 
-        <p class="px-3 text-sm text-body" x-show="estado === 'listo' && examenesDisponibles.length === 0">
+        <p class="text-sm text-body" x-show="estado === 'listo' && examenesDisponibles.length === 0">
             No hay examenes futuros para mostrar.
         </p>
 
-        <p class="px-3 text-sm text-body" x-show="estado === 'listo' && examenesDisponibles.length > 0 && examenesEditables.length === 0">
+        <p class="text-sm text-body" x-show="estado === 'listo' && examenesDisponibles.length > 0 && examenesEditables.length === 0">
             No hay examenes propios disponibles para editar.
         </p>
 
-        <div x-show="estado === 'listo' && examenesEditables.length > 0" class="min-w-0 max-w-md px-3">
-            <label for="examen-editar" class="block mb-2.5 text-sm font-medium text-heading">Examen</label>
+        <div x-show="estado === 'listo' && examenesEditables.length > 0">
+            <label for="examen-editar" class="mb-2.5 block text-sm font-medium text-heading">Examen y curso</label>
             <select id="examen-editar" x-model="examenEdicionId" @change="seleccionarEdicion()"
-                    class="block w-full px-3 py-2.5 border text-sm rounded-base shadow-xs bg-neutral-secondary-medium border-default-medium text-heading focus:ring-brand focus:border-brand">
+                    class="block w-full rounded-base border border-default-medium bg-neutral-secondary-medium px-3 py-2.5 text-sm text-heading shadow-xs focus:border-brand focus:ring-brand">
                 <option value="" disabled>Selecciona un examen</option>
                 <template x-for="examen in examenesEditables" :key="'editar-' + examen.id">
                     <option :value="String(examen.id)" x-text="etiquetaExamen(examen)"></option>
@@ -771,7 +779,7 @@
             </select>
         </div>
 
-        <p class="px-3 text-sm text-body" x-show="cargandoEdicion">Cargando datos del examen...</p>
+        <p class="text-sm text-body" x-show="cargandoEdicion">Cargando datos del examen...</p>
 
         <div x-show="! cargandoEdicion && errorEdicion !== ''" x-cloak>
             <x-ui.alert type="danger" title="No se pudieron cargar los datos del examen">

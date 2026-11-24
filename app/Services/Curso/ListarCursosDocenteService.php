@@ -207,13 +207,18 @@ class ListarCursosDocenteService
      */
     public function activos(int $idDocente): EloquentCollection
     {
+        $gestiones = $this->cursosConGestion($idDocente);
+
         return Curso::query()
             ->where('sis_doc', $idDocente)
             ->where('estado', CursoEstado::EnCurso->value)
             ->withCount(['estudiantes', 'examenes'])
             ->orderByRaw('fecha_creacion desc nulls last')
             ->orderByDesc('id_curso')
-            ->get();
+            ->get()
+            ->each(function (Curso $curso) use ($gestiones): void {
+                $curso->setAttribute('gestion', $gestiones->get((int) $curso->id_curso));
+            });
     }
 
     public function conExamenes(int $idDocente): EloquentCollection
