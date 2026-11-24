@@ -82,6 +82,8 @@
     - 2026-11-22  [OchoaCesar]  refactor: "Archivar curso" y "Restaurar curso"
       dejan de ser dos subopciones del grupo Cursos y pasan a una sola
       subopcion "Archivar/Restaurar cursos" (pagina unica con dos pestanas).
+    - 2026-11-23  [OchoaCesar]  refactor: esa pagina unica deja las pestanas y
+      muestra una sola lista de cursos, con los archivados al final.
     - 2026-11-23  [Valery D. Ortuno P]  refactor: "Archivar/Restaurar cursos"
       pasa a "Archivar curso" y va debajo de "Eliminar curso". Salen "Cursos
       archivados" (se ven con el filtro Archivados de Ver cursos), "Editar
@@ -148,7 +150,7 @@
             ['label' => 'Crear curso', 'route' => 'cursos.crear'],
             ['label' => 'Editar curso', 'route' => 'cursos.editar'],
             ['label' => 'Eliminar curso', 'route' => 'cursos.eliminar'],
-            // Archivar y restaurar son dos pestanas de una sola pagina. Los
+            // Archivar y restaurar comparten una sola lista de cursos. Los
             // archivados se ven con el filtro Archivados de "Ver cursos".
             ['label' => 'Archivar curso', 'route' => 'cursos.archivar-restaurar'],
             ['label' => 'Cargar CSV', 'route' => 'cursos.cargar-csv'],

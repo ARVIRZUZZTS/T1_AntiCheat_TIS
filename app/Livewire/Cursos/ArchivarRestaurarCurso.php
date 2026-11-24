@@ -7,18 +7,25 @@
  *
  * @created 2026-11-22
  *
+ * @updated 2026-11-23
+ *
  * @description
- * Componente de la subopción «Archivar/Restaurar cursos»: una sola página con
- * dos pestañas. Archivar lista los cursos en curso del docente y confirma el
- * archivado en un modal; Restaurar lista los archivados y confirma la
- * restauración en su propio modal. Ambas acciones delegan en sus servicios
- * (Gate + transacción + lockForUpdate) y el resultado sale en el mismo aviso
- * inline de éxito.
+ * Componente de la subopción «Archivar/Restaurar cursos»: una sola lista con
+ * los cursos propios en curso y los archivados al final. Cada tarjeta ofrece
+ * su acción como texto: «Archivar» en rojo para los activos y «Restaurar» en
+ * gris para los archivados. Cada acción se confirma en su modal y delega en su
+ * servicio (Gate + transacción + lockForUpdate); el resultado sale en el mismo
+ * aviso inline de éxito. Bajo el nombre de cada curso se muestra su gestión con
+ * año, igual que en «Ver cursos».
  *
  * @changelog
  * - 2026-11-22  [OchoaCesar]  feat: fusiona las subsecciones "Archivar curso"
  *   y "Restaurar curso" en una página única con pestañas; se retiran los dos
  *   componentes y vistas separados.
+ * - 2026-11-23  [OchoaCesar]  refactor: se eliminan las pestañas; la lista es
+ *   única con los archivados al final y la apertura de un modal cierra el otro.
+ * - 2026-11-23  [OchoaCesar]  feat: cada tarjeta muestra la gestión del curso
+ *   bajo el título, con el mismo formato que «Ver cursos».
  */
 
 declare(strict_types=1);
@@ -39,8 +46,6 @@ use Throwable;
 
 class ArchivarRestaurarCurso extends Component
 {
-    public string $pestana = 'archivar';
-
     public bool $modalAbierto = false;
 
     public bool $modalArchivarAbierto = false;
@@ -59,29 +64,12 @@ class ArchivarRestaurarCurso extends Component
 
     public function mount(): void
     {
-        // Deep-link: /cursos/archivar-restaurar?pestana=restaurar abre esa
-        // pestaña (lo usan los enlaces y las pruebas de listado).
-        $pestana = (string) request()->query('pestana', '');
-        if ($pestana === 'archivar' || $pestana === 'restaurar') {
-            $this->pestana = $pestana;
-        }
-
         // El POST de los endpoints *.store llega por redirect con el mensaje
         // en sesión; se pasa al aviso unificado de la página.
         if (session()->has('mensaje')) {
             $this->mensajeExito = (string) session('mensaje');
             $this->mostrarExito = true;
         }
-    }
-
-    public function cambiarPestana(string $pestana): void
-    {
-        if ($pestana !== 'archivar' && $pestana !== 'restaurar') {
-            return;
-        }
-
-        $this->pestana = $pestana;
-        $this->cerrarTodo();
     }
 
     public function cerrarModal(): void
@@ -104,10 +92,9 @@ class ArchivarRestaurarCurso extends Component
             ->where('estado', CursoEstado::EnCurso->value)
             ->firstOrFail();
 
+        $this->cerrarModales();
         $this->cursoId = (int) $curso->getKey();
         $this->cursoNombre = (string) $curso->nombre_curso;
-        $this->errorArchivar = '';
-        $this->archivando = false;
         $this->modalArchivarAbierto = true;
     }
 
@@ -146,6 +133,7 @@ class ArchivarRestaurarCurso extends Component
 
     public function abrirModalRestaurar(int $cursoId, string $cursoNombre): void
     {
+        $this->cerrarModales();
         $this->cursoId = $cursoId;
         $this->cursoNombre = $cursoNombre;
         $this->modalAbierto = true;
@@ -212,12 +200,16 @@ class ArchivarRestaurarCurso extends Component
 
     public function render(ListarCursosDocenteService $servicio): View
     {
-        $cursos = $this->pestana === 'restaurar'
-            ? $servicio->archivados((int) auth()->id())
-            : $servicio->archivables((int) auth()->id());
+        $idDocente = (int) auth()->id();
+
+        $cursos = $servicio->archivables($idDocente)
+            ->concat($servicio->archivados($idDocente));
+
+        $idsCursos = $cursos->pluck('id_curso')->map(fn ($id): int => (int) $id)->all();
 
         return view('livewire.cursos.archivar-restaurar-curso', [
             'cursos' => $cursos,
+            'gestiones' => $servicio->gestionesPorCurso($idsCursos),
         ])->extends('layouts.app');
     }
 
@@ -229,7 +221,7 @@ class ArchivarRestaurarCurso extends Component
         $this->cursoNombre = '';
     }
 
-    private function cerrarTodo(): void
+    private function cerrarModales(): void
     {
         $this->modalAbierto = false;
         $this->modalArchivarAbierto = false;

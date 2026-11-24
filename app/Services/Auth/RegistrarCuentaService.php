@@ -5,26 +5,38 @@
  * @author Alisson D. Alvarado <alvaradoalissondalet@gmail.com>
  * @updated 2026-11-08
  * @updated 2026-11-09
+ * @updated 2026-11-23
  * @description Validación y registro de cuentas docentes.
  * @changelog
  * - 2026-11-08  [Alisson D. Alvarado]  feat: sugerir nombres de usuario disponibles.
  * - 2026-11-09  [Alisson D. Alvarado]  fix: distinguir conflictos y evitar correos como usuario.
+ * - 2026-11-23  [Diego Tejerina]  feat: bifurcar el registro por correo (HU 27): un correo
+ *   institucional queda pendiente de confirmación por correo y recibe el
+ *   enlace; uno externo queda pendiente de validación manual (HU 26). El
+ *   correo admite cualquier dominio válido, no solo @umss.edu.
  */
 
 namespace App\Services\Auth;
 
 use App\Enums\EstadoCuenta;
 use App\Exceptions\RegistroDuplicadoException;
+use App\Mail\ConfirmarRegistroDocenteMail;
 use App\Models\Rol;
 use App\Models\Usuario;
 use App\Services\Docente\ListarSolicitudesRegistroService;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 
 class RegistrarCuentaService
 {
+    public function __construct(
+        private readonly VerificarCorreoInstitucionalService $verificadorCorreo,
+    ) {
+    }
+
     public const MENSAJE_NOMBRE_REQUERIDO = 'El nombre es requerido';
 
     public const MENSAJE_APELLIDO_REQUERIDO = 'El apellido es requerido';
@@ -137,7 +149,9 @@ class RegistrarCuentaService
 
         if ($datos['correo'] === '') {
             $errores['correo'] = self::MENSAJE_CORREO_REQUERIDO;
-        } elseif (! preg_match('/^[^@\s]+@umss\.edu$/i', $datos['correo'])) {
+        } elseif (filter_var($datos['correo'], FILTER_VALIDATE_EMAIL) === false) {
+            // Cualquier dominio válido: el institucional se verifica por correo
+            // y el externo pasa a la validación manual (HU 27).
             $errores['correo'] = self::MENSAJE_CORREO_INVALIDO;
         }
 
@@ -172,7 +186,12 @@ class RegistrarCuentaService
     {
         $datos = $this->normalizar($datos);
 
-        $usuario = DB::transaction(function () use ($datos): Usuario {
+        // Un correo institucional (o de prueba) se verifica por correo; el resto
+        // pasa a la validación manual de dos docentes (HU 26 / HU 27).
+        $porCorreo = $this->verificadorCorreo->esElegible($datos['correo']);
+        $estado = $porCorreo ? EstadoCuenta::PendienteCorreo : EstadoCuenta::Pendiente;
+
+        $usuario = DB::transaction(function () use ($datos, $estado): Usuario {
             DB::statement('LOCK TABLE usuario IN SHARE ROW EXCLUSIVE MODE');
 
             if ($this->nombreUsuarioExiste($datos['nombreUsuario'])) {
@@ -190,8 +209,7 @@ class RegistrarCuentaService
             $usuario->correo = $datos['correo'];
             $usuario->password = Hash::make($datos['contrasena']);
             $usuario->fecha_creacion = now();
-            // No ingresa hasta que dos docentes la aprueben (HU 26).
-            $usuario->estado_cuenta = EstadoCuenta::Pendiente->value;
+            $usuario->estado_cuenta = $estado->value;
 
             try {
                 $usuario->save();
@@ -214,10 +232,41 @@ class RegistrarCuentaService
             return $usuario;
         });
 
-        // El contador de solicitudes del sidebar suma esta cuenta (HU 26).
+        // El contador de solicitudes del sidebar solo suma las externas (HU 26).
         ListarSolicitudesRegistroService::olvidarPendientes();
 
+        if ($porCorreo) {
+            $this->enviarConfirmacion($usuario);
+        }
+
         return $usuario;
+    }
+
+    /**
+     * Indica si el correo se verifica por correo electrónico (HU 27).
+     *
+     * @param  string  $correo  Correo del docente.
+     * @return bool  true si es institucional o de prueba; false si es externo.
+     */
+    public function seVerificaPorCorreo(string $correo): bool
+    {
+        return $this->verificadorCorreo->esElegible($correo);
+    }
+
+    /**
+     * Envía el correo de confirmación sin dejar la cuenta en estado corrupto:
+     * la cuenta ya está guardada, así que un fallo de SMTP solo se registra y
+     * el docente podrá reintentar; no se revierte el registro.
+     *
+     * @param  Usuario  $usuario  Docente recién registrado.
+     */
+    private function enviarConfirmacion(Usuario $usuario): void
+    {
+        try {
+            Mail::to((string) $usuario->correo)->send(new ConfirmarRegistroDocenteMail($usuario));
+        } catch (\Throwable $error) {
+            report($error);
+        }
     }
 
     private function nombreUsuarioExiste(string $nombreUsuario): bool

@@ -12,7 +12,7 @@
  * @description
  * Prueba de la navegación a la subopción «Archivar curso» del
  * grupo Cursos del sidebar, incluido el estado activo de la página única con
- * dos pestañas.
+ * una sola lista de cursos.
  *
  * @changelog
  * - 2026-11-23  [Valery D. Ortuno P]  test: la subopción pasa a llamarse

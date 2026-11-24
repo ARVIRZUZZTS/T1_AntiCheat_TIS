@@ -3,9 +3,10 @@
     @author  Equipo T1
     @created 2026-11-21
     @updated 2026-11-22
+    @updated 2026-11-23
 
     @description
-    Modal de confirmación de la pestaña «Archivar» de la página única
+    Modal de confirmación de la acción «Archivar» de la página única
     Archivar/Restaurar cursos. Muestra el nombre del curso elegido y los
     botones Archivar / Cancelar. Cierra sin cambios con Cancelar, la X, Esc o
     un clic fuera. El componente se usa dentro de

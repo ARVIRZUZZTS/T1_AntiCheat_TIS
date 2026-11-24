@@ -43,6 +43,18 @@
 | nombre_usuario | varchar | NO | NULL |
 | apellido | varchar | NO | NULL |
 | correo | varchar | YES | NULL |
+| nombre | varchar(50) | YES | NULL |
+| fecha_creacion | timestamp | YES | `CURRENT_TIMESTAMP` |
+| estado_cuenta | varchar(20) | NO | `habilitada` |
+
+`estado_cuenta` (CHECK `IN ('pendiente', 'pendiente_correo', 'habilitada', 'rechazada')`) controla el acceso de las cuentas del registro:
+
+- `habilitada`: ingresa. Las cuentas que crea el sistema (docentes iniciales, auxiliares) nacen así.
+- `pendiente`: correo externo, espera la validación manual de dos docentes (HU 26). Es la única que aparece en la bandeja «Docentes» y en el contador del sidebar.
+- `pendiente_correo`: correo institucional, espera que el docente confirme el enlace que se le envió por correo (HU 27). No pasa por la validación manual.
+- `rechazada`: un docente la desaprobó con motivo; no ingresa.
+
+La transición la resuelven `ValidarRegistroDocenteService` (aprobar/desaprobar, HU 26) y `ConfirmarRegistroController` (confirmar correo, HU 27).
 
 **Datos:**
 | id_usuario | cod_sis | nombre | apellido |
@@ -52,6 +64,22 @@
 | 3 | AUX001 | Diego | Mendoza |
 | 4 | AUX002 | Sofia | Castro |
 | 5 | DOC003 | Fernando | Vargas |
+
+---
+
+### validacion_registro
+
+Decisión de cada docente sobre cada solicitud de registro externa (HU 26). La clave es el par solicitante-validador, así un docente decide una sola vez.
+
+| Columna | Tipo | Nullable | Default |
+|---|---|---|---|
+| id_solicitante | integer | NO | NULL |
+| id_validador | integer | NO | NULL |
+| decision | varchar(11) | NO | NULL (CHECK `IN ('aprobado', 'desaprobado')`) |
+| motivo | varchar(300) | YES | NULL |
+| fecha | timestamp | NO | `CURRENT_TIMESTAMP` |
+
+Clave primaria `(id_solicitante, id_validador)`; ambas FK a `usuario.id_usuario` con `ON DELETE CASCADE`.
 
 ---
 

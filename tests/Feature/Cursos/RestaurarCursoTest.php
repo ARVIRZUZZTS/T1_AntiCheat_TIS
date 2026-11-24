@@ -126,17 +126,22 @@ class RestaurarCursoTest extends TestCase
         ]);
     }
 
-    public function test_dueno_puede_listar_sus_cursos_archivados_en_restaurar(): void
+    public function test_dueno_ve_sus_cursos_archivados_al_final_de_la_lista_unica(): void
     {
         $docente = Usuario::findOrFail(self::DOCENTE);
 
-        $this->actingAs($docente)
-            ->get(route('cursos.archivar-restaurar', ['pestana' => 'restaurar']))
+        $respuesta = $this->actingAs($docente)
+            ->get(route('cursos.archivar-restaurar'))
             ->assertOk()
             ->assertSee('Curso Archivado Propio')
-            ->assertDontSee('Curso En Curso Propio')
+            ->assertSee('Curso En Curso Propio')
             ->assertDontSee('Curso Finalizado Propio')
             ->assertDontSee('Curso Archivado Ajeno');
+
+        $this->assertMatchesRegularExpression(
+            '/Curso En Curso Propio[\s\S]*Curso Archivado Propio/',
+            (string) $respuesta->getContent(),
+        );
     }
 
     public function test_dueno_puede_restaurar_curso_archivado_a_en_curso(): void
@@ -146,7 +151,7 @@ class RestaurarCursoTest extends TestCase
 
         $this->actingAs($docente)
             ->post(route('cursos.restaurar.store', $curso))
-            ->assertRedirect(route('cursos.archivar-restaurar', ['pestana' => 'restaurar']))
+            ->assertRedirect(route('cursos.archivar-restaurar'))
             ->assertSessionHas('mensaje', RestaurarCursoService::MENSAJE_EXITO);
 
         $this->assertSame(CursoEstado::EnCurso->value, Curso::findOrFail(self::CURSO_ARCHIVADO)->estado);
@@ -230,16 +235,16 @@ class RestaurarCursoTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_pagina_restaurar_muestra_estado_vacio_sin_archivados(): void
+    public function test_pagina_muestra_estado_vacio_sin_cursos_para_archivar_ni_restaurar(): void
     {
-        DB::table('curso')->where('id_curso', self::CURSO_ARCHIVADO)->update(['estado' => CursoEstado::EnCurso->value]);
-        DB::table('curso')->where('id_curso', self::CURSO_OTRO_ARCHIVADO)->update(['estado' => CursoEstado::EnCurso->value]);
+        DB::table('curso')->where('sis_doc', self::DOCENTE)
+            ->update(['estado' => CursoEstado::Finalizo->value]);
 
         $docente = Usuario::findOrFail(self::DOCENTE);
 
         $this->actingAs($docente)
-            ->get(route('cursos.archivar-restaurar', ['pestana' => 'restaurar']))
+            ->get(route('cursos.archivar-restaurar'))
             ->assertOk()
-            ->assertSee('No tienes cursos archivados');
+            ->assertSee('No tienes cursos para archivar ni restaurar.');
     }
 }

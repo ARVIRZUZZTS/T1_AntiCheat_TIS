@@ -106,6 +106,42 @@ UPDATE usuario SET password = '$2y$10$oCKNmUI8S9rOkYZDe3r9LOyOU6Ouk4/YyRJvsJYdmY
 
 
 -- ============================================================================
+--  4. `estado_cuenta` EN `usuario` (HU 26 / HU 27)
+-- ============================================================================
+--
+--  Estado de acceso de las cuentas del registro. Si la columna no existe se
+--  crea (habilitada por defecto, para no trabar a las cuentas ya cargadas);
+--  si existe, se reescribe el CHECK con los cuatro estados y se amplia a
+--  varchar(20) para que entre 'pendiente_correo'.
+--
+--    pendiente         correo externo, espera validacion manual (HU 26).
+--    pendiente_correo  correo institucional, espera confirmar el enlace (HU 27).
+--    habilitada        ingresa.
+--    rechazada         desaprobada con motivo.
+-- ============================================================================
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'usuario'
+      AND column_name = 'estado_cuenta'
+  ) THEN
+    ALTER TABLE usuario ADD COLUMN estado_cuenta varchar(20) NOT NULL DEFAULT 'habilitada';
+    RAISE NOTICE 'columna usuario.estado_cuenta creada';
+  ELSE
+    RAISE NOTICE 'columna usuario.estado_cuenta ya existia';
+  END IF;
+END
+$$;
+
+ALTER TABLE usuario DROP CONSTRAINT IF EXISTS usuario_estado_cuenta_check;
+ALTER TABLE usuario ALTER COLUMN estado_cuenta TYPE varchar(20);
+ALTER TABLE usuario ADD CONSTRAINT usuario_estado_cuenta_check
+  CHECK (estado_cuenta IN ('pendiente', 'pendiente_correo', 'habilitada', 'rechazada'));
+
+
+-- ============================================================================
 --  VERIFICACION
 -- ============================================================================
 

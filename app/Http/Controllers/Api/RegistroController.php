@@ -4,9 +4,12 @@
  * @file RegistroController.php
  * @author Alisson D. Alvarado <alvaradoalissondalet@gmail.com>
  * @updated 2026-11-08
+ * @updated 2026-11-23
  * @description Registro de cuentas docentes y sugerencias de usuario.
  * @changelog
  * - 2026-11-08  [Alisson D. Alvarado]  feat: sugerir usuarios y mostrar el estado pendiente.
+ * - 2026-11-23  [Diego Tejerina]  feat: distinguir en la respuesta la verificación por
+ *   correo (institucional) de la validación manual (externo) para el modal (HU 27).
  */
 
 namespace App\Http\Controllers\Api;
@@ -22,6 +25,9 @@ class RegistroController extends Controller
 {
     /** La cuenta queda pendiente hasta que dos docentes la validen (HU 26). */
     public const MENSAJE_CREADA = 'Tu cuenta aun esta en proceso de validacion. Podras ingresar cuando dos docentes la aprueben.';
+
+    /** Correo institucional: se envió el enlace de confirmación (HU 27). */
+    public const MENSAJE_VERIFICAR_CORREO = 'Te enviamos un correo electrónico para confirmar tu registro. Revisa tu bandeja de entrada para activar tu cuenta.';
 
     /**
      * Entrega una sugerencia sin reservar el nombre antes del registro.
@@ -62,6 +68,13 @@ class RegistroController extends Controller
             return response()->json(['errores' => $error->errores()], 409);
         }
 
-        return response()->json(['mensaje' => EstadoCuenta::mensajeAcceso(EstadoCuenta::Pendiente)], 201);
+        $porCorreo = $servicio->seVerificaPorCorreo((string) $request->input('correo'));
+
+        return response()->json([
+            'verificacion' => $porCorreo ? 'correo' : 'manual',
+            'mensaje' => $porCorreo
+                ? self::MENSAJE_VERIFICAR_CORREO
+                : EstadoCuenta::mensajeAcceso(EstadoCuenta::Pendiente),
+        ], 201);
     }
 }
