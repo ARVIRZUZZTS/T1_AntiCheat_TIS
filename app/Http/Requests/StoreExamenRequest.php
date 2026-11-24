@@ -60,6 +60,7 @@ namespace App\Http\Requests;
 use App\Enums\TipoExamen;
 use App\Models\Curso;
 use App\Services\Curso\AsegurarCursoEditableService;
+use App\Services\Curso\ListarCursosDocenteService;
 use App\Services\Examen\CatalogosExamenService;
 use App\Services\Examen\RegistrarExamenService;
 use App\Services\Examen\ValidarDisponibilidadExamenService;
@@ -85,7 +86,19 @@ class StoreExamenRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return $this->user()?->can('crearExamen', $this->route('curso')) ?? false;
+        if (! $this->user()->can('crearExamen', $this->route('curso'))) {
+            return false;
+        }
+
+        foreach ($this->cursosSolicitados() as $idCurso) {
+            $cursoSolicitado = Curso::find($idCurso);
+
+            if ($cursoSolicitado !== null && ! $this->user()->can('crearExamen', $cursoSolicitado)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     protected function failedAuthorization(): void
@@ -217,15 +230,31 @@ class StoreExamenRequest extends FormRequest
         return $fecha !== null && $fecha->format('d/m/Y') === $texto ? $fecha : null;
     }
 
+    /** @return list<int> */
+    protected function cursosSolicitados(): array
+    {
+        return array_values(array_unique(array_map(
+            fn (mixed $id): int => (int) $id,
+            (array) $this->input('cursos', [])
+        )));
+    }
+
     /**
      * Cursos sobre los que rige la regla "un solo examen final y una sola
-     * segunda instancia por curso". En el alta es el curso de la URL; la
-     * edicion lo sobrescribe con los cursos del examen que se edita.
+     * segunda instancia por curso". En el alta son los cursos elegidos en el
+     * formulario (o el de la URL si no viaja la lista); la edicion lo
+     * sobrescribe con los cursos del examen que se edita.
      *
      * @return list<int>
      */
     protected function cursosParaUnicoPorTipo(): array
     {
+        $cursos = $this->cursosSolicitados();
+
+        if ($cursos !== []) {
+            return $cursos;
+        }
+
         $curso = $this->route('curso');
 
         return [$curso instanceof Curso ? (int) $curso->id_curso : (int) $curso];
@@ -259,8 +288,13 @@ class StoreExamenRequest extends FormRequest
     /**
      * @return array<string, mixed>
      */
-    public function rules(CatalogosExamenService $catalogos): array
+    public function rules(CatalogosExamenService $catalogos, ListarCursosDocenteService $cursosDocente): array
     {
+        $idsCursos = $cursosDocente->activos((int) $this->user()?->id_usuario)
+            ->pluck('id_curso')
+            ->map(fn (mixed $id): int => (int) $id)
+            ->all();
+
         return [
             // `in:` y no `Rule::enum()` por un motivo concreto: la regla enum
             // pasa la clave `validation.enum` al traductor y salta la búsqueda de
@@ -293,6 +327,8 @@ class StoreExamenRequest extends FormRequest
             // `in` contra el catálogo cacheado y no `exists`: `exists` hacía
             // una consulta por cada opción marcada.
             'ambientes.*' => ['integer', 'distinct', Rule::in($catalogos->ids('ambientes'))],
+            'cursos' => ['sometimes', 'array', 'min:1'],
+            'cursos.*' => ['integer', 'distinct', Rule::in($idsCursos)],
             'materiales' => ['sometimes', 'array'],
             'materiales.*' => ['integer', 'distinct', Rule::in($catalogos->ids('materiales'))],
             'normas' => ['sometimes', 'array'],
@@ -331,6 +367,10 @@ class StoreExamenRequest extends FormRequest
             'ambientes.min' => 'Seleccione al menos un ambiente.',
             'ambientes.*.in' => 'Uno de los ambientes seleccionados no existe.',
             'ambientes.*.distinct' => 'No repita ambientes.',
+            'cursos.required' => 'Seleccione al menos un curso.',
+            'cursos.min' => 'Seleccione al menos un curso.',
+            'cursos.*.in' => 'Uno de los cursos seleccionados no existe.',
+            'cursos.*.distinct' => 'No repita cursos.',
             'materiales.*.in' => 'Uno de los materiales seleccionados no existe.',
             'materiales.*.distinct' => 'No repita materiales.',
             'normas.*.in' => 'Una de las normas seleccionadas no existe.',
@@ -351,6 +391,7 @@ class StoreExamenRequest extends FormRequest
             'hora_inicio' => 'hora de inicio',
             'duracion' => 'duracion',
             'ambientes' => 'ambientes',
+            'cursos' => 'cursos',
             'materiales' => 'material permitido',
             'normas' => 'normas',
             'materiales_personalizados' => 'materiales personalizados',
