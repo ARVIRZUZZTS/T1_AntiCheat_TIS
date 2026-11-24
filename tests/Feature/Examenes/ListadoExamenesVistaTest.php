@@ -199,8 +199,10 @@ class ListadoExamenesVistaTest extends TestCase
         $parcial = $this->fuenteParcial();
         $formulario = $this->fuente(resource_path('views/components/ui/form-crear-examen.blade.php'));
 
+        $this->assertStringContainsString('get examenesProgramados()', $parcial);
+        $this->assertStringContainsString("examenesDisponibles.filter((examen) => examen.estado === 'Programado')", $parcial);
         $this->assertStringContainsString('get examenesEditables()', $parcial);
-        $this->assertStringContainsString('examenesDisponibles.filter((examen) => Boolean(examen.es_propio))', $parcial);
+        $this->assertStringContainsString('examenesProgramados.filter((examen) => Boolean(examen.es_propio))', $parcial);
         $this->assertStringContainsString('api.examenes.edicion.mostrar', $parcial);
         $this->assertStringContainsString('modo="editar"', $parcial);
         $this->assertStringContainsString('x-for="examen in examenesEditables"', $parcial);

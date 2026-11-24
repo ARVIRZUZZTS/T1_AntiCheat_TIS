@@ -225,9 +225,12 @@
          get examenesDisponibles() {
              return this.examenes.filter((examen) => this.examenDisponible(examen));
          },
-         get examenesEditables() {
-             return this.examenesDisponibles.filter((examen) => Boolean(examen.es_propio));
-         },
+          get examenesProgramados() {
+              return this.examenesDisponibles.filter((examen) => examen.estado === 'Programado');
+          },
+          get examenesEditables() {
+              return this.examenesProgramados.filter((examen) => Boolean(examen.es_propio));
+          },
          get aulasDelExamen() {
              return this.examenDivisionSeleccionado?.ambientes?.length ?? 0;
          },
@@ -768,7 +771,8 @@
             No hay examenes propios disponibles para editar.
         </p>
 
-        <div x-show="estado === 'listo' && examenesEditables.length > 0">
+        <div x-show="estado === 'listo' && examenesEditables.length > 0"
+             class="rounded-base border border-default bg-neutral-primary-soft p-4 shadow-xs sm:p-6">
             <label for="examen-editar" class="mb-2.5 block text-sm font-medium text-heading">Examen y curso</label>
             <select id="examen-editar" x-model="examenEdicionId" @change="seleccionarEdicion()"
                     class="block w-full rounded-base border border-default-medium bg-neutral-secondary-medium px-3 py-2.5 text-sm text-heading shadow-xs focus:border-brand focus:ring-brand">
