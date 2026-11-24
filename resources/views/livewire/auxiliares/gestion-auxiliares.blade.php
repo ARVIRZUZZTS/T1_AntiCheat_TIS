@@ -6,14 +6,16 @@
     @updated 2026-11-09
 
     @description
-    Vista del componente Livewire GestionAuxiliares: listado de auxiliares
-    asignados con filtros de estado y curso. "Crear Auxiliar" ya no abre un
+     Vista del componente Livewire GestionAuxiliares: listado de todas las
+     cuentas de auxiliar con filtros de estado y curso. "Crear Auxiliar" ya no abre un
     modal: enlaza a la página de alta (CrearAuxiliar) y el aviso de éxito del
     alta llega por la sesión al volver.
 
     @changelog
-    - 2026-11-15  [Diego Tejerina]  refactor: se quita el modal de alta; "Crear
-      Auxiliar" enlaza a la página propia y el éxito viaja por la sesión.
+     - 2026-11-15  [Diego Tejerina]  refactor: se quita el modal de alta; "Crear
+       Auxiliar" enlaza a la página propia y el éxito viaja por la sesión.
+     - 2026-11-24  [Equipo T1]  refactor: se quita el filtro Baja; el estado es
+       Activo si hay asignación a un curso e Inactivo si solo existe la cuenta.
     - 2026-10-19  [ARVIRZUZZTS]  feat: creación inicial de la vista.
     - 2026-11-08  [David E. Chavez T.]  style: mover la creación a un modal
       con inputs verticales y botones Cancelar/Guardar.
@@ -46,7 +48,7 @@
         </div>
 
         <div class="flex gap-2 overflow-x-auto lg:shrink-0" role="group" aria-label="Filtro de estado">
-            @foreach (['todos' => 'Todos', 'Activo' => 'Activo', 'Baja' => 'Baja'] as $valor => $etiqueta)
+            @foreach (['todos' => 'Todos', 'Activo' => 'Activo', 'Inactivo' => 'Inactivo'] as $valor => $etiqueta)
                 <x-ui.button type="button" variant="{{ $filtroEstado === $valor ? 'default' : 'secondary' }}"
                              wire:click="filtrarEstado('{{ $valor }}')">
                     {{ $etiqueta }}
@@ -62,11 +64,11 @@
     </div>
 
     <div class="bg-neutral-primary-soft border border-default rounded-base shadow-xs p-6">
-        <h3 class="text-lg font-semibold text-heading mb-4">Auxiliares asignados</h3>
+        <h3 class="text-lg font-semibold text-heading mb-4">Auxiliares</h3>
         <x-ui.table compact empty="No hay auxiliares registrados" :headers="['Auxiliar', 'Código SIS', 'Curso', 'Estado']" :rows="$auxiliares->map(fn($a) => [
             ['heading' => true, 'value' => $a->nombre_usuario.' '.$a->apellido],
             $a->cod_sis,
-            $a->nombre_curso,
+            $a->nombre_curso !== '' ? $a->nombre_curso : '—',
             $a->estado,
         ])->toArray()" />
     </div>

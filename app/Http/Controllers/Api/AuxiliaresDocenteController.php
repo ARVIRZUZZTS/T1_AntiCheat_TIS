@@ -7,20 +7,23 @@
  *
  * @created 2026-11-08
  *
- * @updated 2026-11-08
+ * @updated 2026-11-24
  *
  * @description
- * Endpoint de solo lectura que devuelve los auxiliares registrados por el
- * docente autenticado, cada uno con su curso y estado normalizado.
+ * Endpoint de solo lectura que devuelve todas las cuentas de auxiliar, cada
+ * una con los cursos que tiene asignados en los cursos del docente autenticado
+ * y un estado derivado: ACTIVO si tiene asignaciones activas, INACTIVO si solo
+ * existe su cuenta.
  *
  * El docente sale de la sesión (`$request->user()`), nunca de un parámetro:
- * así nadie puede ver auxiliares de otro docente. Solo existe la ruta GET,
+ * así nadie puede ver asignaciones de otro docente. Solo existe la ruta GET,
  * por lo que el endpoint no permite modificar datos.
  *
  * @changelog
  * - 2026-11-08  [OchoaCesar]  feat: GET /api/docentes/me/auxiliares.
  * - 2026-11-08  [OchoaCesar]  fix: la docblock ya no referencia
  *   FuenteAuxiliares (la pestaña "Ver auxiliares" se retiró).
+ * - 2026-11-24  [Equipo T1]  docs: el estado sale de las asignaciones activas.
  *
  * @see  App\Services\Auxiliar\ListarAuxiliaresDocenteService
  */
@@ -38,7 +41,7 @@ class AuxiliaresDocenteController extends Controller
     /**
      * @param  Request  $request  Sesión del docente autenticado.
      * @param  ListarAuxiliaresDocenteService  $servicio  Proyección al contrato de la lista.
-     * @return JsonResponse Lista de auxiliares; vacía si el docente no tiene ninguno.
+     * @return JsonResponse Todas las cuentas de auxiliar con estado ACTIVO/INACTIVO.
      */
     public function index(Request $request, ListarAuxiliaresDocenteService $servicio): JsonResponse
     {

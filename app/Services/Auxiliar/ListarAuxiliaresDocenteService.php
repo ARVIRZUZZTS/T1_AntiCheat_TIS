@@ -10,24 +10,24 @@
  * @updated 2026-11-08
  *
  * @description
- * Servicio de dominio que lista los auxiliares de un docente con su curso
- * y su estado normalizado.
+ * Servicio de dominio que lista todas las cuentas de auxiliar con sus cursos
+ * activos del docente y su estado derivado de esas asignaciones.
  *
- * La consulta (union auxiliar + curso + estado, orden por curso y luego por
- * apellido, sin N+1) vive en `AuxiliarCursoRepository`; este servicio la
- * proyecta al contrato de la lista —`id`, `nombre`, `apellido`,
- * `codigoSis`, `curso`, `estado`— y normaliza el estado a dos valores:
+ * El repositorio entrega las cuentas y las asignaciones activas en dos consultas
+ * (sin N+1); este servicio las proyecta al contrato de la lista —`id`, `nombre`,
+ * `apellido`, `codigoSis`, `curso`, `estado`— con dos valores posibles:
  *
- *  - `ACTIVO`  cuando la asignación está activa (`auxiliar_curso.estado`
- *              dice 'Activo', sin importar mayúsculas/minúsculas).
- *  - `BAJA`    en cualquier otro caso ('Baja', null o valor desconocido):
- *              solo es activo si lo dice explícitamente.
+ *  - `ACTIVO`    si el auxiliar está asignado a al menos un curso del docente.
+ *  - `INACTIVO`  si solo existe su cuenta, sin asignaciones activas.
  *
- * Los auxiliares dados de baja no se filtran: siguen apareciendo en la lista.
+ * El estado grabado en `auxiliar_curso` ya no se muestra: una baja deja de ser
+ * un estado de la lista y simplemente deja de contar como asignación.
  *
  * @changelog
  * - 2026-11-08  [OchoaCesar]  feat: creación inicial del servicio con
  *   normalización de estado a ACTIVO/BAJA.
+ * - 2026-11-24  [Equipo T1]  refactor: el estado sale de las asignaciones
+ *   activas (ACTIVO/INACTIVO) y se listan también las cuentas sin curso.
  * - 2026-11-08  [OchoaCesar]  fix: la docblock ya no referencia
  *   FuenteAuxiliares (la pestaña "Ver auxiliares" se retiró).
  *
@@ -38,7 +38,6 @@
 namespace App\Services\Auxiliar;
 
 use App\Repositories\AuxiliarCursoRepository;
-use Illuminate\Support\Collection;
 
 class ListarAuxiliaresDocenteService
 {
@@ -54,39 +53,29 @@ class ListarAuxiliaresDocenteService
      */
     public function ejecutar(int $idDocente): array
     {
-        return $this->proyectar($this->repositorio->delDocente($idDocente));
-    }
+        $asignaciones = $this->repositorio->asignacionesActivas($idDocente)
+            ->groupBy('id_auxiliar');
 
-    /**
-     * Pasa las filas del repositorio al contrato de salida, normalizando
-     * el estado.
-     *
-     * @param  Collection<int, \stdClass>  $filas  Filas del repositorio.
-     * @return list<array{id: int, nombre: string, apellido: string, codigoSis: string, curso: string, estado: string}>
-     */
-    private function proyectar(Collection $filas): array
-    {
-        return $filas
-            ->map(fn (object $fila): array => [
-                'id' => (int) $fila->id_usuario,
-                'nombre' => (string) $fila->nombre_usuario,
-                'apellido' => (string) $fila->apellido,
-                'codigoSis' => (string) $fila->cod_sis,
-                'curso' => (string) $fila->nombre_curso,
-                'estado' => $this->normalizarEstado($fila->estado),
-            ])
+        return $this->repositorio->auxiliares()
+            ->map(function (object $auxiliar) use ($asignaciones): array {
+                $cursos = $asignaciones->get($auxiliar->id_usuario, collect())
+                    ->pluck('nombre_curso')
+                    ->unique()
+                    ->values()
+                    ->all();
+
+                return [
+                    'id' => (int) $auxiliar->id_usuario,
+                    'nombre' => (string) $auxiliar->nombre_usuario,
+                    'apellido' => (string) $auxiliar->apellido,
+                    'codigoSis' => (string) $auxiliar->cod_sis,
+                    'curso' => implode(', ', $cursos),
+                    'estado' => $cursos === [] ? 'INACTIVO' : 'ACTIVO',
+                ];
+            })
+            ->sortBy(fn (array $fila): string => ($fila['estado'] === 'INACTIVO' ? '1 ' : '0 ')
+                .mb_strtolower($fila['apellido']).' '.mb_strtolower($fila['nombre']))
             ->values()
             ->all();
-    }
-
-    /**
-     * Normaliza `auxiliar_curso.estado` a los dos valores del contrato.
-     *
-     * @param  mixed  $estado  Valor crudo de la base.
-     * @return string 'ACTIVO' o 'BAJA'.
-     */
-    private function normalizarEstado(mixed $estado): string
-    {
-        return strtoupper(trim((string) $estado)) === 'ACTIVO' ? 'ACTIVO' : 'BAJA';
     }
 }

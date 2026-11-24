@@ -10,13 +10,15 @@
  * @updated 2026-11-08
  *
  * @description
- * Pruebas del endpoint GET /api/docentes/me/auxiliares: lista de los
- * auxiliares del docente autenticado con los criterios del ticket (200 con
- * lista vacía, 401 sin sesión, 403 con otro rol, aislamiento por docente y
- * solo lectura).
+ * Pruebas del endpoint GET /api/docentes/me/auxiliares: lista de todas las
+ * cuentas de auxiliar con estado ACTIVO/INACTIVO según sus asignaciones en los
+ * cursos del docente, además de 401 sin sesión, 403 con otro rol, aislamiento
+ * por docente y solo lectura.
  *
  * @changelog
  * - 2026-11-08  [OchoaCesar]  test: cobertura del endpoint de auxiliares.
+ * - 2026-11-24  [Equipo T1]  test: el estado sale de las asignaciones activas
+ *   y las cuentas sin curso aparecen como INACTIVO.
  *
  * @see  App\Http\Controllers\Api\AuxiliaresDocenteController
  */
@@ -131,35 +133,39 @@ class AuxiliaresDocenteApiTest extends TestCase
         $respuesta = $this->getJson(route('api.docentes.me.auxiliares'))->assertOk();
 
         $filas = $respuesta->json();
+        $porSis = collect($filas)->keyBy('codigoSis');
 
-        $this->assertCount(3, $filas);
+        $this->assertCount(5, $filas);
         $this->assertSame(
             ['id', 'nombre', 'apellido', 'codigoSis', 'curso', 'estado'],
             array_keys($filas[0]),
         );
 
-        // Orden por curso: Algoritmos I (dos auxiliares) y luego Bases de Datos.
-        $this->assertSame(
-            ['Algoritmos I', 'Algoritmos I', 'Bases de Datos'],
-            array_column($filas, 'curso'),
-        );
-        $this->assertSame(
-            ['SIS'.self::AUXILIAR_ACTIVO, 'SIS'.self::AUXILIAR_DE_BAJA, 'SIS'.self::AUXILIAR_OTRO_CURSO],
-            array_column($filas, 'codigoSis'),
-        );
-        $this->assertSame(['ACTIVO', 'BAJA', 'ACTIVO'], array_column($filas, 'estado'));
+        $this->assertSame('ACTIVO', $porSis->get('SIS'.self::AUXILIAR_ACTIVO)['estado']);
+        $this->assertSame('Algoritmos I', $porSis->get('SIS'.self::AUXILIAR_ACTIVO)['curso']);
+        $this->assertSame('ACTIVO', $porSis->get('SIS'.self::AUXILIAR_OTRO_CURSO)['estado']);
+        $this->assertSame('Bases de Datos', $porSis->get('SIS'.self::AUXILIAR_OTRO_CURSO)['curso']);
 
-        // La baja sigue en la lista y el auxiliar de otro docente no aparece.
-        $this->assertNotContains(self::AUXILIAR_DE_OTRO_DOCENTE, array_column($filas, 'id'));
+        // Baja y cuentas sin asignación en los cursos de este docente: inactivas.
+        foreach ([self::AUXILIAR_DE_BAJA, self::AUXILIAR_DE_OTRO_DOCENTE, self::USUARIO_AUXILIAR] as $id) {
+            $this->assertSame('INACTIVO', $porSis->get('SIS'.$id)['estado']);
+            $this->assertSame('', $porSis->get('SIS'.$id)['curso']);
+        }
+
+        $this->assertNotContains('BAJA', array_column($filas, 'estado'));
     }
 
-    public function test_sin_auxiliares_responde_200_con_lista_vacia(): void
+    public function test_sin_asignaciones_responde_200_con_auxiliares_inactivos(): void
     {
         $this->actingAs(Usuario::findOrFail(self::DOCENTE_VACIO));
 
         $respuesta = $this->getJson(route('api.docentes.me.auxiliares'))->assertOk();
 
-        $this->assertSame([], $respuesta->json());
+        $filas = $respuesta->json();
+
+        $this->assertCount(5, $filas);
+        $this->assertSame(array_fill(0, 5, 'INACTIVO'), array_column($filas, 'estado'));
+        $this->assertSame(array_fill(0, 5, ''), array_column($filas, 'curso'));
     }
 
     public function test_no_admite_escritura(): void
