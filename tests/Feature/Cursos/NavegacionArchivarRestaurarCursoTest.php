@@ -7,10 +7,16 @@
  *
  * @created 2026-11-22
  *
+ * @updated 2026-11-23
+ *
  * @description
- * Prueba de la navegación a la subopción «Archivar/Restaurar cursos» del
+ * Prueba de la navegación a la subopción «Archivar curso» del
  * grupo Cursos del sidebar, incluido el estado activo de la página única con
  * dos pestañas.
+ *
+ * @changelog
+ * - 2026-11-23  [Valery D. Ortuno P]  test: la subopción pasa a llamarse
+ *   «Archivar curso».
  */
 
 declare(strict_types=1);
@@ -47,7 +53,7 @@ class NavegacionArchivarRestaurarCursoTest extends TestCase
 
         $this->assertIsString($html);
         $this->assertMatchesRegularExpression(
-            '/<a[^>]+href="'.preg_quote(route('cursos.archivar-restaurar'), '/').'"[^>]*aria-current="page"\s*>\s*<span[^>]*>Archivar\/Restaurar cursos<\/span>/',
+            '/<a[^>]+href="'.preg_quote(route('cursos.archivar-restaurar'), '/').'"[^>]*aria-current="page"\s*>\s*<span[^>]*>Archivar curso<\/span>/',
             $html,
         );
     }
