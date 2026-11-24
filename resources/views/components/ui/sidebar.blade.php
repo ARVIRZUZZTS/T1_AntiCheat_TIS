@@ -81,6 +81,8 @@
     - 2026-11-22  [OchoaCesar]  refactor: "Archivar curso" y "Restaurar curso"
       dejan de ser dos subopciones del grupo Cursos y pasan a una sola
       subopcion "Archivar/Restaurar cursos" (pagina unica con dos pestanas).
+    - 2026-11-23  [OchoaCesar]  refactor: esa pagina unica deja las pestanas y
+      muestra una sola lista de cursos, con los archivados al final.
 --}}
 
 @props([
@@ -142,10 +144,10 @@
             ['label' => 'Ver cursos', 'route' => 'cursos'],
             ['label' => 'Crear curso', 'route' => 'cursos.crear'],
             ['label' => 'Editar curso', 'route' => 'cursos.editar'],
-            // Archivar y restaurar son dos pestanas de una sola pagina.
+            // Archivar y restaurar comparten una sola lista de cursos.
             ['label' => 'Archivar/Restaurar cursos', 'route' => 'cursos.archivar-restaurar'],
             ['label' => 'Eliminar curso', 'route' => 'cursos.eliminar'],
-            ['label' => 'Cursos archivados', 'route' => 'cursos.archivados'],
+            // ['label' => 'Cursos archivados', 'route' => 'cursos.archivados'],
             ['label' => 'Cargar CSV', 'route' => 'cursos.cargar-csv'],
             // El detalle de un curso (/cursos/{curso}) muestra las dos secciones;
             // se resalta "Ver estudiantes" como acceso principal.

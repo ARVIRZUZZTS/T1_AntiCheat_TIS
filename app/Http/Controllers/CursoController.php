@@ -44,6 +44,8 @@
  *   apuntan a la página única /cursos/archivar-restaurar (con la pestaña
  *   correspondiente); se retira restaurarLista() y su vista obsoleta
  *   pages/curso-restaurar (sin ruta).
+ * - 2026-11-23  [OchoaCesar]  refactor: el redirect de restaurar ya no envía
+ *   el parámetro pestana; la página muestra una sola lista de cursos.
  *
  * @see  App\Services\Curso\ContarAfectadosCursoService
  * @see  App\Services\Curso\EliminarCursoService
@@ -273,7 +275,7 @@ class CursoController extends Controller
             return response()->json(['mensaje' => RestaurarCursoService::MENSAJE_EXITO]);
         }
 
-        return redirect()->route('cursos.archivar-restaurar', ['pestana' => 'restaurar'])->with('mensaje', RestaurarCursoService::MENSAJE_EXITO);
+        return redirect()->route('cursos.archivar-restaurar')->with('mensaje', RestaurarCursoService::MENSAJE_EXITO);
     }
 
     public function archivados(Request $request): View

@@ -46,6 +46,9 @@
  *   los exámenes de esos cursos, incluso los que no le compartieron. El
  *   examen compartido sale en su propio curso. Se quita `es_anfitrion` del
  *   curso (la vista ya no lo usaba).
+ * - 2026-11-23  [OchoaCesar]  feat: `gestionesPorCurso()` expone la gestión con
+ *   año de cualquier curso propio (activo o archivado) para la lista única de
+ *   «Archivar/Restaurar cursos», con el mismo formato que «Ver cursos».
  *
  * @see  App\Services\Curso\ListarMateriasConMetricasService
  * @see  App\Http\Controllers\CursoController
@@ -55,7 +58,6 @@
 namespace App\Services\Curso;
 
 use App\Enums\CursoEstado;
-use App\Enums\InvitacionEstado;
 use App\Models\Curso;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
@@ -76,7 +78,17 @@ class ListarCursosDocenteService
      * por examen y el docente invitado los gestiona desde Exámenes.
      *
      * @param  int  $idDocente  ID del docente (`curso.sis_doc`).
-     * @return Collection<int, array{gestion: string|null, curso: Curso, inscritos: int, estudiantes: int, habilitados: int, deshabilitados: int, incidencias: int, examen_activo: bool}> Filas ordenadas de ListarMateriasConMetricasService.
+     * @return Collection<int, array{
+     *     gestion: string|null,
+     *     curso: Curso,
+     *     inscritos: int,
+     *     estudiantes: int,
+     *     habilitados: int,
+     *     deshabilitados: int,
+     *     incidencias: int,
+     *     examen_activo: bool,
+     * }> Filas de ListarMateriasConMetricasService ordenadas, con `gestion`
+     *    ("Segundo semestre 2026" o null).
      *
      * @author Valery D. Ortuno P <valerydariana98@gmail.com>
      *
@@ -144,6 +156,36 @@ class ListarCursosDocenteService
             ->orderBy('nombre_curso')
             ->orderBy('id_curso')
             ->get(['id_curso', 'nombre_curso', 'estado']);
+    }
+
+    /**
+     * Gestión con año ("Segundo semestre 2026") de los cursos indicados,
+     * indexada por id_curso. Cubre también los archivados, que no aparecen en
+     * `cursosConGestion()` porque ese método solo alimenta «Ver cursos».
+     *
+     * @param  array<int, int>  $idsCursos  IDs de los cursos a consultar.
+     * @return Collection<int, non-falsy-string|null> id_curso => texto de la gestión,
+     *                                                o null si no tiene gestion registrada.
+     *
+     * @author OchoaCesar <cesareduardonick@gmail.com>
+     *
+     * @since  2026-11-23
+     */
+    public function gestionesPorCurso(array $idsCursos): Collection
+    {
+        if ($idsCursos === []) {
+            return collect();
+        }
+
+        return DB::table('curso_tipo_gestion as ctg')
+            ->join('tipo_gestion as tg', 'tg.id_tipo_gestion', '=', 'ctg.id_tg')
+            ->whereIn('ctg.id_curso', $idsCursos)
+            ->get(['ctg.id_curso', 'tg.nombre_tipo_gestion', 'ctg.anio'])
+            ->mapWithKeys(fn (object $fila): array => [
+                (int) $fila->id_curso => $fila->nombre_tipo_gestion !== null
+                    ? Str::ucfirst($fila->nombre_tipo_gestion).' '.$fila->anio
+                    : null,
+            ]);
     }
 
     /**

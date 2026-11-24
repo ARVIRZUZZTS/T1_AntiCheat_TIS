@@ -3,11 +3,11 @@
     @author  Equipo T1
     @created 2026-11-21
     @updated 2026-11-22
+    @updated 2026-11-23
 
     @description
     Modal de confirmación para restaurar un curso archivado. Se usa desde la
-    pestaña «Restaurar» de la página única Archivar/Restaurar cursos
-    (Refs #326).
+    página única Archivar/Restaurar cursos (Refs #326).
 --}}
 
 @props([
