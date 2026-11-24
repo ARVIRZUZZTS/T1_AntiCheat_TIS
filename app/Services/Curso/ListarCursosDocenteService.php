@@ -157,6 +157,7 @@ class ListarCursosDocenteService
         return Curso::query()
             ->where('sis_doc', $idDocente)
             ->where('estado', CursoEstado::Archivado->value)
+            ->withCount('estudiantes')
             ->orderBy('nombre_curso')
             ->orderBy('id_curso')
             ->get(['id_curso', 'nombre_curso', 'estado']);
@@ -235,6 +236,7 @@ class ListarCursosDocenteService
         return Curso::query()
             ->where('sis_doc', $idDocente)
             ->where('estado', CursoEstado::EnCurso->value)
+            ->withCount('estudiantes')
             ->orderBy('nombre_curso')
             ->orderBy('id_curso')
             ->get(['id_curso', 'nombre_curso', 'estado']);

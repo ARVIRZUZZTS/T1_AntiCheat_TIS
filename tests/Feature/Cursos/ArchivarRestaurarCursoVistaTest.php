@@ -62,7 +62,7 @@ class ArchivarRestaurarCursoVistaTest extends TestCase
                 'id_usuario' => $id,
                 'cod_sis' => 'DOC'.$id,
                 'password' => 'x',
-                'nombre_usuario' => 'Docente',
+                'nombre_usuario' => 'Docente'.$id,
                 'apellido' => 'Vista '.$id,
             ]);
             DB::table('rol_usuario')->insert(['id_usuario' => $id, 'id_rol' => $rol]);
@@ -141,6 +141,31 @@ class ArchivarRestaurarCursoVistaTest extends TestCase
         );
     }
 
+    public function test_la_tabla_muestra_la_cantidad_de_estudiantes(): void
+    {
+        DB::table('estudiante')->insert([
+            'sis_estudiante' => '997201',
+            'nombre_estudiante' => 'Ana',
+            'apellido_estudiante' => 'Prueba',
+            'carrera' => 'Sistemas',
+        ]);
+        DB::table('estudiante_curso')->insert([
+            'sis_estudiante' => '997201',
+            'id_curso' => self::CURSO,
+        ]);
+
+        $this->actingAs(Usuario::findOrFail(self::DOCENTE));
+
+        $html = Livewire::test(ArchivarRestaurarCurso::class)
+            ->assertSee('ESTUDIANTES')
+            ->html();
+
+        $this->assertMatchesRegularExpression(
+            '/Curso En Curso[\s\S]{0,400}?<td class="px-4 py-2\.5 text-body">1<\/td>/',
+            $html,
+        );
+    }
+
     public function test_acciones_son_texto_rojo_archivar_y_gris_restaurar(): void
     {
         $this->actingAs(Usuario::findOrFail(self::DOCENTE));
@@ -148,11 +173,11 @@ class ArchivarRestaurarCursoVistaTest extends TestCase
         $html = Livewire::test(ArchivarRestaurarCurso::class)->html();
 
         $this->assertMatchesRegularExpression(
-            '/<button[^>]*text-fg-danger-strong[^>]*aria-label="Archivar curso Curso En Curso"[^>]*>[\s\S]{0,80}?Archivar<\/button>/',
+            '/<button[^>]*text-fg-danger-strong[^>]*aria-label="Archivar curso Curso En Curso"[^>]*>[\s\S]{0,80}?Archivar\s*<\/button>/',
             $html,
         );
         $this->assertMatchesRegularExpression(
-            '/<button[^>]*text-body-subtle[^>]*aria-label="Restaurar curso Curso Archivado Propio"[^>]*>[\s\S]{0,80}?Restaurar<\/button>/',
+            '/<button[^>]*text-body-subtle[^>]*aria-label="Restaurar curso Curso Archivado Propio"[^>]*>[\s\S]{0,80}?Restaurar\s*<\/button>/',
             $html,
         );
     }
@@ -208,6 +233,9 @@ class ArchivarRestaurarCursoVistaTest extends TestCase
 
     public function test_muestra_estado_vacio_sin_cursos_propios(): void
     {
+        DB::table('curso_tipo_gestion')
+            ->whereIn('id_curso', [self::CURSO, self::OTRO_CURSO, self::ARCHIVADO])
+            ->delete();
         DB::table('curso')->where('sis_doc', self::DOCENTE)->delete();
 
         $this->actingAs(Usuario::findOrFail(self::DOCENTE));
