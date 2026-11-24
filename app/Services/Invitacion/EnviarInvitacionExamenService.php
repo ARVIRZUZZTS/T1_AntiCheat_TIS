@@ -62,11 +62,19 @@ class EnviarInvitacionExamenService
             $invitacion = DB::transaction(function () use ($invitador, $invitado, $examen): InvitacionExamenCompartido {
                 $this->bloquearTabla();
 
-                $yaExiste = InvitacionExamenCompartido::query()
-                    ->where('id_examen', $examen->id_examen)
-                    ->where('id_docente_invitado', $invitado->id_usuario)
-                    ->whereIn('estado', [InvitacionEstado::Pendiente->value, InvitacionEstado::Aceptada->value])
-                    ->exists();
+                // Ya invitado (pendiente o aceptado) o ya comparte el examen: es
+                // el creador o tiene uno de sus cursos en el.
+                $yaExiste = (int) $examen->creador === (int) $invitado->id_usuario
+                    || InvitacionExamenCompartido::query()
+                        ->where('id_examen', $examen->id_examen)
+                        ->where('id_docente_invitado', $invitado->id_usuario)
+                        ->whereIn('estado', [InvitacionEstado::Pendiente->value, InvitacionEstado::Aceptada->value])
+                        ->exists()
+                    || DB::table('examen_curso as ec')
+                        ->join('curso as c', 'c.id_curso', '=', 'ec.id_curso')
+                        ->where('ec.id_examen', $examen->id_examen)
+                        ->where('c.sis_doc', $invitado->id_usuario)
+                        ->exists();
 
                 if ($yaExiste) {
                     $this->lanzarDuplicada();

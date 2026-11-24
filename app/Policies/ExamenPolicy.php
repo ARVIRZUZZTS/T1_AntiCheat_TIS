@@ -8,6 +8,7 @@
  * @created 2026-10-23
  *
  * @updated 2026-11-20
+ * @updated 2026-11-23
  *
  * @description Autoriza el reporte de horarios de ingreso de un examen a su
  * docente responsable o a un docente invitado que acepto la invitacion, y la
@@ -23,6 +24,8 @@
  *   (ahorra tres consultas a la base remota).
  * - 2026-11-22  [Valery D. Ortuno P]  feat: `monitorear` deja pasar al auxiliar
  *   con el curso activo o con el examen asignado con Monitor (HU 24).
+ * - 2026-11-23  [Valery D. Ortuno P]  fix: `invitarDocente` es solo para el
+ *   anfitrion (creador); un invitado que acepto ya no puede invitar a otros.
  * - 2026-11-20  [Equipo T1]  feat: bloqueo de escrituras si algún curso
  *   vinculado al examen está archivado (HU #321 · Task #323).
  *
@@ -107,17 +110,9 @@ class ExamenPolicy
             return false;
         }
 
-        if ((int) $examen->creador === (int) $usuario->id_usuario) {
-            return true;
-        }
-
-        // Un docente que aceptó la invitación al examen también puede invitar a
-        // otros docentes a compartirlo.
-        return DB::table('invitacion_examen_compartido')
-            ->where('id_examen', $examen->id_examen)
-            ->where('id_docente_invitado', $usuario->id_usuario)
-            ->where('estado', 'aceptado')
-            ->exists();
+        // Solo el anfitrion (quien creo el examen) invita: los invitados que
+        // aceptaron comparten el examen pero no pueden sumar a otros.
+        return (int) $examen->creador === (int) $usuario->id_usuario;
     }
 
     public function reporteHorarioIngreso(Usuario $usuario, Examen $examen, int $idCurso): bool

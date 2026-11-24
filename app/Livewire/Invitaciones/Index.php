@@ -49,6 +49,8 @@
  *   mismo paso, una sola lista para pendientes y aceptadas sin curso, y menos
  *   consultas en cada accion (listas en una consulta y actualizadas en
  *   memoria).
+ * - 2026-11-23  [Valery D. Ortuno P]  fix: Enviar solo ofrece cursos y
+ *   examenes futuros creados por el docente: solo el anfitrion invita.
  *
  * @see  App\Services\Invitacion\AsociarCursosInvitacionService
  * @see  App\Services\Invitacion\EnviarInvitacionExamenService
@@ -141,6 +143,8 @@ class Index extends Component
             ->join('examen_curso as ec', 'ec.id_examen', '=', 'e.id_examen')
             ->leftJoin('tipo_examen as t', 't.id_tipo_examen', '=', 'e.tipo_examen')
             ->where('ec.id_curso', $this->idCurso)
+            // Solo el anfitrion invita: un examen compartido que acepto no sale.
+            ->where('e.creador', auth()->id())
             ->where(fn ($consulta) => $this->futuro($consulta, $ahora))
             ->orderBy('e.fecha')
             ->orderBy('e.hora_inicio')
@@ -388,7 +392,7 @@ class Index extends Component
 
     /**
      * Cursos activos propios (no archivados ni finalizados) con al menos un
-     * examen futuro, en una sola consulta.
+     * examen futuro creado por el docente, en una sola consulta.
      *
      * @return list<array{id: int, nombre: string}>
      */
@@ -402,6 +406,7 @@ class Index extends Component
             ->whereExists(fn ($consulta) => $consulta->from('examen_curso as ec')
                 ->join('examen as e', 'e.id_examen', '=', 'ec.id_examen')
                 ->whereColumn('ec.id_curso', 'c.id_curso')
+                ->where('e.creador', auth()->id())
                 ->where(fn ($futuro) => $this->futuro($futuro, $ahora))
                 ->selectRaw('1'))
             ->orderBy('c.nombre_curso')
