@@ -7,22 +7,38 @@
  *
  * @created 2026-11-22
  *
+ * @updated 2026-11-24
+ *
  * @description
  * Datos de la pagina "Asignar auxiliar" (HU 24):
  *
  *  - `auxiliares`: todos los auxiliares del sistema, cada uno con sus
  *    asignaciones dentro de los cursos del docente (cursos y examenes
- *    sueltos, con las paginas que ve en cada examen).
+ *    sueltos, con las paginas que ve en cada examen) y su proximo examen
+ *    (el mas cercano entre sus examenes asignados y los de sus cursos).
+ *    Orden: primero el del examen mas proximo, luego los que tienen
+ *    asignaciones sin examenes por venir y al final los que no tienen nada.
  *  - `cursos`: los cursos en curso del docente, para asignar a un curso.
  *  - `examenes`: los examenes futuros de esos cursos en curso (no de cursos
  *    archivados), para asignar a uno.
  *
- * Todo sale en tres consultas (la base remota pesa ~380 ms por viaje); las
- * etiquetas de los examenes se arman en PHP para no depender de funciones de
- * agregacion distintas en Postgres y SQLite.
+ * Solo se muestran las asignaciones vigentes: cursos activos (no archivados)
+ * y examenes que aun no empezaron, de cursos activos. Es solo visual: en la
+ * base siguen las asignaciones de cursos archivados y examenes pasados (quien
+ * controlo cada examen).
+ *
+ * Todo sale en dos consultas (la base remota pesa ~380 ms por viaje): los
+ * auxiliares y, en un solo UNION, sus asignaciones y las opciones del modal.
+ * Las etiquetas de los examenes se arman en PHP para no depender de funciones
+ * de agregacion distintas en Postgres y SQLite.
  *
  * @changelog
  * - 2026-11-22  [Valery D. Ortuno P]  feat: creacion inicial (HU 24).
+ * - 2026-11-24  [Valery D. Ortuno P]  feat: proximo examen de cada auxiliar y
+ *   orden por ese examen (sin asignaciones al final), en las mismas consultas.
+ * - 2026-11-24  [Valery D. Ortuno P]  fix/perf: no se muestran asignaciones a
+ *   cursos archivados ni a examenes que ya empezaron (siguen en la base); las
+ *   asignaciones y las opciones salen en una sola consulta (antes dos).
  *
  * @see  App\Livewire\Auxiliares\AsignarAuxiliar
  */
@@ -42,7 +58,7 @@ class ListarAsignacionesAuxiliaresService
 
     /**
      * @return array{
-     *     auxiliares: list<array{id: int, nombre: string, sis: string, cursos: list<array{id: int, nombre: string}>, examenes: list<array{id: int, etiqueta: string, ingreso: bool, monitor: bool}>}>,
+     *     auxiliares: list<array{id: int, nombre: string, sis: string, proximo: ?string, cursos: list<array{id: int, nombre: string}>, examenes: list<array{id: int, etiqueta: string, ingreso: bool, monitor: bool}>}>,
      *     cursos: list<array{id: int, nombre: string}>,
      *     examenes: list<array{id: int, etiqueta: string}>
      * }
@@ -57,17 +73,35 @@ class ListarAsignacionesAuxiliaresService
             ->orderBy('nombre')
             ->get();
 
-        $asignaciones = $this->asignaciones($idDocente)->get();
-        $opciones = $this->opciones($idDocente)->get();
+        $ahora = now();
+        // Asignaciones y opciones del modal en un solo viaje.
+        $consultas = [...$this->asignaciones($idDocente, $ahora), ...$this->opciones($idDocente, $ahora)];
+        $union = array_shift($consultas);
+        foreach ($consultas as $consulta) {
+            $union->unionAll($consulta);
+        }
+        $filas = $union->get();
+        $asignaciones = $filas->where('origen', 'asignacion');
+        $opciones = $filas->where('origen', 'opcion');
 
         $cursosPorAuxiliar = $asignaciones->where('tipo', 'curso')->groupBy('id_auxiliar');
         $examenesPorAuxiliar = $asignaciones->where('tipo', 'examen')->groupBy('id_auxiliar');
+
+        $ahoraTexto = $ahora->format('Y-m-d H:i:s');
 
         return [
             'auxiliares' => $auxiliares->map(fn (object $auxiliar): array => [
                 'id' => (int) $auxiliar->id,
                 'nombre' => trim((string) $auxiliar->nombre),
                 'sis' => trim((string) $auxiliar->sis),
+                // El examen por venir mas cercano: el proximo de cada curso
+                // asignado o un examen asignado que aun no empezo.
+                'proximo' => $asignaciones->where('id_auxiliar', $auxiliar->id)
+                    ->map(fn (object $fila): ?string => $fila->tipo === 'curso'
+                        ? ($fila->proximo === null ? null : substr((string) $fila->proximo, 0, 19))
+                        : ($fila->fecha === null ? null : substr((string) $fila->fecha, 0, 10).' '.($fila->hora_inicio ?? '00:00:00')))
+                    ->filter(fn (?string $cuando): bool => $cuando !== null && $cuando > $ahoraTexto)
+                    ->min(),
                 'cursos' => $cursosPorAuxiliar->get($auxiliar->id, collect())
                     ->sortBy('texto')
                     ->map(fn (object $fila): array => ['id' => (int) $fila->id, 'nombre' => (string) $fila->texto])
@@ -81,7 +115,16 @@ class ListarAsignacionesAuxiliaresService
                     ->map(fn (array $examen): array => collect($examen)->except('fila')->all())
                     ->values()
                     ->all(),
-            ])->values()->all(),
+            ])
+                // Examen mas proximo primero; luego con asignaciones y sin
+                // examenes por venir; al final los que no tienen nada.
+                ->sortBy(fn (array $auxiliar): string => match (true) {
+                    $auxiliar['proximo'] !== null => '0 '.$auxiliar['proximo'],
+                    $auxiliar['cursos'] !== [] || $auxiliar['examenes'] !== [] => '1',
+                    default => '2',
+                }.' '.mb_strtolower($auxiliar['nombre']))
+                ->values()
+                ->all(),
             'cursos' => $opciones->where('tipo', 'curso')
                 ->sortBy('texto')
                 ->map(fn (object $fila): array => ['id' => (int) $fila->id, 'nombre' => (string) $fila->texto])
@@ -96,15 +139,27 @@ class ListarAsignacionesAuxiliaresService
 
     /**
      * Asignaciones vigentes dentro de los cursos del docente: una fila por
-     * curso asignado y una por (examen asignado, curso del docente).
+     * curso activo asignado y una por (examen por venir asignado, curso activo
+     * del docente). Lo archivado o pasado no se muestra (sigue en la base).
+     *
+     * @return list<\Illuminate\Database\Query\Builder>
      */
-    private function asignaciones(int $idDocente)
+    private function asignaciones(int $idDocente, Carbon $ahora): array
     {
+        // Proximo examen de cada curso asignado (texto 'Y-m-d H:i:s').
+        $proximoDelCurso = "(select min(e2.fecha || ' ' || coalesce(e2.hora_inicio, '00:00:00')) from examen e2"
+            .' join examen_curso ec2 on ec2.id_examen = e2.id_examen where ec2.id_curso = c.id_curso'
+            .' and (e2.fecha > ? or (e2.fecha = ? and e2.hora_inicio > ?)))';
+
         $cursos = DB::table('auxiliar_curso as ac')
             ->join('curso as c', 'c.id_curso', '=', 'ac.id_curso')
             ->where('c.sis_doc', $idDocente)
+            ->where('c.estado', CursoEstado::EnCurso->value)
             ->where('ac.estado', AccesoAuxiliarService::ESTADO_ACTIVO)
-            ->selectRaw("'curso' as tipo, ac.id_auxiliar, c.id_curso as id, c.nombre_curso as texto, null as tipo_examen, null as fecha, null as hora_inicio, null as ver_ingreso, null as ver_monitor");
+            ->selectRaw(
+                "'asignacion' as origen, 'curso' as tipo, ac.id_auxiliar, c.id_curso as id, c.nombre_curso as texto, null as tipo_examen, null as fecha, null as hora_inicio, null as ver_ingreso, null as ver_monitor, {$proximoDelCurso} as proximo",
+                [$ahora->toDateString(), $ahora->toDateString(), $ahora->format('H:i:s')],
+            );
 
         $examenes = DB::table('auxiliar_examen as ae')
             ->join('examen as e', 'e.id_examen', '=', 'ae.id_examen')
@@ -112,23 +167,25 @@ class ListarAsignacionesAuxiliaresService
             ->join('curso as c', 'c.id_curso', '=', 'ec.id_curso')
             ->leftJoin('tipo_examen as t', 't.id_tipo_examen', '=', 'e.tipo_examen')
             ->where('c.sis_doc', $idDocente)
-            ->selectRaw("'examen' as tipo, ae.id_auxiliar, e.id_examen as id, c.nombre_curso as texto, t.nombre_tipo_examen as tipo_examen, e.fecha, e.hora_inicio, ae.ver_ingreso, ae.ver_monitor");
+            ->where('c.estado', CursoEstado::EnCurso->value)
+            ->where(fn ($consulta) => $this->futuro($consulta, $ahora))
+            ->selectRaw("'asignacion' as origen, 'examen' as tipo, ae.id_auxiliar, e.id_examen as id, c.nombre_curso as texto, t.nombre_tipo_examen as tipo_examen, e.fecha, e.hora_inicio, ae.ver_ingreso, ae.ver_monitor, null as proximo");
 
-        return $cursos->unionAll($examenes);
+        return [$cursos, $examenes];
     }
 
     /**
      * Opciones del modal: cursos en curso del docente y examenes futuros de
      * sus cursos (una fila por examen y curso).
+     *
+     * @return list<\Illuminate\Database\Query\Builder>
      */
-    private function opciones(int $idDocente)
+    private function opciones(int $idDocente, Carbon $ahora): array
     {
-        $ahora = now();
-
         $cursos = DB::table('curso as c')
             ->where('c.sis_doc', $idDocente)
             ->where('c.estado', CursoEstado::EnCurso->value)
-            ->selectRaw("'curso' as tipo, null as id_auxiliar, c.id_curso as id, c.nombre_curso as texto, null as tipo_examen, null as fecha, null as hora_inicio, null as ver_ingreso, null as ver_monitor");
+            ->selectRaw("'opcion' as origen, 'curso' as tipo, null as id_auxiliar, c.id_curso as id, c.nombre_curso as texto, null as tipo_examen, null as fecha, null as hora_inicio, null as ver_ingreso, null as ver_monitor, null as proximo");
 
         $examenes = DB::table('examen as e')
             ->join('examen_curso as ec', 'ec.id_examen', '=', 'e.id_examen')
@@ -136,14 +193,20 @@ class ListarAsignacionesAuxiliaresService
             ->leftJoin('tipo_examen as t', 't.id_tipo_examen', '=', 'e.tipo_examen')
             ->where('c.sis_doc', $idDocente)
             ->where('c.estado', CursoEstado::EnCurso->value)
-            ->where(fn ($consulta) => $consulta
-                ->where('e.fecha', '>', $ahora->toDateString())
-                ->orWhere(fn ($hoy) => $hoy
-                    ->where('e.fecha', $ahora->toDateString())
-                    ->where('e.hora_inicio', '>', $ahora->format('H:i:s'))))
-            ->selectRaw("'examen' as tipo, null as id_auxiliar, e.id_examen as id, c.nombre_curso as texto, t.nombre_tipo_examen as tipo_examen, e.fecha, e.hora_inicio, null as ver_ingreso, null as ver_monitor");
+            ->where(fn ($consulta) => $this->futuro($consulta, $ahora))
+            ->selectRaw("'opcion' as origen, 'examen' as tipo, null as id_auxiliar, e.id_examen as id, c.nombre_curso as texto, t.nombre_tipo_examen as tipo_examen, e.fecha, e.hora_inicio, null as ver_ingreso, null as ver_monitor, null as proximo");
 
-        return $cursos->unionAll($examenes);
+        return [$cursos, $examenes];
+    }
+
+    /** Examen que aun no empezo: fecha posterior a hoy, o de hoy con hora por venir. */
+    private function futuro($consulta, Carbon $ahora)
+    {
+        return $consulta
+            ->where('e.fecha', '>', $ahora->toDateString())
+            ->orWhere(fn ($hoy) => $hoy
+                ->where('e.fecha', $ahora->toDateString())
+                ->where('e.hora_inicio', '>', $ahora->format('H:i:s')));
     }
 
     /**

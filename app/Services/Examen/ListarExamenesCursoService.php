@@ -11,6 +11,7 @@
  * @updated 2026-11-14
  * @updated 2026-11-16
  * @updated 2026-11-23
+ * @updated 2026-11-24
  *
  * @description
  * Servicio de la feature Examen que lista los exámenes de un curso con la
@@ -52,6 +53,11 @@
  * - 2026-11-23  [Valery D. Ortuno P]  fix: `curso` (la etiqueta del examen) lleva
  *   solo los cursos del docente que mira; en un examen compartido ya no salen
  *   los cursos del otro docente. `cursos` sigue trayendo todos.
+ * - 2026-11-24  [Valery D. Ortuno P]  fix/perf: `listar()` trae los examenes en
+ *   una sola consulta (antes cinco) y solo los que estan en un curso propio
+ *   del docente (un invitado que acepto sin asociar curso veia el examen con
+ *   los cursos de los otros docentes). Con un curso elegido, la etiqueta es
+ *   ese curso.
  */
 
 namespace App\Services\Examen;
@@ -106,26 +112,18 @@ class ListarExamenesCursoService
      */
     public function ejecutar(int $idCurso, ?Carbon $ahora = null): array
     {
-        $curso = Curso::findOrFail($idCurso);
         $ahora ??= Carbon::now();
+        $idDocente = (int) (auth()->id() ?? 0);
 
-        $examenesInvitados = DB::table('invitacion_examen_compartido')
-            ->where('id_docente_invitador', (int) (auth()->id() ?? 0))
-            ->pluck('id_examen')
-            ->all();
+        $examenes = $this->listar($idDocente === 0 ? null : $idDocente, $idCurso, $ahora);
 
-        return $curso->examenes()
-            ->with(['tipoExamen', 'ambientes', 'cursos'])
-            ->withCount([
-                'estudianteExamenes',
-                // Un ingreso duplicado no representa un estudiante adicional.
-                'registrosAsistencia as ingresados' => function (Builder $consulta): Builder {
-                    return $consulta->select(DB::raw('COUNT(DISTINCT id_estudiante)'));
-                },
-                'incidencias',
-            ])
-            ->get()
-            ->map(fn (Examen $examen): array => $this->mapearExamen($examen, $ahora, $examenesInvitados))
+        // Sin examenes se confirma que el curso exista (404 si no); con
+        // examenes ya se sabe que existe y se ahorra la consulta.
+        if ($examenes === []) {
+            Curso::findOrFail($idCurso);
+        }
+
+        return collect($examenes)
             ->sortBy([
                 fn (array $primero, array $segundo): int => ($primero['estado'] === self::ESTADO_FINALIZADO)
                     <=> ($segundo['estado'] === self::ESTADO_FINALIZADO),
@@ -138,6 +136,88 @@ class ListarExamenesCursoService
     }
 
     /**
+     * Examenes con todo lo que muestran las listas (tipo, cursos, ambientes,
+     * inscritos, ingresos, incidencias y si el docente invito a otros) en UNA
+     * sola consulta: cada viaje a la base remota pesa (~380 ms) y antes eran
+     * cinco (examenes, tipos, ambientes, cursos e invitaciones).
+     *
+     * Con `$idDocente` solo salen los examenes que estan en un curso propio
+     * del docente (sea anfitrion o invitado): un examen compartido aparece en
+     * el curso de cada uno. Con `$idCurso`, solo los de ese curso, y la
+     * etiqueta del examen es ese curso.
+     *
+     * @return list<array<string, mixed>> Sin ordenar.
+     */
+    public function listar(?int $idDocente, ?int $idCurso, Carbon $ahora): array
+    {
+        $agrupar = fn (string $expresion): string => DB::getDriverName() === 'pgsql'
+            ? "string_agg({$expresion}, '§')"
+            : "group_concat({$expresion}, '§')";
+
+        $filas = DB::table('examen as e')
+            ->leftJoin('tipo_examen as t', 't.id_tipo_examen', '=', 'e.tipo_examen')
+            ->when($idDocente !== null || $idCurso !== null, fn ($consulta) => $consulta->whereExists(
+                fn ($curso) => $curso->from('examen_curso as ec')
+                    ->join('curso as c', 'c.id_curso', '=', 'ec.id_curso')
+                    ->whereColumn('ec.id_examen', 'e.id_examen')
+                    ->when($idDocente !== null, fn ($propio) => $propio->where('c.sis_doc', $idDocente))
+                    ->when($idCurso !== null, fn ($elegido) => $elegido->where('ec.id_curso', $idCurso))
+                    ->selectRaw('1')
+            ))
+            ->select('e.*', 't.nombre_tipo_examen')
+            ->selectRaw('(select count(*) from estudiante_examen ee where ee.id_examen = e.id_examen) as estudiante_examenes_count')
+            // Un ingreso duplicado no representa un estudiante adicional.
+            ->selectRaw('(select count(distinct ra.id_estudiante) from registro_asistencia ra where ra.id_examen = e.id_examen) as ingresados')
+            ->selectRaw('(select count(*) from central_riesgo cr where cr.id_examen = e.id_examen) as incidencias_count')
+            ->selectRaw(
+                'exists (select 1 from invitacion_examen_compartido i where i.id_examen = e.id_examen and i.id_docente_invitador = ?) as invito',
+                [(int) ($idDocente ?? 0)],
+            )
+            ->selectRaw('(select '.$agrupar("c.id_curso || '|' || coalesce(c.sis_doc, 0) || '|' || c.nombre_curso").' from examen_curso ec join curso c on c.id_curso = ec.id_curso where ec.id_examen = e.id_examen) as cursos_texto')
+            ->selectRaw('(select '.$agrupar("a.id_ambiente || '|' || a.nombre_ambiente").' from examen_ambiente ea join ambiente a on a.id_ambiente = ea.id_ambiente where ea.id_examen = e.id_examen) as ambientes_texto')
+            ->get();
+
+        $invitados = [];
+        $examenes = [];
+
+        foreach ($filas as $fila) {
+            $datos = (array) $fila;
+            if ((bool) $datos['invito']) {
+                $invitados[] = (int) $datos['id_examen'];
+            }
+
+            $examen = (new Examen)->newFromBuilder(array_diff_key($datos, array_flip(['nombre_tipo_examen', 'invito', 'cursos_texto', 'ambientes_texto'])));
+            $examen->setRelation('tipoExamen', $datos['nombre_tipo_examen'] === null ? null
+                : (new \App\Models\TipoExamen)->newFromBuilder(['id_tipo_examen' => $datos['tipo_examen'], 'nombre_tipo_examen' => $datos['nombre_tipo_examen']]));
+            $examen->setRelation('cursos', (new Curso)->newCollection(array_map(
+                fn (array $partes): Curso => (new Curso)->newFromBuilder(['id_curso' => (int) $partes[0], 'sis_doc' => (int) $partes[1], 'nombre_curso' => $partes[2]]),
+                $this->partes($datos['cursos_texto'], 3),
+            )));
+            $examen->setRelation('ambientes', (new Ambiente)->newCollection(array_map(
+                fn (array $partes): Ambiente => (new Ambiente)->newFromBuilder(['id_ambiente' => (int) $partes[0], 'nombre_ambiente' => $partes[1]]),
+                $this->partes($datos['ambientes_texto'], 2),
+            )));
+            $examenes[] = $examen;
+        }
+
+        return array_map(fn (Examen $examen): array => $this->mapearExamen($examen, $ahora, $invitados, $idCurso), $examenes);
+    }
+
+    /**
+     * Separa el texto agrupado ("id|...§id|...") en sus filas.
+     *
+     * @return list<list<string>>
+     */
+    private function partes(?string $texto, int $campos): array
+    {
+        if ($texto === null || $texto === '') {
+            return [];
+        }
+
+        return array_map(fn (string $fila): array => explode('|', $fila, $campos), explode('§', $texto));
+    }
+
+    /**
      * Convierte un examen en el arreglo de datos que consume la vista.
      *
      * @param  Examen  $examen  Examen con el tipo, los cursos y el conteo de
@@ -147,7 +227,7 @@ class ListarExamenesCursoService
      *                                        el invitador.
      * @return array<string, mixed>
      */
-    public function mapearExamen(Examen $examen, Carbon $ahora, array $examenesInvitados = []): array
+    public function mapearExamen(Examen $examen, Carbon $ahora, array $examenesInvitados = [], ?int $idCursoContexto = null): array
     {
         $tipo = TipoExamen::etiquetaDe($examen->tipoExamen?->nombre_tipo_examen);
         $nombre = $examen->nombre_examen ?? $tipo ?? 'Examen #'.$examen->id_examen;
@@ -175,10 +255,10 @@ class ListarExamenesCursoService
             'hora_fin' => $this->recortarHora($examen->hora_fin),
             'duracion' => $examen->duracion,
             'cursos' => $cursos,
-            // Etiqueta del examen para quien mira: solo sus propios cursos (en
-            // un examen compartido el otro docente tiene los suyos). Sin
-            // sesion o sin curso propio, todos los del examen.
-            'curso' => $this->cursosPropios($examen) ?? implode(', ', array_column($cursos, 'nombre')),
+            // Etiqueta del examen para quien mira: el curso elegido en el
+            // selector, o solo sus propios cursos (en un examen compartido el
+            // otro docente tiene los suyos). Sin sesion, todos los del examen.
+            'curso' => $this->cursosPropios($examen, $idCursoContexto) ?? implode(', ', array_column($cursos, 'nombre')),
             'inscritos' => (int) $examen->getAttribute('estudiante_examenes_count'),
             'ingresados' => (int) $examen->getAttribute('ingresados'),
             'incidencias' => (int) $examen->getAttribute('incidencias_count'),
@@ -198,8 +278,15 @@ class ListarExamenesCursoService
      * Nombres de los cursos del examen que son del docente autenticado, o
      * null si no hay sesion o ninguno es suyo.
      */
-    private function cursosPropios(Examen $examen): ?string
+    private function cursosPropios(Examen $examen, ?int $idCursoContexto = null): ?string
     {
+        if ($idCursoContexto !== null && $examen->relationLoaded('cursos')) {
+            $elegido = $examen->cursos->firstWhere('id_curso', $idCursoContexto);
+            if ($elegido !== null) {
+                return $elegido->nombre_curso;
+            }
+        }
+
         $idDocente = (int) (auth()->id() ?? 0);
 
         if ($idDocente === 0 || ! $examen->relationLoaded('cursos')) {

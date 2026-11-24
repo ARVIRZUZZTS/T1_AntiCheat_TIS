@@ -7,6 +7,7 @@
     @updated 2026-11-20
     @updated 2026-11-22
     @updated 2026-11-23
+    @updated 2026-11-24
 
     @description
     Listado exclusivo de la subopción «Ver examenes». No contiene la barra de
@@ -39,6 +40,8 @@
       ambientes e ingresos de la tarjeta (estan en el detalle). Si es
       anfitrion ya no sale tambien "Propio". Espacio entre el filtro y su
       numero ("Todos 35"). El selector de curso vuelve a mostrar solo el nombre.
+    - 2026-11-24  [Valery D. Ortuno P]  style: el selector de curso es mas ancho en
+      escritorio (en movil sigue ocupando todo el ancho).
     - 2026-11-20  [OchoaCesar]  refactor: la eliminación de examen pasa a la
       página propia /examenes/eliminar (subopción del sidebar); se retiran de
       aquí el botón "Eliminar" de la tarjeta, el aviso de bloqueo y sus
@@ -233,7 +236,7 @@
     {{-- Barra blanca: selector y píldoras de filtro. --}}
     <div class="mt-4 bg-neutral-primary-soft border border-default rounded-base shadow-xs p-3 flex flex-col gap-3 sm:flex-row sm:items-center">
         @if ($listadoGlobal)
-            <div class="min-w-0 sm:w-56">
+            <div class="min-w-0 sm:w-72 lg:w-96">
                 <label for="examen-curso-lista" class="block mb-2.5 text-sm font-medium text-heading sm:sr-only">Curso</label>
                 <select id="examen-curso-lista"
                         x-model="cursoLista"

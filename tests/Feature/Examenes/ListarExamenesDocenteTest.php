@@ -7,14 +7,21 @@
  *
  * @created 2026-11-14
  *
+ * @updated 2026-11-24
+ *
  * @description
  * Pruebas del endpoint GET /api/examenes, que alimenta el listado global y los
- * selectores de la pagina unica de Examenes. Comprueba que entren todos los
- * examenes propios o compartidos con una invitacion aceptada, sin descartar los
- * pasados, y que cada examen llegue con los cursos que necesita el nombre
- * "tipo - curso".
+ * selectores de la pagina unica de Examenes. Comprueba que entren los examenes
+ * que estan en un curso propio del docente (los que creo y los compartidos que
+ * acepto y asocio a un curso suyo), sin descartar los pasados, y que la
+ * etiqueta del examen muestre solo los cursos propios.
  *
  * Usa una base SQLite en memoria, sin tocar la base compartida del .env.
+ *
+ * @changelog
+ * - 2026-11-24  [Valery D. Ortuno P]  test: solo examenes en un curso propio del
+ *   docente y etiqueta con sus cursos; `curso.sis_doc` y `central_riesgo` en el
+ *   esquema sqlite.
  *
  * @see App\Http\Controllers\Api\ExamenDocenteController
  * @see App\Services\Examen\ListarExamenesDocenteService
@@ -59,67 +66,46 @@ class ListarExamenesDocenteTest extends TestCase
         parent::tearDown();
     }
 
-    public function test_lista_todos_los_examenes_propios_o_con_invitacion_aceptada(): void
+    public function test_lista_los_examenes_que_estan_en_un_curso_propio(): void
     {
+        // Cursos 1 y 3 son del docente; el 2 es del otro docente.
         $this->crearExamen(1, self::DOCENTE, '2026-11-15', [1]);
-        $this->crearExamen(2, self::OTRO_DOCENTE, '2026-11-16', [1]);
-        $this->crearExamen(3, self::OTRO_DOCENTE, '2026-11-16', [1]);
-        $this->crearExamen(4, self::OTRO_DOCENTE, '2026-11-16', [1]);
         $this->crearExamen(5, self::DOCENTE, '2026-11-13', [1]);
-        $this->crearExamen(6, self::OTRO_DOCENTE, '2026-11-17', [1]);
-        $this->crearExamen(7, self::DOCENTE, '2026-11-17', [1, 2]);
-        $this->crearExamen(8, self::OTRO_DOCENTE, '2026-11-10', [1]);
+        $this->crearExamen(7, self::DOCENTE, '2026-11-17', [1, 3]);
+        // Compartidos: aceptado y asociado a un curso propio (sale).
+        $this->crearExamen(2, self::OTRO_DOCENTE, '2026-11-16', [2, 1]);
+        $this->crearExamen(8, self::OTRO_DOCENTE, '2026-11-10', [2, 1]);
+        // Pendiente, rechazado o aceptado sin asociar curso propio (no salen).
+        $this->crearExamen(3, self::OTRO_DOCENTE, '2026-11-16', [2]);
+        $this->crearExamen(4, self::OTRO_DOCENTE, '2026-11-16', [2]);
+        $this->crearExamen(6, self::OTRO_DOCENTE, '2026-11-17', [2]);
 
+        $invitacion = fn (int $examen, string $estado): array => [
+            'id_examen' => $examen,
+            'id_docente_invitador' => self::OTRO_DOCENTE,
+            'id_docente_invitado' => self::DOCENTE,
+            'estado' => $estado,
+        ];
         DB::table('invitacion_examen_compartido')->insert([
-            [
-                'id_examen' => 2,
-                'id_docente_invitador' => self::OTRO_DOCENTE,
-                'id_docente_invitado' => self::DOCENTE,
-                'estado' => 'aceptado',
-            ],
-            [
-                'id_examen' => 3,
-                'id_docente_invitador' => self::OTRO_DOCENTE,
-                'id_docente_invitado' => self::DOCENTE,
-                'estado' => 'pendiente',
-            ],
-            [
-                'id_examen' => 4,
-                'id_docente_invitador' => self::OTRO_DOCENTE,
-                'id_docente_invitado' => self::DOCENTE,
-                'estado' => 'rechazado',
-            ],
-            [
-                'id_examen' => 1,
-                'id_docente_invitador' => self::DOCENTE,
-                'id_docente_invitado' => self::OTRO_DOCENTE,
-                'estado' => 'aceptado',
-            ],
-            [
-                'id_examen' => 6,
-                'id_docente_invitador' => self::OTRO_DOCENTE,
-                'id_docente_invitado' => self::DOCENTE,
-                'estado' => 'aceptado',
-            ],
-            [
-                'id_examen' => 8,
-                'id_docente_invitador' => self::OTRO_DOCENTE,
-                'id_docente_invitado' => self::DOCENTE,
-                'estado' => 'aceptado',
-            ],
+            $invitacion(2, 'aceptado'),
+            $invitacion(3, 'pendiente'),
+            $invitacion(4, 'rechazado'),
+            $invitacion(6, 'aceptado'),
+            $invitacion(8, 'aceptado'),
         ]);
 
         $this->actingAs(Usuario::query()->findOrFail(self::DOCENTE), 'web');
 
         $respuesta = $this->getJson('/api/examenes')->assertOk();
 
-        $this->assertSame([7, 6, 2, 1, 5, 8], array_column($respuesta->json('datos'), 'id'));
+        $this->assertSame([7, 2, 1, 5, 8], array_column($respuesta->json('datos'), 'id'));
+        // Solo los cursos propios: el del otro docente no aparece en la etiqueta.
         $this->assertSame(
-            ['Calculo 1, Fisica 1', 'Calculo 1', 'Calculo 1', 'Calculo 1', 'Calculo 1', 'Calculo 1'],
+            ['Algebra, Calculo 1', 'Calculo 1', 'Calculo 1', 'Calculo 1', 'Calculo 1'],
             array_column($respuesta->json('datos'), 'curso')
         );
         $this->assertSame('Programado', $respuesta->json('datos.0.estado'));
-        $this->assertSame('Finalizado', $respuesta->json('datos.4.estado'));
+        $this->assertSame('Finalizado', $respuesta->json('datos.3.estado'));
     }
 
     /** Esquema mínimo de las relaciones y del guard de autenticación. */
@@ -141,6 +127,12 @@ class ListarExamenesDocenteTest extends TestCase
         Schema::create('curso', function (Blueprint $tabla): void {
             $tabla->integer('id_curso')->primary();
             $tabla->string('nombre_curso');
+            // Docente dueño del curso: el listado filtra por los cursos propios.
+            $tabla->integer('sis_doc')->nullable();
+        });
+        Schema::create('central_riesgo', function (Blueprint $tabla): void {
+            $tabla->integer('id_registro')->primary();
+            $tabla->integer('id_examen')->nullable();
         });
         Schema::create('tipo_examen', function (Blueprint $tabla): void {
             $tabla->integer('id_tipo_examen')->primary();
@@ -199,8 +191,9 @@ class ListarExamenesDocenteTest extends TestCase
             ['id_usuario' => self::OTRO_DOCENTE, 'id_rol' => 1],
         ]);
         DB::table('curso')->insert([
-            ['id_curso' => 1, 'nombre_curso' => 'Calculo 1'],
-            ['id_curso' => 2, 'nombre_curso' => 'Fisica 1'],
+            ['id_curso' => 1, 'nombre_curso' => 'Calculo 1', 'sis_doc' => self::DOCENTE],
+            ['id_curso' => 2, 'nombre_curso' => 'Fisica 1', 'sis_doc' => self::OTRO_DOCENTE],
+            ['id_curso' => 3, 'nombre_curso' => 'Algebra', 'sis_doc' => self::DOCENTE],
         ]);
         DB::table('tipo_examen')->insert([
             'id_tipo_examen' => 1,

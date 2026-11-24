@@ -8,6 +8,7 @@
  * @created 2026-11-14
  *
  * @updated 2026-11-16
+ * @updated 2026-11-24
  *
  * @description
  * Lista los examenes a los que tiene acceso el docente autenticado: los que
@@ -26,17 +27,17 @@
  * - 2026-11-16  [OchoaCesar]  fix: excluye los examenes sin curso y suma
  *   `incidencias` al payload (igual que el listado por curso).
  *
+ * - 2026-11-24  [Valery D. Ortuno P]  fix/perf: una sola consulta y solo los
+ *   examenes que estan en un curso propio del docente (anfitrion o invitado).
+ *
  * @see  App\Http\Controllers\Api\ExamenDocenteController
  * @see  App\Services\Examen\ListarExamenesCursoService
  */
 
 namespace App\Services\Examen;
 
-use App\Enums\InvitacionEstado;
 use App\Models\Examen;
 use Carbon\Carbon;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Facades\DB;
 
 class ListarExamenesDocenteService
 {
@@ -51,38 +52,11 @@ class ListarExamenesDocenteService
     public function ejecutar(int $idDocente, ?Carbon $ahora = null): array
     {
         $ahora ??= Carbon::now();
-        $examenesInvitados = DB::table('invitacion_examen_compartido')
-            ->where('id_docente_invitador', $idDocente)
-            ->pluck('id_examen')
-            ->all();
 
-        return Examen::query()
-            ->with(['tipoExamen', 'ambientes', 'cursos'])
-            ->withCount([
-                'estudianteExamenes',
-                'registrosAsistencia as ingresados' => function (Builder $consulta): Builder {
-                    return $consulta->select(DB::raw('COUNT(DISTINCT id_estudiante)'));
-                },
-                'incidencias',
-            ])
-            ->where(function (Builder $consulta) use ($idDocente): Builder {
-                return $consulta
-                    ->where('creador', $idDocente)
-                    ->orWhereHas('invitaciones', function (Builder $invitaciones) use ($idDocente): Builder {
-                        return $invitaciones
-                            ->where('id_docente_invitado', $idDocente)
-                            ->where('estado', InvitacionEstado::Aceptada->value);
-                    });
-            })
-            // Un examen desvinculado de todos sus cursos queda huérfano: no
-            // debe seguir apareciendo en el listado global del docente.
-            ->whereHas('cursos')
-            ->get()
-            ->map(fn (Examen $examen): array => $this->mapeador->mapearExamen(
-                $examen,
-                $ahora,
-                $examenesInvitados,
-            ))
+        // Una sola consulta: los examenes que estan en un curso propio del
+        // docente, sea anfitrion o invitado (un examen sin curso propio o
+        // desvinculado de todos sus cursos no aparece).
+        return collect($this->mapeador->listar($idDocente, null, $ahora))
             ->sortBy([
                 ['fecha', 'desc'],
                 ['hora_inicio', 'desc'],
