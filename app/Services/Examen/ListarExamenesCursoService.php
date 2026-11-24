@@ -62,6 +62,7 @@
 
 namespace App\Services\Examen;
 
+use App\Enums\CursoEstado;
 use App\Enums\TipoExamen;
 use App\Models\Ambiente;
 use App\Models\Curso;
@@ -161,6 +162,7 @@ class ListarExamenesCursoService
                     ->join('curso as c', 'c.id_curso', '=', 'ec.id_curso')
                     ->whereColumn('ec.id_examen', 'e.id_examen')
                     ->when($idDocente !== null, fn ($propio) => $propio->where('c.sis_doc', $idDocente))
+                    ->where('c.estado', '!=', CursoEstado::Archivado->value)
                     ->when($idCurso !== null, fn ($elegido) => $elegido->where('ec.id_curso', $idCurso))
                     ->selectRaw('1')
             ))

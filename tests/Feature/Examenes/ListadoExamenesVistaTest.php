@@ -286,17 +286,19 @@ class ListadoExamenesVistaTest extends TestCase
         $this->assertStringContainsString('(int) $curso->examenes_count > 0', $servicio);
     }
 
-    public function test_la_lista_de_examenes_tiene_filtro_de_tiempo(): void
+    public function test_la_lista_de_examenes_tiene_filtro_de_estado(): void
     {
         $lista = $this->fuenteLista();
 
-        $this->assertStringContainsString('filtroTiempo', $lista);
-        $this->assertStringContainsString('esPasado(examen) {', $lista);
+        $this->assertStringContainsString('filtroEstado', $lista);
+        $this->assertStringContainsString('esFinalizado(examen) {', $lista);
         $this->assertStringContainsString("examen?.estado === 'Finalizado'", $lista);
         $this->assertStringContainsString('get examenesFiltrados()', $lista);
         $this->assertStringContainsString('<template x-for="examen in examenesFiltrados"', $lista);
-        $this->assertStringContainsString('Proximos <span class="ml-1.5" x-text="conteo.proximos">', $lista);
-        $this->assertStringContainsString('Pasados <span class="ml-1.5" x-text="conteo.pasados">', $lista);
+        $this->assertStringContainsString('Programados <span class="ml-1.5" x-text="conteo.programados">', $lista);
+        $this->assertStringContainsString('Finalizados <span class="ml-1.5" x-text="conteo.finalizados">', $lista);
+        $this->assertStringNotContainsString('>Proximos<', $lista);
+        $this->assertStringNotContainsString('>Pasados<', $lista);
         $this->assertStringNotContainsString('busqueda-examen', $lista);
     }
 
