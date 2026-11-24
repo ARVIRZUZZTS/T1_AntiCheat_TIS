@@ -6,12 +6,14 @@ use App\Enums\CursoEstado;
 use App\Models\Curso;
 use App\Services\Curso\AsegurarCursoEditableService;
 use App\Services\Curso\CargarListaEstudiantesService;
+use App\Services\Curso\ListarCursosDocenteService;
 use App\Support\DTO\CargarListaEstudiantesResultado;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
+use InvalidArgumentException;
 use Livewire\Attributes\Title;
 use Livewire\Component;
 use Livewire\WithFileUploads;
@@ -30,8 +32,8 @@ use Livewire\WithFileUploads;
  * pantalla el selector de curso (solo cursos activos y gestionables, al estilo
  * de «Habilitar estudiantes»), la zona de carga con arrastrar y soltar (visible
  * solo con un curso elegido) y el modal de confirmación de reemplazo cuando el
- * curso ya tiene estudiantes. Al terminar redirige a «Ver estudiantes» con el
- * curso preseleccionado y un banner con el resumen de la carga.
+ * curso ya tiene estudiantes. Al terminar muestra el resumen en la misma
+ * pantalla y descarta el archivo.
  *
  * @changelog
  * - 2026-11-21  [Equipo T1]  feat: carga de lista de estudiantes por Excel/CSV (HU 25).
@@ -58,6 +60,8 @@ class CargarCsv extends Component
 
     public string $mensajeError = '';
 
+    public string $mensajeExito = '';
+
     public bool $mostrarModalReemplazo = false;
 
     /**
@@ -75,7 +79,7 @@ class CargarCsv extends Component
 
         if ($curso !== null && $curso->exists) {
             Gate::authorize('gestionar', $curso);
-            app(AsegurarCursoEditableService::class)->asegurarCursoEditable($curso, 'curso');
+            $this->asegurarCursoActivo($curso, 'curso');
             $this->cursoId = (int) $curso->id_curso;
         }
     }
@@ -92,6 +96,7 @@ class CargarCsv extends Component
     {
         $this->archivo = null;
         $this->mensajeError = '';
+        $this->mensajeExito = '';
         $this->mostrarModalReemplazo = false;
 
         if ($this->cursoId === null) {
@@ -133,7 +138,7 @@ class CargarCsv extends Component
      *
      * @param  CargarListaEstudiantesService  $servicio  Servicio de carga.
      */
-    public function cargar(CargarListaEstudiantesService $servicio): mixed
+    public function cargar(CargarListaEstudiantesService $servicio): void
     {
         $this->validate();
         $curso = $this->cursoSeleccionado();
@@ -142,10 +147,10 @@ class CargarCsv extends Component
         if ($this->cursoTieneEstudiantes($curso)) {
             $this->mostrarModalReemplazo = true;
 
-            return null;
+            return;
         }
 
-        return $this->procesar($servicio, $curso, reemplazar: false);
+        $this->procesar($servicio, $curso, reemplazar: false);
     }
 
     /**
@@ -153,13 +158,13 @@ class CargarCsv extends Component
      *
      * @param  CargarListaEstudiantesService  $servicio  Servicio de carga.
      */
-    public function confirmarReemplazo(CargarListaEstudiantesService $servicio): mixed
+    public function confirmarReemplazo(CargarListaEstudiantesService $servicio): void
     {
         $this->validate();
         $curso = $this->cursoSeleccionado();
         $this->asegurarCursoValido($curso);
 
-        return $this->procesar($servicio, $curso, reemplazar: true);
+        $this->procesar($servicio, $curso, reemplazar: true);
     }
 
     /**
@@ -171,16 +176,14 @@ class CargarCsv extends Component
     }
 
     /**
-     * Cancela la carga y vuelve al detalle del curso (o a la lista si no hay
-     * ninguno elegido).
+     * Descarta el archivo y los avisos sin salir de la pantalla de carga.
      */
-    public function cancelar(): mixed
+    public function cancelar(): void
     {
-        if ($this->cursoId === null) {
-            return $this->redirectRoute('cursos', navigate: true);
-        }
-
-        return $this->redirectRoute('cursos.detalle', ['curso' => $this->cursoId], navigate: true);
+        $this->archivo = null;
+        $this->mensajeError = '';
+        $this->mensajeExito = '';
+        $this->mostrarModalReemplazo = false;
     }
 
     public function render(): mixed
@@ -195,19 +198,24 @@ class CargarCsv extends Component
      * @param  Curso  $curso  Curso destino.
      * @param  bool  $reemplazar  Si reemplaza la lista anterior.
      */
-    private function procesar(CargarListaEstudiantesService $servicio, Curso $curso, bool $reemplazar): mixed
+    private function procesar(CargarListaEstudiantesService $servicio, Curso $curso, bool $reemplazar): void
     {
         try {
             $resultado = $servicio->ejecutar($curso, $this->archivo, (int) auth()->id(), $reemplazar);
 
-            session()->flash('mensaje', $this->resumen($resultado));
-
-            return $this->redirectRoute('cursos.ver-estudiantes', ['curso' => $curso->id_curso], navigate: true);
-        } catch (\Throwable $error) {
+            $this->archivo = null;
+            $this->mensajeError = '';
+            $this->mostrarModalReemplazo = false;
+            $this->mensajeExito = $this->resumen($resultado);
+        } catch (ValidationException $error) {
+            $this->mostrarModalReemplazo = false;
+            $this->mensajeError = $error->validator->errors()->first() ?: 'No se pudo completar la carga.';
+        } catch (InvalidArgumentException $error) {
             $this->mostrarModalReemplazo = false;
             $this->mensajeError = $error->getMessage();
-
-            return null;
+        } catch (\Throwable) {
+            $this->mostrarModalReemplazo = false;
+            $this->mensajeError = 'No se pudo completar la carga. Inténtalo de nuevo.';
         }
     }
 
@@ -240,10 +248,8 @@ class CargarCsv extends Component
      */
     private function cursosGestionables(): array
     {
-        return Curso::query()
-            ->where('sis_doc', (int) auth()->id())
-            ->where('estado', '!=', CursoEstado::Archivado->value)
-            ->orderBy('nombre_curso')
+        return app(ListarCursosDocenteService::class)
+            ->activos((int) auth()->id())
             ->pluck('nombre_curso', 'id_curso')
             ->all();
     }
@@ -289,6 +295,17 @@ class CargarCsv extends Component
         }
 
         Gate::authorize('gestionar', $curso);
-        app(AsegurarCursoEditableService::class)->asegurarCursoEditable($curso, 'cursoId');
+        $this->asegurarCursoActivo($curso, 'cursoId');
+    }
+
+    private function asegurarCursoActivo(Curso $curso, string $campo): void
+    {
+        if ($curso->estado !== CursoEstado::EnCurso->value) {
+            throw ValidationException::withMessages([
+                $campo => 'Solo puedes cargar estudiantes en cursos activos.',
+            ]);
+        }
+
+        app(AsegurarCursoEditableService::class)->asegurarCursoEditable($curso, $campo);
     }
 }

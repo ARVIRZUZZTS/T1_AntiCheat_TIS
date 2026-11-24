@@ -163,7 +163,7 @@ class CargarListaEstudiantesTest extends TestCase
         return UploadedFile::fake()->createWithContent('lista.xlsx', (string) file_get_contents($path));
     }
 
-    public function test_csv_oficial_en_curso_vacio_redirige_a_ver_estudiantes(): void
+    public function test_csv_oficial_en_curso_vacio_se_queda_en_cargar_csv(): void
     {
         $archivo = $this->csvOficial([
             ['1', '202600001', 'Quispe', 'Juan', 'Ingenieria de Sistemas', '', '', '', '', '', ''],
@@ -175,9 +175,10 @@ class CargarListaEstudiantesTest extends TestCase
             ->set('archivo', $archivo)
             ->call('cargar')
             ->assertHasNoErrors()
-            ->assertRedirect(route('cursos.ver-estudiantes', ['curso' => self::CURSO]));
+            ->assertNoRedirect()
+            ->assertSet('mensajeExito', 'Se inscribieron 2 estudiante(s): 2 habilitado(s), '
+                .'0 deshabilitado(s) por la central de riesgos. Duplicados en el archivo: 0. Filas omitidas: 0.');
 
-        $this->assertNotNull(session('mensaje'));
         $this->assertDatabaseHas('estudiante', [
             'sis_estudiante' => '202600001',
             'nombre_estudiante' => 'Juan',
@@ -192,16 +193,20 @@ class CargarListaEstudiantesTest extends TestCase
         ]);
     }
 
-    public function test_ver_estudiantes_muestra_el_banner_de_resumen(): void
+    public function test_cargar_csv_muestra_el_banner_de_resumen(): void
     {
-        $resumen = 'Se inscribieron 2 estudiante(s): 1 habilitado(s), 1 deshabilitado(s) '
-            .'por la central de riesgos. Duplicados en el archivo: 0. Filas omitidas: 1.';
+        $archivo = $this->csvOficial([
+            ['1', '202600001', 'Quispe', 'Juan', 'Ingenieria de Sistemas', '', '', '', '', '', ''],
+            ['2', '202600002', 'Lopez', 'Maria', 'Ingenieria de Sistemas', '', '', '', '', '', ''],
+        ]);
 
-        $this->actingAs($this->docente())
-            ->withSession(['mensaje' => $resumen])
-            ->get(route('cursos.ver-estudiantes', ['curso' => self::CURSO]))
-            ->assertOk()
-            ->assertSee($resumen);
+        Livewire::actingAs($this->docente())
+            ->test(CargarCsv::class, ['curso' => Curso::findOrFail(self::CURSO)])
+            ->set('archivo', $archivo)
+            ->call('cargar')
+            ->assertNoRedirect()
+            ->assertSee('Carga completada')
+            ->assertSee('Se inscribieron 2 estudiante(s)');
     }
 
     public function test_xlsx_se_carga_con_phpspreadsheet(): void
@@ -215,7 +220,7 @@ class CargarListaEstudiantesTest extends TestCase
             ->set('archivo', $archivo)
             ->call('cargar')
             ->assertHasNoErrors()
-            ->assertRedirect(route('cursos.ver-estudiantes', ['curso' => self::CURSO]));
+            ->assertNoRedirect();
 
         $this->assertDatabaseHas('estudiante', ['sis_estudiante' => '202600010', 'nombre_estudiante' => 'Sofia']);
         $this->assertDatabaseHas('estudiante_curso', ['sis_estudiante' => '202600010', 'id_curso' => self::CURSO]);
@@ -248,7 +253,7 @@ class CargarListaEstudiantesTest extends TestCase
             ->set('archivo', $archivo)
             ->call('cargar')
             ->assertHasNoErrors()
-            ->assertRedirect(route('cursos.ver-estudiantes', ['curso' => self::CURSO]));
+            ->assertNoRedirect();
 
         $this->assertDatabaseHas('estudiante_examen', [
             'sis_estudiante' => '202600020',
@@ -357,7 +362,7 @@ class CargarListaEstudiantesTest extends TestCase
 
         $componente->call('confirmarReemplazo')
             ->assertHasNoErrors()
-            ->assertRedirect(route('cursos.ver-estudiantes', ['curso' => self::CURSO]));
+            ->assertNoRedirect();
 
         $this->assertDatabaseMissing('estudiante_curso', ['sis_estudiante' => '202600050', 'id_curso' => self::CURSO]);
         $this->assertDatabaseHas('estudiante_curso', ['sis_estudiante' => '202600051', 'id_curso' => self::CURSO]);

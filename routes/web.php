@@ -114,6 +114,7 @@
  *   muestra una sola lista con los archivados al final.
  */
 
+use App\Enums\CursoEstado;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ConfirmarRegistroController;
 use App\Http\Controllers\CursoController;
@@ -139,6 +140,7 @@ use App\Services\Curso\AsegurarCursoEditableService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Validation\ValidationException;
 
 Route::middleware('auth')->group(function (): void {
     Route::get('/', InicioController::class)->name('inicio');
@@ -267,6 +269,11 @@ Route::middleware(['auth', 'docente'])->group(function (): void {
 
         $curso = Curso::query()->findOrFail($cursoId);
         Gate::authorize('gestionar', $curso);
+        if ($curso->estado !== CursoEstado::EnCurso->value) {
+            throw ValidationException::withMessages([
+                'curso' => 'Solo puedes cargar estudiantes en cursos activos.',
+            ]);
+        }
         app(AsegurarCursoEditableService::class)->asegurarCursoEditable($curso, 'curso');
 
         return view('pages.cursos-cargar-csv', ['curso' => $curso]);
