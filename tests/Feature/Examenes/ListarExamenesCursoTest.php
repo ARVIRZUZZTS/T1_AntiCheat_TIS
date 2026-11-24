@@ -23,6 +23,8 @@
  *   dato derivado de la hora de inicio y la duración).
  * - 2026-11-23  [OchoaCesar]  test: crear `central_riesgo` en el esquema sqlite
  *   y esperar `incidencias` en el payload del listado.
+ * - 2026-11-24  [Valery D. Ortuno P]  test: `curso.sis_doc` en el esquema sqlite
+ *   (el listado filtra por los cursos propios del docente).
  *
  * @see App\Http\Controllers\Api\CursoExamenController
  * @see App\Services\Examen\ListarExamenesCursoService
@@ -226,6 +228,8 @@ class ListarExamenesCursoTest extends TestCase
         Schema::create('curso', function (Blueprint $tabla): void {
             $tabla->integer('id_curso')->primary();
             $tabla->string('nombre_curso');
+            // Docente dueño del curso: el listado filtra por los cursos propios.
+            $tabla->integer('sis_doc')->nullable();
         });
         Schema::create('tipo_examen', function (Blueprint $tabla): void {
             $tabla->integer('id_tipo_examen')->primary();
