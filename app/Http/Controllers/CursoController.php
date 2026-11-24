@@ -278,27 +278,6 @@ class CursoController extends Controller
         return redirect()->route('cursos.archivar-restaurar')->with('mensaje', RestaurarCursoService::MENSAJE_EXITO);
     }
 
-    public function archivados(Request $request): View
-    {
-        $cursos = Curso::query()
-            ->where('sis_doc', $request->user()->id_usuario)
-            ->where('estado', CursoEstado::Archivado->value)
-            ->with([
-                'estudiantes',
-                'examenes.tipoExamen',
-                'examenes.cursos',
-                'examenes.incidencias.estudiante',
-            ])
-            ->withCount(['estudiantes', 'examenes'])
-            ->orderByDesc('fecha_creacion')
-            ->orderByDesc('id_curso')
-            ->get();
-
-        return view('pages.cursos-archivados', [
-            'cursos' => $cursos,
-        ]);
-    }
-
     /**
      * Vista de un curso: tarjetas de conteo y las secciones Estudiantes,
      * Habilitaciones y Auxiliares.

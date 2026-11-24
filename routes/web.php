@@ -281,7 +281,6 @@ Route::middleware(['auth', 'docente'])->group(function (): void {
     Route::post('/cursos/{curso}/restaurar', [CursoController::class, 'restaurar'])
         ->whereNumber('curso')
         ->name('cursos.restaurar.store');
-    Route::get('/archivados', [CursoController::class, 'archivados'])->name('cursos.archivados');
     Route::post('/cursos', [CursoController::class, 'store'])->name('cursos.store');
     // Cursos · Eliminar curso: conteo previo para el modal y borrado definitivo.
     // Solo el docente dueño puede hacerlo (CursoPolicy::eliminar).
