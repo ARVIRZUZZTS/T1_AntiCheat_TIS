@@ -10,8 +10,8 @@
  * @description
  * Pruebas de archivado de cursos (HU #321 · Task #323): solo el docente dueño
  * puede archivar cursos en estado `EnCurso`, el curso pasa a solo lectura,
- * se conserva el historial en `/archivados`, se ve en Ver cursos (filtro
- * Archivados) y se excluye de los selectores activos, bloqueando escrituras
+ * se conserva el historial en Ver cursos (filtro Archivados) y se excluye de
+ * los selectores activos, bloqueando escrituras
  * incluso en exámenes compartidos.
  *
  * @changelog
@@ -30,6 +30,7 @@ use App\Services\Curso\AsegurarCursoEditableService;
 use App\Services\Curso\ListarCursosDocenteService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
@@ -192,19 +193,19 @@ class ArchivarCursoTest extends TestCase
         $this->assertFalse($activos->pluck('id_curso')->contains(self::CURSO_EN_CURSO));
     }
 
-    public function test_pagina_archivados_muestra_historial_de_solo_lectura(): void
+    public function test_historial_de_archivados_vive_en_el_filtro_de_ver_cursos(): void
     {
         DB::table('curso')->where('id_curso', self::CURSO_EN_CURSO)->update(['estado' => CursoEstado::Archivado->value]);
         $docente = Usuario::findOrFail(self::DOCENTE);
 
         $this->actingAs($docente)
-            ->get(route('cursos.archivados'))
+            ->get(route('cursos'))
             ->assertOk()
+            ->assertSee('Archivados 2')
             ->assertSee('Curso En Curso')
-            ->assertSee('Solo lectura')
-            ->assertSee('Ana Prueba')
-            ->assertSee((string) self::EXAMEN)
-            ->assertSee('sospechoso');
+            ->assertSee('Archivado');
+
+        $this->assertFalse(Route::has('cursos.archivados'));
     }
 
     public function test_bloquea_escritura_en_curso_archivado(): void

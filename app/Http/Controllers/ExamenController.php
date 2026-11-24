@@ -295,15 +295,18 @@ class ExamenController extends Controller
         $idDocente = (int) $request->user()->id_usuario;
         $ahora = Carbon::now();
 
-        $listado = array_map(function (array $examen): array {
-            $examen['estado'] = match ($examen['estado']) {
-                ListarExamenesCursoService::ESTADO_EN_CURSO => 'En curso',
-                ListarExamenesCursoService::ESTADO_FINALIZADO => 'Finalizado',
-                default => 'Programado',
-            };
+        $listado = array_values(array_filter(
+            array_map(function (array $examen): array {
+                $examen['estado'] = match ($examen['estado']) {
+                    ListarExamenesCursoService::ESTADO_EN_CURSO => 'En curso',
+                    ListarExamenesCursoService::ESTADO_FINALIZADO => 'Finalizado',
+                    default => 'Programado',
+                };
 
-            return $examen;
-        }, $examenes->ejecutar($idDocente, $ahora));
+                return $examen;
+            }, $examenes->ejecutar($idDocente, $ahora)),
+            fn (array $examen): bool => $examen['estado'] === 'Programado',
+        ));
 
         // Cursos del docente vinculados a cada examen: solo de esos cursos
         // sale el botón "Eliminar" en la tarjeta.
@@ -325,29 +328,13 @@ class ExamenController extends Controller
                 ->all() ?? [];
         }
 
-        // Programados y en curso primero (fecha ascendente: los más próximos
-        // arriba); finalizados al final (fecha descendente: los más recientes).
-        $activos = array_values(array_filter(
-            $listado,
-            fn (array $examen): bool => $examen['estado'] !== 'Finalizado',
-        ));
-        $finalizados = array_values(array_filter(
-            $listado,
-            fn (array $examen): bool => $examen['estado'] === 'Finalizado',
-        ));
-
-        usort($activos, static function (array $primero, array $segundo): int {
+        usort($listado, static function (array $primero, array $segundo): int {
             return [$primero['fecha'] ?? '9999-12-31', $primero['hora_inicio'] ?? '', $primero['id']]
                 <=> [$segundo['fecha'] ?? '9999-12-31', $segundo['hora_inicio'] ?? '', $segundo['id']];
         });
 
-        usort($finalizados, static function (array $primero, array $segundo): int {
-            return [$segundo['fecha'] ?? '', $segundo['hora_inicio'] ?? '', $segundo['id']]
-                <=> [$primero['fecha'] ?? '', $primero['hora_inicio'] ?? '', $primero['id']];
-        });
-
         return view('pages.examen-eliminar', [
-            'examenes' => array_merge($activos, $finalizados),
+            'examenes' => $listado,
             'ahora' => $ahora->format('Y-m-d H:i'),
         ]);
     }

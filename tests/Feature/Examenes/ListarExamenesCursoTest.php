@@ -230,6 +230,7 @@ class ListarExamenesCursoTest extends TestCase
             $tabla->string('nombre_curso');
             // Docente dueño del curso: el listado filtra por los cursos propios.
             $tabla->integer('sis_doc')->nullable();
+            $tabla->string('estado')->default('EnCurso');
         });
         Schema::create('tipo_examen', function (Blueprint $tabla): void {
             $tabla->integer('id_tipo_examen')->primary();

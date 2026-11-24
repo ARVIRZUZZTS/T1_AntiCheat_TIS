@@ -183,14 +183,18 @@ class ListadoExamenesVistaTest extends TestCase
         $this->assertStringContainsString("const inicio = examen.fecha + ' ' + (examen.hora_inicio || '00:00');", $parcial);
         $this->assertStringContainsString('return inicio > this.ahora;', $parcial);
         $this->assertStringContainsString('x-for="examen in examenesDisponibles"', $parcial);
+        $this->assertStringContainsString('x-for="examen in examenesProgramados"', $parcial);
+        $this->assertStringContainsString('No hay examenes programados para dividir.', $parcial);
         $this->assertStringContainsString('No hay examenes futuros para mostrar.', $parcial);
         $this->assertStringContainsString('<template x-for="examen in examenes" :key="examen.id">', $parcial);
         $this->assertStringContainsString("tab === 'editar'", $parcial);
         $this->assertStringContainsString('id="examen-editar"', $parcial);
+        $this->assertStringContainsString('id="examen-dividir"', $parcial);
 
-        // Las etiquetas de los selectores muestran tipo y curso, sin fecha.
-        $this->assertStringContainsString("return [examen.tipo || 'Sin tipo', examen.curso || '']", $parcial);
-        $this->assertStringNotContainsString('this.fechaDe(examen), this.horario(examen)', $parcial);
+        $this->assertStringContainsString('gestionesPorCurso: @js($gestionesPorCurso->all())', $parcial);
+        $this->assertStringContainsString('this.fechaDe(examen), gestion || \'\'', $parcial);
+        $this->assertStringContainsString('class="mb-2.5 block text-sm font-medium text-heading"', $parcial);
+        $this->assertStringContainsString('class="block w-full rounded-base border border-default-medium bg-neutral-secondary-medium px-3 py-2.5 text-sm text-heading shadow-xs focus:border-brand focus:ring-brand"', $parcial);
     }
 
     public function test_editar_carga_el_formulario_sin_enviar_cambios(): void
@@ -198,8 +202,10 @@ class ListadoExamenesVistaTest extends TestCase
         $parcial = $this->fuenteParcial();
         $formulario = $this->fuente(resource_path('views/components/ui/form-crear-examen.blade.php'));
 
+        $this->assertStringContainsString('get examenesProgramados()', $parcial);
+        $this->assertStringContainsString("examenesDisponibles.filter((examen) => examen.estado === 'Programado')", $parcial);
         $this->assertStringContainsString('get examenesEditables()', $parcial);
-        $this->assertStringContainsString('examenesDisponibles.filter((examen) => Boolean(examen.es_propio))', $parcial);
+        $this->assertStringContainsString('examenesProgramados.filter((examen) => Boolean(examen.es_propio))', $parcial);
         $this->assertStringContainsString('api.examenes.edicion.mostrar', $parcial);
         $this->assertStringContainsString('modo="editar"', $parcial);
         $this->assertStringContainsString('x-for="examen in examenesEditables"', $parcial);
@@ -286,17 +292,19 @@ class ListadoExamenesVistaTest extends TestCase
         $this->assertStringContainsString('(int) $curso->examenes_count > 0', $servicio);
     }
 
-    public function test_la_lista_de_examenes_tiene_filtro_de_tiempo(): void
+    public function test_la_lista_de_examenes_tiene_filtro_de_estado(): void
     {
         $lista = $this->fuenteLista();
 
-        $this->assertStringContainsString('filtroTiempo', $lista);
-        $this->assertStringContainsString('esPasado(examen) {', $lista);
+        $this->assertStringContainsString('filtroEstado', $lista);
+        $this->assertStringContainsString('esFinalizado(examen) {', $lista);
         $this->assertStringContainsString("examen?.estado === 'Finalizado'", $lista);
         $this->assertStringContainsString('get examenesFiltrados()', $lista);
         $this->assertStringContainsString('<template x-for="examen in examenesFiltrados"', $lista);
-        $this->assertStringContainsString('Proximos <span class="ml-1.5" x-text="conteo.proximos">', $lista);
-        $this->assertStringContainsString('Pasados <span class="ml-1.5" x-text="conteo.pasados">', $lista);
+        $this->assertStringContainsString('Programados <span class="ml-1.5" x-text="conteo.programados">', $lista);
+        $this->assertStringContainsString('Finalizados <span class="ml-1.5" x-text="conteo.finalizados">', $lista);
+        $this->assertStringNotContainsString('>Proximos<', $lista);
+        $this->assertStringNotContainsString('>Pasados<', $lista);
         $this->assertStringNotContainsString('busqueda-examen', $lista);
     }
 

@@ -147,6 +147,10 @@
     // no de un curso (lo muestran las tarjetas de cada examen).
     $opcionesCursos = $cursos->mapWithKeys(fn ($curso) => [$curso->id_curso => $curso->nombre_curso])->all();
 
+    $gestionesPorCurso = $gestionesPorCurso ?? $cursos->mapWithKeys(
+        fn ($curso) => [(int) $curso->id_curso => $curso->gestion ?? null]
+    );
+
     // Si el alta falló, se vuelve a abrir la pestaña del formulario.
     $tabInicial = $tabInicial ?? (($errors->any() && $puedeCrearExamen) ? 'crear' : 'lista');
 
@@ -164,8 +168,9 @@
          cursoFijo: @js((string) ($curso?->id_curso ?? '')),
          urlListaGlobal: @js($urlListaGlobal),
          urlListaCurso: @js($urlListaCurso),
-         // Contexto de la pestana de lista: vacio = todos los cursos.
+          // Contexto de la pestana de lista: vacio = todos los cursos.
          cursoLista: @js($listadoGlobal ? '' : (string) ($curso?->id_curso ?? '')),
+         gestionesPorCurso: @js($gestionesPorCurso->all()),
          examenes: [],
          ahora: @js(now()->format('Y-m-d H:i')),
          estado: 'listo',
@@ -220,9 +225,12 @@
          get examenesDisponibles() {
              return this.examenes.filter((examen) => this.examenDisponible(examen));
          },
-         get examenesEditables() {
-             return this.examenesDisponibles.filter((examen) => Boolean(examen.es_propio));
-         },
+          get examenesProgramados() {
+              return this.examenesDisponibles.filter((examen) => examen.estado === 'Programado');
+          },
+          get examenesEditables() {
+              return this.examenesProgramados.filter((examen) => Boolean(examen.es_propio));
+          },
          get aulasDelExamen() {
              return this.examenDivisionSeleccionado?.ambientes?.length ?? 0;
          },
@@ -269,7 +277,10 @@
              return inicio > this.ahora;
          },
          etiquetaExamen(examen) {
-             return [examen.tipo || 'Sin tipo', examen.curso || '']
+             const idCurso = examen.cursos?.[0]?.id;
+             const gestion = idCurso === undefined ? null : this.gestionesPorCurso[idCurso];
+
+             return [examen.tipo || 'Sin tipo', examen.curso || '', this.fechaDe(examen), gestion || '']
                  .filter(Boolean)
                  .join(' - ');
          },
@@ -740,8 +751,8 @@
 
     {{-- Editar Examen: se elige uno propio y se precarga el mismo formulario
          del alta. Al cambiar la seleccion se consulta el detalle del examen. --}}
-    <section x-show="tab === 'editar'" x-cloak class="flex flex-col gap-4">
-        <p class="px-3 text-sm text-body" x-show="estado === 'cargando'">Cargando examenes...</p>
+    <section x-show="tab === 'editar'" x-cloak class="mx-auto w-full max-w-2xl flex flex-col gap-4">
+        <p class="text-sm text-body" x-show="estado === 'cargando'">Cargando examenes...</p>
 
         <div x-show="estado === 'error'" x-cloak>
             <x-ui.alert type="danger" title="No se pudieron cargar los examenes">
@@ -752,18 +763,19 @@
             </x-ui.alert>
         </div>
 
-        <p class="px-3 text-sm text-body" x-show="estado === 'listo' && examenesDisponibles.length === 0">
+        <p class="text-sm text-body" x-show="estado === 'listo' && examenesDisponibles.length === 0">
             No hay examenes futuros para mostrar.
         </p>
 
-        <p class="px-3 text-sm text-body" x-show="estado === 'listo' && examenesDisponibles.length > 0 && examenesEditables.length === 0">
+        <p class="text-sm text-body" x-show="estado === 'listo' && examenesDisponibles.length > 0 && examenesEditables.length === 0">
             No hay examenes propios disponibles para editar.
         </p>
 
-        <div x-show="estado === 'listo' && examenesEditables.length > 0" class="min-w-0 max-w-md px-3">
-            <label for="examen-editar" class="block mb-2.5 text-sm font-medium text-heading">Examen</label>
+        <div x-show="estado === 'listo' && examenesEditables.length > 0"
+             class="rounded-base border border-default bg-neutral-primary-soft p-4 shadow-xs sm:p-6">
+            <label for="examen-editar" class="mb-2.5 block text-sm font-medium text-heading">Examen y curso</label>
             <select id="examen-editar" x-model="examenEdicionId" @change="seleccionarEdicion()"
-                    class="block w-full px-3 py-2.5 border text-sm rounded-base shadow-xs bg-neutral-secondary-medium border-default-medium text-heading focus:ring-brand focus:border-brand">
+                    class="block w-full rounded-base border border-default-medium bg-neutral-secondary-medium px-3 py-2.5 text-sm text-heading shadow-xs focus:border-brand focus:ring-brand">
                 <option value="" disabled>Selecciona un examen</option>
                 <template x-for="examen in examenesEditables" :key="'editar-' + examen.id">
                     <option :value="String(examen.id)" x-text="etiquetaExamen(examen)"></option>
@@ -771,7 +783,7 @@
             </select>
         </div>
 
-        <p class="px-3 text-sm text-body" x-show="cargandoEdicion">Cargando datos del examen...</p>
+        <p class="text-sm text-body" x-show="cargandoEdicion">Cargando datos del examen...</p>
 
         <div x-show="! cargandoEdicion && errorEdicion !== ''" x-cloak>
             <x-ui.alert type="danger" title="No se pudieron cargar los datos del examen">
@@ -857,65 +869,69 @@
             </x-ui.alert>
         </div>
 
-        <p class="px-3 text-sm text-body" x-show="estado === 'listo' && examenesDisponibles.length === 0">
-            No hay examenes futuros para mostrar.
+        <p class="px-3 text-sm text-body" x-show="estado === 'listo' && examenesProgramados.length === 0">
+            No hay examenes programados para dividir.
         </p>
 
-        <div x-show="estado === 'listo' && examenesDisponibles.length > 0" class="flex flex-col gap-4">
-            <div class="min-w-0 max-w-md">
-                <label for="examen-dividir" class="block mb-2.5 text-sm font-medium text-heading">Examen</label>
-                <select id="examen-dividir" x-model="examenDivisionId"
-                        @change="criterioDivision = ''; errorDivision = ''"
-                        class="block w-full px-3 py-2.5 border text-sm rounded-base shadow-xs bg-neutral-secondary-medium border-default-medium text-heading focus:ring-brand focus:border-brand">
-                    <option value="" disabled>Selecciona un examen</option>
-                    <template x-for="examen in examenesDisponibles" :key="'dividir-' + examen.id">
-                        <option :value="examen.id" x-text="etiquetaExamen(examen)"></option>
-                    </template>
-                </select>
-            </div>
+        <div x-show="estado === 'listo' && examenesProgramados.length > 0"
+             class="rounded-base border border-default bg-neutral-primary-soft p-4 shadow-xs sm:p-6">
+            <div class="flex flex-col gap-4">
+                <div class="min-w-0 max-w-md">
+                    <label for="examen-dividir" class="mb-2.5 block text-sm font-medium text-heading">Examen</label>
+                    <select id="examen-dividir" x-model="examenDivisionId"
+                            @change="criterioDivision = ''; errorDivision = ''"
+                            x-bind:disabled="estado !== 'listo'"
+                            class="block w-full rounded-base border border-default-medium bg-neutral-secondary-medium px-3 py-2.5 text-sm text-heading shadow-xs focus:border-brand focus:ring-brand">
+                        <option value="" disabled>Seleccione un examen</option>
+                        <template x-for="examen in examenesProgramados" :key="'dividir-' + examen.id">
+                            <option :value="examen.id" x-text="etiquetaExamen(examen)"></option>
+                        </template>
+                    </select>
+                </div>
 
-            <template x-if="examenDivisionSeleccionado && ! puedeDividir">
-                <p class="px-3 text-sm text-body">
-                    No se puede dividir el examen, solo se cuenta con un aula
-                </p>
-            </template>
+                <template x-if="examenDivisionSeleccionado && ! puedeDividir">
+                    <p class="text-sm text-body">
+                        No se puede dividir el examen, solo se cuenta con un aula
+                    </p>
+                </template>
 
-            <template x-if="puedeDividir">
-                <div class="flex flex-col gap-4">
-                    <div class="flex flex-wrap items-baseline gap-x-2 px-3">
-                        <h3 class="text-xl font-bold text-heading" x-text="examenDivisionSeleccionado?.tipo || 'Sin tipo'"></h3>
-                        <p class="text-sm font-medium text-body" x-show="examenDivisionSeleccionado?.curso" x-text="'— ' + examenDivisionSeleccionado?.curso"></p>
-                    </div>
-
-                    <div class="flex flex-col gap-3 sm:flex-row sm:items-end">
-                        <div class="min-w-0 flex-1 sm:max-w-xs">
-                            <x-ui.select
-                                label="Dividir por"
-                                name="division_por"
-                                x-model="criterioDivision"
-                                @change="errorDivision = ''"
-                                :options="$opcionesDivision"
-                                placeholder="Selecciona un criterio"
-                            />
+                <template x-if="puedeDividir">
+                    <div class="flex flex-col gap-4">
+                        <div class="flex flex-wrap items-baseline gap-x-2">
+                            <h3 class="text-xl font-bold text-heading" x-text="examenDivisionSeleccionado?.tipo || 'Sin tipo'"></h3>
+                            <p class="text-sm font-medium text-body" x-show="examenDivisionSeleccionado?.curso" x-text="'— ' + examenDivisionSeleccionado?.curso"></p>
                         </div>
 
-                        <x-ui.button
-                            variant="default"
-                            @click="abrirModalDivision()"
-                            x-bind:disabled="criterioDivision === ''"
-                            x-bind:class="criterioDivision === '' ? 'opacity-50 cursor-not-allowed' : ''"
-                        >
-                            Dividir
-                        </x-ui.button>
-                    </div>
+                        <div class="flex flex-col gap-3 sm:flex-row sm:items-end">
+                            <div class="min-w-0 flex-1 sm:max-w-xs">
+                                <x-ui.select
+                                    label="Dividir por"
+                                    name="division_por"
+                                    x-model="criterioDivision"
+                                    @change="errorDivision = ''"
+                                    :options="$opcionesDivision"
+                                    placeholder="Seleccione un criterio"
+                                />
+                            </div>
 
-                    <div x-show="errorDivision !== ''" x-cloak>
-                        <x-ui.alert type="danger" title="No se pudo preparar la division">
-                            <span x-text="errorDivision"></span>
-                        </x-ui.alert>
+                            <x-ui.button
+                                variant="default"
+                                @click="abrirModalDivision()"
+                                x-bind:disabled="criterioDivision === ''"
+                                x-bind:class="criterioDivision === '' ? 'opacity-50 cursor-not-allowed' : ''"
+                            >
+                                Dividir
+                            </x-ui.button>
+                        </div>
+
+                        <div x-show="errorDivision !== ''" x-cloak>
+                            <x-ui.alert type="danger" title="No se pudo preparar la division">
+                                <span x-text="errorDivision"></span>
+                            </x-ui.alert>
+                        </div>
                     </div>
-                </div>
-            </template>
+                </template>
+            </div>
         </div>
     </section>
     </div>

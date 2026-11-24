@@ -108,6 +108,20 @@ class ListarExamenesDocenteTest extends TestCase
         $this->assertSame('Finalizado', $respuesta->json('datos.3.estado'));
     }
 
+    public function test_no_lista_examenes_cuyos_cursos_estan_archivados(): void
+    {
+        $this->crearExamen(1, self::DOCENTE, '2026-11-15', [1]);
+        $this->crearExamen(2, self::DOCENTE, '2026-11-16', [3]);
+        DB::table('curso')->where('id_curso', 1)->update(['estado' => 'Archivado']);
+
+        $this->actingAs(Usuario::query()->findOrFail(self::DOCENTE), 'web');
+
+        $this->getJson('/api/examenes')
+            ->assertOk()
+            ->assertJsonCount(1, 'datos')
+            ->assertJsonPath('datos.0.id', 2);
+    }
+
     /** Esquema mínimo de las relaciones y del guard de autenticación. */
     private function crearEsquema(): void
     {
@@ -129,6 +143,7 @@ class ListarExamenesDocenteTest extends TestCase
             $tabla->string('nombre_curso');
             // Docente dueño del curso: el listado filtra por los cursos propios.
             $tabla->integer('sis_doc')->nullable();
+            $tabla->string('estado')->default('EnCurso');
         });
         Schema::create('central_riesgo', function (Blueprint $tabla): void {
             $tabla->integer('id_registro')->primary();

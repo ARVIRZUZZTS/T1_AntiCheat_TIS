@@ -88,7 +88,7 @@
     <div
         x-data="{
             busqueda: '',
-            filtro: 'todos',
+            filtro: 'activos',
             coincide(nombre, activo) {
                 const termino = this.busqueda.trim().toLowerCase();
 
@@ -147,14 +147,14 @@
             </div>
 
             <div class="flex gap-2 overflow-x-auto sm:shrink-0">
-                <button type="button" class="{{ $pillBase }}" :aria-pressed="filtro === 'todos'" :class="filtro === 'todos' ? '{{ $pillActiva }}' : '{{ $pillInactiva }}'" @click="filtro = 'todos'">
-                    Todos {{ $cursos->count() }}
-                </button>
                 <button type="button" class="{{ $pillBase }}" :aria-pressed="filtro === 'activos'" :class="filtro === 'activos' ? '{{ $pillActiva }}' : '{{ $pillInactiva }}'" @click="filtro = 'activos'">
                     Activos {{ $totalActivos }}
                 </button>
                 <button type="button" class="{{ $pillBase }}" :aria-pressed="filtro === 'archivados'" :class="filtro === 'archivados' ? '{{ $pillActiva }}' : '{{ $pillInactiva }}'" @click="filtro = 'archivados'">
                     Archivados {{ $totalArchivados }}
+                </button>
+                <button type="button" class="{{ $pillBase }}" :aria-pressed="filtro === 'todos'" :class="filtro === 'todos' ? '{{ $pillActiva }}' : '{{ $pillInactiva }}'" @click="filtro = 'todos'">
+                    Todos {{ $cursos->count() }}
                 </button>
             </div>
         </div>

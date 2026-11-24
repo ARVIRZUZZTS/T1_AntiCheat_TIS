@@ -79,27 +79,27 @@
          examenes: [],
          estado: 'listo',
          peticion: 0,
-         filtroTiempo: 'todos',
-         esPasado(examen) {
+         filtroEstado: 'todos',
+         esFinalizado(examen) {
              return examen?.estado === 'Finalizado';
          },
-         get conteo() {
-             const pasados = this.examenes.filter((examen) => this.esPasado(examen)).length;
+          get conteo() {
+              const finalizados = this.examenes.filter((examen) => this.esFinalizado(examen)).length;
 
-             return { todos: this.examenes.length, proximos: this.examenes.length - pasados, pasados };
-         },
-         get examenesFiltrados() {
-             return this.examenes.filter((examen) => {
-                 if (this.filtroTiempo === 'pasados') {
-                     return this.esPasado(examen);
-                 }
-                 if (this.filtroTiempo === 'proximos') {
-                     return ! this.esPasado(examen);
-                 }
+              return { todos: this.examenes.length, programados: this.examenes.length - finalizados, finalizados };
+          },
+          get examenesFiltrados() {
+              return this.examenes.filter((examen) => {
+                  if (this.filtroEstado === 'finalizados') {
+                      return this.esFinalizado(examen);
+                  }
+                  if (this.filtroEstado === 'programados') {
+                      return ! this.esFinalizado(examen);
+                  }
 
-                 return true;
-             });
-         },
+                  return true;
+              });
+          },
          // Modal Ver detalle.
          modalDetalle: false,
          examenDetalle: null,
@@ -251,14 +251,14 @@
         @endif
 
         <div class="flex gap-2 overflow-x-auto sm:ml-auto sm:shrink-0">
-            <button type="button" class="{{ $pillBase }}" :aria-pressed="filtroTiempo === 'todos'" :class="filtroTiempo === 'todos' ? '{{ $pillActiva }}' : '{{ $pillInactiva }}'" @click="filtroTiempo = 'todos'">
+            <button type="button" class="{{ $pillBase }}" :aria-pressed="filtroEstado === 'todos'" :class="filtroEstado === 'todos' ? '{{ $pillActiva }}' : '{{ $pillInactiva }}'" @click="filtroEstado = 'todos'">
                 Todos <span class="ml-1.5" x-text="conteo.todos"></span>
             </button>
-            <button type="button" class="{{ $pillBase }}" :aria-pressed="filtroTiempo === 'proximos'" :class="filtroTiempo === 'proximos' ? '{{ $pillActiva }}' : '{{ $pillInactiva }}'" @click="filtroTiempo = 'proximos'">
-                Proximos <span class="ml-1.5" x-text="conteo.proximos"></span>
+            <button type="button" class="{{ $pillBase }}" :aria-pressed="filtroEstado === 'programados'" :class="filtroEstado === 'programados' ? '{{ $pillActiva }}' : '{{ $pillInactiva }}'" @click="filtroEstado = 'programados'">
+                Programados <span class="ml-1.5" x-text="conteo.programados"></span>
             </button>
-            <button type="button" class="{{ $pillBase }}" :aria-pressed="filtroTiempo === 'pasados'" :class="filtroTiempo === 'pasados' ? '{{ $pillActiva }}' : '{{ $pillInactiva }}'" @click="filtroTiempo = 'pasados'">
-                Pasados <span class="ml-1.5" x-text="conteo.pasados"></span>
+            <button type="button" class="{{ $pillBase }}" :aria-pressed="filtroEstado === 'finalizados'" :class="filtroEstado === 'finalizados' ? '{{ $pillActiva }}' : '{{ $pillInactiva }}'" @click="filtroEstado = 'finalizados'">
+                Finalizados <span class="ml-1.5" x-text="conteo.finalizados"></span>
             </button>
         </div>
     </div>

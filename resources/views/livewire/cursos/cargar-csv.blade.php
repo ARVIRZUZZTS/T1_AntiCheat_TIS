@@ -30,6 +30,12 @@
             @endif
         </div>
 
+        @if ($mensajeExito !== '')
+            <x-ui.alert type="success" title="Carga completada" class="mb-0!">
+                {{ $mensajeExito }}
+            </x-ui.alert>
+        @endif
+
         {{-- Paso 2: zona de carga (solo con un curso elegido). --}}
         @if ($cursoId && ! empty($cursos))
             <form wire:submit="cargar" enctype="multipart/form-data"
