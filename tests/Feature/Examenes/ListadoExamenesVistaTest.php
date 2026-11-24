@@ -56,6 +56,9 @@
  * - 2026-11-14  [Alex Candia]  test: la página única ya no tiene selector de
  *   materia, usa el endpoint global, muestra el curso en las etiquetas y el
  *   formulario de alta permite elegir el curso.
+ * - 2026-11-23  [Valery D. Ortuno P]  test: la tarjeta de Ver examenes ya no
+ *   muestra ingresos ni ambientes (estan en el detalle) y el numero del filtro
+ *   lleva espacio.
  */
 
 namespace Tests\Feature\Examenes;
@@ -292,8 +295,8 @@ class ListadoExamenesVistaTest extends TestCase
         $this->assertStringContainsString("examen?.estado === 'Finalizado'", $lista);
         $this->assertStringContainsString('get examenesFiltrados()', $lista);
         $this->assertStringContainsString('<template x-for="examen in examenesFiltrados"', $lista);
-        $this->assertStringContainsString('Proximos <span x-text="conteo.proximos">', $lista);
-        $this->assertStringContainsString('Pasados <span x-text="conteo.pasados">', $lista);
+        $this->assertStringContainsString('Proximos <span class="ml-1.5" x-text="conteo.proximos">', $lista);
+        $this->assertStringContainsString('Pasados <span class="ml-1.5" x-text="conteo.pasados">', $lista);
         $this->assertStringNotContainsString('busqueda-examen', $lista);
     }
 
@@ -309,8 +312,10 @@ class ListadoExamenesVistaTest extends TestCase
         $this->assertStringContainsString('lg:divide-x lg:divide-default', $cursos);
         $this->assertStringContainsString('text-lg font-semibold text-heading', $lista);
         $this->assertStringContainsString('text-lg font-semibold text-heading', $cursos);
-        $this->assertStringContainsString('text-xl sm:text-2xl font-semibold', $lista);
         $this->assertStringContainsString('text-xl sm:text-2xl font-semibold', $cursos);
+        // Ingresos y ambientes ya no van en la tarjeta: estan en el detalle.
+        $this->assertStringNotContainsString('>Ingresos:<', $lista);
+        $this->assertStringNotContainsString('>Ambientes:<', $lista);
         $this->assertStringContainsString('Fecha:', $lista);
         $this->assertStringContainsString('Proximo examen:', $cursos);
         $this->assertStringNotContainsString('Ver curso ›', $cursos);

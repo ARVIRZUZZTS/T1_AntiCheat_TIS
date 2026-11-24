@@ -6,6 +6,7 @@
     @updated 2026-11-19
     @updated 2026-11-20
     @updated 2026-11-22
+    @updated 2026-11-23
 
     @description
     Listado exclusivo de la subopción «Ver examenes». No contiene la barra de
@@ -32,6 +33,12 @@
     - 2026-11-22  [Valery D. Ortuno P]  fix: el selector de curso muestra solo el
       nombre; se quita "(Anfitrion)", que es de un examen compartido y no de un
       curso.
+    - 2026-11-23  [Valery D. Ortuno P]  style: tarjeta con el formato de Ver
+      cursos: el tipo de examen como titulo y debajo, mas suave, "Curso:" con
+      el nombre del curso; luego fecha y horario, y "Ver detalle". Se quitan
+      ambientes e ingresos de la tarjeta (estan en el detalle). Si es
+      anfitrion ya no sale tambien "Propio". Espacio entre el filtro y su
+      numero ("Todos 35"). El selector de curso vuelve a mostrar solo el nombre.
     - 2026-11-20  [OchoaCesar]  refactor: la eliminación de examen pasa a la
       página propia /examenes/eliminar (subopción del sidebar); se retiran de
       aquí el botón "Eliminar" de la tarjeta, el aviso de bloqueo y sus
@@ -49,15 +56,9 @@
     $urlListaGlobal = route('api.examenes.listar');
     $urlListaCurso = route('api.cursos.examenes.listar', ['idCurso' => '__CURSO__']);
 
-    $opcionesCursos = $cursos->mapWithKeys(function ($curso) {
-        $etiqueta = $curso->nombre_curso;
-
-        if (!empty($curso->es_anfitrion)) {
-            $etiqueta .= ' (Anfitrion)';
-        }
-
-        return [$curso->id_curso => $etiqueta];
-    })->all();
+    // Solo el nombre: "Anfitrion" / "Invitado" es de un examen compartido,
+    // no de un curso (lo muestran las tarjetas de cada examen).
+    $opcionesCursos = $cursos->mapWithKeys(fn ($curso) => [$curso->id_curso => $curso->nombre_curso])->all();
 
     $pillBase = 'shrink-0 whitespace-nowrap inline-flex items-center justify-center box-border border focus:ring-4 shadow-xs font-medium leading-5 rounded-full focus:outline-none px-4 py-2.5 text-sm';
     $pillActiva = 'text-white bg-brand border-transparent hover:bg-brand-strong focus:ring-brand-medium';
@@ -248,13 +249,13 @@
 
         <div class="flex gap-2 overflow-x-auto sm:ml-auto sm:shrink-0">
             <button type="button" class="{{ $pillBase }}" :aria-pressed="filtroTiempo === 'todos'" :class="filtroTiempo === 'todos' ? '{{ $pillActiva }}' : '{{ $pillInactiva }}'" @click="filtroTiempo = 'todos'">
-                Todos <span x-text="conteo.todos"></span>
+                Todos <span class="ml-1.5" x-text="conteo.todos"></span>
             </button>
             <button type="button" class="{{ $pillBase }}" :aria-pressed="filtroTiempo === 'proximos'" :class="filtroTiempo === 'proximos' ? '{{ $pillActiva }}' : '{{ $pillInactiva }}'" @click="filtroTiempo = 'proximos'">
-                Proximos <span x-text="conteo.proximos"></span>
+                Proximos <span class="ml-1.5" x-text="conteo.proximos"></span>
             </button>
             <button type="button" class="{{ $pillBase }}" :aria-pressed="filtroTiempo === 'pasados'" :class="filtroTiempo === 'pasados' ? '{{ $pillActiva }}' : '{{ $pillInactiva }}'" @click="filtroTiempo = 'pasados'">
-                Pasados <span x-text="conteo.pasados"></span>
+                Pasados <span class="ml-1.5" x-text="conteo.pasados"></span>
             </button>
         </div>
     </div>
@@ -266,14 +267,13 @@
                     <div class="h-5 w-52 rounded bg-neutral-secondary-medium"></div>
                     <div class="h-4 w-24 rounded-full bg-neutral-secondary-medium"></div>
                 </div>
-                <div class="grid grid-cols-2 gap-4 border-t border-default pt-4 lg:border-t-0 lg:pt-0 lg:px-6">
-                    <div class="h-9 w-24 rounded bg-neutral-secondary-medium mx-auto"></div>
-                    <div class="h-9 w-24 rounded bg-neutral-secondary-medium mx-auto"></div>
-                    <div class="h-9 w-24 rounded bg-neutral-secondary-medium mx-auto"></div>
-                    <div class="h-9 w-24 rounded bg-neutral-secondary-medium mx-auto"></div>
+                <div class="flex flex-col gap-2 border-t border-default pt-4 lg:border-t-0 lg:pt-0 lg:px-6">
+                    <div class="h-3 w-16 rounded bg-neutral-secondary-medium"></div>
+                    <div class="h-4 w-24 rounded bg-neutral-secondary-medium"></div>
+                    <div class="h-4 w-28 rounded bg-neutral-secondary-medium"></div>
                 </div>
                 <div class="border-t border-default pt-4 lg:border-t-0 lg:pt-0 lg:pl-6">
-                    <div class="h-9 w-32 rounded bg-neutral-secondary-medium ml-auto"></div>
+                    <div class="h-4 w-20 rounded bg-neutral-secondary-medium ml-auto"></div>
                 </div>
             </div>
         @endforeach
@@ -291,11 +291,11 @@
     <ul class="mt-4 flex flex-col gap-3" x-show="estado === 'listo'" x-cloak>
         <template x-for="examen in examenesFiltrados" :key="examen.id">
             <li class="rounded-base bg-neutral-primary-soft shadow-xs border border-default p-4 sm:p-5 grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1fr)] lg:items-center lg:gap-0 lg:divide-x lg:divide-default">
-                {{-- Nombre con curso y etiquetas. --}}
+                {{-- Examen: tipo + etiquetas y debajo el curso. --}}
                 <div class="min-w-0 lg:pr-6">
-                    <h3 class="text-lg font-semibold text-heading wrap-break-word" x-text="etiquetaExamen(examen)"></h3>
-                    <div class="mt-1.5 flex flex-wrap gap-2">
-                        <span x-show="examen.es_propio" class="inline-flex items-center px-1.5 py-0.5 text-xs font-medium rounded-full border bg-brand-softer border-brand-subtle text-fg-brand-strong">Propio</span>
+                    <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                        <h3 class="text-lg font-semibold text-heading wrap-break-word" x-text="tipoDe(examen)"></h3>
+                        {{-- Anfitrion ya dice que es suyo (y compartido); "Propio" no se repite. --}}
                         <span x-show="examen.es_anfitrion" class="inline-flex items-center px-1.5 py-0.5 text-xs font-medium rounded-full border bg-warning-soft border-warning-subtle text-fg-warning">Anfitrion</span>
                         <span x-show="!examen.es_propio" class="inline-flex items-center px-1.5 py-0.5 text-xs font-medium rounded-full border bg-success-soft border-success-subtle text-fg-success-strong">Invitado</span>
                         <x-ui.badge type="gray" x-show="examen.estado === 'Programado'">
@@ -308,26 +308,14 @@
                             <span x-text="examen.estado"></span>
                         </x-ui.badge>
                     </div>
+                    <p class="mt-1 text-xs text-body wrap-break-word">Curso: <span x-text="examen.curso || 'Sin curso'"></span></p>
                 </div>
 
-                {{-- Datos de la tarjeta. --}}
-                <div class="grid grid-cols-2 gap-4 border-t border-default pt-4 lg:border-t-0 lg:pt-0 lg:px-6">
-                    <div class="flex flex-col items-center gap-1.5 text-center">
-                        <span class="text-xs font-semibold uppercase text-muted">Fecha:</span>
-                        <time class="text-sm font-mono text-body" :datetime="examen.fecha" x-text="fechaDe(examen)"></time>
-                    </div>
-                    <div class="flex flex-col items-center gap-1.5 text-center">
-                        <span class="text-xs font-semibold uppercase text-muted">Horario:</span>
-                        <span class="text-sm font-mono text-body" x-text="horario(examen)"></span>
-                    </div>
-                    <div class="flex flex-col items-center gap-1.5 text-center">
-                        <span class="text-xs font-semibold uppercase text-muted">Ambientes:</span>
-                        <span class="text-sm font-mono text-body" x-text="ambientesDe(examen)"></span>
-                    </div>
-                    <div class="flex flex-col items-center gap-1.5 text-center">
-                        <span class="text-xs font-semibold uppercase text-muted">Ingresos:</span>
-                        <span class="text-xl sm:text-2xl font-semibold text-heading" x-text="examen.ingresados"></span>
-                    </div>
+                {{-- Fecha y horario, como el proximo examen de Ver cursos. --}}
+                <div class="border-t border-default pt-4 lg:border-t-0 lg:pt-0 lg:px-6">
+                    <p class="text-xs font-semibold uppercase text-muted">Fecha:</p>
+                    <time class="mt-1 block text-sm font-medium text-heading" :datetime="examen.fecha" x-text="fechaDe(examen)"></time>
+                    <p class="text-sm text-body" x-text="horario(examen)"></p>
                 </div>
 
                 {{-- Mismo enlace que "Ver detalle" de la central de riesgos. --}}

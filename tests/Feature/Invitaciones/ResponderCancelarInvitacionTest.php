@@ -235,21 +235,21 @@ class ResponderCancelarInvitacionTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_el_docente_que_acepto_puede_invitar_a_otro(): void
+    public function test_el_docente_que_acepto_no_puede_invitar_a_otro(): void
     {
+        // Solo el anfitrion (creador) invita.
         $this->crearInvitacion('aceptado');
 
         $this->actingAs(Usuario::query()->findOrFail(self::INVITADO), 'web')
             ->postJson(route('api.examenes.invitaciones.enviar', self::EXAMEN), [
                 'docente_invitado_id' => self::OTRO_DOCENTE,
             ])
-            ->assertCreated();
+            ->assertForbidden();
 
-        $this->assertDatabaseHas('invitacion_examen_compartido', [
+        $this->assertDatabaseMissing('invitacion_examen_compartido', [
             'id_examen' => self::EXAMEN,
             'id_docente_invitador' => self::INVITADO,
             'id_docente_invitado' => self::OTRO_DOCENTE,
-            'estado' => 'pendiente',
         ]);
     }
 

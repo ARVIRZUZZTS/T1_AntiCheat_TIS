@@ -10,8 +10,13 @@
  * @description
  * Pruebas de archivado de cursos (HU #321 · Task #323): solo el docente dueño
  * puede archivar cursos en estado `EnCurso`, el curso pasa a solo lectura,
- * se conserva el historial en `/archivados` y se excluye de listados/selectores
- * activos, bloqueando escrituras incluso en exámenes compartidos.
+ * se conserva el historial en `/archivados`, se ve en Ver cursos (filtro
+ * Archivados) y se excluye de los selectores activos, bloqueando escrituras
+ * incluso en exámenes compartidos.
+ *
+ * @changelog
+ * - 2026-11-23  [Valery D. Ortuno P]  test: el curso archivado sale en Ver
+ *   cursos (filtro Archivados) pero no en los selectores activos.
  */
 
 namespace Tests\Feature\Cursos;
@@ -175,12 +180,13 @@ class ArchivarCursoTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_curso_archivado_se_excluye_de_listados_y_selectores_activos(): void
+    public function test_curso_archivado_sale_en_ver_cursos_pero_no_en_selectores_activos(): void
     {
         DB::table('curso')->where('id_curso', self::CURSO_EN_CURSO)->update(['estado' => CursoEstado::Archivado->value]);
 
+        // Ver cursos lo muestra (filtro Archivados); los selectores activos no.
         $filas = app(ListarCursosDocenteService::class)->conMetricas(self::DOCENTE);
-        $this->assertFalse($filas->pluck('curso.id_curso')->contains(self::CURSO_EN_CURSO));
+        $this->assertTrue($filas->pluck('curso.id_curso')->contains(self::CURSO_EN_CURSO));
 
         $activos = app(ListarCursosDocenteService::class)->activos(self::DOCENTE);
         $this->assertFalse($activos->pluck('id_curso')->contains(self::CURSO_EN_CURSO));

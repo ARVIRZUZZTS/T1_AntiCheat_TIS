@@ -32,6 +32,11 @@
  * - 2026-10-11  [David E. Chavez T.]  feat: aviso "Estudiante ingresado a
  *   central de riesgo" al registrar/confirmar un tramposo, con un aviso por
  *   materia activa del estudiante (#HU6).
+ * - 2026-11-23  [Valery D. Ortuno P]  perf: `notificarInvitacionExamen()`
+ *   inserta el aviso con su id en el mismo INSERT y no vuelve a bloquear la
+ *   tabla si quien llama ya la bloqueo (`$tablaBloqueada`).
+ *   `notificarRespuestaInvitacion()` reapunta el aviso con un solo UPDATE y
+ *   solo bloquea e inserta si no existia.
  */
 
 namespace App\Services\Notificacion;
@@ -196,20 +201,37 @@ class NotificacionService
         });
     }
 
-    public function notificarInvitacionExamen(InvitacionExamenCompartido $invitacion): NotificacionDocente
+    /**
+     * Aviso al docente invitado. El id (max + 1) sale en el mismo INSERT: un
+     * viaje a la base en vez de dos. Con `$tablaBloqueada` quien llama ya
+     * bloqueo la tabla dentro de su transaccion y no se vuelve a bloquear.
+     */
+    public function notificarInvitacionExamen(InvitacionExamenCompartido $invitacion, bool $tablaBloqueada = false): NotificacionDocente
     {
-        return DB::transaction(function () use ($invitacion): NotificacionDocente {
-            $this->bloquearTabla();
+        return DB::transaction(function () use ($invitacion, $tablaBloqueada): NotificacionDocente {
+            if (! $tablaBloqueada) {
+                $this->bloquearTabla();
+            }
 
-            return NotificacionDocente::create([
-                'id_notificacion' => (int) NotificacionDocente::query()->max('id_notificacion') + 1,
+            $datos = [
                 'id_central_riesgo' => null,
                 'id_curso' => null,
                 'id_docente_destinatario' => $invitacion->id_docente_invitado,
                 'id_invitacion' => $invitacion->id_invitacion,
                 'tipo' => self::TIPO_INVITACION_EXAMEN,
                 'estado' => self::ESTADO_RECIBIDO,
-            ]);
+            ];
+            $fila = DB::selectOne(
+                'insert into notificacion_docente (id_notificacion, id_central_riesgo, id_curso, id_docente_destinatario, id_invitacion, tipo, estado) '
+                .'select coalesce(max(id_notificacion), 0) + 1, ?, ?, ?, ?, ?, ? from notificacion_docente '
+                .'returning id_notificacion',
+                array_values($datos),
+            );
+
+            $aviso = (new NotificacionDocente)->forceFill(['id_notificacion' => (int) $fila->id_notificacion] + $datos);
+            $aviso->exists = true;
+
+            return $aviso;
         });
     }
 
@@ -228,25 +250,38 @@ class NotificacionService
     public function notificarRespuestaInvitacion(InvitacionExamenCompartido $invitacion): NotificacionDocente
     {
         return DB::transaction(function () use ($invitacion): NotificacionDocente {
-            $this->bloquearTabla();
+            $datos = [
+                'id_central_riesgo' => null,
+                'id_curso' => null,
+                'id_docente_destinatario' => $invitacion->id_docente_invitador,
+                'tipo' => self::TIPO_RESPUESTA_INVITACION,
+                'estado' => self::ESTADO_RECIBIDO,
+                'oculta' => false,
+            ];
 
-            $aviso = NotificacionDocente::query()
-                ->where('id_invitacion', $invitacion->id_invitacion)
-                ->first();
+            // Lo normal es que el aviso exista (lo creo el envio): se reapunta
+            // en un solo viaje, sin bloquear la tabla.
+            $fila = DB::selectOne(
+                'update notificacion_docente set id_central_riesgo = ?, id_curso = ?, id_docente_destinatario = ?, tipo = ?, estado = ?, oculta = ? '
+                .'where id_invitacion = ? returning id_notificacion',
+                [...array_values($datos), $invitacion->id_invitacion],
+            );
 
-            if ($aviso === null) {
-                $aviso = new NotificacionDocente;
-                $aviso->id_notificacion = (int) NotificacionDocente::query()->max('id_notificacion') + 1;
-                $aviso->id_invitacion = $invitacion->id_invitacion;
+            // Sin aviso previo se crea uno (el id max + 1 exige el bloqueo).
+            if ($fila === null) {
+                $this->bloquearTabla();
+                $fila = DB::selectOne(
+                    'insert into notificacion_docente (id_notificacion, id_invitacion, id_central_riesgo, id_curso, id_docente_destinatario, tipo, estado, oculta) '
+                    .'select coalesce(max(id_notificacion), 0) + 1, ?, ?, ?, ?, ?, ?, ? from notificacion_docente '
+                    .'returning id_notificacion',
+                    [$invitacion->id_invitacion, ...array_values($datos)],
+                );
             }
 
-            $aviso->id_central_riesgo = null;
-            $aviso->id_curso = null;
-            $aviso->id_docente_destinatario = $invitacion->id_docente_invitador;
-            $aviso->tipo = self::TIPO_RESPUESTA_INVITACION;
-            $aviso->estado = self::ESTADO_RECIBIDO;
-            $aviso->oculta = false;
-            $aviso->save();
+            $aviso = (new NotificacionDocente)->forceFill(
+                ['id_notificacion' => (int) $fila->id_notificacion, 'id_invitacion' => $invitacion->id_invitacion] + $datos
+            );
+            $aviso->exists = true;
 
             return $aviso;
         });

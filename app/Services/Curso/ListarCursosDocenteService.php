@@ -16,7 +16,8 @@
  *
  * - `conMetricas()`: solo sus cursos con las métricas de
  *   ListarMateriasConMetricasService, primero los activos y después los
- *   finalizados (cursos pasados), cada grupo del más reciente al más antiguo.
+ *   archivados (filtro Archivados de Ver cursos), cada grupo del más reciente
+ *   al más antiguo.
  *   Los cursos compartidos por invitación ya no se listan: las invitaciones
  *   son por examen y se manejan en la sección Exámenes (`activos()`).
  * - `activos()`: solo los cursos en curso propios, para elegir uno en
@@ -49,6 +50,10 @@
  * - 2026-11-23  [OchoaCesar]  feat: `gestionesPorCurso()` expone la gestión con
  *   año de cualquier curso propio (activo o archivado) para la lista única de
  *   «Archivar/Restaurar cursos», con el mismo formato que «Ver cursos».
+ * - 2026-11-23  [Valery D. Ortuno P]  fix: `conMetricas()` vuelve a incluir los
+ *   cursos archivados, para el filtro Archivados de Ver cursos (sale la
+ *   subopcion "Cursos archivados" del sidebar). Editar curso ya filtra solo
+ *   los activos.
  *
  * @see  App\Services\Curso\ListarMateriasConMetricasService
  * @see  App\Http\Controllers\CursoController
@@ -129,7 +134,6 @@ class ListarCursosDocenteService
             ->leftJoin('curso_tipo_gestion as ctg', 'ctg.id_curso', '=', 'c.id_curso')
             ->leftJoin('tipo_gestion as tg', 'tg.id_tipo_gestion', '=', 'ctg.id_tg')
             ->where('c.sis_doc', $idDocente)
-            ->where('c.estado', '!=', CursoEstado::Archivado->value)
             ->get(['c.id_curso', 'tg.nombre_tipo_gestion', 'ctg.anio'])
             ->mapWithKeys(fn (object $fila): array => [
                 (int) $fila->id_curso => $fila->nombre_tipo_gestion !== null

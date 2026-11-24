@@ -45,6 +45,14 @@ class BuscarDocentesInvitablesService
                 $consulta->where('id_examen', $examen->id_examen)
                     ->whereIn('estado', $estadosActivos);
             })
+            // Quien ya comparte el examen (el creador o un docente con un curso
+            // en el) no se vuelve a invitar.
+            ->where('usuario.id_usuario', '!=', $examen->creador)
+            ->whereNotExists(fn ($curso) => $curso->from('examen_curso as ec')
+                ->join('curso as c', 'c.id_curso', '=', 'ec.id_curso')
+                ->where('ec.id_examen', $examen->id_examen)
+                ->whereColumn('c.sis_doc', 'usuario.id_usuario')
+                ->selectRaw('1'))
             ->where(function ($consulta) use ($operador, $patron): void {
                 $consulta->where('usuario.nombre_usuario', $operador, $patron)
                     ->orWhere('usuario.apellido', $operador, $patron)

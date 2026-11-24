@@ -8,6 +8,7 @@
  * @created 2026-10-23
  *
  * @updated 2026-11-20
+ * @updated 2026-11-23
  *
  * @description Autoriza el reporte de horarios de ingreso de un examen a su
  * docente responsable o a un docente invitado que acepto la invitacion, y la
@@ -23,6 +24,10 @@
  *   (ahorra tres consultas a la base remota).
  * - 2026-11-22  [Valery D. Ortuno P]  feat: `monitorear` deja pasar al auxiliar
  *   con el curso activo o con el examen asignado con Monitor (HU 24).
+ * - 2026-11-23  [Valery D. Ortuno P]  fix: `invitarDocente` es solo para el
+ *   anfitrion (creador); un invitado que acepto ya no puede invitar a otros.
+ * - 2026-11-23  [Valery D. Ortuno P]  perf: `invitarDocente` revisa primero el
+ *   creador (sin consultar) y luego rol y curso archivado en una sola consulta.
  * - 2026-11-20  [Equipo T1]  feat: bloqueo de escrituras si algún curso
  *   vinculado al examen está archivado (HU #321 · Task #323).
  *
@@ -95,29 +100,22 @@ class ExamenPolicy
 
     public function invitarDocente(Usuario $usuario, Examen $examen): bool
     {
-        if ($this->tieneCursoArchivado($examen)) {
+        // Solo el anfitrion (quien creo el examen) invita: los invitados que
+        // aceptaron comparten el examen pero no pueden sumar a otros. Se sabe
+        // sin consultar.
+        if ((int) $examen->creador !== (int) $usuario->id_usuario) {
             return false;
         }
 
-        $esDocente = $usuario->roles()
-            ->where('nombre_rol', Rol::NOMBRE_DOCENTE)
-            ->exists();
+        // Docente y sin cursos archivados en el examen, en una sola consulta
+        // (la busqueda de docentes lo revisa en cada tecla).
+        $fila = DB::selectOne(
+            'select exists (select 1 from rol_usuario ru join rol r on r.id_rol = ru.id_rol where ru.id_usuario = ? and r.nombre_rol = ?) as docente, '
+            .'exists (select 1 from examen_curso ec join curso c on c.id_curso = ec.id_curso where ec.id_examen = ? and c.estado = ?) as archivado',
+            [$usuario->id_usuario, Rol::NOMBRE_DOCENTE, $examen->id_examen, \App\Enums\CursoEstado::Archivado->value],
+        );
 
-        if (! $esDocente) {
-            return false;
-        }
-
-        if ((int) $examen->creador === (int) $usuario->id_usuario) {
-            return true;
-        }
-
-        // Un docente que aceptó la invitación al examen también puede invitar a
-        // otros docentes a compartirlo.
-        return DB::table('invitacion_examen_compartido')
-            ->where('id_examen', $examen->id_examen)
-            ->where('id_docente_invitado', $usuario->id_usuario)
-            ->where('estado', 'aceptado')
-            ->exists();
+        return (bool) $fila->docente && ! (bool) $fila->archivado;
     }
 
     public function reporteHorarioIngreso(Usuario $usuario, Examen $examen, int $idCurso): bool

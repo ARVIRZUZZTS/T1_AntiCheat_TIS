@@ -38,6 +38,8 @@
  *   pendientes y las aceptadas que aun no tienen curso.
  * - 2026-11-23  [Valery D. Ortuno P]  fix: aceptar ya no copia reglas ni
  *   materiales al invitado; el examen compartido usa los del examen.
+ * - 2026-11-23  [Valery D. Ortuno P]  perf: la validacion de los cursos viaja en
+ *   la misma consulta que bloquea la invitacion.
  *
  * @see  App\Livewire\Invitaciones\Index
  * @see  App\Services\Examen\ConfiguracionExamenDocenteService::crearPara()
@@ -153,13 +155,13 @@ class AsociarCursosInvitacionService
         $idsCursos = $this->idsLimpios($idsCursos);
 
         DB::transaction(function () use ($docente, $idInvitacion, $idsCursos): void {
-            $invitacion = $this->invitacionBloqueada($docente, $idInvitacion);
+            $invitacion = $this->invitacionBloqueada($docente, $idInvitacion, $idsCursos);
 
             if ($invitacion->estado !== InvitacionEstado::Pendiente->value) {
                 $this->rechazarCon('invitacion', self::MENSAJE_NO_PENDIENTE);
             }
 
-            $this->exigirCursos($docente, $idsCursos);
+            $this->exigirCursos($idsCursos, (int) $invitacion->cursos_validos);
 
             DB::table('invitacion_examen_compartido')
                 ->where('id_invitacion', $idInvitacion)
@@ -196,13 +198,13 @@ class AsociarCursosInvitacionService
         $idsCursos = $this->idsLimpios($idsCursos);
 
         DB::transaction(function () use ($docente, $idInvitacion, $idsCursos): void {
-            $invitacion = $this->invitacionBloqueada($docente, $idInvitacion);
+            $invitacion = $this->invitacionBloqueada($docente, $idInvitacion, $idsCursos);
 
             if ($invitacion->estado !== InvitacionEstado::Aceptada->value) {
                 $this->rechazarCon('invitacion', self::MENSAJE_NO_ACEPTADA);
             }
 
-            $this->exigirCursos($docente, $idsCursos);
+            $this->exigirCursos($idsCursos, (int) $invitacion->cursos_validos);
 
             $idConfiguracion = $invitacion->config_propia !== null
                 ? (int) $invitacion->config_propia
@@ -249,16 +251,28 @@ class AsociarCursosInvitacionService
      *
      * @throws ValidationException
      */
-    private function invitacionBloqueada(Usuario $docente, int $idInvitacion): object
+    /**
+     * @param  list<int>  $idsCursos  Cursos elegidos: cuantos son activos propios
+     *                                viaja en la misma consulta (`cursos_validos`).
+     */
+    private function invitacionBloqueada(Usuario $docente, int $idInvitacion, array $idsCursos = []): object
     {
+        $cursosValidos = $idsCursos === []
+            ? '0'
+            : '(select count(*) from curso where id_curso in ('.implode(', ', array_fill(0, count($idsCursos), '?')).') and sis_doc = ? and estado = ?)';
+
         $invitacion = DB::table('invitacion_examen_compartido as i')
             ->where('i.id_invitacion', $idInvitacion)
             ->where('i.id_docente_invitado', $docente->id_usuario)
             ->selectRaw(
                 'i.id_invitacion, i.id_examen, i.id_docente_invitador, i.estado,'
                 .' (select id_configuracion_examen from configuracion_examen_docente where id_examen = i.id_examen and id_docente = i.id_docente_invitado) as config_propia,'
-                .' exists (select 1 from examen_curso ec join curso c on c.id_curso = ec.id_curso where ec.id_examen = i.id_examen and c.estado = ?) as archivado',
-                [CursoEstado::Archivado->value],
+                .' exists (select 1 from examen_curso ec join curso c on c.id_curso = ec.id_curso where ec.id_examen = i.id_examen and c.estado = ?) as archivado,'
+                .' '.$cursosValidos.' as cursos_validos',
+                array_merge(
+                    [CursoEstado::Archivado->value],
+                    $idsCursos === [] ? [] : [...$idsCursos, $docente->id_usuario, CursoEstado::EnCurso->value],
+                ),
             )
             ->lockForUpdate()
             ->first();
@@ -338,17 +352,15 @@ class AsociarCursosInvitacionService
      *
      * @throws ValidationException
      */
-    private function exigirCursos(Usuario $docente, array $idsCursos): void
+    /**
+     * @param  list<int>  $idsCursos
+     * @param  int  $validos  Cuantos son cursos activos propios (de la consulta del bloqueo).
+     */
+    private function exigirCursos(array $idsCursos, int $validos): void
     {
         if ($idsCursos === []) {
             $this->rechazarCon('cursos', self::MENSAJE_SIN_CURSOS);
         }
-
-        $validos = DB::table('curso')
-            ->whereIn('id_curso', $idsCursos)
-            ->where('sis_doc', $docente->id_usuario)
-            ->where('estado', CursoEstado::EnCurso->value)
-            ->count();
 
         if ($validos !== count($idsCursos)) {
             $this->rechazarCon('cursos', self::MENSAJE_CURSO_INVALIDO);

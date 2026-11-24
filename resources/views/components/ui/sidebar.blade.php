@@ -10,6 +10,7 @@
     @updated 2026-11-19
     @updated 2026-11-20
     @updated 2026-11-22
+    @updated 2026-11-23
 
     @description
     Sidebar de navegacion del panel, en formato acordeon. Cada seccion
@@ -83,6 +84,10 @@
       subopcion "Archivar/Restaurar cursos" (pagina unica con dos pestanas).
     - 2026-11-23  [OchoaCesar]  refactor: esa pagina unica deja las pestanas y
       muestra una sola lista de cursos, con los archivados al final.
+    - 2026-11-23  [Valery D. Ortuno P]  refactor: "Archivar/Restaurar cursos"
+      pasa a "Archivar curso" y va debajo de "Eliminar curso". Salen "Cursos
+      archivados" (se ven con el filtro Archivados de Ver cursos), "Editar
+      auxiliar" y "Eliminar auxiliar".
 --}}
 
 @props([
@@ -144,10 +149,10 @@
             ['label' => 'Ver cursos', 'route' => 'cursos'],
             ['label' => 'Crear curso', 'route' => 'cursos.crear'],
             ['label' => 'Editar curso', 'route' => 'cursos.editar'],
-            // Archivar y restaurar comparten una sola lista de cursos.
-            ['label' => 'Archivar/Restaurar cursos', 'route' => 'cursos.archivar-restaurar'],
             ['label' => 'Eliminar curso', 'route' => 'cursos.eliminar'],
-            // ['label' => 'Cursos archivados', 'route' => 'cursos.archivados'],
+            // Archivar y restaurar comparten una sola lista de cursos. Los
+            // archivados se ven con el filtro Archivados de "Ver cursos".
+            ['label' => 'Archivar curso', 'route' => 'cursos.archivar-restaurar'],
             ['label' => 'Cargar CSV', 'route' => 'cursos.cargar-csv'],
             // El detalle de un curso (/cursos/{curso}) muestra las dos secciones;
             // se resalta "Ver estudiantes" como acceso principal.
@@ -173,8 +178,6 @@
         ['label' => 'Auxiliares', 'children' => [
             ['label' => 'Ver auxiliares', 'route' => 'auxiliares'],
             ['label' => 'Crear auxiliar', 'route' => 'auxiliares.crear'],
-            ['label' => 'Editar auxiliar', 'route' => 'auxiliares.editar'],
-            ['label' => 'Eliminar auxiliar', 'route' => 'auxiliares.eliminar'],
             ['label' => 'Asignar auxiliar', 'route' => 'auxiliares.asignar'],
         ]],
         // Validacion del registro de docentes (HU 26): el contador muestra las
