@@ -35,6 +35,10 @@
     - 2026-11-23  [Valery D. Ortuno P]  refactor: una sola lista en Aceptar
       (pendientes y aceptadas sin curso); Aceptar pide el curso en el mismo
       paso y se quitan las explicaciones largas.
+    - 2026-11-23  [Valery D. Ortuno P]  refactor: Rechazar y Cancelar piden
+      confirmacion en un modal ("Seguro que quieres...?") y muestran el aviso
+      "Invitacion rechazada." / "Invitacion cancelada." en otro, en vez del
+      confirm del navegador.
 
     @see  app/Livewire/Invitaciones/Index.php
 --}}
@@ -64,6 +68,43 @@
              this.elegidos = [];
              this.error = '';
              this.modal = true;
+         },
+         // Confirmar rechazar (recibidas) o cancelar (enviadas), con modal.
+         confirmacion: null,
+         confirmando: false,
+         errorConfirmacion: '',
+         aviso: '',
+         pedir(tipo, datos) {
+             this.confirmacion = { tipo: tipo, id: datos.id, detalle: datos.detalle };
+             this.errorConfirmacion = '';
+         },
+         cerrarConfirmacion() {
+             if (! this.confirmando) {
+                 this.confirmacion = null;
+             }
+         },
+         async ejecutar() {
+             if (this.confirmando || ! this.confirmacion) {
+                 return;
+             }
+             this.confirmando = true;
+             this.errorConfirmacion = '';
+             const tipo = this.confirmacion.tipo;
+             try {
+                 const error = tipo === 'rechazar'
+                     ? await $wire.rechazar(this.confirmacion.id)
+                     : await $wire.cancelar(this.confirmacion.id);
+                 if (error) {
+                     this.errorConfirmacion = error;
+                 } else {
+                     this.confirmacion = null;
+                     this.aviso = tipo === 'rechazar' ? 'Invitacion rechazada.' : 'Invitacion cancelada.';
+                 }
+             } catch (e) {
+                 this.errorConfirmacion = 'No se pudo conectar con el servidor.';
+             } finally {
+                 this.confirmando = false;
+             }
          },
          async confirmar() {
              if (this.guardando || this.elegidos.length === 0) {
@@ -119,6 +160,10 @@
                                 'id' => $invitacion['id'],
                                 'examen' => $invitacion['examen'].($invitacion['fecha_examen'] ? ' · '.$invitacion['fecha_examen'] : ''),
                             ]);
+                            $datosRechazo = \Illuminate\Support\Js::from([
+                                'id' => $invitacion['id'],
+                                'detalle' => $invitacion['examen'].($invitacion['fecha_examen'] ? ' · '.$invitacion['fecha_examen'] : '').' - '.$invitacion['invitador'],
+                            ]);
                         @endphp
                         <div wire:key="invitacion-{{ $invitacion['id'] }}" class="flex flex-col gap-3 rounded-base border border-default p-4">
                             <div class="space-y-1 text-sm">
@@ -139,8 +184,7 @@
                                         Aceptar
                                     </x-ui.button>
                                     <x-ui.button-cancelar type="button" class="justify-center"
-                                                          wire:click="rechazar({{ $invitacion['id'] }})"
-                                                          wire:confirm="Rechazar la invitacion?">
+                                                          @click="pedir('rechazar', {{ $datosRechazo }})">
                                         Rechazar
                                     </x-ui.button-cancelar>
                                 @else
@@ -226,7 +270,10 @@
                 @else
                     <ul class="space-y-2">
                         @foreach ($enviadas as $enviada)
-                            @php [$etiqueta, $tipoBadge] = $estados[$enviada['estado']] ?? [$enviada['estado'], 'gray']; @endphp
+                            @php
+                                [$etiqueta, $tipoBadge] = $estados[$enviada['estado']] ?? [$enviada['estado'], 'gray'];
+                                $datosCancelacion = \Illuminate\Support\Js::from(['id' => $enviada['id'], 'detalle' => $enviada['invitado']]);
+                            @endphp
                             <li wire:key="enviada-{{ $enviada['id'] }}" class="flex flex-col gap-2 rounded-base border border-default px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
                                 <div class="min-w-0 text-sm">
                                     <p class="font-medium text-heading wrap-break-word">{{ $enviada['invitado'] }}</p>
@@ -235,7 +282,7 @@
                                 <div class="flex shrink-0 items-center gap-3">
                                     <x-ui.badge :type="$tipoBadge">{{ $etiqueta }}</x-ui.badge>
                                     @if ($enviada['estado'] === 'pendiente')
-                                        <button type="button" wire:click="cancelar({{ $enviada['id'] }})" wire:confirm="Cancelar la invitacion?"
+                                        <button type="button" @click="pedir('cancelar', {{ $datosCancelacion }})"
                                                 class="text-xs font-bold text-fg-danger-strong hover:underline">
                                             Cancelar
                                         </button>
@@ -248,6 +295,51 @@
             </div>
         @endif
     @endif
+
+    {{-- Modal: confirmar rechazar o cancelar una invitacion. --}}
+    <div x-show="confirmacion !== null" x-cloak
+         class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/50 p-4"
+         role="dialog" aria-modal="true" aria-labelledby="titulo-confirmacion"
+         @click.self="cerrarConfirmacion()" @keydown.escape.window="cerrarConfirmacion()">
+        <div class="w-full max-w-md rounded-xl border border-neutral-quaternary bg-neutral-primary-soft shadow-lg">
+            <div class="border-b border-neutral-quaternary px-4 py-3">
+                <h2 id="titulo-confirmacion" class="text-[15px] font-semibold text-fg-brand"
+                    x-text="confirmacion?.tipo === 'rechazar' ? 'Rechazar invitacion' : 'Cancelar invitacion'"></h2>
+            </div>
+            <div class="space-y-2 p-4 text-sm">
+                <p class="text-heading" x-text="confirmacion?.tipo === 'rechazar' ? '¿Seguro que quieres rechazar esta invitacion?' : '¿Seguro que quieres cancelar esta invitacion?'"></p>
+                <p class="font-semibold text-heading wrap-break-word" x-text="confirmacion?.detalle"></p>
+                <p x-show="errorConfirmacion !== ''" x-text="errorConfirmacion" class="text-fg-danger-strong"></p>
+            </div>
+            <div class="flex flex-col gap-2 border-t border-neutral-quaternary px-4 py-3 sm:flex-row sm:justify-end">
+                <button type="button" @click="cerrarConfirmacion()" :disabled="confirmando"
+                        class="inline-flex items-center justify-center rounded-base border border-default px-4 py-2 text-sm font-medium text-body hover:bg-neutral-secondary-medium disabled:opacity-50">
+                    Volver
+                </button>
+                <button type="button" @click="ejecutar()" :disabled="confirmando"
+                        class="inline-flex items-center justify-center rounded-base bg-danger px-4 py-2 text-sm font-medium text-white hover:bg-danger-strong disabled:cursor-not-allowed disabled:opacity-50">
+                    <span x-text="confirmando ? 'Guardando...' : (confirmacion?.tipo === 'rechazar' ? 'Rechazar' : 'Cancelar invitacion')"></span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    {{-- Modal: aviso de exito despues de rechazar o cancelar. --}}
+    <div x-show="aviso !== ''" x-cloak
+         class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/50 p-4"
+         role="dialog" aria-modal="true" aria-labelledby="titulo-aviso-invitacion"
+         @click.self="aviso = ''" @keydown.escape.window="aviso = ''">
+        <div class="w-full max-w-sm rounded-xl border border-neutral-quaternary bg-neutral-primary-soft p-6 text-center shadow-lg">
+            <span class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-success-soft text-fg-success-strong">
+                <svg class="h-6 w-6" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.5 11.5 11 14l4.5-5M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
+            </span>
+            <p id="titulo-aviso-invitacion" class="mt-4 text-sm text-heading" x-text="aviso"></p>
+            <button type="button" @click="aviso = ''"
+                    class="mt-5 inline-flex w-full items-center justify-center rounded-base bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-strong">
+                Aceptar
+            </button>
+        </div>
+    </div>
 
     {{-- Modal: elegir los cursos a los que se asocia el examen. --}}
     <div x-show="modal" x-cloak
