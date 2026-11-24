@@ -5,6 +5,8 @@
  *
  * @created 2026-10-10
  *
+ * @updated 2026-11-24
+ *
  * @description
  * Pruebas de humo de la pantalla de notificaciones (HU 12 · T1/T3/T4 y
  * HU 6 · T3): la ruta carga, incluye las plantillas de tarjeta de "Posible
@@ -22,6 +24,8 @@
  * - 2026-10-11  [David E. Chavez T.]  test: HU 6 · T4 — la pantalla apunta al
  *   endpoint real, declara la plantilla de cada `tipo` de aviso y la tarjeta
  *   central acepta la descripción que manda el backend.
+ * - 2026-11-24  [Equipo T1]  test: la bandeja declara el endpoint que marca las
+ *   notificaciones como leídas.
  */
 
 namespace Tests\Feature;
@@ -59,6 +63,7 @@ class NotificacionesTest extends TestCase
         $respuesta = $this->get(route('notificaciones'))->assertOk();
 
         $respuesta->assertSee('data-endpoint="'.route('api.notificaciones.index').'"', false);
+        $respuesta->assertSee('data-marcar-leidas="'.route('api.notificaciones.leidas').'"', false);
         $respuesta->assertSee('id="notificacion-template-tramposo"', false);
         $respuesta->assertSee('id="notificacion-template-central"', false);
     }

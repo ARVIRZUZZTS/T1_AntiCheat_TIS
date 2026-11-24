@@ -72,6 +72,8 @@ class RegistrarExamenTest extends TestCase
 
     private const ID_OTRO_CURSO = 900302;
 
+    private const ID_SEGUNDO_CURSO = 900303;
+
     private const ID_AMBIENTE = 900301;
 
     private const ID_OTRO_AMBIENTE = 900302;
@@ -112,6 +114,13 @@ class RegistrarExamenTest extends TestCase
             'id_curso' => self::ID_OTRO_CURSO,
             'nombre_curso' => 'Otro curso de Alta',
             'sis_doc' => self::ID_OTRO_DOCENTE,
+            'fecha_creacion' => now()->toDateString(),
+            'estado' => 'EnCurso',
+        ]);
+        DB::table('curso')->insert([
+            'id_curso' => self::ID_SEGUNDO_CURSO,
+            'nombre_curso' => 'Segundo curso de Alta',
+            'sis_doc' => self::ID_DOCENTE,
             'fecha_creacion' => now()->toDateString(),
             'estado' => 'EnCurso',
         ]);
@@ -156,7 +165,7 @@ class RegistrarExamenTest extends TestCase
 
         $examen = Examen::query()->where('creador', self::ID_DOCENTE)->firstOrFail();
 
-        $this->assertSame('2026-12-15', $examen->fecha);
+        $this->assertSame(now()->addMonth()->format('Y-m-d'), $examen->fecha);
         $this->assertSame('08:30:00', $examen->hora_inicio);
         $this->assertSame(90, (int) $examen->duracion);
         $this->assertSame($this->idTipoExamenParcial(), (int) $examen->tipo_examen);
@@ -484,6 +493,66 @@ class RegistrarExamenTest extends TestCase
 
         $this->assertCount(3, $ids);
         $this->assertCount(3, $ids->unique());
+    }
+
+    public function test_crea_un_solo_examen_para_varios_cursos(): void
+    {
+        $estudiantes = [
+            self::ID_CURSO => '90030301',
+            self::ID_SEGUNDO_CURSO => '90030302',
+        ];
+
+        foreach ($estudiantes as $idCurso => $sis) {
+            DB::table('estudiante')->insert([
+                'sis_estudiante' => $sis,
+                'nombre_estudiante' => 'Estudiante',
+                'apellido_estudiante' => 'De Prueba '.$sis,
+                'carrera' => 'Sistemas',
+            ]);
+            DB::table('estudiante_curso')->insert([
+                'sis_estudiante' => $sis,
+                'id_curso' => $idCurso,
+            ]);
+        }
+
+        $this->post(route('cursos.examenes.store', self::ID_CURSO), $this->datosValidos([
+            'cursos' => [self::ID_CURSO, self::ID_SEGUNDO_CURSO],
+        ]))->assertRedirect(route('examenes', ['curso' => self::ID_CURSO]));
+
+        $examen = Examen::query()->where('creador', self::ID_DOCENTE)->firstOrFail();
+        $cursos = DB::table('examen_curso')
+            ->where('id_examen', $examen->id_examen)
+            ->orderBy('id_curso')
+            ->pluck('id_curso')
+            ->map(fn (mixed $id): int => (int) $id)
+            ->all();
+
+        $this->assertSame([self::ID_CURSO, self::ID_SEGUNDO_CURSO], $cursos);
+        $this->assertSame(1, DB::table('examen')->where('id_examen', $examen->id_examen)->count());
+
+        foreach ($estudiantes as $idCurso => $sis) {
+            $this->assertDatabaseHas('estudiante_examen', [
+                'id_examen' => $examen->id_examen,
+                'id_curso' => $idCurso,
+                'sis_estudiante' => $sis,
+            ]);
+        }
+    }
+
+    public function test_rechaza_cursos_que_el_docente_no_puede_gestionar(): void
+    {
+        $this->post(route('cursos.examenes.store', self::ID_CURSO), $this->datosValidos([
+            'cursos' => [self::ID_CURSO, self::ID_OTRO_CURSO],
+        ]))->assertForbidden();
+
+        $this->assertDatabaseMissing('examen_curso', ['id_curso' => self::ID_OTRO_CURSO]);
+    }
+
+    public function test_rechaza_un_curso_inexistente_en_la_lista(): void
+    {
+        $this->post(route('cursos.examenes.store', self::ID_CURSO), $this->datosValidos([
+            'cursos' => [999999],
+        ]))->assertSessionHasErrors('cursos.0');
     }
 
     /**

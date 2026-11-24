@@ -11,6 +11,7 @@
     @updated 2026-11-20
     @updated 2026-11-22
     @updated 2026-11-23
+    @updated 2026-11-24
 
     @description
     Sidebar de navegacion del panel, en formato acordeon. Cada seccion
@@ -88,6 +89,8 @@
       pasa a "Archivar curso" y va debajo de "Eliminar curso". Salen "Cursos
       archivados" (se ven con el filtro Archivados de Ver cursos), "Editar
       auxiliar" y "Eliminar auxiliar".
+    - 2026-11-24  [Equipo T1]  fix: el badge de notificaciones usa el conteo de
+      avisos nuevos y baja a 0 cuando la bandeja los marca como leídos.
 --}}
 
 @props([
@@ -372,34 +375,43 @@
 <script>
 (function () {
     'use strict';
-    var badge = document.getElementById('notificaciones-badge');
-    if (!badge) {
-        return;
+    var endpointConteo = '{{ route('api.notificaciones.conteo') }}';
+
+    function pintar(total) {
+        var badge = document.getElementById('notificaciones-badge');
+        if (!badge) {
+            return;
+        }
+
+        var nuevas = Number(total) || 0;
+        if (nuevas > 0) {
+            badge.textContent = nuevas > 99 ? '99+' : nuevas;
+            badge.classList.remove('hidden');
+        } else {
+            badge.textContent = '0';
+            badge.classList.add('hidden');
+        }
     }
 
-    var endpoint = '{{ route('api.notificaciones.index') }}';
-
     function actualizar() {
-        fetch(endpoint, { headers: { 'Accept': 'application/json' }, credentials: 'same-origin' })
+        fetch(endpointConteo, { headers: { 'Accept': 'application/json' }, credentials: 'same-origin' })
             .then(function (respuesta) {
                 if (!respuesta.ok) {
                     throw new Error('HTTP ' + respuesta.status);
                 }
                 return respuesta.json();
             })
-            .then(function (notificaciones) {
-                var total = Array.isArray(notificaciones) ? notificaciones.length : 0;
-                if (total > 0) {
-                    badge.textContent = total > 99 ? '99+' : total;
-                    badge.classList.remove('hidden');
-                } else {
-                    badge.classList.add('hidden');
-                }
+            .then(function (datos) {
+                pintar(datos && typeof datos.nuevas === 'number' ? datos.nuevas : 0);
             })
             .catch(function () {
                 // silencioso
             });
     }
+
+    window.addEventListener('notificaciones-leidas', function (evento) {
+        pintar(evento.detail && typeof evento.detail.nuevas === 'number' ? evento.detail.nuevas : 0);
+    });
 
     actualizar();
     setInterval(actualizar, 60000);

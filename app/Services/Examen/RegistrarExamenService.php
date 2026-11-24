@@ -65,10 +65,11 @@ namespace App\Services\Examen;
 use App\Enums\EstadoEstudianteExamen;
 use App\Models\ConfiguracionExamenDocente;
 use App\Models\Curso;
-use App\Models\Estudiante;
 use App\Models\EstudianteExamen;
 use App\Models\Examen;
+use App\Services\Curso\AsegurarCursoEditableService;
 use Carbon\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use RuntimeException;
@@ -100,14 +101,14 @@ class RegistrarExamenService
         private readonly DividirExamenService $dividirExamenService,
         private readonly ConfiguracionExamenDocenteService $configuraciones,
         private readonly ValidarDisponibilidadExamenService $disponibilidad,
-        private readonly \App\Services\Curso\AsegurarCursoEditableService $editable,
+        private readonly AsegurarCursoEditableService $editable,
     ) {}
 
     /**
      * Crea el examen y todo lo que se le eligió.
      *
-     * @param  Curso  $curso  Curso al que queda asociado el examen.
-     * @param  array<string, mixed>  $datos  Datos ya validados (validated() del request).
+     * @param  Curso  $curso  Curso de la URL, que sigue marcando la vuelta del alta.
+     * @param  array<string, mixed>  $datos  Datos ya validados; `cursos` puede traer varios ids.
      * @return Examen Examen creado, con las relaciones ya escritas.
      *
      * @throws InvalidArgumentException Si el tipo no existe en el catálogo.
@@ -115,14 +116,19 @@ class RegistrarExamenService
      */
     public function ejecutar(Curso $curso, array $datos): Examen
     {
-        $this->editable->asegurarCursoEditable($curso, 'tipo_examen');
+        $cursos = $this->cursosDesdeDatos($curso, $datos);
+
+        foreach ($cursos as $cursoVinculado) {
+            $this->editable->asegurarCursoEditable($cursoVinculado, 'tipo_examen');
+        }
+
         $creador = $this->idCreador($curso);
 
-        return DB::transaction(function () use ($curso, $datos, $creador): Examen {
+        return DB::transaction(function () use ($cursos, $datos, $creador): Examen {
             // El bloqueo que protege max(id)+1 tambien hace atomica esta segunda
             // comprobacion contra otra alta o edicion concurrente.
             $siguienteId = $this->siguienteIdExamen();
-            $this->validarDisponibilidad($curso, $datos, $creador);
+            $this->validarDisponibilidad($cursos, $datos, $creador);
 
             $examen = new Examen;
             $examen->id_examen = $siguienteId;
@@ -133,7 +139,7 @@ class RegistrarExamenService
             $examen->tipo_examen = $this->idTipoExamen((string) $datos['tipo_examen']);
             $examen->save();
 
-            $examen->cursos()->attach($curso->id_curso);
+            $examen->cursos()->attach($this->idsDeCursos($cursos));
             // attach() y no sync(): el examen es nuevo, así que no hay nada que
             // comparar y sync() solo sumaba una consulta por relación. Los ids
             // se deduplican porque attach() no lo hace.
@@ -145,7 +151,7 @@ class RegistrarExamenService
             $this->guardarNormasPersonalizadas($examen, $datos['normas_personalizadas'] ?? null);
 
             $configuracion = $this->configuraciones->crearPara($examen, $creador);
-            $this->inscribirEstudiantes($examen, $curso, $configuracion);
+            $this->inscribirEstudiantes($examen, $cursos, $configuracion);
             $this->asignarEstudiantesAAmbientes($examen, $datos);
 
             return $examen;
@@ -166,8 +172,45 @@ class RegistrarExamenService
         return (int) Examen::query()->max('id_examen') + 1;
     }
 
+    /**
+     * Cursos que se vinculan al examen. La lista del formulario manda todos;
+     * las paginas de compatibilidad que no la envian conservan el curso de la
+     * URL como unico destino.
+     *
+     * @param  array<string, mixed>  $datos
+     * @return Collection<int, Curso>
+     */
+    private function cursosDesdeDatos(Curso $curso, array $datos): Collection
+    {
+        $ids = array_values(array_unique(array_map(
+            fn (mixed $id): int => (int) $id,
+            (array) ($datos['cursos'] ?? [])
+        )));
+
+        if ($ids === []) {
+            return new Collection([$curso]);
+        }
+
+        $porId = Curso::query()->whereIn('id_curso', $ids)->get()->keyBy('id_curso');
+        $cursos = collect($ids)->map(fn (int $id): ?Curso => $porId->get($id))->filter()->values();
+
+        return $cursos->isEmpty() ? new Collection([$curso]) : new Collection($cursos->all());
+    }
+
+    /**
+     * @param  Collection<int, Curso>  $cursos
+     * @return list<int>
+     */
+    private function idsDeCursos(Collection $cursos): array
+    {
+        return $cursos->pluck('id_curso')
+            ->map(fn (mixed $id): int => (int) $id)
+            ->values()
+            ->all();
+    }
+
     /** @param array<string, mixed> $datos */
-    private function validarDisponibilidad(Curso $curso, array $datos, int $creador): void
+    private function validarDisponibilidad(Collection $cursos, array $datos, int $creador): void
     {
         $inicio = Carbon::createFromFormat('d/m/Y H:i', $datos['fecha'].' '.$datos['hora_inicio']);
 
@@ -175,13 +218,13 @@ class RegistrarExamenService
             $inicio,
             (int) $datos['duracion'],
             array_map(fn ($id): int => (int) $id, (array) $datos['ambientes']),
-            [(int) $curso->id_curso],
+            $this->idsDeCursos($cursos),
             $creador,
         );
     }
 
     /**
-     * Inscribe a todos los estudiantes del curso en el examen recién creado.
+     * Inscribe a todos los estudiantes de los cursos elegidos en el examen recién creado.
      *
      * Sin esto el monitor en vivo no muestra a nadie: `GenerarReporteAsistenciaService`
      * lista `estudiante_examen` filtrado por examen, y esa tabla queda vacía si
@@ -198,26 +241,31 @@ class RegistrarExamenService
      */
     private function inscribirEstudiantes(
         Examen $examen,
-        Curso $curso,
+        Collection $cursos,
         ConfiguracionExamenDocente $configuracion,
     ): void {
         DB::statement('LOCK TABLE estudiante_examen IN SHARE ROW EXCLUSIVE MODE');
 
         $primerId = (int) EstudianteExamen::query()->max('id_estudiante_examen') + 1;
+        $filas = [];
 
-        $filas = $curso->estudiantes()
-            ->orderBy('sis_estudiante')
-            ->get()
-            ->values()
-            ->map(fn (Estudiante $estudiante, int $indice): array => [
-                'id_estudiante_examen' => $primerId + $indice,
-                'sis_estudiante' => $estudiante->sis_estudiante,
-                'id_examen' => $examen->id_examen,
-                'id_curso' => $curso->id_curso,
-                'id_configuracion_examen' => $configuracion->id_configuracion_examen,
-                'estado' => EstadoEstudianteExamen::Habilitado->value,
-            ])
-            ->all();
+        foreach ($cursos as $curso) {
+            $estudiantes = $curso->estudiantes()
+                ->orderBy('sis_estudiante')
+                ->get()
+                ->values();
+
+            foreach ($estudiantes as $estudiante) {
+                $filas[] = [
+                    'id_estudiante_examen' => $primerId + count($filas),
+                    'sis_estudiante' => $estudiante->sis_estudiante,
+                    'id_examen' => $examen->id_examen,
+                    'id_curso' => $curso->id_curso,
+                    'id_configuracion_examen' => $configuracion->id_configuracion_examen,
+                    'estado' => EstadoEstudianteExamen::Habilitado->value,
+                ];
+            }
+        }
 
         if ($filas !== []) {
             EstudianteExamen::query()->insert($filas);

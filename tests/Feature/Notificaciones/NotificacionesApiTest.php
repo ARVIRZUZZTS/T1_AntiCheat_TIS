@@ -8,13 +8,15 @@
  * @created 2026-10-11
  *
  * @updated 2026-10-26
+ * @updated 2026-11-24
  *
  * @description
  * Pruebas de integración de los endpoints de notificaciones: listado ordenado
  * de más reciente a más antiguo, lista vacía, auxiliar sin notificaciones,
- * ocultado lógico sin afectar el caso ni a otros usuarios, y la mezcla de los
- * dos tipos de aviso (HU 12 "Posible Tramposo" y HU 6 "Estudiante ingresado a
- * central de riesgo") que hoy devuelve el listado.
+ * ocultado lógico sin afectar el caso ni a otros usuarios, conteo de avisos
+ * nuevos, marcado de leídas y la mezcla de los dos tipos de aviso (HU 12
+ * "Posible Tramposo" y HU 6 "Estudiante ingresado a central de riesgo") que hoy
+ * devuelve el listado.
  *
  * Igual que otras pruebas del proyecto, el esquema se arma sobre SQLite en
  * memoria con una conexión dedicada, así NO se toca la base compartida de
@@ -34,6 +36,8 @@
  *   para abrir el detalle.
  * - 2026-10-26  [Valery D. Ortuno P]  test: sin `estado_incidencia` ni
  *   `id_confirmador`, eliminadas de la base (el tipo es el estado).
+ * - 2026-11-24  [Equipo T1]  test: el badge cuenta solo `recibido` y baja a 0
+ *   al marcar como leídas, sin borrar el historial ni tocar otros docentes.
  */
 
 namespace Tests\Feature\Notificaciones;
@@ -117,6 +121,64 @@ class NotificacionesApiTest extends TestCase
             ->assertExactJson([]);
     }
 
+    public function test_el_conteo_devuelve_solo_las_notificaciones_recibidas_no_ocultas(): void
+    {
+        $this->actingAs(Usuario::findOrFail(self::DOCENTE_A), 'web')
+            ->getJson('/api/notificaciones/conteo')
+            ->assertOk()
+            ->assertExactJson(['nuevas' => 2]);
+
+        DB::table('notificacion_docente')->where('id_notificacion', 1)->update(['estado' => 'visto']);
+
+        $this->getJson('/api/notificaciones/conteo')
+            ->assertOk()
+            ->assertExactJson(['nuevas' => 1]);
+
+        $this->actingAs(Usuario::findOrFail(self::DOCENTE_SIN_AVISOS), 'web')
+            ->getJson('/api/notificaciones/conteo')
+            ->assertOk()
+            ->assertExactJson(['nuevas' => 0]);
+
+        $this->actingAs(Usuario::findOrFail(self::AUXILIAR), 'web')
+            ->getJson('/api/notificaciones/conteo')
+            ->assertOk()
+            ->assertExactJson(['nuevas' => 0]);
+    }
+
+    public function test_marcar_todas_como_leidas_deja_el_conteo_en_cero_sin_borrar_el_historial(): void
+    {
+        $this->actingAs(Usuario::findOrFail(self::DOCENTE_A), 'web')
+            ->patchJson('/api/notificaciones/leidas')
+            ->assertOk()
+            ->assertJsonPath('cantidad', 2);
+
+        $this->assertDatabaseHas('notificacion_docente', ['id_notificacion' => 1, 'estado' => 'visto']);
+        $this->assertDatabaseHas('notificacion_docente', ['id_notificacion' => 2, 'estado' => 'visto']);
+        $this->assertDatabaseHas('notificacion_docente', ['id_notificacion' => 4, 'estado' => 'recibido', 'oculta' => true]);
+
+        $this->getJson('/api/notificaciones/conteo')
+            ->assertOk()
+            ->assertExactJson(['nuevas' => 0]);
+
+        $this->getJson('/api/notificaciones')
+            ->assertOk()
+            ->assertJsonCount(2)
+            ->assertJsonPath('0.id', 1)
+            ->assertJsonPath('1.id', 2);
+    }
+
+    public function test_marcar_como_leidas_no_toca_las_notificaciones_de_otro_docente(): void
+    {
+        $this->actingAs(Usuario::findOrFail(self::DOCENTE_B), 'web')
+            ->patchJson('/api/notificaciones/leidas')
+            ->assertOk()
+            ->assertJsonPath('cantidad', 1);
+
+        $this->assertDatabaseHas('notificacion_docente', ['id_notificacion' => 3, 'estado' => 'visto']);
+        $this->assertDatabaseHas('notificacion_docente', ['id_notificacion' => 1, 'estado' => 'recibido']);
+        $this->assertDatabaseHas('notificacion_docente', ['id_notificacion' => 2, 'estado' => 'recibido']);
+    }
+
     public function test_ocultar_una_notificacion_propia_la_persiste_y_no_cambia_el_caso(): void
     {
         $this->actingAs(Usuario::findOrFail(self::DOCENTE_A), 'web')
@@ -145,9 +207,11 @@ class NotificacionesApiTest extends TestCase
             ->assertNotFound();
     }
 
-    public function test_ambos_endpoints_requieren_autenticacion(): void
+    public function test_los_endpoints_requieren_autenticacion(): void
     {
         $this->getJson('/api/notificaciones')->assertUnauthorized();
+        $this->getJson('/api/notificaciones/conteo')->assertUnauthorized();
+        $this->patchJson('/api/notificaciones/leidas')->assertUnauthorized();
         $this->patchJson('/api/notificaciones/1/ocultar')->assertUnauthorized();
     }
 

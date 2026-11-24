@@ -11,9 +11,9 @@
  *
  * @description
  * Pruebas de integración de `ListarAuxiliaresDocenteService` contra la base
- * local de pruebas: normalización del estado a ACTIVO/BAJA, inclusión de los
- * dados de baja, una sola consulta (sin N+1) y orden por curso y luego por
- * apellido.
+ * local de pruebas: estado derivado de las asignaciones activas, inclusión de
+ * las cuentas sin curso (INACTIVO), dos consultas (sin N+1) y orden por estado
+ * y apellido.
  *
  * @see  App\Services\Auxiliar\ListarAuxiliaresDocenteService
  * @see  App\Repositories\AuxiliarCursoRepository
@@ -25,6 +25,7 @@
 
 namespace Tests\Feature\Auxiliares;
 
+use App\Models\Rol;
 use App\Services\Auxiliar\ListarAuxiliaresDocenteService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
@@ -48,6 +49,8 @@ class ListarAuxiliaresDocenteServiceTest extends TestCase
     private const AUX_ZUNIGA = 9100014;
 
     private const AUX_AJENO = 9100015;
+
+    private const AUX_SIN_CURSO = 9100016;
 
     private const CURSO_ZOOLOGIA = 9101001;
 
@@ -74,24 +77,27 @@ class ListarAuxiliaresDocenteServiceTest extends TestCase
         $this->assertSame('Zoología', $zuniga['curso']);
     }
 
-    public function test_el_auxiliar_dado_de_baja_se_devuelve_como_baja(): void
+    public function test_el_auxiliar_sin_asignaciones_activas_se_devuelve_como_inactivo(): void
     {
         $filas = $this->servicio()->ejecutar(self::DOCENTE);
 
         $beta = $this->buscarPorSis($filas, '9100012');
 
-        $this->assertSame('BAJA', $beta['estado']);
+        $this->assertSame('INACTIVO', $beta['estado']);
+        $this->assertSame('', $beta['curso']);
     }
 
-    public function test_los_auxiliares_dados_de_baja_siguen_apareciendo_en_la_lista(): void
+    public function test_las_cuentas_sin_curso_siguen_apareciendo_en_la_lista(): void
     {
         $filas = $this->servicio()->ejecutar(self::DOCENTE);
 
-        $this->assertContains('9100012', array_column($filas, 'codigoSis'));
-        $this->assertCount(4, $filas);
+        $sinCurso = $this->buscarPorSis($filas, '9100016');
+
+        $this->assertSame('INACTIVO', $sinCurso['estado']);
+        $this->assertCount(6, $filas);
     }
 
-    public function test_consulta_en_una_sola_query_sin_n_mas_uno(): void
+    public function test_consulta_en_dos_queries_sin_n_mas_uno(): void
     {
         $consultas = 0;
         DB::listen(function () use (&$consultas): void {
@@ -100,35 +106,38 @@ class ListarAuxiliaresDocenteServiceTest extends TestCase
 
         $filas = $this->servicio()->ejecutar(self::DOCENTE);
 
-        $this->assertCount(4, $filas);
-        $this->assertSame(1, $consultas, 'La lista debe salir en una sola consulta.');
+        $this->assertCount(6, $filas);
+        $this->assertSame(2, $consultas, 'Cuentas y asignaciones salen en dos consultas, sin N+1.');
     }
 
-    public function test_el_orden_es_curso_luego_apellido(): void
+    public function test_el_orden_es_activos_luego_inactivos_y_apellido(): void
     {
         $filas = $this->servicio()->ejecutar(self::DOCENTE);
 
-        // Algoritmos (Alfa, Beta, Gamma) antes que Zoología (Zúñiga), y dentro
-        // de Algoritmos los apellidos en orden alfabético.
+        // Primero los activos por apellido (Alfa, Gamma, Zúñiga) y después los
+        // inactivos por apellido (Ajeno, Beta, Sin curso).
         $this->assertSame(
-            ['9100011', '9100012', '9100013', '9100014'],
+            ['9100011', '9100013', '9100014', '9100015', '9100012', '9100016'],
             array_column($filas, 'codigoSis'),
         );
         $this->assertSame(
-            ['Algoritmos', 'Algoritmos', 'Algoritmos', 'Zoología'],
+            ['Algoritmos', 'Algoritmos', 'Zoología', '', '', ''],
             array_column($filas, 'curso'),
         );
         $this->assertSame(
-            ['Alfa', 'Beta', 'Gamma', 'Zúñiga'],
-            array_column($filas, 'apellido'),
+            ['ACTIVO', 'ACTIVO', 'ACTIVO', 'INACTIVO', 'INACTIVO', 'INACTIVO'],
+            array_column($filas, 'estado'),
         );
     }
 
-    public function test_no_incluye_auxiliares_de_cursos_de_otro_docente(): void
+    public function test_las_asignaciones_de_otro_docente_no_cuentan_como_activas(): void
     {
         $filas = $this->servicio()->ejecutar(self::DOCENTE);
 
-        $this->assertNotContains('9100015', array_column($filas, 'codigoSis'));
+        $ajeno = $this->buscarPorSis($filas, '9100015');
+
+        $this->assertSame('INACTIVO', $ajeno['estado']);
+        $this->assertSame('', $ajeno['curso']);
     }
 
     private function servicio(): ListarAuxiliaresDocenteService
@@ -165,7 +174,19 @@ class ListarAuxiliaresDocenteServiceTest extends TestCase
             ['id_usuario' => self::AUX_ALFA, 'cod_sis' => '9100011', 'password' => 'secreto5', 'nombre_usuario' => 'Zoe', 'apellido' => 'Alfa'],
             ['id_usuario' => self::AUX_GAMMA, 'cod_sis' => '9100013', 'password' => 'secreto6', 'nombre_usuario' => 'Alicia', 'apellido' => 'Gamma'],
             ['id_usuario' => self::AUX_AJENO, 'cod_sis' => '9100015', 'password' => 'secreto7', 'nombre_usuario' => 'Luis', 'apellido' => 'Ajeno'],
+            ['id_usuario' => self::AUX_SIN_CURSO, 'cod_sis' => '9100016', 'password' => 'secreto8', 'nombre_usuario' => 'Nora', 'apellido' => 'Sin curso'],
         ]);
+
+        DB::table('rol')->insertOrIgnore([
+            ['id_rol' => 1, 'nombre_rol' => 'docente'],
+            ['id_rol' => 2, 'nombre_rol' => Rol::NOMBRE_AUXILIAR],
+        ]);
+
+        $rolAuxiliar = DB::table('rol')->where('nombre_rol', Rol::NOMBRE_AUXILIAR)->value('id_rol');
+
+        foreach ([self::AUX_ZUNIGA, self::AUX_BETA, self::AUX_ALFA, self::AUX_GAMMA, self::AUX_AJENO, self::AUX_SIN_CURSO] as $idAuxiliar) {
+            DB::table('rol_usuario')->insert(['id_usuario' => $idAuxiliar, 'id_rol' => $rolAuxiliar]);
+        }
 
         DB::table('curso')->insert([
             ['id_curso' => self::CURSO_ZOOLOGIA, 'nombre_curso' => 'Zoología', 'sis_doc' => self::DOCENTE, 'fecha_creacion' => '2026-11-08', 'estado' => 'EnCurso'],

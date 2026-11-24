@@ -45,7 +45,7 @@
                                 <dt class="text-xs font-medium text-muted">Estado</dt>
                                 <dd class="mt-1">
                                     <x-ui.badge :type="$esActivo ? 'success' : 'gray'">
-                                        {{ $esActivo ? 'Activo' : 'Baja' }}
+                                        {{ $esActivo ? 'Activo' : 'Inactivo' }}
                                     </x-ui.badge>
                                 </dd>
                             </div>
@@ -71,7 +71,7 @@
                                 <td class="px-6 py-4 text-body">{{ $auxiliar['curso'] }}</td>
                                 <td class="px-6 py-4">
                                     <x-ui.badge :type="$esActivo ? 'success' : 'gray'">
-                                        {{ $esActivo ? 'Activo' : 'Baja' }}
+                                        {{ $esActivo ? 'Activo' : 'Inactivo' }}
                                     </x-ui.badge>
                                 </td>
                             </tr>

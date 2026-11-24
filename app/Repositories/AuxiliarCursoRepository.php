@@ -14,14 +14,15 @@
  * que unen `auxiliar_curso`, `usuario` y `curso` sin pasar por la capa de
  * servicio. Es la primera pieza de la capa repositorio del proyecto.
  *
- * La consulta principal trae los auxiliares de un docente en un solo viaje
- * (joins, sin N+1), no filtra por estado —los dados de baja siguen en la
- * lista— y ordena por curso y luego por apellido, con el nombre como
- * desempate determinista. La normalización del estado a ACTIVO/BAJA es
- * responsabilidad del servicio.
+ * Las consultas separan las cuentas de auxiliar de sus asignaciones activas
+ * del docente (estado 'Activo'); el servicio proyecta ambas en dos viajes, sin
+ * N+1. El estado de la lista ya no sale de `auxiliar_curso.estado`: una cuenta
+ * sin asignaciones activas es INACTIVO, con una o más es ACTIVO.
  *
  * @changelog
  * - 2026-11-08  [OchoaCesar]  feat: creación inicial con `delDocente()`.
+ * - 2026-11-24  [Equipo T1]  refactor: el estado deja de tomarse de la fila
+ *   de asignación y pasa a derivarse de la existencia de asignaciones activas.
  * - 2026-11-08  [OchoaCesar]  fix: la docblock ya no referencia
  *   FuenteAuxiliares (la pestaña "Ver auxiliares" se retiró).
  *
@@ -31,49 +32,51 @@
 
 namespace App\Repositories;
 
-use Illuminate\Database\Query\Builder;
+use App\Models\Rol;
+use App\Services\Auxiliar\AccesoAuxiliarService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 class AuxiliarCursoRepository
 {
     /**
-     * Asignaciones de auxiliares (auxiliar + curso + estado) de un docente.
+     * Todas las cuentas con rol auxiliar, estén o no asignadas a un curso.
      *
-     * Una sola consulta con joins: cada fila trae el auxiliar (`usuario`),
-     * su curso y el estado de la asignación. No se excluye ningún estado
-     * y no se resuelven colecciones por fila, así que no hay N+1.
-     *
-     * @param  int  $idDocente  ID del usuario docente (`curso.sis_doc`).
-     * @return Collection<int, \stdClass> Filas con id_usuario, cod_sis,
-     *                                    nombre_usuario, apellido,
-     *                                    nombre_curso y estado, ordenadas por
-     *                                    curso y apellido.
+     * @return Collection<int, \stdClass>
      */
-    public function delDocente(int $idDocente): Collection
+    public function auxiliares(): Collection
     {
-        return $this->consultaBase()
-            ->where('curso.sis_doc', $idDocente)
-            ->orderBy('curso.nombre_curso')
-            ->orderBy('usuario.apellido')
-            ->orderBy('usuario.nombre_usuario')
+        return DB::table('usuario as u')
+            ->join('rol_usuario as ru', 'ru.id_usuario', '=', 'u.id_usuario')
+            ->join('rol as r', 'r.id_rol', '=', 'ru.id_rol')
+            ->where('r.nombre_rol', Rol::NOMBRE_AUXILIAR)
+            ->orderBy('u.apellido')
+            ->orderBy('u.nombre_usuario')
             ->get([
-                'usuario.id_usuario',
-                'usuario.cod_sis',
-                'usuario.nombre_usuario',
-                'usuario.apellido',
-                'curso.nombre_curso',
-                'auxiliar_curso.estado',
+                'u.id_usuario',
+                'u.cod_sis',
+                'u.nombre_usuario',
+                'u.apellido',
             ]);
     }
 
     /**
-     * Base compartida de la consulta: unión de auxiliar, curso y estado.
+     * Asignaciones activas dentro de los cursos del docente, una fila por curso.
+     *
+     * @param  int  $idDocente  ID del usuario docente (`curso.sis_doc`).
+     * @return Collection<int, \stdClass>
      */
-    private function consultaBase(): Builder
+    public function asignacionesActivas(int $idDocente): Collection
     {
-        return DB::table('auxiliar_curso')
-            ->join('usuario', 'usuario.id_usuario', '=', 'auxiliar_curso.id_auxiliar')
-            ->join('curso', 'curso.id_curso', '=', 'auxiliar_curso.id_curso');
+        return DB::table('auxiliar_curso as ac')
+            ->join('curso as c', 'c.id_curso', '=', 'ac.id_curso')
+            ->where('c.sis_doc', $idDocente)
+            ->where('ac.estado', AccesoAuxiliarService::ESTADO_ACTIVO)
+            ->orderBy('c.nombre_curso')
+            ->get([
+                'ac.id_auxiliar',
+                'c.id_curso',
+                'c.nombre_curso',
+            ]);
     }
 }

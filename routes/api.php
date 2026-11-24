@@ -13,6 +13,7 @@
  * @updated 2026-11-08
  * @updated 2026-11-16
  * @updated 2026-11-19
+ * @updated 2026-11-24
  *
  * @description Rutas JSON del backend.
  *
@@ -34,6 +35,7 @@
  *   el selector de Crear / Editar examen (POST y DELETE /ambientes).
  * - 2026-11-19  [Valery D. Ortuno P]  refactor: se quita DELETE /ambientes;
  *   los ambientes solo se agregan.
+ * - 2026-11-24  [Equipo T1]  fix: conteo y marcado de leídas de notificaciones.
  */
 
 use App\Http\Controllers\Api\AmbienteController;
@@ -87,10 +89,16 @@ Route::middleware(['web', 'auth:web'])->group(function (): void {
         ->whereNumber('idIncidencia')
         ->name('api.incidencias.detalle');
 
-    // Notificaciones "Posible Tramposo" del docente autenticado (HU 12): listado
-    // y ocultado lógico. Un auxiliar no recibe estas notificaciones.
+    // Notificaciones del docente autenticado: historial, badge de nuevas y
+    // marcado de leídas. Un auxiliar no recibe estas notificaciones.
     Route::get('/notificaciones', [NotificacionController::class, 'index'])
         ->name('api.notificaciones.index');
+
+    Route::get('/notificaciones/conteo', [NotificacionController::class, 'conteo'])
+        ->name('api.notificaciones.conteo');
+
+    Route::patch('/notificaciones/leidas', [NotificacionController::class, 'marcarLeidas'])
+        ->name('api.notificaciones.leidas');
 
     Route::patch('/notificaciones/{idNotificacion}/ocultar', [NotificacionController::class, 'ocultar'])
         ->whereNumber('idNotificacion')

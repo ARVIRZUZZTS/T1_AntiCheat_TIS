@@ -213,8 +213,42 @@
 
     $opcionesCursos = $cursos ?? [];
     $tieneSelectorCurso = ! $esEdicion && $opcionesCursos !== [];
-    $cursoIdInicial = old('curso_id', $cursoId);
-    $nombreCursoInicial = $nombreCurso ?: ($opcionesCursos[$cursoIdInicial] ?? '');
+
+    $indiceCursos = collect($opcionesCursos)
+        ->map(fn (mixed $nombre, mixed $id): array => [
+            'id' => (int) $id,
+            'nombre' => (string) $nombre,
+            'termino' => mb_strtolower((string) $nombre),
+        ])
+        ->values()
+        ->all();
+
+    $porIdCurso = collect($indiceCursos)->keyBy('id');
+    $idCursoFijo = (int) ($cursoId ?? 0);
+
+    if ($idCursoFijo > 0 && ! $porIdCurso->has($idCursoFijo)) {
+        $fijo = [
+            'id' => $idCursoFijo,
+            'nombre' => $nombreCurso ?: (string) $idCursoFijo,
+            'termino' => mb_strtolower($nombreCurso ?: (string) $idCursoFijo),
+        ];
+        $indiceCursos[] = $fijo;
+        $porIdCurso->put($idCursoFijo, $fijo);
+    }
+
+    $idsCursosElegidos = (array) old('cursos', []);
+    if ($idsCursosElegidos === [] && $idCursoFijo > 0) {
+        $idsCursosElegidos = [(int) old('curso_id', $idCursoFijo)];
+    }
+
+    $cursosElegidos = collect($idsCursosElegidos)
+        ->map(fn (mixed $id): ?array => $porIdCurso->get((int) $id))
+        ->filter()
+        ->values()
+        ->all();
+
+    $cursoIdInicial = $cursosElegidos[0]['id'] ?? $idCursoFijo;
+    $nombreCursoInicial = $nombreCurso ?: ($cursosElegidos[0]['nombre'] ?? '');
 
     $catalogoAmbientes = collect($ambientes)->keyBy('id');
 
@@ -251,6 +285,11 @@
         cursos: @js($opcionesCursos),
         cursoId: @js((string) ($cursoIdInicial ?? '')),
         nombreCurso: @js($nombreCursoInicial),
+        indiceCursos: @js($indiceCursos),
+        cursosElegidos: @js($cursosElegidos),
+        busquedaCurso: '',
+        listaCursosAbierta: false,
+        indiceCursoResaltado: -1,
         modo: @js($modo),
         idPrefijo: @js($idPrefijo),
         accionUrl: @js($accionInicial),
@@ -306,6 +345,7 @@
                 fecha: ['fecha', 'hora_inicio'],
                 horaInicio: ['hora_inicio'],
                 duracion: ['duracion'],
+                cursosElegidos: ['cursos'],
                 ambientesElegidos: ['ambientes'],
                 materialesElegidos: ['materiales'],
                 materialesPersonalizados: ['materiales_personalizados'],
@@ -323,10 +363,58 @@
             });
         },
 
-        cambiarCurso() {
-            this.nombreCurso = this.cursos[this.cursoId] ?? '';
-            this.limpiarErrores(['curso_id']);
-            this.exito = false;
+        cursosVisibles() {
+            const termino = this.busquedaCurso.trim().toLowerCase();
+            const elegidos = this.cursosElegidos.map((curso) => curso.id);
+
+            return this.indiceCursos.filter((curso) =>
+                !elegidos.includes(curso.id) && curso.termino.indexOf(termino) !== -1
+            );
+        },
+
+        agregarCurso(id) {
+            const curso = this.indiceCursos.find((item) => item.id === Number(id));
+
+            if (! curso || this.cursosElegidos.some((item) => item.id === curso.id)) {
+                return;
+            }
+
+            this.cursosElegidos = this.cursosElegidos.concat(curso);
+            this.cursoId = String(curso.id);
+            this.nombreCurso = curso.nombre;
+            this.busquedaCurso = '';
+            this.indiceCursoResaltado = -1;
+            this.listaCursosAbierta = false;
+        },
+
+        quitarCurso(id) {
+            this.cursosElegidos = this.cursosElegidos.filter((curso) => curso.id !== Number(id));
+
+            const primero = this.cursosElegidos[0] ?? null;
+
+            this.cursoId = primero ? String(primero.id) : '';
+            this.nombreCurso = primero ? primero.nombre : '';
+        },
+
+        moverResaltadoCurso(paso) {
+            const total = this.cursosVisibles().length;
+
+            if (total === 0) {
+                this.indiceCursoResaltado = -1;
+
+                return;
+            }
+
+            this.listaCursosAbierta = true;
+            this.indiceCursoResaltado = (this.indiceCursoResaltado + paso + total) % total;
+        },
+
+        elegirResaltadoCurso() {
+            const curso = this.cursosVisibles()[this.indiceCursoResaltado];
+
+            if (curso) {
+                this.agregarCurso(curso.id);
+            }
         },
 
         cargarIndiceAmbientes() {
@@ -811,26 +899,78 @@
 >
     <form method="POST" x-bind:action="urlAccion" @if ($esEdicion) x-on:submit.prevent @endif>
         @csrf
-        @if (! $tieneSelectorCurso)
-            <input type="hidden" name="curso_id" x-bind:value="cursoId">
+        <input type="hidden" name="curso_id" x-bind:value="cursoId">
+        @if ($tieneSelectorCurso)
+            <template x-for="curso in cursosElegidos" :key="'envio_curso_' + curso.id">
+                <input type="hidden" name="cursos[]" :value="curso.id" />
+            </template>
         @endif
 
     <div class="space-y-4 py-4">
         @if ($tieneSelectorCurso)
-            <x-ui.select
-                label="Curso"
-                name="curso_id"
-                id="{{ $idPrefijo }}_curso_examen"
-                x-model="cursoId"
-                @change="cambiarCurso()"
-                :options="$opcionesCursos"
-                placeholder="Selecciona un curso"
-                x-bind:class="claseErrorDe('curso_id')"
-                x-bind:aria-invalid="errorDe('curso_id') ? 'true' : null"
-                required
-            />
-            <p x-show="errorDe('curso_id')" x-text="errorDe('curso_id')"
-               class="mt-1 text-sm text-fg-danger-strong"></p>
+            <div @click.outside="listaCursosAbierta = false">
+                <label for="{{ $idPrefijo }}_busqueda_curso" class="block mb-2.5 text-sm font-medium text-heading">
+                    Cursos <span class="text-fg-danger-strong" aria-hidden="true">*</span>
+                </label>
+
+                <input type="text" id="{{ $idPrefijo }}_busqueda_curso"
+                       role="combobox"
+                       aria-autocomplete="list"
+                       aria-controls="{{ $idPrefijo }}_lista-cursos"
+                       :aria-expanded="listaCursosAbierta"
+                       autocomplete="off"
+                       x-model="busquedaCurso"
+                       @click="listaCursosAbierta = true"
+                       @input="listaCursosAbierta = true; indiceCursoResaltado = -1"
+                       @keydown.down.prevent="moverResaltadoCurso(1)"
+                       @keydown.up.prevent="moverResaltadoCurso(-1)"
+                       @keydown.enter.prevent="elegirResaltadoCurso()"
+                       @keydown.escape="listaCursosAbierta = false"
+                       placeholder="Buscar curso"
+                       x-bind:class="claseErrorDe('cursos')"
+                       x-bind:aria-invalid="errorDe('cursos') ? 'true' : null"
+                       class="block w-full p-3 border border-default-medium bg-neutral-secondary-medium text-heading text-sm rounded-base focus:ring-brand focus:border-brand shadow-xs placeholder:text-body" />
+
+                <p class="mt-1.5 text-xs text-body">Puedes elegir varios cursos; el examen se compartira con todos.</p>
+
+                <ul id="{{ $idPrefijo }}_lista-cursos" role="listbox" aria-label="Cursos disponibles"
+                    x-show="listaCursosAbierta" x-cloak
+                    class="mt-2 max-h-40 overflow-y-auto rounded-base border border-default divide-y divide-default">
+                    <template x-for="(curso, posicion) in cursosVisibles()" :key="curso.id">
+                        <li>
+                            <button type="button" role="option"
+                                    :aria-selected="posicion === indiceCursoResaltado"
+                                    @click="agregarCurso(curso.id)"
+                                    class="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-start text-sm hover:bg-neutral-secondary-medium focus:outline-none focus:ring-2 focus:ring-brand-medium"
+                                    :class="posicion === indiceCursoResaltado ? 'bg-neutral-secondary-medium text-heading' : 'text-body'">
+                                <span class="truncate" x-text="curso.nombre"></span>
+                                <svg class="w-4 h-4 shrink-0 text-fg-brand" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v14m7-7H5"/></svg>
+                            </button>
+                        </li>
+                    </template>
+
+                    <li x-show="cursosVisibles().length === 0" class="px-3 py-2.5 text-sm text-body">
+                        No hay cursos que coincidan con la busqueda.
+                    </li>
+                </ul>
+
+                <ul class="mt-3 flex flex-col gap-2">
+                    <template x-for="curso in cursosElegidos" :key="curso.id">
+                        <li class="flex items-center justify-between gap-2 px-3 py-2 rounded-base border border-default bg-neutral-secondary-soft">
+                            <span class="truncate text-sm text-heading" x-text="curso.nombre"></span>
+                            <button type="button" @click="quitarCurso(curso.id)"
+                                    class="shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-base text-body hover:text-fg-danger hover:bg-neutral-secondary-medium focus:outline-none focus:ring-2 focus:ring-danger-medium"
+                                    :aria-label="'Quitar ' + curso.nombre" title="Quitar curso">
+                                <svg class="w-4 h-4" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0 1 16.138 21H7.862a2 2 0 0 1-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 0 0-1-1H10a1 1 0 0 0-1 1v3M4 7h16"/></svg>
+                                <span class="sr-only" x-text="'Quitar ' + curso.nombre"></span>
+                            </button>
+                        </li>
+                    </template>
+                </ul>
+
+                <p x-show="errorDe('cursos')" x-text="errorDe('cursos')"
+                   class="mt-1 text-sm text-fg-danger-strong"></p>
+            </div>
         @else
             <x-ui.input
                 label="Curso"
