@@ -61,7 +61,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\CursoEstado;
 use App\Http\Requests\StoreCursoRequest;
 use App\Models\Curso;
 use App\Models\Usuario;
@@ -306,6 +305,7 @@ class CursoController extends Controller
      * debajo, la sección Estudiantes del curso elegido.
      *
      * @param  Request  $request  Request con el docente autenticado.
+     * @param  ListarCursosDocenteService  $cursos  Servicio de cursos activos.
      * @return View Vista pages.curso-ver.
      *
      * @throws AuthorizationException Si el curso no es del docente (403).
@@ -314,9 +314,9 @@ class CursoController extends Controller
      *
      * @since  2026-11-15
      */
-    public function verEstudiantes(Request $request): View
+    public function verEstudiantes(Request $request, ListarCursosDocenteService $cursos): View
     {
-        return $this->vistaSeccionCurso($request, 'estudiantes');
+        return $this->vistaSeccionCurso($request, $cursos, 'estudiantes');
     }
 
     /**
@@ -324,6 +324,7 @@ class CursoController extends Controller
      * Habilitaciones del elegido, con sus modales de cambio de estado.
      *
      * @param  Request  $request  Request con el docente autenticado.
+     * @param  ListarCursosDocenteService  $cursos  Servicio de cursos activos.
      * @return View Vista pages.curso-ver.
      *
      * @throws AuthorizationException Si el curso no es del docente (403).
@@ -332,9 +333,9 @@ class CursoController extends Controller
      *
      * @since  2026-11-15
      */
-    public function habilitarEstudiantes(Request $request): View
+    public function habilitarEstudiantes(Request $request, ListarCursosDocenteService $cursos): View
     {
-        return $this->vistaSeccionCurso($request, 'habilitacion');
+        return $this->vistaSeccionCurso($request, $cursos, 'habilitacion');
     }
 
     /**
@@ -342,18 +343,15 @@ class CursoController extends Controller
      * docente y curso inicial desde ?curso=ID.
      *
      * @param  Request  $request  Request con el docente autenticado.
+     * @param  ListarCursosDocenteService  $cursos  Servicio de cursos activos.
      * @param  string  $soloTab  Sección única a mostrar (estudiantes / habilitacion).
      * @return View Vista pages.curso-ver acotada a la sección.
      *
      * @throws AuthorizationException Si el curso no es del docente (403).
      */
-    private function vistaSeccionCurso(Request $request, string $soloTab): View
+    private function vistaSeccionCurso(Request $request, ListarCursosDocenteService $cursos, string $soloTab): View
     {
-        $cursos = Curso::query()
-            ->where('sis_doc', $request->user()->id_usuario)
-            ->where('estado', '!=', CursoEstado::Archivado->value)
-            ->orderBy('nombre_curso')
-            ->get();
+        $cursos = $cursos->activos((int) $request->user()->id_usuario);
 
         $cursoId = $request->integer('curso');
         $cursoSeleccionado = $cursoId > 0 ? $cursos->firstWhere('id_curso', $cursoId) : null;
