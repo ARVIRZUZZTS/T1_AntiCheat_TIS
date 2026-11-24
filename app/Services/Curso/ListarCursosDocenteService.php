@@ -211,6 +211,13 @@ class ListarCursosDocenteService
             ->get();
     }
 
+    public function conExamenes(int $idDocente): EloquentCollection
+    {
+        return $this->activos($idDocente)
+            ->filter(fn (Curso $curso): bool => (int) $curso->examenes_count > 0)
+            ->values();
+    }
+
     /**
      * Cursos propios en estado `EnCurso`, en orden alfabético, listos para
      * archivar. Los cursos compartidos por invitación quedan afuera: el

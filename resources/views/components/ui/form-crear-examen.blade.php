@@ -474,6 +474,16 @@
             return conIndice ? this.errores[conIndice] : '';
         },
 
+        todosLosErrores() {
+            if (! this.mostrarErrores) {
+                return [];
+            }
+
+            return [...new Set(Object.values(this.errores).filter(
+                (mensaje) => typeof mensaje === 'string' && mensaje !== ''
+            ))];
+        },
+
         // Clases de error del campo, o nada si no hay.
         claseErrorDe(campo) {
             return this.errorDe(campo) ? '{{ $claseError }}' : '';
@@ -1111,17 +1121,17 @@
         <p x-show="errorDe('normas_personalizadas')" x-text="errorDe('normas_personalizadas')"
            class="mt-1 text-sm text-fg-danger-strong"></p>
     </div>
+    <div x-show="todosLosErrores().length > 0" x-cloak>
+        <x-ui.alert type="danger" title="{{ $esEdicion ? 'No se pudo guardar' : 'No se pudo crear el examen' }}">
+            <span x-text="todosLosErrores().join(' ')"></span>
+        </x-ui.alert>
+    </div>
     @if ($esEdicion)
         {{-- Resultado del guardado (Task #261): exito o un error que no sea de
              un campo (por ejemplo, de red). Los errores por campo los muestra
              cada campo con errorDe(). --}}
         <div x-show="exito" x-cloak>
             <x-ui.alert type="success" title="Examen actualizado">Examen actualizado con exito.</x-ui.alert>
-        </div>
-        <div x-show="errorDe('general')" x-cloak>
-            <x-ui.alert type="danger" title="No se pudo guardar">
-                <span x-text="errorDe('general')"></span>
-            </x-ui.alert>
         </div>
     @endif
 

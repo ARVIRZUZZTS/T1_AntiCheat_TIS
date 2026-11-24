@@ -231,6 +231,22 @@ class ListaCursosTest extends TestCase
             ->assertSee('No tienes cursos registrados');
     }
 
+    public function test_selector_de_examenes_ignora_cursos_sin_examenes(): void
+    {
+        DB::table('curso')->insert([
+            'id_curso' => 996109, 'nombre_curso' => 'Sin examenes',
+            'sis_doc' => self::DOCENTE, 'estado' => 'EnCurso',
+            'fecha_creacion' => now()->toDateString(),
+        ]);
+
+        $servicio = app(ListarCursosDocenteService::class);
+
+        $this->assertContains(996109, $servicio->activos(self::DOCENTE)->pluck('id_curso')->all());
+        $this->assertNotContains(996109, $servicio->conExamenes(self::DOCENTE)->pluck('id_curso')->all());
+        $this->assertContains(self::CURSO_PROPIO, $servicio->conExamenes(self::DOCENTE)->pluck('id_curso')->all());
+        $this->assertContains(self::CURSO_INVITADO, $servicio->conExamenes(self::DOCENTE)->pluck('id_curso')->all());
+    }
+
     public function test_detalle_no_admite_invitacion_pendiente_ni_rechazada(): void
     {
         $this->actingAs(Usuario::findOrFail(self::DOCENTE));

@@ -187,7 +187,7 @@
                     <div class="min-w-0 lg:pr-6">
                         <div class="min-w-0">
                             <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-                                <p class="font-semibold text-heading wrap-break-word">{{ $curso->nombre_curso }}</p>
+                                <p class="text-lg font-semibold text-heading wrap-break-word">{{ $curso->nombre_curso }}</p>
                                 <x-ui.badge :type="$esActivo ? 'status-habilitado' : 'gray'">
                                     {{ $esActivo ? 'Activo' : 'Archivado' }}
                                 </x-ui.badge>
@@ -201,14 +201,14 @@
                         <p class="text-xs font-semibold uppercase text-muted">Proximo examen:</p>
                         @if ($examen)
                             <p class="mt-1 text-sm font-medium text-heading">{{ $inicioExamen->format('d/m/Y') }}</p>
-                            <p class="text-xs text-body">{{ $inicioExamen->format('H:i') }}{{ $finExamen ? ' - '.$finExamen->format('H:i') : '' }}</p>
+                            <p class="text-sm text-body">{{ $inicioExamen->format('H:i') }}{{ $finExamen ? ' - '.$finExamen->format('H:i') : '' }}</p>
                         @else
                             <p class="mt-1 text-sm text-body">No hay examenes programados</p>
                         @endif
                     </div>
 
                     {{-- Metricas del curso: inscritos e incidencias. --}}
-                    <div class="grid grid-cols-2 border-t border-default pt-4 divide-x divide-default lg:border-t-0 lg:pt-0 lg:pl-2">
+                    <div class="grid grid-cols-2 border-t border-default pt-4 divide-x divide-default lg:border-t-0 lg:pt-0 lg:pl-6">
                         @foreach ($metricas as $metrica)
                             <div class="text-center sm:px-3">
                                 <p class="text-xl sm:text-2xl font-semibold {{ $metrica['valor'] === 0 ? 'text-fg-disabled' : $metrica['color'] }}">{{ $metrica['valor'] }}</p>
