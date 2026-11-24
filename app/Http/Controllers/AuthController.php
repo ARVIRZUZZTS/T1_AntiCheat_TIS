@@ -28,7 +28,10 @@ class AuthController extends Controller
 
             $request->session()->regenerate();
 
-            return redirect()->intended(route('notificaciones'));
+            $usuario = Auth::user();
+            abort_unless($usuario instanceof Usuario, 401);
+
+            return redirect()->intended(route(InicioController::destino($usuario)));
         }
 
         return back()

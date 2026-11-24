@@ -119,6 +119,7 @@ use App\Http\Controllers\ConfirmarRegistroController;
 use App\Http\Controllers\CursoController;
 use App\Http\Controllers\EditarCursoVistaController;
 use App\Http\Controllers\ExamenController;
+use App\Http\Controllers\InicioController;
 use App\Http\Controllers\Reporte\ExportarReporteAsistenciaController;
 use App\Http\Controllers\Reporte\ExportarReporteIngresosIlegalesController;
 use App\Http\Controllers\Reporte\ListarReporteIngresosIlegalesController;
@@ -140,9 +141,8 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('auth')->group(function (): void {
-    Route::view('/', 'pages.inicio')->name('inicio');
-
-    Route::view('/inicio', 'pages.inicio');
+    Route::get('/', InicioController::class)->name('inicio');
+    Route::redirect('/inicio', '/');
     // Destino de "Cursos" en el sidebar del auxiliar. Su contenido (cursos a los
     // que está asignado y sus exámenes) se define en una HU posterior.
     Route::view('/mis-cursos', 'pages.auxiliar-cursos')->name('auxiliar.cursos');

@@ -76,6 +76,14 @@ class RutasPrincipalesTest extends TestCase
         $this->get(route('cursos'))->assertOk();
     }
 
+    public function test_la_raiz_redirige_al_listado_real_del_docente(): void
+    {
+        $this->actingAsDocenteDe($this->curso);
+
+        $this->get('/')->assertRedirect(route('cursos'));
+        $this->get('/inicio')->assertRedirect('/');
+    }
+
     public function test_la_pagina_de_crear_curso_carga_sin_error(): void
     {
         $this->actingAsDocenteDe($this->curso);
