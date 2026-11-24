@@ -35,6 +35,8 @@
  *   y materiales (las del examen); aceptar ya no las copia.
  * - 2026-11-23  [Valery D. Ortuno P]  test: solo el anfitrion invita y no se
  *   ofrece ni se invita a quien ya comparte el examen.
+ * - 2026-11-23  [Valery D. Ortuno P]  test: rechazar y cancelar devuelven el
+ *   error para el modal (los avisos son modales de la vista).
  *
  * @see App\Livewire\Invitaciones\Index
  * @see App\Services\Invitacion\AsociarCursosInvitacionService
@@ -170,7 +172,8 @@ class ExamenCompartidoCursosTest extends TestCase
             ->set('idCurso', self::CALCULO_ROBERTO)
             ->set('idExamen', self::NUEVO)
             ->call('cancelar', self::INVITACION)
-            ->assertSet('mensajeExito', 'Invitacion cancelada.');
+            // El aviso "Invitacion cancelada." es un modal de la vista.
+            ->assertReturned('');
 
         $this->assertSame(['cancelado'], array_column($componente->get('enviadas'), 'estado'));
     }
@@ -249,7 +252,8 @@ class ExamenCompartidoCursosTest extends TestCase
         Livewire::actingAs($this->usuario(self::PATRICIA))
             ->test(Index::class, ['tab' => 'recibir'])
             ->call('rechazar', self::INVITACION)
-            ->assertSet('mensajeExito', 'Invitacion rechazada.')
+            // La confirmacion y el aviso "Invitacion rechazada." son modales de la vista.
+            ->assertReturned('')
             ->assertSet('invitaciones', []);
 
         $this->assertDatabaseHas('invitacion_examen_compartido', ['id_invitacion' => self::INVITACION, 'estado' => 'rechazado']);

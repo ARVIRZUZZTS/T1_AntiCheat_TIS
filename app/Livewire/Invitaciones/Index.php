@@ -51,6 +51,9 @@
  *   memoria).
  * - 2026-11-23  [Valery D. Ortuno P]  fix: Enviar solo ofrece cursos y
  *   examenes futuros creados por el docente: solo el anfitrion invita.
+ * - 2026-11-23  [Valery D. Ortuno P]  refactor: `rechazar()` y `cancelar()`
+ *   devuelven el error para el modal de confirmacion de la vista (antes el
+ *   confirm del navegador y un aviso en la pagina).
  *
  * @see  App\Services\Invitacion\AsociarCursosInvitacionService
  * @see  App\Services\Invitacion\EnviarInvitacionExamenService
@@ -233,7 +236,13 @@ class Index extends Component
         $this->reiniciarDocente();
     }
 
-    public function cancelar(int $idInvitacion, CancelarInvitacionExamenService $servicio): void
+    /**
+     * Cancela una invitacion pendiente. La confirmacion y el aviso de exito
+     * son modales de la vista.
+     *
+     * @return string Error para el modal, o '' si salio bien.
+     */
+    public function cancelar(int $idInvitacion, CancelarInvitacionExamenService $servicio): string
     {
         $this->mensajeExito = '';
         $this->mensajeError = '';
@@ -242,25 +251,22 @@ class Index extends Component
         $invitacion = InvitacionExamenCompartido::query()->find($idInvitacion);
 
         if ($invitacion === null) {
-            $this->mensajeError = 'La invitacion ya no existe.';
-
-            return;
+            return 'La invitacion ya no existe.';
         }
 
         try {
             $servicio->cancelar(auth()->user(), $invitacion);
         } catch (ValidationException $error) {
-            $this->mensajeError = (string) collect($error->errors())->flatten()->first();
-
-            return;
+            return (string) collect($error->errors())->flatten()->first();
         }
 
-        $this->mensajeExito = 'Invitacion cancelada.';
         $this->enviadas = collect($this->enviadas)
             ->map(fn (array $enviada): array => $enviada['id'] === $idInvitacion
                 ? ['estado' => InvitacionEstado::Cancelada->value] + $enviada
                 : $enviada)
             ->all();
+
+        return '';
     }
 
     /**
@@ -293,17 +299,19 @@ class Index extends Component
         );
     }
 
-    public function rechazar(int $idInvitacion): void
+    /**
+     * Rechaza una invitacion. La confirmacion y el aviso "Invitacion
+     * rechazada." son modales de la vista.
+     *
+     * @return string Error para el modal, o '' si salio bien.
+     */
+    public function rechazar(int $idInvitacion): string
     {
-        $error = $this->responder(
+        return $this->responder(
             fn (AsociarCursosInvitacionService $servicio) => $servicio->rechazar(auth()->user(), $idInvitacion),
             $idInvitacion,
-            'Invitacion rechazada.',
+            '',
         );
-
-        if ($error !== '') {
-            $this->mensajeError = $error;
-        }
     }
 
     public function render(): View

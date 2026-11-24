@@ -26,6 +26,8 @@
  *   con el curso activo o con el examen asignado con Monitor (HU 24).
  * - 2026-11-23  [Valery D. Ortuno P]  fix: `invitarDocente` es solo para el
  *   anfitrion (creador); un invitado que acepto ya no puede invitar a otros.
+ * - 2026-11-23  [Valery D. Ortuno P]  perf: `invitarDocente` revisa primero el
+ *   creador (sin consultar) y luego rol y curso archivado en una sola consulta.
  * - 2026-11-20  [Equipo T1]  feat: bloqueo de escrituras si algún curso
  *   vinculado al examen está archivado (HU #321 · Task #323).
  *
@@ -98,21 +100,22 @@ class ExamenPolicy
 
     public function invitarDocente(Usuario $usuario, Examen $examen): bool
     {
-        if ($this->tieneCursoArchivado($examen)) {
-            return false;
-        }
-
-        $esDocente = $usuario->roles()
-            ->where('nombre_rol', Rol::NOMBRE_DOCENTE)
-            ->exists();
-
-        if (! $esDocente) {
-            return false;
-        }
-
         // Solo el anfitrion (quien creo el examen) invita: los invitados que
-        // aceptaron comparten el examen pero no pueden sumar a otros.
-        return (int) $examen->creador === (int) $usuario->id_usuario;
+        // aceptaron comparten el examen pero no pueden sumar a otros. Se sabe
+        // sin consultar.
+        if ((int) $examen->creador !== (int) $usuario->id_usuario) {
+            return false;
+        }
+
+        // Docente y sin cursos archivados en el examen, en una sola consulta
+        // (la busqueda de docentes lo revisa en cada tecla).
+        $fila = DB::selectOne(
+            'select exists (select 1 from rol_usuario ru join rol r on r.id_rol = ru.id_rol where ru.id_usuario = ? and r.nombre_rol = ?) as docente, '
+            .'exists (select 1 from examen_curso ec join curso c on c.id_curso = ec.id_curso where ec.id_examen = ? and c.estado = ?) as archivado',
+            [$usuario->id_usuario, Rol::NOMBRE_DOCENTE, $examen->id_examen, \App\Enums\CursoEstado::Archivado->value],
+        );
+
+        return (bool) $fila->docente && ! (bool) $fila->archivado;
     }
 
     public function reporteHorarioIngreso(Usuario $usuario, Examen $examen, int $idCurso): bool
