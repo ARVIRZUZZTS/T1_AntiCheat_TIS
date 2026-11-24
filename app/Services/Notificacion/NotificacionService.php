@@ -22,6 +22,8 @@
  * - `listarPara()` devuelve las notificaciones no ocultas del usuario
  *   autenticado, de la más reciente a la más antigua, con el tiempo transcurrido
  *   en español. Un auxiliar nunca recibe notificaciones.
+ * - `contarNuevas()` y `marcarTodasLeidas()` separan el badge de avisos nuevos
+ *   del historial: solo cuentan/marcan las filas `recibido` y no ocultas.
  * - `ocultar()` hace el borrado lógico de una notificación propia.
  *
  * @see  App\Services\Notificacion\TiempoTranscurrido
@@ -37,6 +39,8 @@
  *   tabla si quien llama ya la bloqueo (`$tablaBloqueada`).
  *   `notificarRespuestaInvitacion()` reapunta el aviso con un solo UPDATE y
  *   solo bloquea e inserta si no existia.
+ * - 2026-11-24  [Equipo T1]  fix: el badge cuenta solo avisos `recibido` y al
+ *   abrir la bandeja se marcan todos como `visto`.
  */
 
 namespace App\Services\Notificacion;
@@ -91,6 +95,9 @@ class NotificacionService
 
     /** Estado inicial con el que nace un aviso, del enum `estado_notificacion`. */
     public const ESTADO_RECIBIDO = 'recibido';
+
+    /** Estado de un aviso ya leído por el docente. */
+    public const ESTADO_VISTO = 'visto';
 
     public function __construct(
         private readonly TiempoTranscurrido $tiempo = new TiempoTranscurrido,
@@ -245,7 +252,7 @@ class NotificacionService
      * aviso previo, se crea uno.
      *
      * @param  InvitacionExamenCompartido  $invitacion  Invitación ya respondida.
-     * @return NotificacionDocente  Aviso dirigido al invitador.
+     * @return NotificacionDocente Aviso dirigido al invitador.
      */
     public function notificarRespuestaInvitacion(InvitacionExamenCompartido $invitacion): NotificacionDocente
     {
@@ -301,8 +308,7 @@ class NotificacionService
      * la columna `fecha_evento`.
      *
      * @param  CarbonInterface  $momento  Fecha y hora de finalización del respaldo.
-     *
-     * @return array<int, NotificacionDocente>  Avisos creados, uno por docente.
+     * @return array<int, NotificacionDocente> Avisos creados, uno por docente.
      *
      * @author T1 - Tech One SRL
      *
@@ -344,8 +350,7 @@ class NotificacionService
      * Texto del aviso de respaldo con la fecha y hora exactas.
      *
      * @param  ?CarbonInterface  $fecha  Momento del respaldo.
-     *
-     * @return string  Mensaje informativo para la tarjeta.
+     * @return string Mensaje informativo para la tarjeta.
      *
      * @author T1 - Tech One SRL
      *
@@ -412,16 +417,7 @@ class NotificacionService
             return collect();
         }
 
-        $notificaciones = NotificacionDocente::query()
-            ->where('oculta', false)
-            ->where(function (Builder $query) use ($usuario): void {
-                $query->where('id_docente_destinatario', $usuario->id_usuario)
-                    ->orWhere(function (Builder $notificacionLegacy) use ($usuario): void {
-                        $notificacionLegacy
-                            ->whereNull('id_docente_destinatario')
-                            ->whereHas('curso', fn (Builder $curso): Builder => $curso->where('sis_doc', $usuario->id_usuario));
-                    });
-            })
+        $notificaciones = $this->consultarPara($usuario)
             ->with([
                 'curso',
                 'centralRiesgo.estudiante',
@@ -435,6 +431,56 @@ class NotificacionService
             ->get();
 
         return $this->preparar($notificaciones);
+    }
+
+    /**
+     * Cantidad de avisos nuevos (recibidos y no ocultos) del usuario. Las filas
+     * ya vistas siguen en el historial, pero no cuentan para el badge.
+     */
+    public function contarNuevas(Usuario $usuario): int
+    {
+        if ($this->esAuxiliar($usuario)) {
+            return 0;
+        }
+
+        return $this->consultarPara($usuario)
+            ->where('estado', self::ESTADO_RECIBIDO)
+            ->count();
+    }
+
+    /**
+     * Marca como vistos todos los avisos nuevos del usuario y devuelve cuántos
+     * cambiaron. Los ocultos y los ajenos quedan intactos.
+     */
+    public function marcarTodasLeidas(Usuario $usuario): int
+    {
+        if ($this->esAuxiliar($usuario)) {
+            return 0;
+        }
+
+        return $this->consultarPara($usuario)
+            ->where('estado', self::ESTADO_RECIBIDO)
+            ->update(['estado' => self::ESTADO_VISTO]);
+    }
+
+    /**
+     * Consulta base de los avisos visibles del usuario: destinatario directo o,
+     * en las filas legacy, el docente dueño del curso.
+     *
+     * @return Builder<NotificacionDocente>
+     */
+    private function consultarPara(Usuario $usuario): Builder
+    {
+        return NotificacionDocente::query()
+            ->where('oculta', false)
+            ->where(function (Builder $query) use ($usuario): void {
+                $query->where('id_docente_destinatario', $usuario->id_usuario)
+                    ->orWhere(function (Builder $notificacionLegacy) use ($usuario): void {
+                        $notificacionLegacy
+                            ->whereNull('id_docente_destinatario')
+                            ->whereHas('curso', fn (Builder $curso): Builder => $curso->where('sis_doc', $usuario->id_usuario));
+                    });
+            });
     }
 
     /**
@@ -643,8 +689,7 @@ class NotificacionService
      * porque la notificación es estrictamente de solo lectura.
      *
      * @param  NotificacionDocente  $notificacion  Aviso de tipo `respaldo_bd`.
-     *
-     * @return array<string, mixed>  Datos para la pantalla/API.
+     * @return array<string, mixed> Datos para la pantalla/API.
      */
     private function mapearRespaldo(NotificacionDocente $notificacion): array
     {

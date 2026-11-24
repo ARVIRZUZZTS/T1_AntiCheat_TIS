@@ -7,6 +7,8 @@
  *
  * @created 2026-10-11
  *
+ * @updated 2026-11-24
+ *
  * @description
  * Endpoints JSON de las notificaciones del docente. Sirven a las dos HU que
  * generan avisos (el campo `tipo` del payload indica cuál):
@@ -18,6 +20,10 @@
  * - `index`   GET  `/api/notificaciones` — lista las notificaciones no ocultas
  *   del usuario autenticado, de la más reciente a la más antigua. Lista vacía
  *   (200, `[]`) cuando no hay ninguna.
+ * - `conteo` GET `/api/notificaciones/conteo` — cantidad de avisos nuevos para
+ *   el badge del sidebar, sin cargar el historial completo.
+ * - `marcarLeidas` PATCH `/api/notificaciones/leidas` — pasa a `visto` los
+ *   avisos nuevos del usuario al abrir la bandeja.
  * - `ocultar` PATCH `/api/notificaciones/{id}/ocultar` — borrado lógico de una
  *   notificación propia. 404 si no existe, 403 si es de otro usuario.
  *
@@ -29,6 +35,8 @@
  * - 2026-10-11  [T1]  feat: endpoints de notificaciones del docente (#HU12).
  * - 2026-10-11  [David E. Chavez T.]  docs: los endpoints también sirven los
  *   avisos "central_riesgo" de la HU 6 (#HU6).
+ * - 2026-11-24  [Equipo T1]  fix: conteo de nuevas y marcado de leídas para que
+ *   el badge baje a 0 al abrir la bandeja.
  */
 
 namespace App\Http\Controllers\Api;
@@ -52,6 +60,31 @@ class NotificacionController extends Controller
         $usuario = $request->user('web');
 
         return response()->json($servicio->listarPara($usuario)->values());
+    }
+
+    /**
+     * Cantidad de avisos nuevos para el badge del sidebar.
+     */
+    public function conteo(Request $request, NotificacionService $servicio): JsonResponse
+    {
+        /** @var Usuario $usuario */
+        $usuario = $request->user('web');
+
+        return response()->json(['nuevas' => $servicio->contarNuevas($usuario)]);
+    }
+
+    /**
+     * Marca como leídas todas las notificaciones nuevas del usuario.
+     */
+    public function marcarLeidas(Request $request, NotificacionService $servicio): JsonResponse
+    {
+        /** @var Usuario $usuario */
+        $usuario = $request->user('web');
+
+        return response()->json([
+            'mensaje' => 'Notificaciones marcadas como leídas.',
+            'cantidad' => $servicio->marcarTodasLeidas($usuario),
+        ]);
     }
 
     /**

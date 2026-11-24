@@ -3,6 +3,7 @@
     @author  Alisson D. Alvarado <alvaradoalissondalet@gmail.com>
     @created 2026-10-09
     @updated 2026-10-11
+    @updated 2026-11-24
 
     @description
     Pantalla de notificaciones del docente. Lista las notificaciones que devuelve
@@ -31,6 +32,8 @@
       el onclick incrustado del template quedaba siempre en 0 y el modal lo
       ignoraba, por lo que "Ver detalle" no abría nada.
     - 2026-11-08  [Alisson D. Alvarado]  fix: mostrar notificaciones sin acciones.
+    - 2026-11-24  [Equipo T1]  fix: al cargar la bandeja se marcan como leídas
+      todas las notificaciones nuevas y el badge del sidebar baja a 0.
 
     @see  \resources\views\components\ui\notificacion-card.blade.php
 --}}
@@ -119,10 +122,11 @@
             </div>
         </template>
 
-        <div id="notificaciones-lista"
-             class="mt-6 flex flex-col gap-4"
-             data-endpoint="{{ route('api.notificaciones.index') }}"
-             data-es-auxiliar="{{ $esAuxiliar ? '1' : '0' }}">
+         <div id="notificaciones-lista"
+              class="mt-6 flex flex-col gap-4"
+              data-endpoint="{{ route('api.notificaciones.index') }}"
+              data-marcar-leidas="{{ route('api.notificaciones.leidas') }}"
+              data-es-auxiliar="{{ $esAuxiliar ? '1' : '0' }}">
         </div>
 
         <div id="notificaciones-vacio" class="mt-6" hidden>
@@ -144,7 +148,9 @@
 
             var vacio = document.getElementById('notificaciones-vacio');
             var endpoint = lista.dataset.endpoint;
+            var endpointLeidas = lista.dataset.marcarLeidas;
             var esAuxiliar = lista.dataset.esAuxiliar === '1';
+            var csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 
             var plantillas = {
                 posible_tramposo: document.getElementById('notificacion-template-tramposo'),
@@ -215,6 +221,31 @@
                 return nodo;
             }
 
+            function marcarLeidas() {
+                if (!endpointLeidas) {
+                    return;
+                }
+
+                fetch(endpointLeidas, {
+                    method: 'PATCH',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken
+                    },
+                    credentials: 'same-origin'
+                })
+                    .then(function (respuesta) {
+                        if (!respuesta.ok) {
+                            throw new Error('HTTP ' + respuesta.status);
+                        }
+                        window.dispatchEvent(new CustomEvent('notificaciones-leidas', { detail: { nuevas: 0 } }));
+                    })
+                    .catch(function () {
+                        // silencioso: el polling del sidebar vuelve a consultar
+                    });
+            }
+
             function cargar() {
                 if (esAuxiliar) {
                     actualizarVacio();
@@ -236,6 +267,7 @@
                             lista.appendChild(crearTarjeta(notificacion));
                         });
                         actualizarVacio();
+                        marcarLeidas();
                     })
                     .catch(actualizarVacio);
             }
