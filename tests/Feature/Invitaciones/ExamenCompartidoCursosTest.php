@@ -13,7 +13,8 @@
  *  - Enviar: solo cursos activos propios con examenes programados, solo
  *    examenes futuros con fecha y
  *    hora (incluido uno recien creado), busqueda en vivo, resumen del envio,
- *    duplicado y cancelar una pendiente.
+ *    duplicado y cancelar una pendiente. Solo el anfitrion invita y no se
+ *    ofrece a quien ya comparte el examen.
  *  - Aceptar eligiendo los cursos del invitado en el mismo paso: el examen
  *    queda en esos cursos (`examen_curso`) con sus estudiantes inscritos bajo
  *    su configuracion (sin copiar reglas: valen las del examen). Sin cursos o con cursos
@@ -32,6 +33,8 @@
  *   una sola lista, rechazar y copia de reglas y materiales.
  * - 2026-11-23  [Valery D. Ortuno P]  test: ambos docentes ven las mismas reglas
  *   y materiales (las del examen); aceptar ya no las copia.
+ * - 2026-11-23  [Valery D. Ortuno P]  test: solo el anfitrion invita y no se
+ *   ofrece ni se invita a quien ya comparte el examen.
  *
  * @see App\Livewire\Invitaciones\Index
  * @see App\Services\Invitacion\AsociarCursosInvitacionService
@@ -40,14 +43,17 @@
 namespace Tests\Feature\Invitaciones;
 
 use App\Livewire\Invitaciones\Index;
+use App\Models\Examen;
 use App\Models\Usuario;
 use App\Services\Examen\ObtenerDetalleExamenService;
 use App\Services\Invitacion\AsociarCursosInvitacionService;
 use App\Services\Invitacion\EnviarInvitacionExamenService;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -290,6 +296,47 @@ class ExamenCompartidoCursosTest extends TestCase
             ['docente' => 'Roberto Silva', 'rol' => 'Creador', 'cursos' => ['Calculo I - Grupo 1']],
             ['docente' => 'Patricia Rojas', 'rol' => 'Invitado', 'cursos' => ['Fisica I']],
         ], $detalle['participantes']);
+    }
+
+    public function test_el_invitado_que_acepto_no_puede_invitar_a_otros(): void
+    {
+        // Patricia acepto y el examen ya esta en su curso Fisica I.
+        $this->invitar('aceptado');
+        DB::table('examen_curso')->insert(['id_examen' => self::NUEVO, 'id_curso' => self::FISICA_PATRICIA]);
+
+        // En Enviar no le sale: solo el anfitrion invita.
+        Livewire::actingAs($this->usuario(self::PATRICIA))
+            ->test(Index::class, ['tab' => 'enviar'])
+            ->assertSet('cursos', []);
+
+        $this->expectException(AuthorizationException::class);
+        app(EnviarInvitacionExamenService::class)
+            ->ejecutar($this->usuario(self::PATRICIA), Examen::findOrFail(self::NUEVO), self::ROBERTO);
+    }
+
+    public function test_no_se_ofrece_ni_se_invita_a_quien_ya_comparte_el_examen(): void
+    {
+        // Fernando ya tiene un curso en el examen (lo comparte sin invitacion pendiente).
+        DB::table('usuario')->insert(['id_usuario' => 3, 'cod_sis' => 'DOC003', 'password' => 'x', 'nombre_usuario' => 'Fernando', 'apellido' => 'Paz']);
+        DB::table('rol_usuario')->insert(['id_usuario' => 3, 'id_rol' => 1]);
+        DB::table('curso')->insert(['id_curso' => 30, 'nombre_curso' => 'Algebra', 'sis_doc' => 3, 'estado' => 'EnCurso']);
+        DB::table('examen_curso')->insert(['id_examen' => self::NUEVO, 'id_curso' => 30]);
+
+        $componente = Livewire::actingAs($this->usuario(self::ROBERTO))
+            ->test(Index::class, ['tab' => 'enviar'])
+            ->set('idCurso', self::CALCULO_ROBERTO)
+            ->set('idExamen', self::NUEVO)
+            ->set('busquedaDocente', 'fer');
+        $this->assertSame([], $componente->get('docentes'));
+
+        try {
+            app(EnviarInvitacionExamenService::class)
+                ->ejecutar($this->usuario(self::ROBERTO), Examen::findOrFail(self::NUEVO), 3);
+            $this->fail('Se invito a quien ya comparte el examen.');
+        } catch (ValidationException $error) {
+            $this->assertSame([EnviarInvitacionExamenService::MENSAJE_DUPLICADA], $error->errors()['docente_invitado_id']);
+        }
+        $this->assertSame(0, DB::table('invitacion_examen_compartido')->count());
     }
 
     private function invitar(string $estado = 'pendiente'): void
