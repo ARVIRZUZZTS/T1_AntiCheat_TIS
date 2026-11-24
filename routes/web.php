@@ -114,6 +114,7 @@
 
 use App\Enums\CursoEstado;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\ConfirmarRegistroController;
 use App\Http\Controllers\CursoController;
 use App\Http\Controllers\EditarCursoVistaController;
 use App\Http\Controllers\ExamenController;
@@ -220,6 +221,13 @@ Route::middleware('guest')->group(function (): void {
 });
 
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+
+// Confirmación del correo de un docente institucional (HU 27). La firma se
+// valida dentro del controlador, así un enlace vencido avisa en el login en
+// lugar de devolver un 403.
+Route::get('/registro/confirmar/{usuario}', ConfirmarRegistroController::class)
+    ->whereNumber('usuario')
+    ->name('registro.confirmar');
 
 Route::middleware(['auth', 'docente'])->group(function (): void {
     Route::view('/docentes', 'pages.docentes')->name('docentes');

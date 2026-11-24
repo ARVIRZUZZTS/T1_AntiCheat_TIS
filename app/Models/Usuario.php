@@ -48,6 +48,8 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
  * @property string $password
  * @property string $nombre_usuario
  * @property string $apellido
+ * @property ?string $nombre
+ * @property ?string $fecha_creacion
  * @property string $estado_cuenta Valor de App\Enums\EstadoCuenta.
  */
 class Usuario extends Authenticatable
