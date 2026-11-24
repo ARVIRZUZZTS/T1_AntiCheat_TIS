@@ -10,7 +10,7 @@
  * @updated 2026-11-23
  *
  * @description
- * Componente de la subopción «Archivar/Restaurar cursos»: una sola lista con
+ * Componente de la subopción «Archivar curso»: una sola tabla con
  * los cursos propios en curso y los archivados al final. Cada tarjeta ofrece
  * su acción como texto: «Archivar» en rojo para los activos y «Restaurar» en
  * gris para los archivados. Cada acción se confirma en su modal y delega en su

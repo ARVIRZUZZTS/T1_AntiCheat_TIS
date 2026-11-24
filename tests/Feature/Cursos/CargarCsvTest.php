@@ -9,8 +9,6 @@ use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
-use PhpOffice\PhpSpreadsheet\Spreadsheet;
-use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Tests\TestCase;
 
 class CargarCsvTest extends TestCase
@@ -46,16 +44,9 @@ class CargarCsvTest extends TestCase
         ]);
     }
 
-    private function archivoXlsx(): UploadedFile
+    private function archivoCsv(): UploadedFile
     {
-        $spreadsheet = new Spreadsheet;
-        $sheet = $spreadsheet->getActiveSheet();
-        $sheet->setCellValue('A1', 'SIS');
-        $sheet->setCellValue('A2', '910200001');
-        $path = tempnam(sys_get_temp_dir(), 'xlsx');
-        (new Xlsx($spreadsheet))->save($path);
-
-        return UploadedFile::fake()->createWithContent('lista.xlsx', file_get_contents($path));
+        return UploadedFile::fake()->createWithContent('lista.csv', "SIS\n910200001\n");
     }
 
     public function test_get_autorizado_renderiza_componente(): void
@@ -76,28 +67,55 @@ class CargarCsvTest extends TestCase
             ->assertSessionHasErrors('curso');
     }
 
-    public function test_cancelar_redirige_a_detalle(): void
+    public function test_get_curso_finalizado_bloquea(): void
+    {
+        DB::table('curso')->where('id_curso', self::CURSO)->update(['estado' => 'Finalizo']);
+        $docente = Usuario::findOrFail(self::DOCENTE);
+        $this->actingAs($docente)
+            ->get(route('cursos.cargar-csv', ['curso' => self::CURSO]))
+            ->assertSessionHasErrors('curso');
+    }
+
+    public function test_cancelar_no_sale_de_cargar_csv(): void
     {
         $docente = Usuario::findOrFail(self::DOCENTE);
         Livewire::actingAs($docente)
             ->test(CargarCsv::class, ['curso' => Curso::findOrFail(self::CURSO)])
+            ->set('archivo', $this->archivoCsv())
             ->call('cancelar')
-            ->assertRedirect(route('cursos.detalle', ['curso' => self::CURSO]));
+            ->assertNoRedirect()
+            ->assertSet('archivo', null)
+            ->assertSet('mensajeError', '')
+            ->assertSet('mensajeExito', '');
     }
 
-    public function test_carga_exitosa_redirige_con_flash(): void
+    public function test_cambiar_curso_limpia_archivo_y_avisos(): void
     {
         $docente = Usuario::findOrFail(self::DOCENTE);
-        $archivo = $this->archivoXlsx();
+        Livewire::actingAs($docente)
+            ->test(CargarCsv::class, ['curso' => Curso::findOrFail(self::CURSO)])
+            ->set('archivo', $this->archivoCsv())
+            ->set('mensajeError', 'error previo')
+            ->set('mensajeExito', 'exito previo')
+            ->set('cursoId', null)
+            ->assertSet('archivo', null)
+            ->assertSet('mensajeError', '')
+            ->assertSet('mensajeExito', '');
+    }
+
+    public function test_carga_exitosa_muestra_resumen_en_la_misma_vista(): void
+    {
+        $docente = Usuario::findOrFail(self::DOCENTE);
+        $archivo = $this->archivoCsv();
 
         Livewire::actingAs($docente)
             ->test(CargarCsv::class, ['curso' => Curso::findOrFail(self::CURSO)])
             ->set('archivo', $archivo)
             ->call('cargar')
             ->assertHasNoErrors()
-            ->assertRedirect(route('cursos.ver-estudiantes', ['curso' => self::CURSO]));
-
-        $this->assertNotNull(session('mensaje'));
+            ->assertNoRedirect()
+            ->assertSet('mensajeExito', 'Se inscribieron 1 estudiante(s): 1 habilitado(s), '
+                .'0 deshabilitado(s) por la central de riesgos. Duplicados en el archivo: 0. Filas omitidas: 0.');
     }
 
     public function test_archivo_invalido_muestra_error(): void

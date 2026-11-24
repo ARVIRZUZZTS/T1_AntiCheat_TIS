@@ -212,9 +212,35 @@ class EliminarCursoTest extends TestCase
             ->get(route('cursos.eliminar'))
             ->assertOk()
             ->assertSee('Curso a eliminar')
-            ->assertSee('Eliminar curso')
+            ->assertSee('Eliminar')
             ->assertSee('data-url-afectados', false)
             ->assertDontSee('Curso de otro docente');
+    }
+
+    public function test_la_pagina_eliminar_solo_lista_cursos_activos(): void
+    {
+        foreach ([970103 => 'Finalizo', 970104 => 'Archivado'] as $id => $estado) {
+            DB::table('curso')->insert([
+                'id_curso' => $id,
+                'nombre_curso' => 'Curso '.$estado,
+                'sis_doc' => self::DOCENTE,
+                'estado' => $estado,
+                'fecha_creacion' => now()->toDateString(),
+            ]);
+            DB::table('curso_tipo_gestion')->insert([
+                'id_curso' => $id,
+                'id_tg' => DB::table('tipo_gestion')->value('id_tipo_gestion'),
+                'anio' => now()->year,
+            ]);
+        }
+
+        $respuesta = $this->actingAs(Usuario::findOrFail(self::DOCENTE))
+            ->get(route('cursos.eliminar'))
+            ->assertOk();
+
+        $cursos = collect($respuesta->original->getData()['cursos'] ?? []);
+
+        $this->assertSame([self::CURSO_PROPIO], $cursos->pluck('id_curso')->all());
     }
 
     public function test_la_eliminacion_por_json_devuelve_el_mensaje_de_exito(): void

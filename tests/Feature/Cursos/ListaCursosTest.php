@@ -214,6 +214,8 @@ class ListaCursosTest extends TestCase
         $this->actingAs(Usuario::findOrFail(self::DOCENTE))
             ->get(route('cursos'))
             ->assertOk()
+            ->assertSee("filtro: 'activos'", false)
+            ->assertSeeInOrder(['Activos 1', 'Archivados 1', 'Todos 2'])
             ->assertSee('Todos 2')
             ->assertSee('Activos 1')
             ->assertSee('Archivados 1')
@@ -244,7 +246,7 @@ class ListaCursosTest extends TestCase
         $this->assertContains(996109, $servicio->activos(self::DOCENTE)->pluck('id_curso')->all());
         $this->assertNotContains(996109, $servicio->conExamenes(self::DOCENTE)->pluck('id_curso')->all());
         $this->assertContains(self::CURSO_PROPIO, $servicio->conExamenes(self::DOCENTE)->pluck('id_curso')->all());
-        $this->assertContains(self::CURSO_INVITADO, $servicio->conExamenes(self::DOCENTE)->pluck('id_curso')->all());
+        $this->assertNotContains(self::CURSO_INVITADO, $servicio->conExamenes(self::DOCENTE)->pluck('id_curso')->all());
     }
 
     public function test_detalle_no_admite_invitacion_pendiente_ni_rechazada(): void

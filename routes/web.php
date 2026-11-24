@@ -114,11 +114,13 @@
  *   muestra una sola lista con los archivados al final.
  */
 
+use App\Enums\CursoEstado;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ConfirmarRegistroController;
 use App\Http\Controllers\CursoController;
 use App\Http\Controllers\EditarCursoVistaController;
 use App\Http\Controllers\ExamenController;
+use App\Http\Controllers\InicioController;
 use App\Http\Controllers\Reporte\ExportarReporteAsistenciaController;
 use App\Http\Controllers\Reporte\ExportarReporteIngresosIlegalesController;
 use App\Http\Controllers\Reporte\ListarReporteIngresosIlegalesController;
@@ -138,11 +140,11 @@ use App\Services\Curso\AsegurarCursoEditableService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Validation\ValidationException;
 
 Route::middleware('auth')->group(function (): void {
-    Route::view('/', 'pages.inicio')->name('inicio');
-
-    Route::view('/inicio', 'pages.inicio');
+    Route::get('/', InicioController::class)->name('inicio');
+    Route::redirect('/inicio', '/');
     // Destino de "Cursos" en el sidebar del auxiliar. Su contenido (cursos a los
     // que está asignado y sus exámenes) se define en una HU posterior.
     Route::view('/mis-cursos', 'pages.auxiliar-cursos')->name('auxiliar.cursos');
@@ -267,6 +269,11 @@ Route::middleware(['auth', 'docente'])->group(function (): void {
 
         $curso = Curso::query()->findOrFail($cursoId);
         Gate::authorize('gestionar', $curso);
+        if ($curso->estado !== CursoEstado::EnCurso->value) {
+            throw ValidationException::withMessages([
+                'curso' => 'Solo puedes cargar estudiantes en cursos activos.',
+            ]);
+        }
         app(AsegurarCursoEditableService::class)->asegurarCursoEditable($curso, 'curso');
 
         return view('pages.cursos-cargar-csv', ['curso' => $curso]);
@@ -281,7 +288,6 @@ Route::middleware(['auth', 'docente'])->group(function (): void {
     Route::post('/cursos/{curso}/restaurar', [CursoController::class, 'restaurar'])
         ->whereNumber('curso')
         ->name('cursos.restaurar.store');
-    Route::get('/archivados', [CursoController::class, 'archivados'])->name('cursos.archivados');
     Route::post('/cursos', [CursoController::class, 'store'])->name('cursos.store');
     // Cursos · Eliminar curso: conteo previo para el modal y borrado definitivo.
     // Solo el docente dueño puede hacerlo (CursoPolicy::eliminar).

@@ -159,20 +159,19 @@
                     No tienes cursos activos.
                 </p>
             @else
-                {{-- La gestión distingue cursos con el mismo nombre en distintos periodos. --}}
-                <div class="mb-4">
-                    <label for="seleccionar-curso" class="mb-2.5 block text-sm font-medium text-heading">Curso y gestión</label>
-                    <select id="seleccionar-curso" x-model="seleccion" @change="seleccionar(seleccion)"
+                <div class="rounded-base border border-default bg-neutral-primary-soft p-4 shadow-xs sm:p-6">
+                    <x-ui.select
+                        label="Curso y gestión"
+                        name="seleccionar-curso"
+                        :options="$cursos->mapWithKeys(fn (array $fila): array => [
+                            route('api.cursos.detalle', $fila['curso']->id_curso) => $fila['curso']->nombre_curso
+                                .($fila['gestion'] ? ' - '.$fila['gestion'] : ''),
+                        ])->all()"
+                        placeholder="Seleccione un curso"
+                        x-model="seleccion"
+                        @change="seleccionar(seleccion)"
                         x-bind:disabled="guardando"
-                        class="block w-full rounded-base border border-default-medium bg-neutral-secondary-medium px-3 py-2.5 text-sm text-heading shadow-xs focus:border-brand focus:ring-brand">
-                        <option value="">Seleccione un curso</option>
-                        @foreach ($cursos as $fila)
-                            @php $curso = $fila['curso']; @endphp
-                            <option value="{{ route('api.cursos.detalle', $curso->id_curso) }}">
-                                {{ $curso->nombre_curso }}{{ $fila['gestion'] ? ' - '.$fila['gestion'] : '' }}
-                            </option>
-                        @endforeach
-                    </select>
+                    />
                 </div>
             @endif
 

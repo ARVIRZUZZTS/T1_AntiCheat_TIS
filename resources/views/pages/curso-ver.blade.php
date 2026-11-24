@@ -7,8 +7,8 @@
 
     @description
     Página de las subopciones "Ver estudiantes" y "Habilitar estudiantes" del
-    sidebar: un selector con los cursos del docente y, debajo, solo la sección
-    pedida del elegido (lista de estudiantes en lectura o habilitación, sin
+     sidebar: un selector con los cursos activos del docente y, debajo, solo la
+     sección pedida del elegido (lista de estudiantes en lectura o habilitación, sin
     tarjetas de conteo), reutilizando el parcial curso-contenido. El selector es
     server-driven: al cambiarlo recarga con ?curso=ID. Si se llega desde la
     lista con ese query, viene preseleccionado.
@@ -46,11 +46,13 @@
             <form method="GET" action="{{ $accionUrl }}"
                   class="mx-auto max-w-2xl rounded-base border border-default bg-neutral-primary-soft p-4 shadow-xs lg:mx-0">
                 <x-ui.select
-                    label="Curso"
+                    label="Curso y gestión"
                     name="curso"
-                    :options="$cursos->mapWithKeys(fn ($curso) => [$curso->id_curso => $curso->nombre_curso])->all()"
+                    :options="$cursos->mapWithKeys(fn ($curso) => [
+                        $curso->id_curso => $curso->nombre_curso.($curso->gestion ? ' - '.$curso->gestion : ''),
+                    ])->all()"
                     :selected="$cursoSeleccionado?->id_curso"
-                    placeholder="Selecciona un curso"
+                    placeholder="Seleccione un curso"
                     onchange="this.form.submit()"
                 />
                 <noscript>

@@ -6,8 +6,8 @@
 
     @description
     Página "Eliminar curso" (subopción del sidebar, debajo de "Editar curso"):
-    la lista de cursos del docente autenticado. Cada fila muestra únicamente
-    el nombre del curso y su botón "Eliminar curso".
+    la tabla de cursos activos del docente autenticado. Cada fila muestra el
+    curso, su gestión, la cantidad de estudiantes y su botón "Eliminar".
 
     Al tocar el botón se abre un modal que pide los auxiliares y estudiantes
     afectados al endpoint `cursos.eliminar.afectados`, los muestra como
@@ -179,44 +179,49 @@
         @keydown.escape.window="cerrarModal()"
         class="px-4 py-4 sm:px-6 sm:py-6 lg:px-8"
     >
-        <ul class="mx-auto w-full max-w-2xl overflow-hidden rounded-base border border-default bg-neutral-primary-soft shadow-xs">
-            @if ($cursos->isEmpty())
-                <li class="p-8 text-center text-sm text-body">No tienes cursos registrados</li>
-            @else
-                @foreach ($cursos as $curso)
-                    <li
-                        x-show="! eliminados.includes({{ $curso->id_curso }})"
-                        class="flex flex-col gap-3 border-b border-default p-4 last:border-b-0 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:p-5"
-                    >
-                        <p class="min-w-0 font-medium text-heading break-words">{{ $curso->nombre_curso }}</p>
+        @if ($cursos->isEmpty())
+            <p class="mx-auto max-w-2xl rounded-base border border-default bg-neutral-primary-soft p-8 text-center text-sm text-body shadow-xs">
+                No tienes cursos activos para eliminar.
+            </p>
+        @else
+            <x-ui.table compact :headers="['CURSO', 'GESTIÓN', 'ESTUDIANTES', 'ACCIONES']">
+                <x-slot:body>
+                    @foreach ($cursos as $curso)
+                        <tr wire:key="curso-eliminar-{{ $curso->id_curso }}"
+                            x-show="! eliminados.includes({{ $curso->id_curso }})"
+                            @class(['bg-neutral-primary', 'border-b border-default' => ! $loop->last])>
+                            <th scope="row" class="px-4 py-2.5 font-medium text-heading">
+                                <span class="block wrap-break-word">{{ $curso->nombre_curso }}</span>
+                            </th>
+                            <td class="px-4 py-2.5 text-body">{{ $curso->gestion ?? 'Gestión no registrada' }}</td>
+                            <td class="px-4 py-2.5 text-body">{{ $curso->estudiantes_count }}</td>
+                            <td class="px-4 py-2.5">
+                                <button
+                                    type="button"
+                                    class="inline-flex min-h-11 shrink-0 items-center px-2 text-sm font-medium text-fg-danger-strong underline-offset-2 hover:underline focus:rounded-base focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-medium"
+                                    data-eliminar-curso="{{ $curso->id_curso }}"
+                                    data-curso-id="{{ $curso->id_curso }}"
+                                    data-curso-nombre="{{ $curso->nombre_curso }}"
+                                    data-url-afectados="{{ route('cursos.eliminar.afectados', $curso) }}"
+                                    data-url-eliminar="{{ route('cursos.destroy', $curso) }}"
+                                    aria-label="Eliminar curso {{ $curso->nombre_curso }}"
+                                    aria-haspopup="dialog"
+                                    @click="abrirModal($el.dataset)"
+                                >
+                                    Eliminar
+                                </button>
+                            </td>
+                        </tr>
+                    @endforeach
 
-                        <x-ui.button
-                            type="button"
-                            variant="danger"
-                            size="sm"
-                            class="w-full shrink-0 sm:w-auto"
-                            data-eliminar-curso="{{ $curso->id_curso }}"
-                            data-curso-id="{{ $curso->id_curso }}"
-                            data-curso-nombre="{{ $curso->nombre_curso }}"
-                            data-url-afectados="{{ route('cursos.eliminar.afectados', $curso) }}"
-                            data-url-eliminar="{{ route('cursos.destroy', $curso) }}"
-                            aria-label="Eliminar curso {{ $curso->nombre_curso }}"
-                            @click="abrirModal($el.dataset)"
-                        >
-                            Eliminar curso
-                        </x-ui.button>
-                    </li>
-                @endforeach
-
-                <li
-                    x-show="eliminados.length === totalCursos"
-                    x-cloak
-                    class="p-8 text-center text-sm text-body"
-                >
-                    No tienes cursos registrados
-                </li>
-            @endif
-        </ul>
+                    <tr x-show="eliminados.length === totalCursos" x-cloak>
+                        <td colspan="4" class="px-4 py-8 text-center text-sm text-body">
+                            No tienes cursos activos para eliminar.
+                        </td>
+                    </tr>
+                </x-slot:body>
+            </x-ui.table>
+        @endif
 
         {{-- Aviso de éxito sin recargar la página. --}}
         <div

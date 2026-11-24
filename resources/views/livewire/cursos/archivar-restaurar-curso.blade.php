@@ -5,73 +5,79 @@
     @updated 2026-11-23
 
     @description
-    Página única «Archivar/Restaurar cursos»: una sola lista con los cursos en
-    curso primero y los archivados al final. Cada tarjeta muestra su acción
-    como texto: «Archivar» en rojo para los activos y «Restaurar» en gris para
-    los archivados; la confirman sus modales y comparten el aviso inline de
-    éxito. El error de la restauración se muestra en un banner role="alert".
-    Bajo el título de cada curso se muestra su gestión con año, igual que en
-    «Ver cursos».
+    Página «Archivar curso»: una sola tabla con los cursos en curso primero y
+    los archivados al final. Cada fila muestra la gestión, la cantidad de
+    estudiantes y su acción: «Archivar» en rojo para los activos y «Restaurar»
+    en gris para los archivados. Cada acción se confirma en su modal y comparte
+    el aviso inline de éxito.
 --}}
 
-@section('title', 'Archivar / Restaurar cursos')
+@section('title', 'Archivar curso')
 
 <div class="px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
-    <header class="mx-auto mb-4 flex w-full max-w-2xl flex-col gap-1 sm:mb-5">
-        <p class="text-sm text-body">Archiva un curso que ya no gestionas o restaura uno archivado.</p>
+    <header class="mx-auto mb-4 flex w-full flex-col gap-1 sm:mb-5">
+        <p class="text-sm text-body">Archiva un curso que ya no gestionas. Los cursos archivados se pueden restaurar desde la misma lista.</p>
     </header>
 
     @if (session('error'))
-        <div role="alert" class="mx-auto mb-4 w-full max-w-2xl rounded-base border border-danger bg-danger-soft px-4 py-3 text-sm text-heading">
+        <div role="alert" class="mx-auto mb-4 w-full rounded-base border border-danger bg-danger-soft px-4 py-3 text-sm text-heading">
             {{ session('error') }}
         </div>
     @endif
 
-    <div class="mx-auto w-full max-w-2xl overflow-hidden rounded-base border border-default bg-neutral-primary-soft shadow-xs">
-        @if ($cursos->isEmpty())
-            <div class="flex flex-col items-center gap-3 p-8 text-center">
-                <svg class="size-10 text-body-subtle" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5v9a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 16.5v-9m16.5 0A2.25 2.25 0 0 0 18 5.25H6a2.25 2.25 0 0 0-2.25 2.25m16.5 0v-.75A2.25 2.25 0 0 0 18 4.5H6a2.25 2.25 0 0 0-2.25 2.25v.75m7.5 4.5h3" />
-                </svg>
-                <p class="text-sm text-body">
-                    No tienes cursos para archivar ni restaurar.
-                </p>
-            </div>
-        @else
-            <ul>
+    @if ($cursos->isEmpty())
+        <div class="flex flex-col items-center gap-3 rounded-base border border-default bg-neutral-primary-soft p-8 text-center shadow-xs">
+            <svg class="size-10 text-body-subtle" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5v9a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 16.5v-9m16.5 0A2.25 2.25 0 0 0 18 5.25H6a2.25 2.25 0 0 0-2.25 2.25m16.5 0v-.75A2.25 2.25 0 0 0 18 4.5H6a2.25 2.25 0 0 0-2.25 2.25v.75m7.5 4.5h3" />
+            </svg>
+            <p class="text-sm text-body">
+                No tienes cursos para archivar ni restaurar.
+            </p>
+        </div>
+    @else
+        <x-ui.table compact :headers="['CURSO', 'GESTIÓN', 'ESTUDIANTES', 'ACCIONES']">
+            <x-slot:body>
                 @foreach ($cursos as $curso)
-                    <li class="flex flex-col gap-3 border-b border-default p-4 last:border-b-0 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:p-5">
-                        <div class="min-w-0">
-                            <p class="font-medium text-heading break-words">{{ $curso->nombre_curso }}</p>
-                            <p class="mt-1 text-xs text-body">{{ $gestiones->get($curso->id_curso) ?? 'Gestion no registrada' }}</p>
-                        </div>
-
-                        @if ($curso->estado === \App\Enums\CursoEstado::Archivado->value)
-                            <button
-                                type="button"
-                                class="inline-flex min-h-11 shrink-0 items-center px-2 text-sm font-medium text-body-subtle underline-offset-2 hover:text-heading hover:underline focus:rounded-base focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-medium"
-                                aria-label="Restaurar curso {{ $curso->nombre_curso }}"
-                                aria-haspopup="dialog"
-                                wire:click='abrirModalRestaurar({{ $curso->id_curso }}, {!! \Illuminate\Support\Js::from($curso->nombre_curso) !!})'
-                            >
-                                Restaurar
-                            </button>
-                        @else
-                            <button
-                                type="button"
-                                class="inline-flex min-h-11 shrink-0 items-center px-2 text-sm font-medium text-fg-danger-strong underline-offset-2 hover:underline focus:rounded-base focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-medium"
-                                aria-label="Archivar curso {{ $curso->nombre_curso }}"
-                                aria-haspopup="dialog"
-                                wire:click="abrirModalArchivar({{ $curso->id_curso }})"
-                            >
-                                Archivar
-                            </button>
-                        @endif
-                    </li>
+                    <tr wire:key="curso-archivar-{{ $curso->id_curso }}" @class([
+                        'bg-neutral-primary',
+                        'border-b border-default' => ! $loop->last,
+                    ])>
+                        <th scope="row" class="px-4 py-2.5 font-medium text-heading">
+                            <span class="block wrap-break-word">{{ $curso->nombre_curso }}</span>
+                            <span class="mt-0.5 block text-xs text-body">
+                                {{ $curso->estado === \App\Enums\CursoEstado::Archivado->value ? 'Archivado' : 'En curso' }}
+                            </span>
+                        </th>
+                        <td class="px-4 py-2.5 text-body">{{ $gestiones->get($curso->id_curso) ?? 'Gestion no registrada' }}</td>
+                        <td class="px-4 py-2.5 text-body">{{ $curso->estudiantes_count }}</td>
+                        <td class="px-4 py-2.5">
+                            @if ($curso->estado === \App\Enums\CursoEstado::Archivado->value)
+                                <button
+                                    type="button"
+                                    class="inline-flex min-h-11 shrink-0 items-center px-2 text-sm font-medium text-body-subtle underline-offset-2 hover:text-heading hover:underline focus:rounded-base focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-medium"
+                                    aria-label="Restaurar curso {{ $curso->nombre_curso }}"
+                                    aria-haspopup="dialog"
+                                    wire:click='abrirModalRestaurar({{ $curso->id_curso }}, {!! \Illuminate\Support\Js::from($curso->nombre_curso) !!})'
+                                >
+                                    Restaurar
+                                </button>
+                            @else
+                                <button
+                                    type="button"
+                                    class="inline-flex min-h-11 shrink-0 items-center px-2 text-sm font-medium text-fg-danger-strong underline-offset-2 hover:underline focus:rounded-base focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-medium"
+                                    aria-label="Archivar curso {{ $curso->nombre_curso }}"
+                                    aria-haspopup="dialog"
+                                    wire:click="abrirModalArchivar({{ $curso->id_curso }})"
+                                >
+                                    Archivar
+                                </button>
+                            @endif
+                        </td>
+                    </tr>
                 @endforeach
-            </ul>
-        @endif
-    </div>
+            </x-slot:body>
+        </x-ui.table>
+    @endif
 
     @if ($mostrarExito)
         <div

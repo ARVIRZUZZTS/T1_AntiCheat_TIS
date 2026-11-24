@@ -6,12 +6,9 @@
 
     @description
     Página "Eliminar examen" (subopción del sidebar, debajo de "Editar
-    examen"): la lista de todos los exámenes del docente (propios y con
-    invitación aceptada), con los programados primero y los finalizados al
-    final. Cada tarjeta muestra solo el título del examen con su etiqueta de
-    estado y el botón "Eliminar" a la derecha, por cada curso que el docente
-    gestiona; un examen compartido donde solo es invitado se muestra sin
-    botón.
+    examen"): la tabla de exámenes programados del docente. Cada fila muestra
+    el examen, su fecha, el curso gestionado, la cantidad de inscritos y el
+    botón "Eliminar".
 
     Al tocar "Eliminar" se valida en pantalla: si el examen ya inició o
     finalizó, o tiene ingresos o incidencias, se muestra el aviso de bloqueo
@@ -58,7 +55,7 @@
             modalEliminar: false,
             examenEliminar: null,
             avisoEliminacion: '',
-            avisoExamenId: '',
+            avisoClave: '',
             errorEliminacion: '',
             exitoEliminacion: false,
             eliminando: false,
@@ -68,14 +65,8 @@
             mensajeNoIniciado: 'No se puede eliminar un examen que ya inició o finalizó',
             mensajeConDatos: 'No se puede eliminar un examen con ingresos o incidencias registradas',
 
-            visibleCard(datos) {
-                const total = Number(datos.total) || 0;
-
-                if (total === 0) {
-                    return true;
-                }
-
-                return String(datos.claves || '').split(',').some((clave) => ! this.vinculosEliminados.includes(clave));
+            visibleFila(datos) {
+                return ! this.vinculosEliminados.includes(String(datos.clave || ''));
             },
 
             motivoBloqueoEliminar(datos) {
@@ -95,15 +86,13 @@
 
             abrirModalEliminar(datos) {
                 this.avisoEliminacion = '';
-                this.avisoExamenId = '';
+                this.avisoClave = '';
                 this.errorEliminacion = '';
 
                 const motivo = this.motivoBloqueoEliminar(datos);
                 if (motivo !== '') {
-                    // El aviso se muestra dentro de la tarjeta presionada, no
-                    // al final de la lista: ahi lo ve quien hizo el clic.
                     this.avisoEliminacion = motivo;
-                    this.avisoExamenId = String(datos.examenId);
+                    this.avisoClave = String(datos.examenId) + ':' + String(datos.cursoId);
                     return;
                 }
 
@@ -184,99 +173,68 @@
         @keydown.escape.window="cerrarConEscape()"
         class="px-4 py-4 sm:px-6 sm:py-6 lg:px-8"
     >
-        <ul class="mx-auto flex w-full max-w-4xl flex-col gap-4">
-            @empty($examenes)
-                <li class="rounded-base border border-default bg-neutral-primary-soft p-8 text-center text-sm text-body shadow-xs">
-                    No tienes examenes registrados
-                </li>
-            @else
-                @foreach ($examenes as $examen)
-                    @php
-                        $etiqueta = ($examen['tipo'] ?: 'Sin tipo').($examen['curso'] !== '' ? ' - '.$examen['curso'] : '');
-                        $claves = array_map(
-                            fn (array $cursoPropio): string => $examen['id'].':'.$cursoPropio['id'],
-                            $examen['cursos_propios'],
-                        );
-                    @endphp
-                    <li
-                        data-claves="{{ implode(',', $claves) }}"
-                        data-total="{{ count($claves) }}"
-                        x-show="visibleCard($el.dataset)"
-                        x-cloak
-                        class="flex flex-col gap-4 rounded-base border border-default bg-neutral-primary-soft px-5 py-6 shadow-xs sm:px-8"
-                    >
-                        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-                            {{-- Titulo del examen y su etiqueta de estado. --}}
-                            <div class="flex min-w-0 flex-col items-start gap-1">
-                                <h3 class="text-xl font-bold text-heading">{{ $etiqueta }}</h3>
-
-                                @if ($examen['estado'] === 'Programado')
-                                    <x-ui.badge type="gray">Programado</x-ui.badge>
-                                @elseif ($examen['estado'] === 'En curso')
-                                    <x-ui.badge type="warning">En curso</x-ui.badge>
-                                @else
-                                    <x-ui.badge type="brand" class="gap-1">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-3 w-3 shrink-0" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
-                                        Finalizado
-                                    </x-ui.badge>
-                                @endif
-                            </div>
-
-                            {{-- Acciones a la derecha: un boton por curso que
-                                 el docente gestiona. --}}
-                            @if ($examen['cursos_propios'] !== [])
-                                <div class="flex shrink-0 flex-col gap-2">
-                                    @foreach ($examen['cursos_propios'] as $cursoPropio)
-                                        <div
-                                            class="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-end sm:gap-2"
-                                            x-show="! vinculosEliminados.includes('{{ $examen['id'] }}:{{ $cursoPropio['id'] }}')"
-                                            x-cloak
-                                        >
-                                            @if (count($examen['cursos_propios']) > 1)
-                                                <span class="text-sm font-medium text-heading sm:text-right">{{ $cursoPropio['nombre'] }}</span>
-                                            @endif
-                                            <x-ui.button
-                                                type="button"
-                                                variant="danger"
-                                                size="sm"
-                                                class="w-full justify-center sm:w-auto"
-                                                data-examen-id="{{ $examen['id'] }}"
-                                                data-examen-nombre="{{ $etiqueta }}"
-                                                data-curso-id="{{ $cursoPropio['id'] }}"
-                                                data-curso-nombre="{{ $cursoPropio['nombre'] }}"
-                                                data-fecha="{{ $examen['fecha'] ?? '' }}"
-                                                data-hora-inicio="{{ $examen['hora_inicio'] ?? '' }}"
-                                                data-ingresados="{{ $examen['ingresados'] }}"
-                                                data-incidencias="{{ $examen['incidencias'] }}"
-                                                aria-label="Eliminar examen del curso {{ $cursoPropio['nombre'] }}"
-                                                @click="abrirModalEliminar($el.dataset)"
-                                            >
-                                                Eliminar
-                                            </x-ui.button>
-                                        </div>
-                                    @endforeach
+        <x-ui.table compact :headers="['EXAMEN', 'CURSO', 'INSCRITOS', 'ACCIONES']">
+            <x-slot:body>
+                @forelse ($examenes as $examen)
+                    @foreach ($examen['cursos_propios'] as $cursoPropio)
+                        @php
+                            $clave = $examen['id'].':'.$cursoPropio['id'];
+                            $etiqueta = $examen['tipo'] ?: 'Sin tipo';
+                            $fecha = $examen['fecha'] ?? '';
+                        @endphp
+                        <tr x-show="visibleFila($el.dataset)" x-cloak data-clave="{{ $clave }}"
+                            @class(['bg-neutral-primary', 'border-b border-default' => ! $loop->last])>
+                            <th scope="row" class="px-4 py-2.5 font-medium text-heading">
+                                <span class="block wrap-break-word">{{ $etiqueta }}</span>
+                                <span class="mt-0.5 block text-xs text-body">
+                                    {{ $fecha !== '' ? \Illuminate\Support\Carbon::parse($fecha)->format('d/m/Y') : 'Sin fecha' }}
+                                </span>
+                                <div x-show="avisoClave === '{{ $clave }}'" x-cloak class="mt-2">
+                                    <x-ui.alert type="danger" title="No se puede eliminar el examen">
+                                        <span x-text="avisoEliminacion"></span>
+                                    </x-ui.alert>
                                 </div>
-                            @endif
-                        </div>
+                            </th>
+                            <td class="px-4 py-2.5 text-body">{{ $cursoPropio['nombre'] }}</td>
+                            <td class="px-4 py-2.5 text-body">{{ $examen['inscritos'] }}</td>
+                            <td class="px-4 py-2.5">
+                                <button
+                                    type="button"
+                                    class="inline-flex min-h-11 shrink-0 items-center px-2 text-sm font-medium text-fg-danger-strong underline-offset-2 hover:underline focus:rounded-base focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-medium"
+                                    data-examen-id="{{ $examen['id'] }}"
+                                    data-examen-nombre="{{ $etiqueta }}"
+                                    data-curso-id="{{ $cursoPropio['id'] }}"
+                                    data-curso-nombre="{{ $cursoPropio['nombre'] }}"
+                                    data-clave="{{ $clave }}"
+                                    data-fecha="{{ $fecha }}"
+                                    data-hora-inicio="{{ $examen['hora_inicio'] ?? '' }}"
+                                    data-ingresados="{{ $examen['ingresados'] }}"
+                                    data-incidencias="{{ $examen['incidencias'] }}"
+                                    aria-label="Eliminar examen del curso {{ $cursoPropio['nombre'] }}"
+                                    aria-haspopup="dialog"
+                                    @click="abrirModalEliminar($el.dataset)"
+                                >
+                                    Eliminar
+                                </button>
+                            </td>
+                        </tr>
+                    @endforeach
+                @empty
+                    <tr>
+                        <td colspan="4" class="px-4 py-8 text-center text-sm text-body">
+                            No tienes exámenes programados para eliminar.
+                        </td>
+                    </tr>
+                @endforelse
 
-                        {{-- Aviso de bloqueo dentro de la tarjeta presionada. --}}
-                        <div x-show="avisoExamenId === '{{ $examen['id'] }}'" x-cloak>
-                            <x-ui.alert type="danger" title="No se puede eliminar el examen">
-                                <span x-text="avisoEliminacion"></span>
-                            </x-ui.alert>
-                        </div>
-                    </li>
-                @endforeach
-
-                <li
-                    x-show="soloLectura === 0 && vinculosEliminados.length === totalVinculos"
-                    x-cloak
-                    class="rounded-base border border-default bg-neutral-primary-soft p-8 text-center text-sm text-body shadow-xs"
-                >
-                    No tienes examenes registrados
-                </li>
-            @endif
-        </ul>
+                <tr x-show="soloLectura === 0 && totalVinculos > 0 && vinculosEliminados.length === totalVinculos"
+                    x-cloak>
+                    <td colspan="4" class="px-4 py-8 text-center text-sm text-body">
+                        No tienes exámenes programados para eliminar.
+                    </td>
+                </tr>
+            </x-slot:body>
+        </x-ui.table>
 
         {{-- Modal de confirmación. --}}
         <div
