@@ -23,6 +23,8 @@
  * - 2026-11-22  [Valery D. Ortuno P]  test: "Ver examenes" del auxiliar.
  * - 2026-11-22  [Valery D. Ortuno P]  test: no se asignan examenes de cursos
  *   archivados.
+ * - 2026-11-24  [Valery D. Ortuno P]  test: no se muestran cursos archivados ni
+ *   examenes pasados, y el orden por el examen mas proximo.
  *
  * @see App\Livewire\Auxiliares\AsignarAuxiliar
  * @see App\Services\Auxiliar\AsignarAuxiliarService
@@ -118,6 +120,40 @@ class AsignarAuxiliarTest extends TestCase
 
         $this->assertSame([self::ALGEBRA, self::CALCULO], array_column($datos['cursos'], 'id'));
         $this->assertSame([self::PARCIAL_CALCULO, self::PARCIAL_ALGEBRA, self::FINAL_CALCULO], array_column($datos['examenes'], 'id'));
+    }
+
+    public function test_no_se_muestran_cursos_archivados_ni_examenes_pasados(): void
+    {
+        // Siguen en la base (quien controlo), pero no se muestran.
+        DB::table('auxiliar_curso')->insert(['id_auxiliar' => self::ANA, 'id_curso' => self::ARCHIVADO, 'estado' => 'Activo']);
+        DB::table('auxiliar_examen')->insert([
+            'id_auxiliar' => self::ANA, 'id_examen' => self::PASADO_CALCULO,
+            'ver_ingreso' => true, 'ver_monitor' => true, 'asignado_por' => self::ROBERTO,
+        ]);
+
+        $datos = Livewire::actingAs($this->usuario(self::ROBERTO))->test(AsignarAuxiliar::class)->instance()->datos;
+        $ana = collect($datos['auxiliares'])->firstWhere('id', self::ANA);
+
+        $this->assertSame([], $ana['cursos']);
+        $this->assertSame([], $ana['examenes']);
+        $this->assertSame(1, DB::table('auxiliar_curso')->where('id_auxiliar', self::ANA)->count());
+        $this->assertSame(1, DB::table('auxiliar_examen')->where('id_auxiliar', self::ANA)->count());
+    }
+
+    public function test_ordena_por_el_examen_mas_proximo_y_sin_asignaciones_al_final(): void
+    {
+        // Luis ve Calculo I (examen hoy 14:00); Ana un examen del 05/12.
+        DB::table('auxiliar_examen')->insert([
+            'id_auxiliar' => self::ANA, 'id_examen' => self::PARCIAL_ALGEBRA,
+            'ver_ingreso' => true, 'ver_monitor' => false, 'asignado_por' => self::ROBERTO,
+        ]);
+        DB::table('usuario')->insert(['id_usuario' => 12, 'cod_sis' => 'SIS12', 'password' => 'x', 'nombre_usuario' => 'Abel', 'apellido' => 'Soto']);
+        DB::table('rol_usuario')->insert(['id_usuario' => 12, 'id_rol' => 2]);
+
+        $datos = Livewire::actingAs($this->usuario(self::ROBERTO))->test(AsignarAuxiliar::class)->instance()->datos;
+
+        $this->assertSame([self::LUIS, self::ANA, 12], array_column($datos['auxiliares'], 'id'));
+        $this->assertSame(['2026-11-22 14:00:00', '2026-12-05 08:15:00', null], array_column($datos['auxiliares'], 'proximo'));
     }
 
     public function test_asigna_un_auxiliar_a_un_curso(): void
