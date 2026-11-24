@@ -133,14 +133,10 @@ class CursoController extends Controller
      *
      * @since  2026-11-16
      */
-    public function eliminar(Request $request): View
+    public function eliminar(Request $request, ListarCursosDocenteService $cursos): View
     {
         return view('pages.curso-eliminar', [
-            'cursos' => Curso::query()
-                ->where('sis_doc', $request->user()->id_usuario)
-                ->where('estado', '!=', CursoEstado::Archivado->value)
-                ->orderBy('nombre_curso')
-                ->get(['id_curso', 'nombre_curso']),
+            'cursos' => $cursos->activos((int) $request->user()->id_usuario),
         ]);
     }
 
