@@ -2,8 +2,11 @@
 
 /**
  * @file    TituloPaginaTest.php
+ *
  * @author  Valery D. Ortuno P. <valerydariana98@gmail.com>
+ *
  * @created 2026-09-25
+ *
  * @updated 2026-09-25
  * @updated 2026-10-25
  *
@@ -20,6 +23,8 @@
 
 namespace Tests\Feature;
 
+use App\Models\Curso;
+use App\Models\Usuario;
 use Tests\TestCase;
 
 class TituloPaginaTest extends TestCase
@@ -29,11 +34,20 @@ class TituloPaginaTest extends TestCase
      */
     public function test_una_vista_blade_muestra_su_titulo_por_seccion(): void
     {
-        $this->actingAs(\App\Models\Usuario::query()->firstOrFail());
+        $this->actingAs(Usuario::query()->firstOrFail());
         $contenido = $this->get('/monitoreo')->assertOk()->getContent();
 
         $this->assertStringContainsString('<title>Monitor en vivo</title>', $contenido);
         $this->assertStringContainsString('>Monitor en vivo</h1>', $contenido);
+    }
+
+    public function test_la_pagina_de_proximos_examenes_muestra_su_titulo(): void
+    {
+        $this->actingAs(Usuario::query()->firstOrFail());
+        $contenido = $this->get('/monitoreo/proximos')->assertOk()->getContent();
+
+        $this->assertStringContainsString('<title>Próximos Exámenes</title>', $contenido);
+        $this->assertStringContainsString('>Próximos Exámenes</h1>', $contenido);
     }
 
     /**
@@ -43,8 +57,8 @@ class TituloPaginaTest extends TestCase
     {
         // Página suelta de estudiantes del curso: es un componente Livewire de
         // página completa y solo la abre el docente dueño del curso.
-        $curso = \App\Models\Curso::query()->orderBy('id_curso')->firstOrFail();
-        $this->actingAs(\App\Models\Usuario::query()->findOrFail($curso->sis_doc));
+        $curso = Curso::query()->orderBy('id_curso')->firstOrFail();
+        $this->actingAs(Usuario::query()->findOrFail($curso->sis_doc));
         $contenido = $this->get(route('cursos.estudiantes.estado', $curso->id_curso))->assertOk()->getContent();
 
         $this->assertStringContainsString('<title>Estudiantes del curso — Anticheat TIS</title>', $contenido);

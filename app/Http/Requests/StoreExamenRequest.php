@@ -53,6 +53,9 @@
  *   (cursosParaUnicoPorTipo/examenExcluidoDeUnicoPorTipo) para que
  *   UpdateExamenRequest la reutilice excluyendo el examen que edita (Task #261).
  *   Sin cambios de comportamiento en el alta.
+ * - 2026-11-23  refactor: la hora actual pasa a ser válida (comparación
+ *   estricta `<` en vez de `<=`), así un examen que inicia exactamente ahora
+ *   no se rechaza.
  */
 
 namespace App\Http\Requests;
@@ -123,7 +126,7 @@ class StoreExamenRequest extends FormRequest
      *   el año empiece con 19 o 20, para poder dar un mensaje propio ("Ingrese
      *   un año válido") en vez del genérico de formato.
      * - Una fecha anterior a hoy no es válida y, si es hoy, tampoco una hora que
-     *   ya pasó (o es la actual). "Hoy" y "ahora" son de Bolivia: es la zona de
+     *   ya pasó. La hora actual sí es válida. "Hoy" y "ahora" son de Bolivia: es la zona de
      *   la aplicación (`app.timezone`, America/La_Paz), así que no dependen de
      *   la hora del navegador.
      *
@@ -186,7 +189,7 @@ class StoreExamenRequest extends FormRequest
                 && ! $validator->errors()->has('hora_inicio')
                 && preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $hora) === 1
                 // Mismo formato H:i en las dos, así que se comparan como texto.
-                && $hora <= $ahora->format('H:i')) {
+                && $hora < $ahora->format('H:i')) {
                 $validator->errors()->add('hora_inicio', 'Ingrese una hora valida.');
             }
 

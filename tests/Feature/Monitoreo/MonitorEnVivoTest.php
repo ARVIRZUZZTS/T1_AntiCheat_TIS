@@ -215,4 +215,21 @@ class MonitorEnVivoTest extends TestCase
             'id_examen' => $this->idExamen,
         ]);
     }
+
+    /** En modo ingreso la tabla está vacía hasta que se busque. */
+    public function test_registro_de_ingresos_vacio_sin_busqueda(): void
+    {
+        $componente = Livewire::test(MonitorEnVivo::class);
+
+        $this->assertSame(0, $componente->instance()->estudiantes()->total());
+    }
+
+    /** Con búsqueda, el registro de ingresos muestra resultados. */
+    public function test_registro_de_ingresos_muestra_resultados_con_busqueda(): void
+    {
+        $componente = Livewire::test(MonitorEnVivo::class)
+            ->set('busqueda', 'Monitor');
+
+        $this->assertGreaterThan(0, $componente->instance()->estudiantes()->total());
+    }
 }

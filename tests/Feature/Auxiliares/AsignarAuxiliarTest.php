@@ -345,6 +345,7 @@ class AsignarAuxiliarTest extends TestCase
 
         $html = $this->actingAs($this->usuario(self::ANA))->get(route('auxiliar.cursos'))->assertOk()->getContent();
 
+        $this->assertStringContainsString('href="'.route('monitoreo.proximos').'"', $html);
         $this->assertStringContainsString('href="'.route('monitoreo.ingreso').'"', $html);
         $this->assertStringNotContainsString('href="'.route('monitoreo').'"', $html);
     }
