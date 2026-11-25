@@ -92,6 +92,11 @@
     - 2026-11-24  [Equipo T1]  fix: el badge de notificaciones usa el conteo de
       avisos nuevos y baja a 0 cuando la bandeja los marca como leídos.
 --}}
+     - 2026-11-24  [Alisson D. Alvarado <alvaradoalissondalet@gmail.com>]  feat:
+       mostrar Ver cursos como unica opcion de Cursos para auxiliares.
+     - 2026-11-24  [Equipo T1]  feat: el badge de notificaciones también cuenta
+       los avisos nuevos de cambios de examen de los auxiliares.
+ --}}
 
 @props([
     'id' => 'sidebar',
@@ -371,7 +376,7 @@
     </div>
 </aside>
 
-@if ($rolUsuario === 'docente')
+@if (in_array($rolUsuario, [\App\Models\Rol::NOMBRE_DOCENTE, \App\Models\Rol::NOMBRE_AUXILIAR], true))
 <script>
 (function () {
     'use strict';

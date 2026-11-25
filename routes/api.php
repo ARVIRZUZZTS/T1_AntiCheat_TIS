@@ -89,8 +89,8 @@ Route::middleware(['web', 'auth:web'])->group(function (): void {
         ->whereNumber('idIncidencia')
         ->name('api.incidencias.detalle');
 
-    // Notificaciones del docente autenticado: historial, badge de nuevas y
-    // marcado de leídas. Un auxiliar no recibe estas notificaciones.
+    // Notificaciones del usuario autenticado: historial, badge de nuevas y
+    // marcado de leídas. Docentes y auxiliares ven solo lo que se les dirige.
     Route::get('/notificaciones', [NotificacionController::class, 'index'])
         ->name('api.notificaciones.index');
 
