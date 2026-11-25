@@ -4,12 +4,14 @@
     @created 2026-10-19
     @updated 2026-11-08
     @updated 2026-11-09
+    @updated 2026-11-24
 
     @description
      Vista del componente Livewire GestionAuxiliares: listado de todas las
-     cuentas de auxiliar con filtros de estado y curso. "Crear Auxiliar" ya no abre un
+     cuentas de auxiliar con filtro de estado y búsqueda. "Crear Auxiliar" ya no abre un
     modal: enlaza a la página de alta (CrearAuxiliar) y el aviso de éxito del
-    alta llega por la sesión al volver.
+    alta llega por la sesión al volver. La acción «Ver detalle» de cada fila
+    abre un modal con todos los cursos a los que pertenece el auxiliar.
 
     @changelog
      - 2026-11-15  [Diego Tejerina]  refactor: se quita el modal de alta; "Crear
@@ -27,8 +29,14 @@
       junto al botón (en la cabecera de la tarjeta deformaban el espacio de
       la tabla) y la tabla vacía muestra "No hay auxiliares registrados"
       dentro del cuerpo (prop `empty` de x-ui.table).
+    - 2026-11-24  [OchoaCesar]  style: Se retiro el filtro de cursos de la
+      pestaña. Ahora se verán todos los cursos a los que pertenece un auxiliar
+      en el botón de ver detalle.
+    - 2026-11-24  [OchoaCesar]  style: se retira la columna Curso de la tabla
+      y los cursos pasan al modal «Ver detalle» (columna Acciones).
 
     @see  app/Livewire/Auxiliares/GestionAuxiliares.php
+    @see  resources/views/components/ui/modal-detalle-auxiliar.blade.php
 --}}
 
 @section('title', 'Auxiliares')
@@ -55,21 +63,25 @@
                 </x-ui.button>
             @endforeach
         </div>
-
-        <div class="lg:w-56 lg:shrink-0">
-            <x-ui.select name="filtroCurso" wire:model.live="filtroCurso"
-                :options="['todos' => 'Todos los cursos'] + $cursos->pluck('nombre_curso', 'id_curso')->all()"
-                :selected="$filtroCurso" />
-        </div>
     </div>
 
     <div class="bg-neutral-primary-soft border border-default rounded-base shadow-xs p-6">
         <h3 class="text-lg font-semibold text-heading mb-4">Auxiliares</h3>
-        <x-ui.table compact empty="No hay auxiliares registrados" :headers="['Auxiliar', 'Código SIS', 'Curso', 'Estado']" :rows="$auxiliares->map(fn($a) => [
-            ['heading' => true, 'value' => $a->nombre_usuario.' '.$a->apellido],
-            $a->cod_sis,
-            $a->nombre_curso !== '' ? $a->nombre_curso : '—',
-            $a->estado,
-        ])->toArray()" />
+
+        @php
+            $filas = $auxiliares->map(fn ($a) => [
+                ['heading' => true, 'value' => $a->nombre_usuario.' '.$a->apellido],
+                $a->cod_sis,
+                $a->estado,
+                ['html' => '<button type="button" wire:click="verDetalle('.$a->id_usuario.')" aria-label="Ver detalle de '.e($a->nombre_usuario.' '.$a->apellido).'" aria-haspopup="dialog" class="inline-flex min-h-11 shrink-0 items-center px-2 text-sm font-medium text-body-subtle underline-offset-2 hover:text-heading hover:underline focus:rounded-base focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-medium">Ver detalle</button>'],
+            ])->toArray();
+        @endphp
+
+        <x-ui.table compact empty="No hay auxiliares registrados" :headers="['Auxiliar', 'Código SIS', 'Estado', 'Acciones']" :rows="$filas" />
     </div>
+
+    <x-ui.modal-detalle-auxiliar
+        :abierto="$detalleAbierto"
+        :cursos="$detalleCursos"
+    />
 </div>
