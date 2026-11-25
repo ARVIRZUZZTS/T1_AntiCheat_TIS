@@ -91,6 +91,8 @@
       auxiliar" y "Eliminar auxiliar".
     - 2026-11-24  [Equipo T1]  fix: el badge de notificaciones usa el conteo de
       avisos nuevos y baja a 0 cuando la bandeja los marca como leídos.
+    - 2026-11-24  [Alisson D. Alvarado <alvaradoalissondalet@gmail.com>]  feat:
+      mostrar Ver cursos como unica opcion de Cursos para auxiliares.
 --}}
 
 @props([
@@ -213,7 +215,9 @@
 
     $auxiliarItems = array_values(array_filter([
         // Sus cursos no son los del docente: tiene su propia ruta (HU aparte).
-        ['label' => 'Cursos', 'route' => 'auxiliar.cursos'],
+        ['label' => 'Cursos', 'children' => [
+            ['label' => 'Ver cursos', 'route' => 'auxiliar.cursos'],
+        ]],
         // Solo los examenes a los que esta asignado (HU 24).
         ['label' => 'Examenes', 'children' => [
             ['label' => 'Ver examenes', 'route' => 'auxiliar.examenes'],
@@ -221,10 +225,11 @@
         $monitorAuxiliar !== [] ? ['label' => 'Monitor en vivo', 'children' => $monitorAuxiliar] : null,
     ]));
 
-    if ($items) {
-        $nav = $items;
-    } elseif ($rolUsuario === 'auxiliar') {
+    // El menu del auxiliar no debe sustituirse por opciones de otro rol.
+    if ($rolUsuario === \App\Models\Rol::NOMBRE_AUXILIAR) {
         $nav = $auxiliarItems;
+    } elseif ($items) {
+        $nav = $items;
     } else {
         $nav = $defaultItems;
     }

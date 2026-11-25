@@ -34,6 +34,8 @@
     - 2026-11-08  [Alisson D. Alvarado]  fix: mostrar notificaciones sin acciones.
     - 2026-11-24  [Equipo T1]  fix: al cargar la bandeja se marcan como leídas
       todas las notificaciones nuevas y el badge del sidebar baja a 0.
+    - 2026-11-24  [Alisson D. Alvarado <alvaradoalissondalet@gmail.com>]  fix:
+      identificar la bandeja del auxiliar con sus avisos de cambios de aula.
 
     @see  \resources\views\components\ui\notificacion-card.blade.php
 --}}
@@ -51,7 +53,7 @@
 
     <div class="px-4 sm:px-6 lg:px-[2vh]">
         <p class="text-body">
-            Notificaciones de posibles tramposos.
+            {{ $esAuxiliar ? 'Notificaciones de cambios de aula.' : 'Notificaciones de posibles tramposos.' }}
         </p>
 
         {{-- Plantillas de tarjeta: el script clona la que corresponde al `tipo`
