@@ -93,6 +93,8 @@
       avisos nuevos y baja a 0 cuando la bandeja los marca como leídos.
     - 2026-11-24  [Alisson D. Alvarado <alvaradoalissondalet@gmail.com>]  feat:
       mostrar Ver cursos como unica opcion de Cursos para auxiliares.
+    - 2026-11-24  [Alisson D. Alvarado <alvaradoalissondalet@gmail.com>]  fix:
+      reconocer el rol auxiliar aunque no sea el primer rol del usuario.
 --}}
 
 @props([
@@ -108,7 +110,9 @@
 
     $usuario = auth()->user();
     $nombreUsuario = $usuario ? trim($usuario->nombre_usuario.' '.$usuario->apellido) : null;
-    $rolUsuario = $usuario?->roles->first()?->nombre_rol;
+    $rolUsuario = $usuario?->roles->contains('nombre_rol', \App\Models\Rol::NOMBRE_AUXILIAR)
+        ? \App\Models\Rol::NOMBRE_AUXILIAR
+        : $usuario?->roles->first()?->nombre_rol;
 
     // Un item (o subopcion) esta activo si su ruta coincide con la actual, con
     // el prop $active o con uno de sus patrones extra ($extra). El comodin
