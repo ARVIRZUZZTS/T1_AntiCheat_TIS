@@ -93,6 +93,7 @@
       avisos nuevos y baja a 0 cuando la bandeja los marca como leídos.
 --}}
 
+
 @props([
     'id' => 'sidebar',
     'titleMain' => null,
@@ -371,7 +372,7 @@
     </div>
 </aside>
 
-@if ($rolUsuario === 'docente')
+@if (in_array($rolUsuario, [\App\Models\Rol::NOMBRE_DOCENTE, \App\Models\Rol::NOMBRE_AUXILIAR], true))
 <script>
 (function () {
     'use strict';

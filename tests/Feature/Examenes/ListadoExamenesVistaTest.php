@@ -13,6 +13,7 @@
  * @updated 2026-11-04
  * @updated 2026-11-05
  * @updated 2026-11-14
+ * @updated 2026-11-24
  *
  * @description
  * Pruebas de la vista del listado de exámenes: verifican sobre la fuente de las
@@ -59,6 +60,8 @@
  * - 2026-11-23  [Valery D. Ortuno P]  test: la tarjeta de Ver examenes ya no
  *   muestra ingresos ni ambientes (estan en el detalle) y el numero del filtro
  *   lleva espacio.
+ * - 2026-11-24  [Equipo T1]  test: toda etiqueta de examen lleva gestion, con
+ *   mapa completo de cursos propios y texto de respaldo.
  */
 
 namespace Tests\Feature\Examenes;
@@ -192,7 +195,9 @@ class ListadoExamenesVistaTest extends TestCase
         $this->assertStringContainsString('id="examen-dividir"', $parcial);
 
         $this->assertStringContainsString('gestionesPorCurso: @js($gestionesPorCurso->all())', $parcial);
-        $this->assertStringContainsString('this.fechaDe(examen), gestion || \'\'', $parcial);
+        $this->assertStringContainsString('const gestiones = (examen.cursos || [])', $parcial);
+        $this->assertStringContainsString("return gestiones || 'Gestion no registrada';", $parcial);
+        $this->assertStringContainsString('this.fechaDe(examen), this.gestionDe(examen)', $parcial);
         $this->assertStringContainsString('class="mb-2.5 block text-sm font-medium text-heading"', $parcial);
         $this->assertStringContainsString('class="block w-full rounded-base border border-default-medium bg-neutral-secondary-medium px-3 py-2.5 text-sm text-heading shadow-xs focus:border-brand focus:ring-brand"', $parcial);
     }
@@ -260,9 +265,9 @@ class ListadoExamenesVistaTest extends TestCase
         $this->assertStringContainsString('$tieneSelectorCurso = ! $esEdicion && $opcionesCursos !== [];', $formulario);
         $this->assertStringContainsString('label="Curso"', $formulario);
         $this->assertStringContainsString('name="curso_id"', $formulario);
-        $this->assertStringContainsString('@change="cambiarCurso()"', $formulario);
-        $this->assertStringContainsString('this.nombreCurso = this.cursos[this.cursoId] ?? \'\';', $formulario);
-        $this->assertStringContainsString("old('curso_id', \$cursoId)", $formulario);
+        $this->assertStringContainsString('@click="agregarCurso(curso.id)"', $formulario);
+        $this->assertStringContainsString('this.nombreCurso = curso.nombre;', $formulario);
+        $this->assertStringContainsString("old('curso_id', \$idCursoFijo)", $formulario);
         $this->assertStringContainsString(':cursos="$listadoGlobal ? $opcionesCursos : []"', $this->fuenteParcial());
     }
 
@@ -290,6 +295,17 @@ class ListadoExamenesVistaTest extends TestCase
         $this->assertStringContainsString('->conExamenes((int) $request->user()->id_usuario)', $controlador);
         $this->assertStringContainsString('public function conExamenes(int $idDocente): EloquentCollection', $servicio);
         $this->assertStringContainsString('(int) $curso->examenes_count > 0', $servicio);
+    }
+
+    public function test_las_vistas_de_examenes_reciben_todas_las_gestiones_del_docente(): void
+    {
+        $controlador = $this->fuente(app_path('Http/Controllers/ExamenController.php'));
+        $servicio = $this->fuente(app_path('Services/Curso/ListarCursosDocenteService.php'));
+
+        $this->assertStringContainsString('$gestionesPorCurso = $cursos->cursosConGestion($idDocente);', $controlador);
+        $this->assertStringContainsString("'gestionesPorCurso' => \$gestionesPorCurso", $controlador);
+        $this->assertStringContainsString('public function cursosConGestion(int $idDocente): Collection', $servicio);
+        $this->assertStringContainsString("->where('c.sis_doc', \$idDocente)", $servicio);
     }
 
     public function test_la_lista_de_examenes_tiene_filtro_de_estado(): void

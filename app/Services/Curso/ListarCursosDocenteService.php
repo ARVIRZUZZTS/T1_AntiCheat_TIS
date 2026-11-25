@@ -58,6 +58,8 @@
  *   los activos.
  * - 2026-11-24  [OchoaCesar]  feat: `archivables()` solo devuelve los cursos en
  *   curso con gestión del año actual (Refs #326); los archivados no se filtran.
+ * - 2026-11-24  [Equipo T1]  fix: `cursosConGestion()` es publica para que el
+ *   selector de exámenes etiquete también cursos finalizados o compartidos.
  *
  * @see  App\Services\Curso\ListarMateriasConMetricasService
  * @see  App\Http\Controllers\CursoController
@@ -132,7 +134,7 @@ class ListarCursosDocenteService
      * @return Collection<int, non-falsy-string|null> id_curso => "Segundo semestre 2026", o
      *                                                null si el curso no tiene gestión.
      */
-    private function cursosConGestion(int $idDocente): Collection
+    public function cursosConGestion(int $idDocente): Collection
     {
         return DB::table('curso as c')
             ->leftJoin('curso_tipo_gestion as ctg', 'ctg.id_curso', '=', 'c.id_curso')

@@ -15,6 +15,7 @@
  * @updated 2026-11-14
  * @updated 2026-11-19
  * @updated 2026-11-20
+ * @updated 2026-11-24
  *
  * @description
  * Controlador HTTP de la sección Exámenes del docente. Solo orquesta:
@@ -25,6 +26,8 @@
  * - `crear`: el formulario de alta de un examen, como página propia.
  * - `eliminarVista`: la subopción "Eliminar examen" del sidebar, con la lista
  *   de todos los exámenes del docente ordenada (programados primero).
+ * - `editarVista`/`dividirVista`: el parcial de exámenes con el mapa completo
+ *   de gestiones del docente, para que todas las etiquetas lleven gestión.
  * - `store`: valida (StoreExamenRequest), delega el alta en
  *   RegistrarExamenService y vuelve a la página única con el curso elegido y
  *   un mensaje de éxito.
@@ -58,6 +61,8 @@
  *   "Eliminar examen" del sidebar: lista de todos los exámenes del docente,
  *   programados primero y finalizados al final, con los cursos que el docente
  *   gestiona por examen para el botón de eliminación.
+ * - 2026-11-24  [Equipo T1]  fix: el mapa de gestiones del parcial cubre todos
+ *   los cursos del docente, no solo los activos.
  *
  * @see  StoreExamenRequest
  * @see  App\Services\Examen\CatalogosExamenService
@@ -106,6 +111,7 @@ class ExamenController extends Controller
         ListarCursosDocenteService $cursos,
         CatalogosExamenService $catalogos,
     ): View {
+        $gestionesPorCurso = $cursos->cursosConGestion((int) $request->user()->id_usuario);
         $cursos = $cursos->conExamenes((int) $request->user()->id_usuario);
 
         // El curso puede venir de la URL (recarga o enlace directo) o quedar en
@@ -130,6 +136,7 @@ class ExamenController extends Controller
         return view('pages.examenes', [
             'cursos' => $cursos,
             'cursoInicial' => $cursoInicial,
+            'gestionesPorCurso' => $gestionesPorCurso,
             'tabInicial' => $tabInicial,
             'ambientes' => $catalogos->ambientes(),
             'materiales' => $catalogos->materiales(),
@@ -144,6 +151,7 @@ class ExamenController extends Controller
      *
      * @param  Curso  $curso  Curso de la URL.
      * @param  CatalogosExamenService  $catalogos  Catálogos del formulario.
+     * @param  ListarCursosDocenteService  $cursos  Servicio de cursos del docente.
      * @return View Vista pages.examenes-curso.
      *
      * @throws AuthorizationException Si el curso no es del docente (403).
@@ -152,8 +160,11 @@ class ExamenController extends Controller
      *
      * @since  2026-10-24
      */
-    public function curso(Curso $curso, CatalogosExamenService $catalogos): View
-    {
+    public function curso(
+        Curso $curso,
+        CatalogosExamenService $catalogos,
+        ListarCursosDocenteService $cursos,
+    ): View {
         Gate::authorize('gestionar', $curso);
 
         // La edicion tambien usa los catalogos, aunque el curso ya no permita
@@ -162,6 +173,7 @@ class ExamenController extends Controller
 
         return view('pages.examenes-curso', [
             'curso' => $curso,
+            'gestionesPorCurso' => $cursos->cursosConGestion((int) auth()->id()),
             'ambientes' => $catalogos->ambientes(),
             'materiales' => $catalogos->materiales(),
             'normas' => $catalogos->normas(),
@@ -352,7 +364,9 @@ class ExamenController extends Controller
         string $soloTab,
         string $vista,
     ): View {
-        $cursos = $cursos->activos((int) $request->user()->id_usuario);
+        $idDocente = (int) $request->user()->id_usuario;
+        $gestionesPorCurso = $cursos->cursosConGestion($idDocente);
+        $cursos = $cursos->activos($idDocente);
 
         $cursoId = $request->integer('curso');
         $cursoInicial = $cursoId > 0 ? $cursos->firstWhere('id_curso', $cursoId) : null;
@@ -368,6 +382,7 @@ class ExamenController extends Controller
         return view($vista, [
             'cursos' => $cursos,
             'cursoInicial' => $cursoInicial,
+            'gestionesPorCurso' => $gestionesPorCurso,
             'soloTab' => $soloTab,
             'ambientes' => $catalogo['ambientes'],
             'materiales' => $catalogo['materiales'],
