@@ -8,6 +8,7 @@
  * @created 2026-11-22
  *
  * @updated 2026-11-23
+ * @updated 2026-11-24
  *
  * @description
  * Pruebas de la página única «Archivar/Restaurar cursos»: una sola lista con
@@ -15,7 +16,12 @@
  * título de cada curso, la acción «Archivar» en rojo y «Restaurar» en gris,
  * apertura y cierre de cada modal, confirmación
  * con sus servicios, avisos de éxito y error y el trap de foco del modal de
- * archivar.
+ * archivar. Los activos se limitan a los de la gestión del año actual (sin
+ * gestión o de otro año no se listan); los archivados no se filtran.
+ *
+ * @changelog
+ * - 2026-11-24  [OchoaCesar]  test: activos solo de la gestión del año actual;
+ *   caso nulo de gestión pasa a un curso archivado (Refs #326).
  */
 
 declare(strict_types=1);
@@ -48,14 +54,24 @@ class ArchivarRestaurarCursoVistaTest extends TestCase
 
     private const AJENO_ARCHIVADO = 997204;
 
+    private const SIN_GESTION = 997205;
+
+    private const ANIO_ANTERIOR = 997206;
+
+    private const ARCHIVADO_SIN_GESTION = 997207;
+
     protected function setUp(): void
     {
         parent::setUp();
 
         $rol = DB::table('rol')->where('nombre_rol', 'docente')->value('id_rol');
         $gestion = DB::table('tipo_gestion')->value('id_tipo_gestion');
+        $gestionOtra = DB::table('tipo_gestion')
+            ->where('id_tipo_gestion', '!=', $gestion)
+            ->value('id_tipo_gestion');
         $this->assertNotNull($rol);
         $this->assertNotNull($gestion);
+        $this->assertNotNull($gestionOtra);
 
         foreach ([self::DOCENTE, self::OTRO] as $id) {
             DB::table('usuario')->insert([
@@ -69,12 +85,15 @@ class ArchivarRestaurarCursoVistaTest extends TestCase
         }
 
         $this->crearCurso(self::CURSO, 'Curso En Curso', self::DOCENTE, CursoEstado::EnCurso, (int) $gestion);
-        $this->crearCurso(self::OTRO_CURSO, 'Otro Curso', self::DOCENTE, CursoEstado::EnCurso);
+        $this->crearCurso(self::OTRO_CURSO, 'Otro Curso', self::DOCENTE, CursoEstado::EnCurso, (int) $gestionOtra);
+        $this->crearCurso(self::SIN_GESTION, 'Curso Sin Gestion', self::DOCENTE, CursoEstado::EnCurso);
+        $this->crearCurso(self::ANIO_ANTERIOR, 'Curso Anio Anterior', self::DOCENTE, CursoEstado::EnCurso, (int) $gestion, now()->year - 1);
         $this->crearCurso(self::ARCHIVADO, 'Curso Archivado Propio', self::DOCENTE, CursoEstado::Archivado, (int) $gestion);
+        $this->crearCurso(self::ARCHIVADO_SIN_GESTION, 'Curso Archivado Sin Gestion', self::DOCENTE, CursoEstado::Archivado);
         $this->crearCurso(self::AJENO_ARCHIVADO, 'Curso Archivado Ajeno', self::OTRO, CursoEstado::Archivado, (int) $gestion);
     }
 
-    private function crearCurso(int $id, string $nombre, int $docente, CursoEstado $estado, ?int $gestion = null): void
+    private function crearCurso(int $id, string $nombre, int $docente, CursoEstado $estado, ?int $gestion = null, ?int $anio = null): void
     {
         DB::table('curso')->insert([
             'id_curso' => $id,
@@ -88,7 +107,7 @@ class ArchivarRestaurarCursoVistaTest extends TestCase
             DB::table('curso_tipo_gestion')->insert([
                 'id_curso' => $id,
                 'id_tg' => $gestion,
-                'anio' => now()->year,
+                'anio' => $anio ?? now()->year,
             ]);
         }
     }
@@ -113,6 +132,18 @@ class ArchivarRestaurarCursoVistaTest extends TestCase
         $this->assertTrue($servicio->archivables(999999)->isEmpty());
     }
 
+    public function test_servicio_archivables_excluye_cursos_sin_gestion_y_del_anio_anterior(): void
+    {
+        $nombres = app(ListarCursosDocenteService::class)
+            ->archivables(self::DOCENTE)
+            ->pluck('nombre_curso')
+            ->all();
+
+        $this->assertSame(['Curso En Curso', 'Otro Curso'], $nombres);
+        $this->assertNotContains('Curso Sin Gestion', $nombres);
+        $this->assertNotContains('Curso Anio Anterior', $nombres);
+    }
+
     public function test_servicio_archivados_devuelve_solo_archivados_propios_ordenados(): void
     {
         $cursos = app(ListarCursosDocenteService::class)->archivados(self::DOCENTE);
@@ -132,6 +163,9 @@ class ArchivarRestaurarCursoVistaTest extends TestCase
             ->assertSee('Curso En Curso')
             ->assertSee('Otro Curso')
             ->assertSee('Curso Archivado Propio')
+            ->assertSee('Curso Archivado Sin Gestion')
+            ->assertDontSee('Curso Sin Gestion')
+            ->assertDontSee('Curso Anio Anterior')
             ->assertDontSee('Curso Archivado Ajeno')
             ->html();
 
@@ -139,6 +173,18 @@ class ArchivarRestaurarCursoVistaTest extends TestCase
             '/Curso En Curso[\s\S]*Otro Curso[\s\S]*Curso Archivado Propio/',
             $html,
         );
+    }
+
+    public function test_solo_se_muestran_los_activos_de_la_gestion_del_anio_actual(): void
+    {
+        $this->actingAs(Usuario::findOrFail(self::DOCENTE));
+
+        Livewire::test(ArchivarRestaurarCurso::class)
+            ->assertSee('Curso En Curso')
+            ->assertSee('Otro Curso')
+            ->assertSee('Curso Archivado Propio')
+            ->assertDontSee('Curso Sin Gestion')
+            ->assertDontSee('Curso Anio Anterior');
     }
 
     public function test_la_tabla_muestra_la_cantidad_de_estudiantes(): void
@@ -185,12 +231,14 @@ class ArchivarRestaurarCursoVistaTest extends TestCase
     public function test_cada_curso_muestra_su_gestion_debajo_del_titulo(): void
     {
         $gestiones = app(ListarCursosDocenteService::class)
-            ->gestionesPorCurso([self::CURSO, self::ARCHIVADO, self::OTRO_CURSO]);
+            ->gestionesPorCurso([self::CURSO, self::ARCHIVADO, self::OTRO_CURSO, self::ARCHIVADO_SIN_GESTION]);
 
         $textoGestion = $gestiones->get(self::CURSO);
         $this->assertNotNull($textoGestion);
         $this->assertSame($textoGestion, $gestiones->get(self::ARCHIVADO));
-        $this->assertNull($gestiones->get(self::OTRO_CURSO));
+        $this->assertNotNull($gestiones->get(self::OTRO_CURSO));
+        $this->assertNotSame($textoGestion, $gestiones->get(self::OTRO_CURSO));
+        $this->assertNull($gestiones->get(self::ARCHIVADO_SIN_GESTION));
 
         $this->actingAs(Usuario::findOrFail(self::DOCENTE));
 
@@ -202,7 +250,7 @@ class ArchivarRestaurarCursoVistaTest extends TestCase
         $texto = preg_quote($textoGestion, '/');
         $this->assertMatchesRegularExpression('/Curso En Curso[\s\S]{0,250}?'.$texto.'/', $html);
         $this->assertMatchesRegularExpression('/Curso Archivado Propio[\s\S]{0,250}?'.$texto.'/', $html);
-        $this->assertMatchesRegularExpression('/Otro Curso[\s\S]{0,250}?Gestion no registrada/', $html);
+        $this->assertMatchesRegularExpression('/Curso Archivado Sin Gestion[\s\S]{0,250}?Gestion no registrada/', $html);
     }
 
     public function test_pagina_muestra_la_lista_combinada_sin_parametro_de_pestana(): void
@@ -234,7 +282,7 @@ class ArchivarRestaurarCursoVistaTest extends TestCase
     public function test_muestra_estado_vacio_sin_cursos_propios(): void
     {
         DB::table('curso_tipo_gestion')
-            ->whereIn('id_curso', [self::CURSO, self::OTRO_CURSO, self::ARCHIVADO])
+            ->whereIn('id_curso', [self::CURSO, self::OTRO_CURSO, self::ANIO_ANTERIOR, self::ARCHIVADO])
             ->delete();
         DB::table('curso')->where('sis_doc', self::DOCENTE)->delete();
 

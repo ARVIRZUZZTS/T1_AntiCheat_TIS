@@ -8,10 +8,13 @@
  * @created 2026-11-22
  *
  * @updated 2026-11-23
+ * @updated 2026-11-24
  *
  * @description
  * Componente de la subopción «Archivar curso»: una sola tabla con
- * los cursos propios en curso y los archivados al final. Cada tarjeta ofrece
+ * los cursos propios en curso y los archivados al final. Solo se listan los
+ * activos con gestión del año actual (sin gestión o de otro año quedan
+ * afuera); los archivados no se filtran. Cada tarjeta ofrece
  * su acción como texto: «Archivar» en rojo para los activos y «Restaurar» en
  * gris para los archivados. Cada acción se confirma en su modal y delega en su
  * servicio (Gate + transacción + lockForUpdate); el resultado sale en el mismo
@@ -26,6 +29,8 @@
  *   única con los archivados al final y la apertura de un modal cierra el otro.
  * - 2026-11-23  [OchoaCesar]  feat: cada tarjeta muestra la gestión del curso
  *   bajo el título, con el mismo formato que «Ver cursos».
+ * - 2026-11-24  [OchoaCesar]  feat: la lista muestra solo los cursos en curso
+ *   de la gestión del año actual (Refs #326).
  */
 
 declare(strict_types=1);

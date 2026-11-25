@@ -354,7 +354,7 @@ class ActualizarExamenTest extends TestCase
                 'fecha' => now()->addMonth()->format('d/m/Y'),
                 'duracion' => 200,
                 'ambientes' => [999999],
-            ]));
+            ]), auth()->user());
             $this->fail('Se esperaba una QueryException por el ambiente inexistente.');
         } catch (QueryException) {
             // Esperado: el ambiente 999999 viola la FK y revierte la transaccion.

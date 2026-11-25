@@ -13,6 +13,7 @@
     @updated 2026-11-19
     @updated 2026-11-20
     @updated 2026-11-22
+    @updated 2026-11-24
 
     @description
     Parcial de la sección Exámenes. En la página única lista todos los exámenes
@@ -108,6 +109,8 @@
       aquí el botón "Eliminar" de la tarjeta, el aviso de bloqueo y sus
       modales. El selector de curso, "Invitar docente" y "Dividir" se
       conservan.
+    - 2026-11-24  [Equipo T1]  fix: todas las etiquetas de examen llevan
+      gestión; se busca en cualquier curso del examen y hay texto de respaldo.
 
     @see  App\Http\Controllers\Api\CursoExamenController
     @see  App\Http\Controllers\Api\ExamenDocenteController
@@ -276,11 +279,15 @@
 
              return inicio > this.ahora;
          },
-         etiquetaExamen(examen) {
-             const idCurso = examen.cursos?.[0]?.id;
-             const gestion = idCurso === undefined ? null : this.gestionesPorCurso[idCurso];
+         gestionDe(examen) {
+             const gestiones = (examen.cursos || [])
+                 .map((curso) => this.gestionesPorCurso[curso?.id])
+                 .find((gestion) => Boolean(gestion));
 
-             return [examen.tipo || 'Sin tipo', examen.curso || '', this.fechaDe(examen), gestion || '']
+             return gestiones || 'Gestion no registrada';
+         },
+         etiquetaExamen(examen) {
+             return [examen.tipo || 'Sin tipo', examen.curso || '', this.fechaDe(examen), this.gestionDe(examen)]
                  .filter(Boolean)
                  .join(' - ');
          },

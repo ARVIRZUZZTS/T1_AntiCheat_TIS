@@ -19,6 +19,10 @@
  *
  * @changelog
  * - 2026-11-22  [Valery D. Ortuno P]  feat: creacion inicial (HU 24).
+ * - 2026-11-24  [Alisson D. Alvarado <alvaradoalissondalet@gmail.com>]  fix:
+ *   excluir asignaciones a examenes sin permisos habilitados.
+ * - 2026-11-24  [Alisson D. Alvarado <alvaradoalissondalet@gmail.com>]  feat:
+ *   entregar los nombres por separado para filtrar examenes compartidos.
  *
  * @see  App\Livewire\Auxiliares\ExamenesAuxiliar
  * @see  App\Services\Auxiliar\AccesoAuxiliarService
@@ -100,6 +104,9 @@ class ListarExamenesAuxiliarService
 
         return DB::table('auxiliar_examen')
             ->where('id_auxiliar', $idAuxiliar)
+            ->where(fn (Builder $consulta) => $consulta
+                ->where('ver_ingreso', true)
+                ->orWhere('ver_monitor', true))
             ->select('id_examen')
             ->union($porCurso);
     }
@@ -140,6 +147,7 @@ class ListarExamenesAuxiliarService
             'id' => (int) $fila->id_examen,
             'tipo' => $tipo === '' ? 'Examen' : Str::ucfirst($tipo),
             'cursos' => $grupo->pluck('nombre_curso')->unique()->sort()->implode(', '),
+            'nombres_cursos' => $grupo->pluck('nombre_curso')->unique()->sort()->values()->all(),
             'fecha' => $inicio?->format('d/m/Y') ?? ($fila->fecha ? Carbon::parse($fila->fecha)->format('d/m/Y') : 'Sin fecha'),
             'horario' => $inicio ? $inicio->format('H:i').($fin ? ' - '.$fin->format('H:i') : '') : '—',
             'ambientes' => $ambientes->pluck('nombre_ambiente')->implode(', ') ?: '—',

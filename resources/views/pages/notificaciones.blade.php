@@ -6,20 +6,20 @@
     @updated 2026-11-24
 
     @description
-    Pantalla de notificaciones del docente. Lista las notificaciones que devuelve
+    Pantalla de notificaciones del usuario. Lista las notificaciones que devuelve
     el endpoint real `/api/notificaciones`, ordenadas de la más reciente a la más
     antigua (el backend ya las ordena y les pone el tiempo transcurrido en
-    español). Cada una se pinta con `x-ui.notificacion-card`, eligiendo la
-    plantilla según el `tipo` del aviso (HU 6 · T3):
+    español). Cada una se pinta con la plantilla que corresponde a su `tipo`:
 
       - `posible_tramposo`: icono ámbar y orientación a la central de riesgos.
       - `central_riesgo`: icono rojo y orientación a la central de riesgos.
+      - `examen_modificado`: icono ámbar con el detalle de lo que se cambió en
+        un examen (ambientes, fecha u hora).
 
     Si no queda ninguna, aparece el mensaje "No tienes notificaciones".
 
-    El rol se lee del usuario autenticado: si es auxiliar, esas notificaciones
-    no se le generan ni se le muestran, así que la pantalla no consulta el
-    endpoint y arranca en el estado vacío.
+    Docentes y auxiliares consultan la misma bandeja: cada uno ve solo los avisos
+    dirigidos a su `id_usuario`.
 
     @changelog
     - 2026-10-09  [Alisson D. Alvarado]  feat: creación inicial de la pantalla.
@@ -34,6 +34,13 @@
     - 2026-11-08  [Alisson D. Alvarado]  fix: mostrar notificaciones sin acciones.
     - 2026-11-24  [Equipo T1]  fix: al cargar la bandeja se marcan como leídas
       todas las notificaciones nuevas y el badge del sidebar baja a 0.
+    - 2026-11-24  [Alisson D. Alvarado <alvaradoalissondalet@gmail.com>]  fix:
+      identificar la bandeja del auxiliar con sus avisos de cambios de aula.
+     - 2026-11-24  [Alisson D. Alvarado <alvaradoalissondalet@gmail.com>]  fix:
+       identificar la bandeja del auxiliar con sus avisos de cambios de aula.
+     - 2026-11-24  [Equipo T1]  feat: los auxiliares consultan su bandeja y se
+       muestra el aviso de cambios de ambientes, fecha y hora de exámenes.
+
 
     @see  \resources\views\components\ui\notificacion-card.blade.php
 --}}
@@ -51,7 +58,7 @@
 
     <div class="px-4 sm:px-6 lg:px-[2vh]">
         <p class="text-body">
-            Notificaciones de posibles tramposos.
+            {{ $esAuxiliar ? 'Notificaciones de cambios en exámenes.' : 'Notificaciones de posibles tramposos y cambios en exámenes.' }}
         </p>
 
         {{-- Plantillas de tarjeta: el script clona la que corresponde al `tipo`
@@ -122,11 +129,24 @@
             </div>
         </template>
 
+         <template id="notificacion-template-examen">
+             <div class="js-notificacion relative flex items-start gap-3 sm:gap-4 rounded-2xl border border-light bg-neutral-primary-soft p-4 sm:p-5 shadow-xs">
+                 <span class="shrink-0 inline-flex items-center justify-center w-11 h-11 bg-warning-soft rounded-xl">
+                     <svg class="w-6 h-6 text-warning" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2" stroke="currentColor" stroke-width="2"/><path stroke="currentColor" stroke-linecap="round" stroke-width="2" d="M8 3v4m8-4v4M3 10h18m-12 4h3m-3 4h6"/></svg>
+                 </span>
+                 <div class="flex-1 min-w-0">
+                     <h3 class="js-titulo text-sm font-bold leading-snug text-heading break-words"></h3>
+                     <p class="js-descripcion mt-1 text-sm text-body break-words"></p>
+                     <span class="js-hace mt-3 block text-xs text-muted"></span>
+                 </div>
+             </div>
+         </template>
+
          <div id="notificaciones-lista"
               class="mt-6 flex flex-col gap-4"
-              data-endpoint="{{ route('api.notificaciones.index') }}"
-              data-marcar-leidas="{{ route('api.notificaciones.leidas') }}"
-              data-es-auxiliar="{{ $esAuxiliar ? '1' : '0' }}">
+               data-endpoint="{{ route('api.notificaciones.index') }}"
+               data-marcar-leidas="{{ route('api.notificaciones.leidas') }}">
+
         </div>
 
         <div id="notificaciones-vacio" class="mt-6" hidden>
@@ -149,7 +169,6 @@
             var vacio = document.getElementById('notificaciones-vacio');
             var endpoint = lista.dataset.endpoint;
             var endpointLeidas = lista.dataset.marcarLeidas;
-            var esAuxiliar = lista.dataset.esAuxiliar === '1';
             var csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 
             var plantillas = {
@@ -157,7 +176,8 @@
                 central_riesgo: document.getElementById('notificacion-template-central'),
                 invitacion_examen: document.getElementById('notificacion-template-invitacion'),
                 respuesta_invitacion: document.getElementById('notificacion-template-respuesta'),
-                respaldo_bd: document.getElementById('notificacion-template-respaldo')
+                respaldo_bd: document.getElementById('notificacion-template-respaldo'),
+                examen_modificado: document.getElementById('notificacion-template-examen')
             };
 
             var titulos = {
@@ -165,7 +185,8 @@
                 central_riesgo: 'Estudiante ingresado a central de riesgo',
                 invitacion_examen: 'Invitacion para compartir un examen',
                 respuesta_invitacion: 'Respuesta a tu invitacion de examen',
-                respaldo_bd: 'Respaldo automático de la base de datos'
+                respaldo_bd: 'Respaldo automático de la base de datos',
+                examen_modificado: 'Cambios en un examen'
             };
 
             function actualizarVacio() {
@@ -247,11 +268,6 @@
             }
 
             function cargar() {
-                if (esAuxiliar) {
-                    actualizarVacio();
-                    return;
-                }
-
                 fetch(endpoint, {
                     headers: { 'Accept': 'application/json' },
                     credentials: 'same-origin'
