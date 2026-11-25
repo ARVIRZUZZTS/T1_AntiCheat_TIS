@@ -2,14 +2,15 @@
     @file    archivar-restaurar-curso.blade.php
     @author  OchoaCesar
     @created 2026-11-22
-    @updated 2026-11-23
+    @updated 2026-11-24
 
     @description
     Página «Archivar curso»: una sola tabla con los cursos en curso primero y
-    los archivados al final. Cada fila muestra la gestión, la cantidad de
-    estudiantes y su acción: «Archivar» en rojo para los activos y «Restaurar»
-    en gris para los archivados. Cada acción se confirma en su modal y comparte
-    el aviso inline de éxito.
+    los archivados al final. Solo se listan los activos con gestión del año
+    actual; los archivados no se filtran. Cada fila muestra la gestión, la
+    cantidad de estudiantes y su acción: «Archivar» en rojo para los activos y
+    «Restaurar» en gris para los archivados. Cada acción se confirma en su
+    modal y comparte el aviso inline de éxito.
 --}}
 
 @section('title', 'Archivar curso')
@@ -57,7 +58,7 @@
                                     class="inline-flex min-h-11 shrink-0 items-center px-2 text-sm font-medium text-body-subtle underline-offset-2 hover:text-heading hover:underline focus:rounded-base focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-medium"
                                     aria-label="Restaurar curso {{ $curso->nombre_curso }}"
                                     aria-haspopup="dialog"
-                                    wire:click='abrirModalRestaurar({{ $curso->id_curso }}, {!! \Illuminate\Support\Js::from($curso->nombre_curso) !!})'
+                                    wire:click="abrirModalRestaurar({{ $curso->id_curso }}, {!! \Illuminate\Support\Js::from($curso->nombre_curso) !!})"
                                 >
                                     Restaurar
                                 </button>

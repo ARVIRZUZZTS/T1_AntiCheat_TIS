@@ -24,8 +24,9 @@
  * - `activos()`: solo los cursos en curso propios, para elegir uno en
  *   Exámenes. Un examen compartido aparece en el curso propio del invitado
  *   (al aceptar lo asocia a sus cursos), no en el curso del otro docente.
- * - `archivables()`: solo los cursos en curso propios, para la subsección
- *   «Archivar curso» (no se pueden archivar cursos compartidos).
+ * - `archivables()`: solo los cursos en curso propios de la gestión del año
+ *   actual, para la subsección «Archivar curso» (no se pueden archivar cursos
+ *   compartidos ni los de otra gestión o sin gestión).
  *
  * El orden se aplica acá y no en ListarMateriasConMetricasService porque ese
  * servicio también alimenta a Reportes, que depende de su orden por id.
@@ -55,6 +56,8 @@
  *   cursos archivados, para el filtro Archivados de Ver cursos (sale la
  *   subopcion "Cursos archivados" del sidebar). Editar curso ya filtra solo
  *   los activos.
+ * - 2026-11-24  [OchoaCesar]  feat: `archivables()` solo devuelve los cursos en
+ *   curso con gestión del año actual (Refs #326); los archivados no se filtran.
  * - 2026-11-24  [Equipo T1]  fix: `cursosConGestion()` es publica para que el
  *   selector de exámenes etiquete también cursos finalizados o compartidos.
  *
@@ -232,18 +235,31 @@ class ListarCursosDocenteService
     }
 
     /**
-     * Cursos propios en estado `EnCurso`, en orden alfabético, listos para
-     * archivar. Los cursos compartidos por invitación quedan afuera: el
-     * servicio de archivado solo autoriza al docente propietario.
+     * Cursos propios en estado `EnCurso` de la gestión del año actual, en
+     * orden alfabético, listos para archivar. Los cursos compartidos por
+     * invitación quedan afuera: el servicio de archivado solo autoriza al
+     * docente propietario. También quedan afuera los cursos sin gestión o
+     * con un año distinto al actual; los archivados no se filtran (los
+     * muestra `archivados()`).
      *
      * @param  int  $idDocente  ID del docente (`curso.sis_doc`).
      * @return EloquentCollection<int, Curso> Cursos con id, nombre y estado.
+     *
+     * @author OchoaCesar <cesareduardonick@gmail.com>
+     *
+     * @since  2026-11-24
      */
     public function archivables(int $idDocente): EloquentCollection
     {
         return Curso::query()
             ->where('sis_doc', $idDocente)
             ->where('estado', CursoEstado::EnCurso->value)
+            ->whereIn(
+                'id_curso',
+                DB::table('curso_tipo_gestion')
+                    ->select('id_curso')
+                    ->where('anio', now()->year),
+            )
             ->withCount('estudiantes')
             ->orderBy('nombre_curso')
             ->orderBy('id_curso')
