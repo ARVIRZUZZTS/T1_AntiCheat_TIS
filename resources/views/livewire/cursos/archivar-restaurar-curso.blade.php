@@ -2,14 +2,15 @@
     @file    archivar-restaurar-curso.blade.php
     @author  OchoaCesar
     @created 2026-11-22
-    @updated 2026-11-23
+    @updated 2026-11-24
 
     @description
     Página «Archivar curso»: una sola tabla con los cursos en curso primero y
-    los archivados al final. Cada fila muestra la gestión, la cantidad de
-    estudiantes y su acción: «Archivar» en rojo para los activos y «Restaurar»
-    en gris para los archivados. Cada acción se confirma en su modal y comparte
-    el aviso inline de éxito.
+    los archivados al final. Solo se listan los activos con gestión del año
+    actual; los archivados no se filtran. Cada fila muestra la gestión, la
+    cantidad de estudiantes y su acción: «Archivar» en rojo para los activos y
+    «Restaurar» en gris para los archivados. Cada acción se confirma en su
+    modal y comparte el aviso inline de éxito.
 --}}
 
 @section('title', 'Archivar curso')
