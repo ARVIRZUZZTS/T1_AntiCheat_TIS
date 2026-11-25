@@ -34,6 +34,8 @@
     - 2026-11-08  [Alisson D. Alvarado]  fix: mostrar notificaciones sin acciones.
     - 2026-11-24  [Equipo T1]  fix: al cargar la bandeja se marcan como leídas
       todas las notificaciones nuevas y el badge del sidebar baja a 0.
+    - 2026-11-24  [Alisson D. Alvarado <alvaradoalissondalet@gmail.com>]  fix:
+      identificar la bandeja del auxiliar con sus avisos de cambios de aula.
      - 2026-11-24  [Alisson D. Alvarado <alvaradoalissondalet@gmail.com>]  fix:
        identificar la bandeja del auxiliar con sus avisos de cambios de aula.
      - 2026-11-24  [Equipo T1]  feat: los auxiliares consultan su bandeja y se
