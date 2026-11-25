@@ -7,6 +7,8 @@
  *
  * @created 2026-11-05
  *
+ * @updated 2026-11-24
+ *
  * @description
  * Endpoints de la pestana Editar Examen:
  *
@@ -14,8 +16,9 @@
  *    para el formulario.
  *  - `actualizar`: guarda los cambios del examen (Task #261). Valida con
  *    UpdateExamenRequest (que reutiliza las reglas del alta) y delega el
- *    guardado en ActualizarExamenService; devuelve los datos ya actualizados
- *    para que el formulario quede en sincronia sin recargar.
+ *    guardado en ActualizarExamenService, que también avisa a los usuarios
+ *    involucrados si cambiaron ambientes, fecha u hora; devuelve los datos ya
+ *    actualizados para que el formulario quede en sincronia sin recargar.
  *
  * Solo el creador del examen puede usarlos: la lectura lo comprueba con el Gate
  * y la escritura con UpdateExamenRequest::authorize(); el listado de la pestana
@@ -25,6 +28,10 @@
  * @see  App\Services\Examen\ActualizarExamenService
  * @see  App\Http\Requests\UpdateExamenRequest
  * @see  App\Policies\ExamenPolicy::editar()
+ *
+ * @changelog
+ * - 2026-11-24  [Equipo T1]  feat: pasar el editor al servicio para notificar
+ *   cambios de ambientes, fecha y hora.
  */
 
 namespace App\Http\Controllers\Api;
@@ -32,6 +39,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\UpdateExamenRequest;
 use App\Models\Examen;
+use App\Models\Usuario;
 use App\Services\Examen\ActualizarExamenService;
 use App\Services\Examen\ObtenerExamenEdicionService;
 use Illuminate\Http\JsonResponse;
@@ -59,7 +67,9 @@ class ExamenEdicionController extends Controller
         ActualizarExamenService $actualizar,
         ObtenerExamenEdicionService $datos,
     ): JsonResponse {
-        $actualizar->ejecutar($examen, $request->validated());
+        /** @var Usuario $editor */
+        $editor = $request->user('web');
+        $actualizar->ejecutar($examen, $request->validated(), $editor);
 
         return response()->json([
             'mensaje' => 'Examen actualizado con exito',

@@ -8,13 +8,16 @@
  * @created 2026-10-11
  *
  * @description
- * Modelo de la tabla `notificacion_docente`: aviso dirigido al docente de una
- * materia. Hay dos tipos (columna `tipo`):
+ * Modelo de la tabla `notificacion_docente`: aviso del sistema dirigido a un
+ * usuario (docente o auxiliar) por su `id_usuario`. Los tipos vigentes son:
  *
  *   - `posible_tramposo` (HU 12): un auxiliar registró al estudiante como
  *     sospechoso; va solo al docente de la materia del caso.
  *   - `central_riesgo` (HU 6): el estudiante quedó registrado o confirmado
  *     como tramposo; se genera uno por cada materia activa del estudiante.
+ *   - `examen_modificado`: cambiaron los ambientes, la fecha o la hora de un
+ *     examen; va a los auxiliares asignados y, si está compartido, a los
+ *     docentes involucrados. Los cambios se guardan en `detalles`.
  *
  * Cada fila referencia el registro del caso en `central_riesgo` y el curso
  * (materia) del docente; el título, el auxiliar, el estudiante, el examen
@@ -35,12 +38,15 @@
  *   avisos "central_riesgo" de la HU 6 (#HU6).
  * - 2026-11-22  [T1]  feat: columna `fecha_evento` para avisos autogenerados sin
  *   entidad de origen, como el respaldo automático de la base de datos (#HU33).
+ * - 2026-11-24  [Equipo T1]  feat: columna `detalles` para el aviso de cambios
+ *   de ambientes, fecha u hora de un examen.
  */
 
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
  * @property int $id_notificacion
@@ -51,7 +57,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $tipo
  * @property string $estado
  * @property bool $oculta
- * @property ?\Illuminate\Support\Carbon $fecha_evento
+ * @property ?Carbon $fecha_evento
+ * @property ?array<string, mixed> $detalles
  */
 class NotificacionDocente extends Model
 {
@@ -76,6 +83,7 @@ class NotificacionDocente extends Model
         'estado',
         'oculta',
         'fecha_evento',
+        'detalles',
     ];
 
     protected function casts(): array
@@ -83,6 +91,7 @@ class NotificacionDocente extends Model
         return [
             'oculta' => 'boolean',
             'fecha_evento' => 'datetime',
+            'detalles' => 'array',
         ];
     }
 

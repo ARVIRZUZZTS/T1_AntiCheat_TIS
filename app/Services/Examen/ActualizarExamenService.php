@@ -23,6 +23,8 @@
  *    sin duplicar filas en las tablas puente ni borrar los catalogos.
  *  - El material y las normas escritas a mano: se reemplazan por lo que llega
  *    (una fila por renglon), que es lo que el formulario reenvia entero.
+ *  - Los avisos a los auxiliares asignados (y a los docentes de un examen
+ *    compartido) cuando cambian los ambientes, la fecha o la hora.
  *
  * Que NO toca, a proposito:
  *
@@ -37,14 +39,19 @@
  * @see  App\Http\Controllers\Api\ExamenEdicionController::actualizar()
  * @see  App\Services\Examen\RegistrarExamenService
  * @see  App\Services\Examen\NormalizaDatosExamen
+ * @see  App\Services\Examen\NotificarCambiosExamenService
  *
  * @changelog
  * - 2026-11-07  [Diego Tejerina]  feat: creacion inicial del servicio.
+ * - 2026-11-24  [Equipo T1]  feat: avisar cambios de ambientes, fecha u hora a
+ *   los auxiliares asignados y a los docentes de exámenes compartidos.
  */
 
 namespace App\Services\Examen;
 
 use App\Models\Examen;
+use App\Models\Usuario;
+use App\Services\Curso\AsegurarCursoEditableService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -54,7 +61,8 @@ class ActualizarExamenService
 
     public function __construct(
         private readonly ValidarDisponibilidadExamenService $disponibilidad,
-        private readonly \App\Services\Curso\AsegurarCursoEditableService $editable,
+        private readonly AsegurarCursoEditableService $editable,
+        private readonly NotificarCambiosExamenService $cambios,
     ) {}
 
     /**
@@ -62,18 +70,21 @@ class ActualizarExamenService
      *
      * @param  Examen  $examen  Examen que se edita (ya resuelto por la ruta).
      * @param  array<string, mixed>  $datos  Datos ya validados (validated() del request).
+     * @param  Usuario  $editor  Docente autenticado que hace el cambio.
      * @return Examen El examen actualizado, con las relaciones ya escritas.
      *
      * @throws \InvalidArgumentException Si el tipo no existe en el catalogo o la
      *                                   fecha/hora no se puede normalizar.
      */
-    public function ejecutar(Examen $examen, array $datos): Examen
+    public function ejecutar(Examen $examen, array $datos, Usuario $editor): Examen
     {
         $this->editable->asegurarExamenEditable($examen, 'examen');
 
-        return DB::transaction(function () use ($examen, $datos): Examen {
+        return DB::transaction(function () use ($examen, $datos, $editor): Examen {
             $this->disponibilidad->bloquearProgramacion();
             $this->validarDisponibilidad($examen, $datos);
+
+            $antes = $this->cambios->capturar($examen);
 
             $examen->fecha = $this->fechaIso($datos['fecha']);
             $examen->hora_inicio = $this->horaIso($datos['hora_inicio']);
@@ -91,6 +102,8 @@ class ActualizarExamenService
 
             $this->reemplazarMaterialesPersonalizados($examen, $datos['materiales_personalizados'] ?? null);
             $this->reemplazarNormasPersonalizadas($examen, $datos['normas_personalizadas'] ?? null);
+
+            $this->cambios->notificar($examen, $antes, $editor);
 
             return $examen;
         });

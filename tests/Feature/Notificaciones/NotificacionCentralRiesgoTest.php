@@ -151,7 +151,7 @@ class NotificacionCentralRiesgoTest extends TestCase
         $this->assertSame([], app(NotificacionService::class)->notificarCentralRiesgo($registro));
         $this->assertDatabaseCount('notificacion_docente', 0);
 
-        $servicio = new ResolverIncidenciaService;
+        $servicio = app(ResolverIncidenciaService::class);
         $servicio->confirmar(2, Usuario::findOrFail(self::DOCENTE_A));
 
         $this->assertDatabaseCount('notificacion_docente', 2);
@@ -168,7 +168,7 @@ class NotificacionCentralRiesgoTest extends TestCase
         app(NotificacionService::class)->notificarCentralRiesgo($registro, porConfirmacion: true);
         $this->assertDatabaseCount('notificacion_docente', 2);
 
-        (new ResolverIncidenciaService)->rechazar(3, Usuario::findOrFail(self::DOCENTE_A));
+        app(ResolverIncidenciaService::class)->rechazar(3, Usuario::findOrFail(self::DOCENTE_A));
 
         $this->assertDatabaseMissing('central_riesgo', ['id_registro' => 3]);
         $this->assertDatabaseCount('notificacion_docente', 0);
