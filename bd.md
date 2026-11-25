@@ -431,6 +431,8 @@ Clave primaria `(id_solicitante, id_validador)`; ambas FK a `usuario.id_usuario`
 | tipo | varchar | NO | NULL |
 | id_docente_destinatario | integer | YES | NULL |
 | id_invitacion | integer | YES | NULL |
+| fecha_evento | timestamp | YES | NULL |
+| detalles | json | YES | NULL |
 
 **Datos:**
 | id_notificacion | id_central_riesgo | id_curso | estado |
