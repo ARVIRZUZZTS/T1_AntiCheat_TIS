@@ -41,9 +41,14 @@ class AsignarAuxiliar extends Component
     /** Auxiliar que llega preseleccionado desde "Asignar ahora" (o null). */
     public ?int $auxiliarPreseleccionado = null;
 
-    public function mount(?int $auxiliar = null): void
+    /**
+     * "Asignar ahora" llega como `?auxiliar=<id>` en la URL. Livewire no pasa el
+     * query string a los argumentos de mount, así que se lee del request.
+     */
+    public function mount(): void
     {
-        $this->auxiliarPreseleccionado = $auxiliar !== null ? (int) $auxiliar : null;
+        $id = (int) request()->query('auxiliar', 0);
+        $this->auxiliarPreseleccionado = $id > 0 ? $id : null;
     }
 
     /**
