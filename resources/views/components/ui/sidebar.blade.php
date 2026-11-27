@@ -228,6 +228,11 @@
             ['label' => 'Ver examenes', 'route' => 'auxiliar.examenes'],
         ]],
         $monitorAuxiliar !== [] ? ['label' => 'Monitor en vivo', 'children' => $monitorAuxiliar] : null,
+        // Coordinador: un auxiliar con permiso crea y asigna auxiliares.
+        $usuario && $usuario->puede_crear_auxiliares ? ['label' => 'Auxiliares', 'children' => [
+            ['label' => 'Crear auxiliar', 'route' => 'auxiliares.crear'],
+            ['label' => 'Asignar auxiliar', 'route' => 'auxiliares.asignar'],
+        ]] : null,
     ]));
 
     // El menu del auxiliar no debe sustituirse por opciones de otro rol.
