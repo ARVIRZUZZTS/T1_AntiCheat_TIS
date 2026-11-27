@@ -45,8 +45,10 @@
 
 namespace App\Livewire\Auxiliares;
 
+use App\Models\Usuario;
 use App\Services\Auxiliar\AccesoAuxiliarService;
 use App\Services\Auxiliar\ListarAuxiliaresDocenteService;
+use App\Services\Auxiliar\ReenviarCredencialesAuxiliarService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -84,6 +86,9 @@ class GestionAuxiliares extends Component
      */
     public array $detalleCursos = [];
 
+    /** Aviso tras reenviar credenciales (vacío si no hay nada que mostrar). */
+    public string $mensajeReenvio = '';
+
     /**
      * Fija el filtro de estado (todos / Activo / Inactivo) desde los botones.
      */
@@ -98,7 +103,7 @@ class GestionAuxiliares extends Component
      */
     public function verDetalle(int $idAuxiliar): void
     {
-        $auxiliar = $this->auxiliares()->firstWhere('id_usuario', $idAuxiliar);
+        $auxiliar = $this->auxiliares()->firstWhere('id', $idAuxiliar);
 
         if ($auxiliar === null) {
             return;
@@ -106,6 +111,31 @@ class GestionAuxiliares extends Component
 
         $this->detalleCursos = $this->cursosDelAuxiliar($idAuxiliar);
         $this->detalleAbierto = true;
+    }
+
+    /**
+     * Reenvía (reseteando) las credenciales del auxiliar y muestra el aviso.
+     * Solo opera sobre auxiliares que están en la lista vigente.
+     */
+    public function reenviarCredenciales(int $idAuxiliar): void
+    {
+        $fila = $this->auxiliares()->firstWhere('id', $idAuxiliar);
+
+        if ($fila === null) {
+            return;
+        }
+
+        $auxiliar = Usuario::query()->find($idAuxiliar);
+
+        if ($auxiliar === null || ! $auxiliar->esAuxiliar()) {
+            return;
+        }
+
+        $enviado = app(ReenviarCredencialesAuxiliarService::class)->reenviar($auxiliar);
+
+        $this->mensajeReenvio = $enviado
+            ? 'Credenciales reenviadas a '.$fila['correo']
+            : 'No se pudo enviar el correo a '.$fila['correo'].'. Inténtalo de nuevo.';
     }
 
     /**
@@ -140,9 +170,10 @@ class GestionAuxiliares extends Component
 
     /**
      * Todas las cuentas de auxiliar con los filtros vigentes. El estado se
-     * deriva de la existencia de asignaciones activas, no de `auxiliar_curso.estado`.
+     * deriva de la existencia de asignaciones activas (cursos o examenes), no de
+     * `auxiliar_curso.estado`. Cada fila lleva su etiqueta de estado lista.
      *
-     * @return Collection<int, \stdClass>
+     * @return Collection<int, array<string, mixed>>
      */
     public function auxiliares(): Collection
     {
@@ -162,15 +193,10 @@ class GestionAuxiliares extends Component
         }
 
         return $filas
-            ->map(function (array $fila): \stdClass {
-                $auxiliar = new \stdClass;
-                $auxiliar->id_usuario = $fila['id'];
-                $auxiliar->cod_sis = $fila['codigoSis'];
-                $auxiliar->nombre_usuario = $fila['nombre'];
-                $auxiliar->apellido = $fila['apellido'];
-                $auxiliar->estado = $fila['estado'] === 'ACTIVO' ? 'Activo' : 'Inactivo';
+            ->map(function (array $fila): array {
+                $fila['estadoEtiqueta'] = $fila['estado'] === 'ACTIVO' ? 'Activo' : 'Inactivo';
 
-                return $auxiliar;
+                return $fila;
             })
             ->values();
     }
@@ -178,7 +204,7 @@ class GestionAuxiliares extends Component
     /** @param array<string, mixed> $fila */
     private function coincide(array $fila, string $termino): bool
     {
-        foreach (['nombre', 'apellido', 'codigoSis'] as $campo) {
+        foreach (['nombreCompleto', 'usuario', 'correo', 'carnet', 'codigoSis'] as $campo) {
             if (mb_strpos(mb_strtolower((string) $fila[$campo]), $termino) !== false) {
                 return true;
             }

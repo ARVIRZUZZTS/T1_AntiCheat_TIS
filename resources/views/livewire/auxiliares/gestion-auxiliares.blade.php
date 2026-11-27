@@ -43,15 +43,35 @@
 
 <div class="flex flex-col gap-6 px-[2vh] mt-[2vh]">
     {{-- Aviso de exito al volver de "Crear auxiliar" (viaja por la sesion). --}}
-    @if (session('mensaje'))
-        <x-ui.alert type="success" title="Listo">{{ session('mensaje') }}</x-ui.alert>
+    @if (session('auxiliarCreado'))
+        @php $creado = session('auxiliarCreado'); @endphp
+        <div x-data="{ visible: true }" x-show="visible">
+            @unless ($creado['credencialesEnviadas'])
+                <x-ui.alert type="warning" title="Correo no enviado" class="mb-3">
+                    No se pudo enviar el correo. Puedes reenviar las credenciales desde la lista de auxiliares.
+                </x-ui.alert>
+            @endunless
+
+            <x-ui.alert type="success" title="Auxiliar creado">
+                <p>Recuerda asignarlo a un curso o examen: sin asignación no podrá ver ningún examen.</p>
+                <div class="mt-3 flex flex-col gap-2 sm:flex-row">
+                    <x-ui.button variant="default" class="justify-center"
+                                 :href="route('auxiliares.asignar', ['auxiliar' => $creado['id']])">
+                        Asignar ahora
+                    </x-ui.button>
+                    <x-ui.button variant="secondary" class="justify-center" x-on:click="visible = false">
+                        Volver a la lista
+                    </x-ui.button>
+                </div>
+            </x-ui.alert>
+        </div>
     @endif
 
     {{-- Buscador automatico + filtros. "Crear auxiliar" ya no vive aca: es una
          subopcion del sidebar. --}}
     <div class="bg-neutral-primary-soft border border-default rounded-base shadow-xs p-3 flex flex-col gap-3 lg:flex-row lg:items-center">
         <div class="flex-1 min-w-0">
-            <x-ui.search-input name="busqueda-auxiliar" placeholder="Buscar por nombre o codigo SIS"
+            <x-ui.search-input name="busqueda-auxiliar" placeholder="Buscar por nombre, usuario, correo o carnet"
                 :show-button="false" pill wire:model.live.debounce.300ms="busqueda" />
         </div>
 
@@ -65,19 +85,46 @@
         </div>
     </div>
 
-    <div class="bg-neutral-primary-soft border border-default rounded-base shadow-xs p-6">
+    <div class="bg-neutral-primary-soft border border-default rounded-base shadow-xs p-4 md:p-6">
         <h3 class="text-lg font-semibold text-heading mb-4">Auxiliares</h3>
 
         @php
-            $filas = $auxiliares->map(fn ($a) => [
-                ['heading' => true, 'value' => $a->nombre_usuario.' '.$a->apellido],
-                $a->cod_sis,
-                $a->estado,
-                ['html' => '<button type="button" wire:click="verDetalle('.$a->id_usuario.')" aria-label="Ver detalle de '.e($a->nombre_usuario.' '.$a->apellido).'" aria-haspopup="dialog" class="inline-flex min-h-11 shrink-0 items-center px-2 text-sm font-medium text-body-subtle underline-offset-2 hover:text-heading hover:underline focus:rounded-base focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-medium">Ver detalle</button>'],
-            ])->toArray();
+            // Celdas largas (usuario, correo, asignaciones) con ancho acotado y
+            // quiebre de texto para que la tabla no desborde el ancho.
+            $filas = $auxiliares->map(function (array $a) {
+                $badge = $a['coordinador']
+                    ? '<span class="ms-2 inline-flex items-center rounded-full bg-brand-softer px-2 py-0.5 text-xs font-medium text-fg-brand align-middle">Coordinador</span>'
+                    : '';
+                $nombreHtml = '<span class="font-medium text-heading break-words">'.e($a['nombreCompleto']).'</span>'.$badge;
+
+                $usuarioHtml = '<span class="break-all">'.e($a['usuario']).'</span>';
+                $correoHtml = '<span class="break-all">'.($a['correo'] !== '' ? e($a['correo']) : '—').'</span>';
+
+                $asignaciones = array_merge(
+                    array_map(fn (string $c): string => 'Curso: '.e($c), $a['cursos']),
+                    array_map(fn (string $x): string => 'Examen: '.e($x), $a['examenes']),
+                );
+                $asignacionesHtml = $asignaciones === []
+                    ? '<span class="text-muted">Sin asignaciones</span>'
+                    : '<ul class="space-y-0.5">'.implode('', array_map(fn (string $t): string => '<li>'.$t.'</li>', $asignaciones)).'</ul>';
+
+                $verDetalle = '<button type="button" wire:click="verDetalle('.$a['id'].')" aria-label="Ver detalle de '.e($a['nombreCompleto']).'" aria-haspopup="dialog" class="inline-flex min-h-11 shrink-0 items-center px-2 text-sm font-medium text-fg-brand underline-offset-2 hover:underline focus:rounded-base focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-medium">Ver detalle</button>';
+
+                return [
+                    ['html' => '<div class="min-w-[9rem] max-w-[14rem]">'.$nombreHtml.'</div>'],
+                    ['html' => '<div class="max-w-[12rem]">'.$usuarioHtml.'</div>'],
+                    $a['carnet'] !== '' ? $a['carnet'] : '—',
+                    ['html' => '<div class="max-w-[14rem]">'.$correoHtml.'</div>'],
+                    ['html' => '<div class="max-w-[16rem]">'.$asignacionesHtml.'</div>'],
+                    $a['estadoEtiqueta'],
+                    ['html' => $verDetalle],
+                ];
+            })->toArray();
         @endphp
 
-        <x-ui.table compact empty="No hay auxiliares registrados" :headers="['Auxiliar', 'Código SIS', 'Estado', 'Acciones']" :rows="$filas" />
+        <x-ui.table compact empty="No hay auxiliares registrados"
+            :headers="['Auxiliar', 'Usuario', 'Carnet', 'Correo', 'Asignaciones', 'Estado', 'Acciones']"
+            :rows="$filas" />
     </div>
 
     <x-ui.modal-detalle-auxiliar
