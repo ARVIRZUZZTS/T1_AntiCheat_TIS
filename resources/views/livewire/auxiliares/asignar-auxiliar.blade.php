@@ -82,7 +82,7 @@
                  ...array_column($auxiliar['examenes'], 'etiqueta'),
              ])),
          ])->values()),
-         // Auxiliar que llega preseleccionado desde "Asignar ahora".
+         // Auxiliar que llega preseleccionado desde Asignar ahora.
          preseleccion: @js($auxiliarPreseleccionado),
          fichas: @js(collect($auxiliares)->map(fn ($auxiliar) => ['id' => $auxiliar['id'], 'nombre' => $auxiliar['nombre']])->values()),
          // Paginacion en el navegador: buscar, ordenar y cambiar de pagina no
@@ -92,7 +92,7 @@
          init() {
              this.$watch('busqueda', () => { this.pagina = 1; });
              this.$watch('orden', () => { this.pagina = 1; });
-             // "Asignar ahora": abre el modal del auxiliar recien creado.
+             // Asignar ahora: abre el modal del auxiliar recien creado.
              if (this.preseleccion) {
                  const ficha = this.fichas.find((f) => f.id === this.preseleccion);
                  if (ficha) {
