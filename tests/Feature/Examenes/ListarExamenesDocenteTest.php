@@ -212,7 +212,7 @@ class ListarExamenesDocenteTest extends TestCase
         ]);
         DB::table('tipo_examen')->insert([
             'id_tipo_examen' => 1,
-            'nombre_tipo_examen' => 'examen parcial',
+            'nombre_tipo_examen' => 'examen primer parcial',
         ]);
     }
 

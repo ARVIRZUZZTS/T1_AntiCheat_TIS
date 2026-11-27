@@ -62,10 +62,13 @@
  *   lleva espacio.
  * - 2026-11-24  [Equipo T1]  test: toda etiqueta de examen lleva gestion, con
  *   mapa completo de cursos propios y texto de respaldo.
+ * - 2026-11-24  [Equipo T1]  test: el alta toma los tipos de TipoExamen, que ya
+ *   incluye primer/segundo parcial y evaluacion corriente.
  */
 
 namespace Tests\Feature\Examenes;
 
+use App\Enums\TipoExamen;
 use Tests\TestCase;
 
 class ListadoExamenesVistaTest extends TestCase
@@ -269,6 +272,27 @@ class ListadoExamenesVistaTest extends TestCase
         $this->assertStringContainsString('this.nombreCurso = curso.nombre;', $formulario);
         $this->assertStringContainsString("old('curso_id', \$idCursoFijo)", $formulario);
         $this->assertStringContainsString(':cursos="$listadoGlobal ? $opcionesCursos : []"', $this->fuenteParcial());
+    }
+
+    public function test_el_formulario_toma_los_tipos_de_examen_del_enum(): void
+    {
+        $formulario = $this->fuente(resource_path('views/components/ui/form-crear-examen.blade.php'));
+
+        $this->assertStringContainsString('use App\Enums\TipoExamen;', $formulario);
+        $this->assertStringContainsString('$opciones = $tipos ?? TipoExamen::opciones();', $formulario);
+        $this->assertStringNotContainsString("'examen parcial'", $formulario);
+        $this->assertStringNotContainsString("'Examen parcial'", $formulario);
+    }
+
+    public function test_el_enum_ofrece_la_nueva_division_del_parcial(): void
+    {
+        $this->assertSame([
+            'examen primer parcial' => 'Examen primer parcial',
+            'examen segundo parcial' => 'Examen segundo parcial',
+            'evaluacion corriente' => 'Evaluacion corriente',
+            'examen final' => 'Examen final',
+            'segunda instancia' => 'Segunda instancia',
+        ], TipoExamen::opciones());
     }
 
     public function test_el_detalle_del_curso_ya_no_tiene_pestana_examenes(): void

@@ -29,7 +29,7 @@
  * - 2026-09-26  [Alisson D. Alvarado]  test: cobertura del criterio de búsqueda
  *   por modo (cifra, letra).
  * - 2026-10-10  [Valery D. Ortuno P]  test: el dato de tipo_examen usa un valor
- *   real del catálogo (examen parcial); 'PP' ya no existe en el enum.
+ *   real del catálogo (examen primer parcial); 'PP' ya no existe en el enum.
  * - 2026-10-24  [Valery D. Ortuno P]  test: la incidencia de prueba guarda
  *   `id_examen`, `sis_estudiante` y `motivo` (NOT NULL desde #70, el insert
  *   fallaba) y el tramposo va confirmado, porque el filtro "tramposos" ahora
@@ -70,7 +70,7 @@ class ListarEstudiantesCursoFiltroTest extends TestCase
 
         DB::table('tipo_examen')->insert([
             'id_tipo_examen' => self::ID_TIPO_EXAMEN,
-            'nombre_tipo_examen' => 'examen parcial',
+            'nombre_tipo_examen' => 'examen primer parcial',
         ]);
 
         DB::table('usuario')->insert([

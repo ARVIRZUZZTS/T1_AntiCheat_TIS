@@ -18,7 +18,7 @@
  * @changelog
  * - 2026-10-09  [Diego Tejerina]  test: cubrir contrato, cursos y ordenamiento.
  * - 2026-10-10  [Valery D. Ortuno P]  test: adaptar los tipos de examen al
- *   catálogo real (examen parcial / examen final) tras alinear el enum.
+ *   catálogo real (examen primer parcial / examen final) tras alinear el enum.
  * - 2026-10-10  [Alex Candia]  test: quitar la columna `hora_fin` (ahora es un
  *   dato derivado de la hora de inicio y la duración).
  * - 2026-11-23  [OchoaCesar]  test: crear `central_riesgo` en el esquema sqlite
@@ -63,7 +63,7 @@ class ListarExamenesCursoTest extends TestCase
             ['id_curso' => 2, 'nombre_curso' => 'Otro curso'],
         ]);
         DB::table('tipo_examen')->insert([
-            ['id_tipo_examen' => 1, 'nombre_tipo_examen' => 'examen parcial'],
+            ['id_tipo_examen' => 1, 'nombre_tipo_examen' => 'examen primer parcial'],
             ['id_tipo_examen' => 2, 'nombre_tipo_examen' => 'examen final'],
         ]);
     }
@@ -184,7 +184,7 @@ class ListarExamenesCursoTest extends TestCase
         $this->crearExamen(1);
 
         $this->getJson('/api/cursos/1/examenes')->assertOk()
-            ->assertJsonPath('datos.0.tipo', 'Examen parcial')
+            ->assertJsonPath('datos.0.tipo', 'Examen primer parcial')
             ->assertJsonPath('datos.0.inscritos', 0)
             ->assertJsonPath('datos.0.ingresados', 0)
             ->assertJsonPath('datos.0.incidencias', 0)

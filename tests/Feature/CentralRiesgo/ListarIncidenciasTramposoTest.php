@@ -91,7 +91,7 @@ class ListarIncidenciasTramposoTest extends TestCase
 
         DB::table('tipo_examen')->insert([
             'id_tipo_examen' => self::ID_TIPO_EXAMEN,
-            'nombre_tipo_examen' => 'examen parcial',
+            'nombre_tipo_examen' => 'examen primer parcial',
         ]);
 
         foreach (

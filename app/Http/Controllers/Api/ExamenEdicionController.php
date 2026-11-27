@@ -32,6 +32,8 @@
  * @changelog
  * - 2026-11-24  [Equipo T1]  feat: pasar el editor al servicio para notificar
  *   cambios de ambientes, fecha y hora.
+ * - 2026-11-24  [Equipo T1]  fix: una ValidationException del servicio (aula
+ *   ocupada, por ejemplo) vuelve como 422 con `errors` para el formulario.
  */
 
 namespace App\Http\Controllers\Api;
@@ -44,6 +46,7 @@ use App\Services\Examen\ActualizarExamenService;
 use App\Services\Examen\ObtenerExamenEdicionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\ValidationException;
 
 class ExamenEdicionController extends Controller
 {
@@ -58,8 +61,11 @@ class ExamenEdicionController extends Controller
 
     /**
      * Guarda los cambios del examen editado. La autorizacion (solo el creador)
-     * y la validacion viven en UpdateExamenRequest; si fallan, Laravel responde
-     * 403 o 422 y este metodo no llega a ejecutarse.
+     * y la validacion del formulario viven en UpdateExamenRequest; si fallan,
+     * Laravel responde 403 o 422 y este metodo no llega a ejecutarse. El
+     * servicio tambien puede rechazar el guardado (por ejemplo, un ambiente
+     * ocupado): esa ValidationException se convierte en 422 para que el modal
+     * muestre el error en el campo, igual que en el alta.
      */
     public function actualizar(
         UpdateExamenRequest $request,
@@ -69,7 +75,15 @@ class ExamenEdicionController extends Controller
     ): JsonResponse {
         /** @var Usuario $editor */
         $editor = $request->user('web');
-        $actualizar->ejecutar($examen, $request->validated(), $editor);
+
+        try {
+            $actualizar->ejecutar($examen, $request->validated(), $editor);
+        } catch (ValidationException $error) {
+            return response()->json([
+                'message' => 'No se pudo guardar el examen.',
+                'errors' => $error->errors(),
+            ], 422);
+        }
 
         return response()->json([
             'mensaje' => 'Examen actualizado con exito',

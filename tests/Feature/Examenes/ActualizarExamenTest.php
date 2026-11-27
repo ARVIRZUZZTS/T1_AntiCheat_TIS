@@ -283,7 +283,7 @@ class ActualizarExamenTest extends TestCase
         $otro->hora_inicio = '08:00:00';
         $otro->duracion = 120;
         $otro->creador = self::ID_OTRO_DOCENTE;
-        $otro->tipo_examen = $this->idTipo('examen parcial');
+        $otro->tipo_examen = $this->idTipo('examen primer parcial');
         $otro->save();
         $otro->cursos()->attach(self::ID_OTRO_CURSO);
         $otro->ambientes()->attach(self::ID_AMBIENTE_2);
@@ -382,7 +382,7 @@ class ActualizarExamenTest extends TestCase
         $examen->hora_inicio = '08:00:00';
         $examen->duracion = 60;
         $examen->creador = self::ID_DOCENTE;
-        $examen->tipo_examen = $this->idTipo('examen parcial');
+        $examen->tipo_examen = $this->idTipo('examen primer parcial');
         $examen->save();
 
         $examen->cursos()->attach(self::ID_CURSO);
@@ -409,7 +409,7 @@ class ActualizarExamenTest extends TestCase
     private function datosValidos(array $sobrescribir = []): array
     {
         return array_merge([
-            'tipo_examen' => 'examen parcial',
+            'tipo_examen' => 'examen primer parcial',
             'fecha' => now()->addMonth()->format('d/m/Y'),
             'hora_inicio' => '09:30',
             'duracion' => 90,
