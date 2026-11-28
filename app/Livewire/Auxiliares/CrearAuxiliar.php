@@ -9,11 +9,13 @@
  *
  * @updated 2026-11-27
  *
+ * @updated 2026-11-28
+ *
  * @description
  * Página "Crear auxiliar" (Auxiliares › Crear auxiliar). Pide nombre, apellido,
- * tipo de auxiliar (UMSS con código SIS o externo con carnet opcional), correo
- * y, solo para docentes, el permiso de coordinador. Ya no se elige curso: la
- * asignación se hace después en "Asignar auxiliar".
+ * tipo de auxiliar (UMSS con código SIS o externo con carnet opcional) y
+ * correo, y muestra en vivo el usuario de acceso que se generará. Ya no se
+ * elige curso ni el permiso de coordinador: van después, en las asignaciones.
  *
  * Orquesta: valida en el servidor, muestra el modal de confirmación y, al
  * confirmar, delega el alta y el envío de credenciales a CrearAuxiliarService.
@@ -24,6 +26,9 @@
  * - 2026-11-27  [Diego Tejerina]  feat: tipo de auxiliar (UMSS/externo), carnet
  *   opcional, correo obligatorio, permiso de coordinador, modal de confirmación
  *   y envío de credenciales por correo. Se quita la elección de curso.
+ * - 2026-11-28  [Valery D. Ortuno P]  refactor: sale el permiso de coordinador
+ *   del alta (irá en las asignaciones); `usuarioVista` muestra en vivo el
+ *   usuario de acceso que se generará.
  *
  * @see  App\Services\Auxiliar\CrearAuxiliarService
  * @see  App\Support\Validadores
@@ -55,19 +60,31 @@ class CrearAuxiliar extends Component
 
     public string $correo = '';
 
-    public bool $puedeCrearAuxiliares = false;
-
     /** true mientras se muestra el modal de confirmación. */
     public bool $confirmando = false;
 
     /** Usuario generado que se mostrará en la confirmación (aux.nombre.apellido). */
     public string $usuarioPreview = '';
 
-    /** El permiso de coordinador solo lo otorga un docente. */
+    /**
+     * Usuario de acceso que se generará, para verlo en vivo al escribir nombre
+     * y apellido ('' si falta alguno). Usa el mismo generador que el alta.
+     */
     #[Computed]
-    public function esDocente(): bool
+    public function usuarioVista(): string
     {
-        return $this->creador()->esDocente();
+        $nombre = $this->limpiar($this->nombre);
+        $apellido = $this->limpiar($this->apellido);
+
+        if ($nombre === '' || $apellido === '') {
+            return '';
+        }
+
+        return app(GeneradorNombreUsuarioService::class)->generar(
+            $nombre,
+            $apellido,
+            GeneradorNombreUsuarioService::PREFIJO_AUXILIAR,
+        );
     }
 
     /** Al pasar a externo se limpia el código SIS (el carnet aplica a ambos). */
@@ -138,8 +155,8 @@ class CrearAuxiliar extends Component
             codSis: trim($this->codSis),
             carnet: trim($this->carnet),
             correo: trim($this->correo),
-            // Un coordinador no puede otorgar el permiso aunque llegue marcado.
-            puedeCrearAuxiliares: $this->esDocente() && $this->puedeCrearAuxiliares,
+            // El permiso de coordinador ya no se da al crear (irá en las asignaciones).
+            puedeCrearAuxiliares: false,
         );
     }
 

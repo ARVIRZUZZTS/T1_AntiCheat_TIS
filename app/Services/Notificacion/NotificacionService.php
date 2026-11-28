@@ -48,6 +48,8 @@
  *   tabla si quien llama ya la bloqueo (`$tablaBloqueada`).
  *   `notificarRespuestaInvitacion()` reapunta el aviso con un solo UPDATE y
  *   solo bloquea e inserta si no existia.
+ * - 2026-11-28  [Valery D. Ortuno P]  refactor: se quita `ocultarDeInvitacion()`,
+ *   que solo usaba la cancelación de invitaciones (ya no existe).
  * - 2026-11-24  [Equipo T1]  fix: el badge cuenta solo avisos `recibido` y al
  *   abrir la bandeja se marcan todos como `visto`.
  * - 2026-11-24  [Equipo T1]  feat: aviso de cambios de ambientes, fecha u hora
@@ -501,20 +503,6 @@ class NotificacionService
             $fecha->format('d/m/Y'),
             $fecha->format('H:i'),
         );
-    }
-
-    /**
-     * Oculta el aviso de una invitación (borrado lógico). Se usa al cancelar:
-     * el invitado deja de ver en su bandeja una invitación que ya no puede
-     * responder.
-     *
-     * @param  int  $idInvitacion  Invitación cuyo aviso se oculta.
-     */
-    public function ocultarDeInvitacion(int $idInvitacion): void
-    {
-        NotificacionDocente::query()
-            ->where('id_invitacion', $idInvitacion)
-            ->update(['oculta' => true]);
     }
 
     /**

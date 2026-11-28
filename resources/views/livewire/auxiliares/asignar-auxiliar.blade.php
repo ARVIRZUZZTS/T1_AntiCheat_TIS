@@ -3,6 +3,7 @@
     @author  Valery D. Ortuno P <valerydariana98@gmail.com>
     @created 2026-11-22
     @updated 2026-11-24
+    @updated 2026-11-28
 
     @description
     Vista de "Asignar auxiliar" (HU 24). Un buscador (nombre, codigo SIS o
@@ -10,7 +11,8 @@
     asignaciones dentro de los cursos del docente: cursos (ve Ingreso y
     Monitor) y examenes sueltos (con las paginas que ve). Las filas llegan
     ordenadas por el examen mas proximo; sin asignaciones, al final. Cada
-    asignacion tiene "Quitar" y cada auxiliar el boton "Asignar", que abre el
+    auxiliar tiene el boton "Asignar" (las asignaciones se quitan en
+    "Desvincular auxiliar"), que abre el
     modal:
 
      - A un curso: selector con los cursos en curso del docente.
@@ -27,6 +29,12 @@
       por curso y avisa "No se encontraron coincidencias". Orden "Examen
       proximo" (por defecto) o "A-Z". Paginacion de 8 por pagina en el
       navegador. No se muestran cursos archivados ni examenes pasados.
+    - 2026-11-28  [Valery D. Ortuno P]  style/feat: en todos los tamanos, nombre y
+      usuario arriba con "Asignar" a la derecha y las asignaciones debajo; sale
+      "Proximo examen". Al asignar a un curso: "Podra ver Ingreso y Monitor..." y
+      (solo el docente) los permisos "Puede crear auxiliares" y "Puede asignar
+      auxiliares". Sale "Quitar" de las asignaciones y su modal: eso se hace
+      en "Desvincular auxiliar".
 
     @see  App\Livewire\Auxiliares\AsignarAuxiliar
 --}}
@@ -66,11 +74,6 @@
          verMonitor: true,
          error: '',
          guardando: false,
-         // Modal Quitar.
-         modalQuitar: false,
-         quitar: null,
-         errorQuitar: '',
-         quitando: false,
          // Una entrada por auxiliar: su posicion por examen proximo (i), su
          // posicion alfabetica (az) y el texto en el que se busca.
          items: @js(collect($auxiliares)->map(fn ($auxiliar, $indice) => [
@@ -84,7 +87,10 @@
          ])->values()),
          // Auxiliar que llega preseleccionado desde Asignar ahora.
          preseleccion: @js($auxiliarPreseleccionado),
-         fichas: @js(collect($auxiliares)->map(fn ($auxiliar) => ['id' => $auxiliar['id'], 'nombre' => $auxiliar['nombre']])->values()),
+         fichas: @js(collect($auxiliares)->map(fn ($auxiliar) => ['id' => $auxiliar['id'], 'nombre' => $auxiliar['nombre'], 'puedeCrear' => $auxiliar['puedeCrear'], 'puedeAsignar' => $auxiliar['puedeAsignar']])->values()),
+         // Permisos de coordinador (solo los da un docente, al asignar a un curso).
+         puedeCrear: false,
+         puedeAsignar: false,
          // Paginacion en el navegador: buscar, ordenar y cambiar de pagina no
          // vuelven al servidor.
          pagina: 1,
@@ -140,6 +146,8 @@
              this.idExamen = '';
              this.verIngreso = true;
              this.verMonitor = true;
+             this.puedeCrear = !! auxiliar.puedeCrear;
+             this.puedeAsignar = !! auxiliar.puedeAsignar;
              this.error = '';
              this.modalAsignar = true;
          },
@@ -158,7 +166,7 @@
              this.error = '';
              try {
                  const error = this.destino === 'curso'
-                     ? await $wire.asignarCurso(this.auxiliar.id, Number(this.idCurso))
+                     ? await $wire.asignarCurso(this.auxiliar.id, Number(this.idCurso), this.puedeCrear, this.puedeAsignar)
                      : await $wire.asignarExamen(this.auxiliar.id, Number(this.idExamen), this.verIngreso, this.verMonitor);
                  if (error) {
                      this.error = error;
@@ -169,32 +177,6 @@
                  this.error = 'No se pudo conectar con el servidor.';
              } finally {
                  this.guardando = false;
-             }
-         },
-         abrirQuitar(datos) {
-             this.quitar = datos;
-             this.errorQuitar = '';
-             this.modalQuitar = true;
-         },
-         async confirmarQuitar() {
-             if (this.quitando) {
-                 return;
-             }
-             this.quitando = true;
-             this.errorQuitar = '';
-             try {
-                 const error = this.quitar.tipo === 'curso'
-                     ? await $wire.quitarCurso(this.quitar.auxiliar, this.quitar.id)
-                     : await $wire.quitarExamen(this.quitar.auxiliar, this.quitar.id);
-                 if (error) {
-                     this.errorQuitar = error;
-                 } else {
-                     this.modalQuitar = false;
-                 }
-             } catch (e) {
-                 this.errorQuitar = 'No se pudo conectar con el servidor.';
-             } finally {
-                 this.quitando = false;
              }
          },
      }">
@@ -228,29 +210,37 @@
             No hay auxiliares registrados. Crea uno desde "Crear auxiliar".
         </p>
     @else
-        {{-- Una fila por auxiliar. En escritorio: datos | asignaciones | boton;
-             en movil se apilan. El orden se cambia con `order` (sin volver al
+        {{-- Una fila por auxiliar: nombre y usuario con "Asignar" a la derecha y
+             debajo sus asignaciones. El orden se cambia con `order` (sin volver al
              servidor): la lista llega por examen mas proximo. --}}
         <div class="flex flex-col gap-3">
             @foreach ($auxiliares as $indice => $auxiliar)
                 @php
                     $sinAsignaciones = $auxiliar['cursos'] === [] && $auxiliar['examenes'] === [];
-                    $proximo = $auxiliar['proximo'] ? \Illuminate\Support\Carbon::parse($auxiliar['proximo']) : null;
+                    $datosAsignar = \Illuminate\Support\Js::from(['id' => $auxiliar['id'], 'nombre' => $auxiliar['nombre'], 'puedeCrear' => $auxiliar['puedeCrear'], 'puedeAsignar' => $auxiliar['puedeAsignar']]);
                 @endphp
                 <article wire:key="auxiliar-{{ $auxiliar['id'] }}"
                          x-show="enPagina({{ $indice }})"
                          :style="'order: ' + (orden === 'alfabetico' ? {{ $posicionAlfabetica[$indice] }} : {{ $indice }})"
-                         class="grid grid-cols-1 gap-4 rounded-base border border-default bg-neutral-primary-soft p-4 shadow-xs sm:p-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)_auto] lg:items-center lg:gap-0 lg:divide-x lg:divide-default">
-                    {{-- Auxiliar y su proximo examen. --}}
-                    <div class="min-w-0 lg:pr-6">
-                        <p class="text-lg font-semibold text-heading wrap-break-word">{{ $auxiliar['nombre'] }}</p>
-                        <p class="text-xs text-body wrap-break-word">Usuario: {{ $auxiliar['usuario'] }}</p>
-                        <p class="mt-2 text-xs font-semibold uppercase text-muted">Proximo examen:</p>
-                        <p class="text-sm text-heading">{{ $proximo ? $proximo->format('d/m/Y H:i') : 'Sin examenes proximos' }}</p>
+                         class="flex flex-col gap-4 rounded-base border border-default bg-neutral-primary-soft p-4 shadow-xs sm:p-5">
+                    {{-- Nombre y usuario arriba; Asignar a la derecha, a la altura del nombre. --}}
+                    <div class="flex items-start justify-between gap-3">
+                        <div class="min-w-0">
+                            <p class="text-lg font-semibold text-heading wrap-break-word">{{ $auxiliar['nombre'] }}</p>
+                            <p class="text-xs text-body wrap-break-word">Usuario: {{ $auxiliar['usuario'] }}</p>
+                            @if ($auxiliar['puedeCrear'] || $auxiliar['puedeAsignar'])
+                                <p class="mt-1 text-xs font-medium text-fg-brand">
+                                    {{ implode(' · ', array_filter([$auxiliar['puedeCrear'] ? 'Puede crear auxiliares' : null, $auxiliar['puedeAsignar'] ? 'Puede asignar auxiliares' : null])) }}
+                                </p>
+                            @endif
+                        </div>
+                        <x-ui.button type="button" class="shrink-0" @click="abrirAsignar({{ $datosAsignar }})">
+                            Asignar
+                        </x-ui.button>
                     </div>
 
                     {{-- Asignaciones dentro de los cursos del docente. --}}
-                    <div class="min-w-0 border-t border-default pt-4 lg:border-t-0 lg:px-6 lg:pt-0">
+                    <div class="min-w-0 border-t border-default pt-4">
                         @if ($sinAsignaciones)
                             <p class="text-sm text-body">Sin asignaciones en tus cursos.</p>
                         @else
@@ -261,10 +251,6 @@
                                             <p class="font-medium text-heading wrap-break-word">Curso: {{ $curso['nombre'] }}</p>
                                             <p class="text-xs text-body">Ingreso y Monitor en todos sus examenes</p>
                                         </div>
-                                        <button type="button" class="shrink-0 text-xs font-bold text-fg-danger-strong hover:underline"
-                                                @click="abrirQuitar({{ \Illuminate\Support\Js::from(['tipo' => 'curso', 'auxiliar' => $auxiliar['id'], 'id' => $curso['id'], 'texto' => 'el curso '.$curso['nombre'], 'nombre' => $auxiliar['nombre']]) }})">
-                                            Quitar
-                                        </button>
                                     </li>
                                 @endforeach
                                 @foreach ($auxiliar['examenes'] as $examen)
@@ -275,22 +261,10 @@
                                                 {{ $examen['ingreso'] && $examen['monitor'] ? 'Ingreso y Monitor' : ($examen['ingreso'] ? 'Solo Ingreso' : 'Solo Monitor') }}
                                             </p>
                                         </div>
-                                        <button type="button" class="shrink-0 text-xs font-bold text-fg-danger-strong hover:underline"
-                                                @click="abrirQuitar({{ \Illuminate\Support\Js::from(['tipo' => 'examen', 'auxiliar' => $auxiliar['id'], 'id' => $examen['id'], 'texto' => 'el examen '.$examen['etiqueta'], 'nombre' => $auxiliar['nombre']]) }})">
-                                            Quitar
-                                        </button>
                                     </li>
                                 @endforeach
                             </ul>
                         @endif
-                    </div>
-
-                    {{-- Asignar. --}}
-                    <div class="border-t border-default pt-4 lg:border-t-0 lg:pl-6 lg:pt-0">
-                        <x-ui.button type="button" class="w-full justify-center lg:w-auto"
-                                     @click="abrirAsignar({{ \Illuminate\Support\Js::from(['id' => $auxiliar['id'], 'nombre' => $auxiliar['nombre']]) }})">
-                            Asignar
-                        </x-ui.button>
                     </div>
                 </article>
             @endforeach
@@ -378,6 +352,23 @@
                                 <option value="{{ $curso['id'] }}">{{ $curso['nombre'] }}</option>
                             @endforeach
                         </select>
+                        <p class="mt-2 text-body">Podra ver Ingreso y Monitor de todos los examenes de este curso.</p>
+                        @if ($this->esDocente)
+                            <fieldset class="mt-4">
+                                <legend class="mb-2 font-medium text-heading">Permisos</legend>
+                                <div class="flex flex-col gap-2">
+                                    <label class="inline-flex items-center gap-2 text-heading">
+                                        <input type="checkbox" x-model="puedeCrear" class="h-4 w-4 rounded-sm border-default-medium text-brand focus:ring-brand">
+                                        Puede crear auxiliares
+                                    </label>
+                                    <label class="inline-flex items-center gap-2 text-heading">
+                                        <input type="checkbox" x-model="puedeAsignar" class="h-4 w-4 rounded-sm border-default-medium text-brand focus:ring-brand">
+                                        Puede asignar auxiliares
+                                    </label>
+                                </div>
+                                <p class="mt-2 text-xs text-body">Solo los auxiliares que cree, en los cursos donde es auxiliar y en los examenes que tiene asignados.</p>
+                            </fieldset>
+                        @endif
                     @endif
                 </div>
 
@@ -423,35 +414,6 @@
                 <button type="button" @click="guardar()" :disabled="guardando || ! puedeGuardar()"
                         class="inline-flex items-center justify-center rounded-base bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-strong disabled:cursor-not-allowed disabled:opacity-50">
                     <span x-text="guardando ? 'Asignando...' : 'Asignar'"></span>
-                </button>
-            </div>
-        </div>
-    </div>
-
-    {{-- Modal Quitar. --}}
-    <div x-show="modalQuitar" x-cloak
-         class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/50 p-4"
-         role="dialog" aria-modal="true" aria-labelledby="titulo-quitar-asignacion"
-         @click.self="modalQuitar = false" @keydown.escape.window="modalQuitar = false">
-        <div class="w-full max-w-md rounded-xl border border-neutral-quaternary bg-neutral-primary-soft shadow-lg">
-            <div class="border-b border-neutral-quaternary px-4 py-3">
-                <h2 id="titulo-quitar-asignacion" class="text-[15px] font-semibold text-fg-brand">Quitar asignacion</h2>
-            </div>
-            <div class="space-y-2 p-4 text-sm text-body">
-                <p>
-                    <span class="font-semibold text-heading" x-text="quitar?.nombre"></span>
-                    dejara de ver <span x-text="quitar?.texto"></span> en Monitor en vivo.
-                </p>
-                <p x-show="errorQuitar !== ''" x-text="errorQuitar" class="text-fg-danger-strong"></p>
-            </div>
-            <div class="flex flex-col gap-2 border-t border-neutral-quaternary px-4 py-3 sm:flex-row sm:justify-end">
-                <button type="button" @click="modalQuitar = false"
-                        class="inline-flex items-center justify-center rounded-base border border-default px-4 py-2 text-sm font-medium text-body hover:bg-neutral-secondary-medium">
-                    Cancelar
-                </button>
-                <button type="button" @click="confirmarQuitar()" :disabled="quitando"
-                        class="inline-flex items-center justify-center rounded-base bg-danger px-4 py-2 text-sm font-medium text-white hover:bg-danger-strong disabled:opacity-50">
-                    <span x-text="quitando ? 'Quitando...' : 'Quitar'"></span>
                 </button>
             </div>
         </div>

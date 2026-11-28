@@ -7,24 +7,30 @@
  *
  * @created 2026-11-27
  *
+ * @updated 2026-11-28
+ *
  * @description
- * Datos de la página "Eliminar auxiliar": los auxiliares que el usuario
- * autenticado puede eliminar, con su correo, tipo (UMSS / Externo), documento
- * (SIS o carnet), asignaciones vigentes, estado y fecha de creación.
+ * Datos de la página "Eliminar auxiliar": los auxiliares del usuario
+ * autenticado con su correo, tipo (UMSS / Externo), documento (SIS o carnet)
+ * y lo que tienen asociado: cursos activos, cursos anteriores y exámenes.
+ * Solo se puede eliminar al que no tiene nada asociado (`eliminable`); si no,
+ * `motivo` dice por qué.
  *
  * Alcance (igual que UsuarioPolicy::eliminar): el docente ve a los auxiliares de
  * los que es responsable (`id_docente_responsable`); el coordinador solo a los
  * que él creó (`id_creador`). Nunca a sí mismo ni a los eliminados.
  *
- * Las asignaciones y el estado (Habilitado = con asignación activa; Deshabilitado
- * = sin ninguna) se derivan de los cursos del docente responsable, con las mismas
- * consultas del repositorio que usa "Ver lista" (sin N+1): una por las cuentas,
- * una por las asignaciones de curso y una por las de examen.
+ * Todo sale en tres consultas (sin N+1): las cuentas, sus asignaciones de curso
+ * (de cualquier docente, activas o pasadas) y la cantidad de exámenes asignados.
  *
  * @changelog
  * - 2026-11-27  [Diego Tejerina]  feat: creación inicial.
+ * - 2026-11-28  [Valery D. Ortuno P]  refactor: cada auxiliar trae sus cursos
+ *   activos, cursos anteriores y exámenes asignados, y si se puede eliminar
+ *   (solo sin nada asociado) con el motivo si no; se quitan el estado y la
+ *   lista de cursos de los filtros.
  *
- * @see  App\Repositories\AuxiliarCursoRepository
+ * @see  App\Services\Auxiliar\EliminarAuxiliarService
  * @see  App\Livewire\Auxiliares\EliminarAuxiliar
  */
 
@@ -33,50 +39,56 @@ namespace App\Services\Auxiliar;
 use App\Enums\EstadoCuenta;
 use App\Models\Rol;
 use App\Models\Usuario;
-use App\Repositories\AuxiliarCursoRepository;
-use Illuminate\Support\Carbon;
+use App\Enums\CursoEstado;
 use Illuminate\Support\Facades\DB;
 
 class ListarAuxiliaresEliminablesService
 {
-    public function __construct(
-        private readonly AuxiliarCursoRepository $repositorio,
-    ) {
-    }
+    public const MOTIVO_CURSOS_ACTIVOS = 'No se puede eliminar un auxiliar con cursos activos asignados';
+
+    public const MOTIVO_CON_HISTORIAL = 'No se puede eliminar un auxiliar que estuvo asignado a cursos o examenes';
 
     /**
      * @param  Usuario  $viewer  Usuario autenticado (docente o coordinador).
      * @return array{
-     *     auxiliares: list<array{id: int, nombreCompleto: string, correo: string, tipo: string, documento: string, asignaciones: list<string>, cursos: list<string>, estado: string}>,
-     *     cursos: list<string>
+     *     auxiliares: list<array{id: int, nombreCompleto: string, correo: string, tipo: string, documento: string, cursosActivos: list<string>, cursosPasados: list<string>, examenes: int, eliminable: bool, motivo: string}>
      * }
      */
     public function ejecutar(Usuario $viewer): array
     {
-        $idDocente = $this->docenteDeContexto($viewer);
+        $cuentas = $this->cuentas($viewer);
+        $ids = $cuentas->pluck('id_usuario')->map(fn (mixed $id): int => (int) $id)->all();
 
-        $asignaciones = $this->repositorio->asignacionesActivas($idDocente)->groupBy('id_auxiliar');
-        $asignacionesExamen = $this->repositorio->asignacionesExamen($idDocente)->groupBy('id_auxiliar');
+        // Cursos asignados (de cualquier docente): activo si la asignacion esta
+        // Activa y el curso en curso; si no, es un curso anterior.
+        $cursos = $ids === [] ? collect() : DB::table('auxiliar_curso as ac')
+            ->join('curso as c', 'c.id_curso', '=', 'ac.id_curso')
+            ->whereIn('ac.id_auxiliar', $ids)
+            ->orderBy('c.nombre_curso')
+            ->get(['ac.id_auxiliar', 'ac.estado as asignacion', 'c.estado as estado_curso', 'c.nombre_curso'])
+            ->groupBy('id_auxiliar');
 
-        $auxiliares = $this->cuentas($viewer)
-            ->map(function (object $auxiliar) use ($asignaciones, $asignacionesExamen): array {
-                $cursos = $asignaciones->get($auxiliar->id_usuario, collect())
-                    ->pluck('nombre_curso')->unique()->values()->all();
+        $examenes = $ids === [] ? collect() : DB::table('auxiliar_examen')
+            ->whereIn('id_auxiliar', $ids)
+            ->selectRaw('id_auxiliar, count(*) as total')
+            ->groupBy('id_auxiliar')
+            ->pluck('total', 'id_auxiliar');
 
-                $examenes = $asignacionesExamen->get($auxiliar->id_usuario, collect())
-                    ->unique('id_examen')
-                    ->map(fn (object $examen): string => $this->etiquetaExamen($examen))
-                    ->values()->all();
+        $auxiliares = $cuentas
+            ->map(function (object $auxiliar) use ($cursos, $examenes): array {
+                $suyos = $cursos->get($auxiliar->id_usuario, collect());
+                $esActivo = fn (object $fila): bool => $fila->asignacion === AccesoAuxiliarService::ESTADO_ACTIVO
+                    && $fila->estado_curso === CursoEstado::EnCurso->value;
+
+                $activos = $suyos->filter($esActivo)->pluck('nombre_curso')->unique()->values()->all();
+                $pasados = $suyos->reject($esActivo)->pluck('nombre_curso')->unique()
+                    ->diff($activos)->values()->all();
+                $totalExamenes = (int) ($examenes->get($auxiliar->id_usuario) ?? 0);
 
                 $nombre = trim((string) ($auxiliar->nombre !== null && trim((string) $auxiliar->nombre) !== ''
                     ? $auxiliar->nombre
                     : $auxiliar->nombre_usuario));
                 $esUmss = $auxiliar->tipo_auxiliar === 'UMSS' || $auxiliar->tipo_auxiliar === null;
-
-                $asignacionesVigentes = array_merge(
-                    array_map(fn (string $c): string => 'Curso: '.$c, $cursos),
-                    array_map(fn (string $x): string => 'Examen: '.$x, $examenes),
-                );
 
                 return [
                     'id' => (int) $auxiliar->id_usuario,
@@ -86,18 +98,21 @@ class ListarAuxiliaresEliminablesService
                     'documento' => $esUmss
                         ? (string) $auxiliar->cod_sis
                         : trim((string) $auxiliar->carnet),
-                    'asignaciones' => $asignacionesVigentes,
-                    'cursos' => $cursos,
-                    'estado' => ($cursos === [] && $examenes === []) ? 'Deshabilitado' : 'Habilitado',
+                    'cursosActivos' => $activos,
+                    'cursosPasados' => $pasados,
+                    'examenes' => $totalExamenes,
+                    'eliminable' => $activos === [] && $pasados === [] && $totalExamenes === 0,
+                    'motivo' => match (true) {
+                        $activos !== [] => self::MOTIVO_CURSOS_ACTIVOS,
+                        $pasados !== [] || $totalExamenes > 0 => self::MOTIVO_CON_HISTORIAL,
+                        default => '',
+                    },
                 ];
             })
             ->values()
             ->all();
 
-        return [
-            'auxiliares' => $auxiliares,
-            'cursos' => $this->cursosDelDocente($idDocente),
-        ];
+        return ['auxiliares' => $auxiliares];
     }
 
     /**
@@ -123,40 +138,5 @@ class ListarAuxiliaresEliminablesService
                 'u.id_usuario', 'u.cod_sis', 'u.nombre_usuario', 'u.nombre', 'u.apellido',
                 'u.correo', 'u.carnet', 'u.tipo_auxiliar',
             ]);
-    }
-
-    /** Docente cuyos cursos definen las asignaciones: el propio o el responsable del coordinador. */
-    private function docenteDeContexto(Usuario $viewer): int
-    {
-        if ($viewer->esDocente()) {
-            return (int) $viewer->id_usuario;
-        }
-
-        return $viewer->id_docente_responsable !== null ? (int) $viewer->id_docente_responsable : 0;
-    }
-
-    /** Cursos del docente, para el filtro por curso. @return list<string> */
-    private function cursosDelDocente(int $idDocente): array
-    {
-        return DB::table('curso')
-            ->where('sis_doc', $idDocente)
-            ->orderBy('nombre_curso')
-            ->pluck('nombre_curso')
-            ->map(fn (mixed $nombre): string => (string) $nombre)
-            ->unique()
-            ->values()
-            ->all();
-    }
-
-    /** Etiqueta corta de un examen asignado: "Examen parcial · 22/11/2026". */
-    private function etiquetaExamen(object $examen): string
-    {
-        $tipo = trim((string) ($examen->nombre_tipo_examen ?? ''));
-        $tipo = $tipo === '' ? 'Examen' : ucfirst($tipo);
-        $fecha = $examen->fecha !== null
-            ? Carbon::parse($examen->fecha)->format('d/m/Y')
-            : 'sin fecha';
-
-        return $tipo.' · '.$fecha;
     }
 }

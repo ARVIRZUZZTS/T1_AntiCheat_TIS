@@ -23,6 +23,10 @@
  * - 2026-11-22  [Valery D. Ortuno P]  test: "Ver examenes" del auxiliar.
  * - 2026-11-22  [Valery D. Ortuno P]  test: no se asignan examenes de cursos
  *   archivados.
+ * - 2026-11-28  [Valery D. Ortuno P]  test: permisos de coordinador separados
+ *   (crear / asignar) que da el docente al asignar a un curso; el coordinador
+ *   solo ve a los auxiliares que creo. Columnas de permisos en el esquema.
+ *   Quitar asignaciones se prueba en el servicio (la pagina ya no lo tiene).
  * - 2026-11-24  [Valery D. Ortuno P]  test: no se muestran cursos archivados ni
  *   examenes pasados, y el orden por el examen mas proximo.
  *
@@ -162,7 +166,7 @@ class AsignarAuxiliarTest extends TestCase
             ->test(AsignarAuxiliar::class)
             ->call('asignarCurso', self::ANA, self::ALGEBRA)
             ->assertReturned('')
-            ->assertSet('mensaje', 'Se asigno a Ana Rojas al curso Algebra I - Grupo 1. Vera Ingreso y Monitor en todos sus examenes.');
+            ->assertSet('mensaje', 'Se asigno a Ana Rojas al curso Algebra I - Grupo 1. Podra ver Ingreso y Monitor de todos sus examenes.');
 
         $this->assertDatabaseHas('auxiliar_curso', ['id_auxiliar' => self::ANA, 'id_curso' => self::ALGEBRA, 'estado' => 'Activo']);
     }
@@ -254,31 +258,107 @@ class AsignarAuxiliarTest extends TestCase
 
     public function test_quitar_un_curso_lo_da_de_baja_y_quitar_un_examen_lo_borra(): void
     {
+        // Lo usa "Desvincular auxiliar" (la pagina Asignar ya no tiene Quitar).
         DB::table('auxiliar_examen')->insert([
             'id_auxiliar' => self::ANA, 'id_examen' => self::PARCIAL_ALGEBRA,
             'ver_ingreso' => true, 'ver_monitor' => true, 'asignado_por' => self::ROBERTO,
         ]);
-        $componente = Livewire::actingAs($this->usuario(self::ROBERTO))->test(AsignarAuxiliar::class);
+        $servicio = app(AsignarAuxiliarService::class);
 
-        $componente->call('quitarCurso', self::LUIS, self::CALCULO)->assertReturned('');
-        $componente->call('quitarExamen', self::ANA, self::PARCIAL_ALGEBRA)->assertReturned('');
+        $servicio->quitarCurso(self::ROBERTO, self::LUIS, self::CALCULO);
+        $servicio->quitarExamen(self::ROBERTO, self::ANA, self::PARCIAL_ALGEBRA);
 
         $this->assertSame('Baja', DB::table('auxiliar_curso')->where('id_auxiliar', self::LUIS)->value('estado'));
         $this->assertSame(0, DB::table('auxiliar_examen')->count());
 
         // Ya no existen.
-        $componente->call('quitarCurso', self::LUIS, self::CALCULO)->assertReturned(AsignarAuxiliarService::MENSAJE_NO_EXISTE);
-        $componente->call('quitarExamen', self::ANA, self::PARCIAL_ALGEBRA)->assertReturned(AsignarAuxiliarService::MENSAJE_NO_EXISTE);
+        $this->assertSame(AsignarAuxiliarService::MENSAJE_NO_EXISTE, $this->errorDe(fn () => $servicio->quitarCurso(self::ROBERTO, self::LUIS, self::CALCULO)));
+        $this->assertSame(AsignarAuxiliarService::MENSAJE_NO_EXISTE, $this->errorDe(fn () => $servicio->quitarExamen(self::ROBERTO, self::ANA, self::PARCIAL_ALGEBRA)));
     }
 
     public function test_un_docente_no_quita_asignaciones_de_cursos_ajenos(): void
     {
-        Livewire::actingAs($this->usuario(self::PATRICIA))
-            ->test(AsignarAuxiliar::class)
-            ->call('quitarCurso', self::LUIS, self::CALCULO)
-            ->assertReturned(AsignarAuxiliarService::MENSAJE_NO_EXISTE);
+        $error = $this->errorDe(fn () => app(AsignarAuxiliarService::class)->quitarCurso(self::PATRICIA, self::LUIS, self::CALCULO));
 
+        $this->assertSame(AsignarAuxiliarService::MENSAJE_NO_EXISTE, $error);
         $this->assertSame('Activo', DB::table('auxiliar_curso')->where('id_auxiliar', self::LUIS)->value('estado'));
+    }
+
+    public function test_la_pagina_asignar_ya_no_tiene_quitar(): void
+    {
+        Livewire::actingAs($this->usuario(self::ROBERTO))
+            ->test(AsignarAuxiliar::class)
+            ->assertSee('Curso: Calculo I - Grupo 1')
+            ->assertDontSee('Quitar asignacion');
+
+        $this->assertFalse(method_exists(AsignarAuxiliar::class, 'quitarCurso'));
+    }
+
+    /** Primer mensaje de error de la accion, o '' si no fallo. */
+    private function errorDe(callable $accion): string
+    {
+        try {
+            $accion();
+        } catch (\Illuminate\Validation\ValidationException $error) {
+            return (string) collect($error->errors())->flatten()->first();
+        }
+
+        return '';
+    }
+
+    public function test_al_asignar_a_un_curso_el_docente_da_los_permisos(): void
+    {
+        Livewire::actingAs($this->usuario(self::ROBERTO))
+            ->test(AsignarAuxiliar::class)
+            ->call('asignarCurso', self::ANA, self::ALGEBRA, true, false)
+            ->assertReturned('');
+
+        $ana = DB::table('usuario')->where('id_usuario', self::ANA)->first();
+        $this->assertTrue((bool) $ana->puede_crear_auxiliares);
+        $this->assertFalse((bool) $ana->puede_asignar_auxiliares);
+    }
+
+    public function test_reasignar_el_mismo_curso_solo_actualiza_los_permisos(): void
+    {
+        // Luis ya esta en Calculo I: reasignarlo cambia sus permisos.
+        Livewire::actingAs($this->usuario(self::ROBERTO))
+            ->test(AsignarAuxiliar::class)
+            ->call('asignarCurso', self::LUIS, self::CALCULO, false, true)
+            ->assertReturned('')
+            ->assertSet('mensaje', 'Se actualizaron los permisos de Luis Perez.')
+            // Sin cambios en los permisos sigue siendo "ya asignado".
+            ->call('asignarCurso', self::LUIS, self::CALCULO, false, true)
+            ->assertReturned(AsignarAuxiliarService::MENSAJE_YA_EN_CURSO);
+
+        $this->assertTrue((bool) DB::table('usuario')->where('id_usuario', self::LUIS)->value('puede_asignar_auxiliares'));
+        $this->assertSame(1, DB::table('auxiliar_curso')->where('id_auxiliar', self::LUIS)->count());
+    }
+
+    public function test_el_coordinador_solo_ve_a_los_auxiliares_que_creo(): void
+    {
+        // Luis coordina (asignar) y creo a Ana; Abel lo creo otro.
+        DB::table('usuario')->where('id_usuario', self::LUIS)->update(['puede_asignar_auxiliares' => true, 'id_docente_responsable' => self::ROBERTO]);
+        DB::table('usuario')->where('id_usuario', self::ANA)->update(['id_creador' => self::LUIS]);
+        DB::table('usuario')->insert(['id_usuario' => 12, 'cod_sis' => 'SIS12', 'password' => 'x', 'nombre_usuario' => 'Abel', 'apellido' => 'Soto']);
+        DB::table('rol_usuario')->insert(['id_usuario' => 12, 'id_rol' => 2]);
+
+        $datos = Livewire::actingAs($this->usuario(self::LUIS))->test(AsignarAuxiliar::class)->instance()->datos;
+
+        $this->assertSame([self::ANA], array_column($datos['auxiliares'], 'id'));
+        // Solo su curso (Calculo I) como opcion.
+        $this->assertSame([self::CALCULO], array_column($datos['cursos'], 'id'));
+    }
+
+    public function test_los_permisos_de_crear_y_asignar_son_separados(): void
+    {
+        DB::table('usuario')->where('id_usuario', self::LUIS)->update(['puede_asignar_auxiliares' => true]);
+        $luis = $this->usuario(self::LUIS);
+
+        $this->assertTrue($luis->puedeAsignarAuxiliares());
+        $this->assertFalse($luis->puedeCrearAuxiliares());
+        // Con solo "asignar" no entra a Crear ni a Eliminar auxiliar.
+        $this->actingAs($luis)->get(route('auxiliares.crear'))->assertForbidden();
+        $this->actingAs($luis)->get(route('auxiliares.eliminar'))->assertForbidden();
     }
 
     public function test_un_auxiliar_no_entra_a_asignar(): void
@@ -439,6 +519,11 @@ class AsignarAuxiliarTest extends TestCase
             $tabla->string('nombre')->nullable();
             $tabla->string('correo')->nullable();
             $tabla->string('estado_cuenta')->default('habilitada');
+            // Coordinador: quien lo creo y sus permisos de crear / asignar auxiliares.
+            $tabla->integer('id_creador')->nullable();
+            $tabla->integer('id_docente_responsable')->nullable();
+            $tabla->boolean('puede_crear_auxiliares')->default(false);
+            $tabla->boolean('puede_asignar_auxiliares')->default(false);
         });
         Schema::create('rol', function (Blueprint $tabla): void {
             $tabla->integer('id_rol')->primary();
