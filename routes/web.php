@@ -115,6 +115,7 @@
  * - 2026-11-24  [Alisson D. Alvarado <alvaradoalissondalet@gmail.com>]  fix:
  *   conectar los cursos asignados al auxiliar con el listado compartido.
  * - 2026-11-27  [Alisson D. Alvarado <alvaradoalissondalet@gmail.com>]  refactor: retirar la ruta de edición de cursos.
+ * - 2026-11-27  [Alisson D. Alvarado <alvaradoalissondalet@gmail.com>]  feat: agregar desvinculación de auxiliares.
  */
 
 use App\Http\Controllers\AuthController;
@@ -129,6 +130,7 @@ use App\Http\Controllers\Reporte\ListarReporteIngresosIlegalesController;
 use App\Http\Controllers\Reporte\ReporteController;
 use App\Livewire\Auxiliares\AsignarAuxiliar;
 use App\Livewire\Auxiliares\CrearAuxiliar;
+use App\Livewire\Auxiliares\DesvincularAuxiliar;
 use App\Livewire\Auxiliares\EliminarAuxiliar;
 use App\Livewire\Auxiliares\ExamenesAuxiliar;
 use App\Livewire\Auxiliares\GestionAuxiliares;
@@ -166,6 +168,10 @@ Route::middleware('auth')->group(function (): void {
     Route::get('/auxiliares/asignar', AsignarAuxiliar::class)
         ->middleware('puede-gestionar-auxiliares')
         ->name('auxiliares.asignar');
+    // Solo el docente propietario puede desvincular auxiliares de sus cursos.
+    Route::get('/auxiliares/desvincular', DesvincularAuxiliar::class)
+        ->middleware('docente')
+        ->name('auxiliares.desvincular');
     // Auxiliares · Crear: el alta de auxiliar como pagina propia (antes era un
     // modal dentro de GestionAuxiliares). Al guardar vuelve a la lista.
     // Docentes y auxiliares con permiso de coordinador.
