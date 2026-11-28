@@ -19,8 +19,7 @@
        del examen con su estado.
      - Aceptar (HU 132): una sola lista. Las pendientes tienen Aceptar /
        Rechazar; Aceptar abre directo el modal para elegir los cursos activos a
-       los que se asocia el examen. Las aceptadas que aun no tienen curso
-       muestran "Asociar a un curso" con el mismo modal.
+       los que se asocia el examen.
 
     @changelog
     - 2026-11-08  [David E. Chavez T.]  feat: creación inicial de la vista.
@@ -42,8 +41,10 @@
       confirm del navegador.
     - 2026-11-28  [Valery D. Ortuno P]  refactor: se quita "Cancelar" de las
       invitaciones enviadas y su modal: una invitacion enviada la acepta o la
-      rechaza el invitado. La etiqueta "Cancelada" queda para las que ya lo
-      estaban.
+      rechaza el invitado. El estado "Cancelada" ya no existe en la base.
+    - 2026-11-28  [Valery D. Ortuno P]  refactor: la lista de recibidas muestra
+      solo pendientes; se quita "Asociar a un curso" aparte (aceptar ya pide
+      los cursos).
 
     @see  app/Livewire/Invitaciones/Index.php
 --}}
@@ -55,20 +56,17 @@
         'pendiente' => ['Pendiente', 'warning'],
         'aceptado' => ['Aceptada', 'success'],
         'rechazado' => ['Rechazada', 'danger'],
-        'cancelado' => ['Cancelada', 'gray'],
     ];
 @endphp
 
 <div class="space-y-4 px-4 pt-[2vh] pb-8 sm:px-6 lg:px-[2vh]"
      x-data="{
          modal: false,
-         modo: 'aceptar',
          invitacion: null,
          elegidos: [],
          error: '',
          guardando: false,
-         abrir(modo, invitacion) {
-             this.modo = modo;
+         abrir(invitacion) {
              this.invitacion = invitacion;
              this.elegidos = [];
              this.error = '';
@@ -116,9 +114,7 @@
              this.error = '';
              try {
                  const ids = this.elegidos.map(Number);
-                 const error = this.modo === 'aceptar'
-                     ? await $wire.aceptar(this.invitacion.id, ids)
-                     : await $wire.asociar(this.invitacion.id, ids);
+                 const error = await $wire.aceptar(this.invitacion.id, ids);
                  if (error) {
                      this.error = error;
                  } else {
@@ -157,7 +153,6 @@
                 <div class="grid grid-cols-1 gap-3 lg:grid-cols-2">
                     @foreach ($invitaciones as $invitacion)
                         @php
-                            $pendiente = $invitacion['estado'] === 'pendiente';
                             $datosModal = \Illuminate\Support\Js::from([
                                 'id' => $invitacion['id'],
                                 'examen' => $invitacion['examen'].($invitacion['fecha_examen'] ? ' · '.$invitacion['fecha_examen'] : ''),
@@ -171,30 +166,20 @@
                             <div class="space-y-1 text-sm">
                                 <div class="flex flex-wrap items-center gap-2">
                                     <p class="font-semibold text-heading wrap-break-word">{{ $invitacion['examen'] }}</p>
-                                    @unless ($pendiente)
-                                        <x-ui.badge type="success">Aceptada</x-ui.badge>
-                                    @endunless
                                 </div>
                                 <p class="text-body">Fecha del examen: {{ $invitacion['fecha_examen'] ?? '—' }}</p>
                                 <p class="text-body">Invitado por: {{ $invitacion['invitador'] }}{{ $invitacion['curso'] ? ' ('.$invitacion['curso'].')' : '' }}</p>
                                 <p class="text-muted">Enviada el {{ $invitacion['enviada_en'] ?? '—' }}</p>
                             </div>
                             <div class="flex flex-col gap-2 sm:flex-row">
-                                @if ($pendiente)
-                                    <x-ui.button type="button" variant="default" class="justify-center"
-                                                 @click="abrir('aceptar', {{ $datosModal }})">
-                                        Aceptar
-                                    </x-ui.button>
-                                    <x-ui.button-cancelar type="button" class="justify-center"
-                                                          @click="pedir('rechazar', {{ $datosRechazo }})">
-                                        Rechazar
-                                    </x-ui.button-cancelar>
-                                @else
-                                    <x-ui.button type="button" variant="default" class="justify-center"
-                                                 @click="abrir('asociar', {{ $datosModal }})">
-                                        Asociar a un curso
-                                    </x-ui.button>
-                                @endif
+                                <x-ui.button type="button" variant="default" class="justify-center"
+                                             @click="abrir({{ $datosModal }})">
+                                    Aceptar
+                                </x-ui.button>
+                                <x-ui.button-cancelar type="button" class="justify-center"
+                                                      @click="pedir('rechazar', {{ $datosRechazo }})">
+                                    Rechazar
+                                </x-ui.button-cancelar>
                             </div>
                         </div>
                     @endforeach
@@ -367,7 +352,7 @@
                 </button>
                 <button type="button" @click="confirmar()" :disabled="guardando || elegidos.length === 0"
                         class="inline-flex items-center justify-center rounded-base bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-strong disabled:cursor-not-allowed disabled:opacity-50">
-                    <span x-text="guardando ? 'Guardando...' : (modo === 'aceptar' ? 'Aceptar invitacion' : 'Asociar')"></span>
+                    <span x-text="guardando ? 'Guardando...' : 'Aceptar invitacion'"></span>
                 </button>
             </div>
         </div>

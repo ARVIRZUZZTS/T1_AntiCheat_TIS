@@ -38,6 +38,8 @@
  * - 2026-11-28  [Valery D. Ortuno P]  test: ya no se cancela una invitacion
  *   enviada; la lista del examen muestra su estado sin "Cancelar".
  *   `notificacion_docente.fecha_lectura` en el esquema sqlite.
+ * - 2026-11-28  [Valery D. Ortuno P]  test: la lista de recibidas muestra solo
+ *   pendientes (sin "Asociar a un curso" aparte).
  * - 2026-11-23  [Valery D. Ortuno P]  test: rechazar y cancelar devuelven el
  *   error para el modal (los avisos son modales de la vista).
  *
@@ -231,23 +233,16 @@ class ExamenCompartidoCursosTest extends TestCase
         $this->assertSame([self::INVITACION], array_column($componente->get('invitaciones'), 'id'));
     }
 
-    public function test_una_aceptada_sin_curso_se_asocia_despues(): void
+    public function test_la_lista_de_recibidas_muestra_solo_pendientes(): void
     {
+        // Aceptada (aunque sea del flujo viejo, sin curso): ya no se lista.
         $this->invitar('aceptado');
-        DB::table('configuracion_examen_docente')->insert([
-            'id_configuracion_examen' => 901, 'id_examen' => self::NUEVO, 'id_docente' => self::PATRICIA,
-        ]);
 
-        $componente = Livewire::actingAs($this->usuario(self::PATRICIA))->test(Index::class, ['tab' => 'recibir']);
-        // Sale en la misma lista, como aceptada.
-        $this->assertSame(['aceptado'], array_column($componente->get('invitaciones'), 'estado'));
-
-        $componente->call('asociar', self::INVITACION, [self::FISICA_PATRICIA])
-            ->assertReturned('')
-            ->assertSet('mensajeExito', 'El examen quedo en Fisica I.')
-            ->assertSet('invitaciones', []);
-
-        $this->assertDatabaseHas('examen_curso', ['id_examen' => self::NUEVO, 'id_curso' => self::FISICA_PATRICIA]);
+        Livewire::actingAs($this->usuario(self::PATRICIA))
+            ->test(Index::class, ['tab' => 'recibir'])
+            ->assertSet('invitaciones', [])
+            ->assertSee('No tienes invitaciones pendientes.')
+            ->assertDontSee('>Aceptada<', false);
     }
 
     public function test_rechazar_avisa_a_quien_invito(): void
