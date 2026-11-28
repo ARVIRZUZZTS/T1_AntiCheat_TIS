@@ -95,10 +95,17 @@
                 $badge = $a['coordinador']
                     ? '<span class="ms-2 inline-flex items-center rounded-full bg-brand-softer px-2 py-0.5 text-xs font-medium text-fg-brand align-middle">Coordinador</span>'
                     : '';
-                $sisHtml = $a['codigoSis'] !== ''
-                    ? '<span class="mt-0.5 block text-xs text-body-subtle">Código: '.e($a['codigoSis']).'</span>'
-                    : '';
-                $nombreHtml = '<span class="font-medium text-heading break-words">'.e($a['nombreCompleto']).'</span>'.$badge.$sisHtml;
+                $datos = [];
+                if ($a['tipo'] !== '') {
+                    $datos[] = 'Tipo: '.e($a['tipo']);
+                }
+                if ($a['codigoSis'] !== '') {
+                    $datos[] = 'Código: '.e($a['codigoSis']);
+                }
+                $datosHtml = $datos === []
+                    ? ''
+                    : '<span class="mt-0.5 block text-xs text-body-subtle">'.implode(' · ', $datos).'</span>';
+                $nombreHtml = '<span class="font-medium text-heading break-words">'.e($a['nombreCompleto']).'</span>'.$badge.$datosHtml;
 
                 $usuarioHtml = '<span class="break-all">'.e($a['usuario']).'</span>';
                 $correoHtml = '<span class="break-all">'.($a['correo'] !== '' ? e($a['correo']) : '—').'</span>';

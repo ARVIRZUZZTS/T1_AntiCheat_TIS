@@ -211,7 +211,7 @@ class GestionAuxiliares extends Component
     /** @param array<string, mixed> $fila */
     private function coincide(array $fila, string $termino): bool
     {
-        foreach (['nombreCompleto', 'usuario', 'correo', 'carnet', 'codigoSis', 'curso'] as $campo) {
+        foreach (['nombreCompleto', 'usuario', 'correo', 'carnet', 'codigoSis', 'tipo', 'curso'] as $campo) {
             if (mb_strpos(mb_strtolower((string) $fila[$campo]), $termino) !== false) {
                 return true;
             }

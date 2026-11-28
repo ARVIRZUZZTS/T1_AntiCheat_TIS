@@ -40,6 +40,7 @@ namespace App\Services\Auxiliar;
 use App\Repositories\AuxiliarCursoRepository;
 use App\Support\NombreCurso;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Str;
 
 class ListarAuxiliaresDocenteService
 {
@@ -82,6 +83,7 @@ class ListarAuxiliaresDocenteService
                     ? $auxiliar->nombre
                     : $auxiliar->nombre_usuario);
                 $correo = trim((string) $auxiliar->correo);
+                $tipo = trim((string) ($auxiliar->tipo_auxiliar ?? ''));
 
                 return [
                     'id' => (int) $auxiliar->id_usuario,
@@ -93,6 +95,7 @@ class ListarAuxiliaresDocenteService
                     'correo' => $correo,
                     'carnet' => trim((string) $auxiliar->carnet),
                     'codigoSis' => (string) $auxiliar->cod_sis,
+                    'tipo' => $tipo === '' ? '' : Str::ucfirst($tipo),
                     'curso' => implode(', ', $cursos),
                     'cursos' => $cursos,
                     'examenes' => $examenes,
