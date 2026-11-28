@@ -158,6 +158,12 @@ class Usuario extends Authenticatable
             || ($this->esAuxiliar() && (bool) $this->puede_crear_auxiliares);
     }
 
+    /** Materias que dicta el docente (máx. 5, ver DocenteMateriaService). @return BelongsToMany<Materia, $this> */
+    public function materias(): BelongsToMany
+    {
+        return $this->belongsToMany(Materia::class, 'docente_materia', 'id_docente', 'id_materia');
+    }
+
     /** @return HasMany<RegistroAsistencia, $this> */
     public function registrosAsistencia(): HasMany
     {
