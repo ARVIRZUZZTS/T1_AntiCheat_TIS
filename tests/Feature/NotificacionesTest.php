@@ -104,4 +104,14 @@ class NotificacionesTest extends TestCase
         $this->assertStringContainsString('El auxiliar Aux Uno registró al estudiante Juan Quispe', $html);
         $this->assertStringContainsString('Hace 20 minutos', $html);
     }
+
+    public function test_la_pantalla_declara_la_plantilla_de_examen_eliminado(): void
+    {
+        $this->actingAs(Usuario::query()->firstOrFail());
+
+        $this->get(route('notificaciones'))
+            ->assertOk()
+            ->assertSee('id="notificacion-template-examen-eliminado"', false)
+            ->assertSee('Examen eliminado');
+    }
 }
