@@ -129,6 +129,7 @@ use App\Http\Controllers\Reporte\ListarReporteIngresosIlegalesController;
 use App\Http\Controllers\Reporte\ReporteController;
 use App\Livewire\Auxiliares\AsignarAuxiliar;
 use App\Livewire\Auxiliares\CrearAuxiliar;
+use App\Livewire\Auxiliares\EliminarAuxiliar;
 use App\Livewire\Auxiliares\ExamenesAuxiliar;
 use App\Livewire\Auxiliares\GestionAuxiliares;
 use App\Livewire\Cursos\ArchivarRestaurarCurso;
@@ -171,15 +172,16 @@ Route::middleware('auth')->group(function (): void {
     Route::get('/auxiliares/crear', CrearAuxiliar::class)
         ->middleware('puede-gestionar-auxiliares')
         ->name('auxiliares.crear');
-    // Auxiliares · Editar / Eliminar: marcadores hasta que se implementen.
+    // Auxiliares · Editar: marcador hasta que se implemente.
     Route::view('/auxiliares/editar', 'pages.en-desarrollo', [
         'titulo' => 'Editar auxiliar',
         'descripcion' => 'La edicion de auxiliares esta en desarrollo.',
     ])->name('auxiliares.editar');
-    Route::view('/auxiliares/eliminar', 'pages.en-desarrollo', [
-        'titulo' => 'Eliminar auxiliar',
-        'descripcion' => 'La eliminacion de auxiliares esta en desarrollo.',
-    ])->name('auxiliares.eliminar');
+    // Auxiliares · Eliminar: eliminación lógica de un auxiliar. El docente
+    // responsable y el coordinador (solo a los que creó) pueden eliminar.
+    Route::get('/auxiliares/eliminar', EliminarAuxiliar::class)
+        ->middleware('puede-gestionar-auxiliares')
+        ->name('auxiliares.eliminar');
 
     // Invitaciones: hoy un solo componente con pestanhas Enviar/Recibir. Se
     // separa en dos subopciones; ambas sirven el mismo componente de momento y
