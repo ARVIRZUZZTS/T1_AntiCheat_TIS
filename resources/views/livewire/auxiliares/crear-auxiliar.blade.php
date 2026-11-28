@@ -3,18 +3,25 @@
     @author  Diego Tejerina <josediegotejerinamolina@gmail.com>
     @created 2026-11-15
     @updated 2026-11-27
+    @updated 2026-11-28
 
     @description
     Vista del alta de auxiliar como página (Auxiliares › Crear auxiliar). Pide
     nombre, apellido, tipo de auxiliar (UMSS con código SIS / externo con carnet
-    opcional), correo y, solo para docentes, el permiso de coordinador. "Crear
-    auxiliar" abre el modal "Confirmar creación"; "Cancelar" vuelve a la lista.
+    opcional) y correo, y muestra en vivo el usuario de acceso que se generará.
+    "Crear auxiliar" abre el modal "Confirmar creación"; "Cancelar" vuelve a la
+    lista. El permiso de coordinador ya no se da aquí (irá en las asignaciones).
 
     @changelog
     - 2026-11-08  [David E. Chavez T.]  feat: formulario de alta (modal original).
     - 2026-11-15  [Diego Tejerina]  refactor: el formulario pasa a página propia.
     - 2026-11-27  [Diego Tejerina]  feat: tipo de auxiliar, carnet, correo,
       permiso de coordinador, vista previa del usuario y modal de confirmación.
+    - 2026-11-28  [Valery D. Ortuno P]  refactor: sin los parentesis de "Auxiliar
+      externo" y "Carnet de identidad"; sale el permiso "Puede crear y asignar
+      auxiliares"; el usuario de acceso se ve en vivo al escribir nombre y
+      apellido, sin el texto "Se genera automaticamente...". El carnet de
+      identidad es obligatorio. Textos sin acentos.
 
     @see  app/Livewire/Auxiliares/CrearAuxiliar.php
 --}}
@@ -27,9 +34,9 @@
             <h1 class="mb-4 text-lg font-semibold text-heading">Crear auxiliar</h1>
 
             <form wire:submit="revisar" class="space-y-4">
-                <x-ui.input name="nombre" label="Nombre" wire:model="nombre" required
+                <x-ui.input name="nombre" label="Nombre" wire:model.live.debounce.400ms="nombre" required
                             maxlength="50" :error="$errors->first('nombre')" />
-                <x-ui.input name="apellido" label="Apellido" wire:model="apellido" required
+                <x-ui.input name="apellido" label="Apellido" wire:model.live.debounce.400ms="apellido" required
                             maxlength="50" :error="$errors->first('apellido')" />
 
                 {{-- Tipo de auxiliar: radios enlazados en vivo para ocultar/mostrar
@@ -44,7 +51,7 @@
                     <div class="flex items-center">
                         <input id="tipo-externo" type="radio" value="externo" wire:model.live="tipoAuxiliar"
                                class="w-4 h-4 text-brand bg-neutral-secondary-medium border border-default-medium focus:ring-2 focus:ring-brand-subtle" />
-                        <label for="tipo-externo" class="ms-2 text-sm font-medium text-heading select-none">Auxiliar externo (sin código SIS)</label>
+                        <label for="tipo-externo" class="ms-2 text-sm font-medium text-heading select-none">Auxiliar externo</label>
                     </div>
                     @if ($tipoAuxiliar === 'externo')
                         <p class="mt-1 text-sm text-muted">Para personas que no son de la UMSS.</p>
@@ -52,32 +59,25 @@
                 </fieldset>
 
                 @if ($tipoAuxiliar === 'UMSS')
-                    <x-ui.input name="codSis" label="Código SIS" wire:model="codSis" required
+                    <x-ui.input name="codSis" label="Codigo SIS" wire:model="codSis" required
                                 inputmode="numeric" maxlength="9" :error="$errors->first('codSis')" />
                 @endif
 
-                <x-ui.input name="carnet" label="Carnet de identidad (cédula)" wire:model="carnet"
+                <x-ui.input name="carnet" label="Carnet de identidad" wire:model="carnet" required
                             inputmode="numeric" maxlength="8"
-                            helper="Opcional. Entre 6 y 8 dígitos."
+                            helper="Entre 6 y 8 digitos."
                             :error="$errors->first('carnet')" />
 
-                <x-ui.input name="correo" type="email" label="Correo electrónico" wire:model="correo" required
-                            maxlength="100" helper="Allí recibirá su usuario, contraseña y el enlace para ingresar."
+                <x-ui.input name="correo" type="email" label="Correo electronico" wire:model="correo" required
+                            maxlength="100" helper="Alli recibira su usuario, contraseña y el enlace para ingresar."
                             :error="$errors->first('correo')" />
 
-                {{-- Vista previa: el usuario se genera con su nombre (aux.nombre.apellido). --}}
+                {{-- Vista previa en vivo: el mismo usuario que se va a crear
+                     (aux.nombre.apellido, con numero si ya existe). --}}
                 <div class="rounded-base border border-dashed border-default px-3 py-2 text-sm text-body">
                     Usuario de acceso:
-                    <span class="font-medium text-heading">{{ trim($nombre) !== '' && trim($apellido) !== '' ? 'aux.' . \Illuminate\Support\Str::slug(\Illuminate\Support\Str::before(trim($nombre), ' ')) . '.' . \Illuminate\Support\Str::slug(\Illuminate\Support\Str::before(trim($apellido), ' ')) : '—' }}</span>
-                    <span class="block text-xs text-muted">Se genera automáticamente; si ya existe, se le agrega un número.</span>
+                    <span class="font-medium text-heading">{{ $this->usuarioVista !== '' ? $this->usuarioVista : '—' }}</span>
                 </div>
-
-                @if ($this->esDocente)
-                    <x-ui.checkbox name="puedeCrearAuxiliares" wire:model="puedeCrearAuxiliares"
-                                   label="Puede crear y asignar auxiliares">
-                        <span class="text-sm text-muted">Le da el permiso de coordinador.</span>
-                    </x-ui.checkbox>
-                @endif
 
                 <div class="flex flex-col gap-3 border-t border-default pt-4 sm:flex-row sm:items-center">
                     <x-ui.button type="submit" variant="default" class="w-full justify-center sm:w-auto"
@@ -105,7 +105,7 @@
         >
             <div class="relative p-4 w-full max-w-md max-h-full">
                 <div class="relative bg-neutral-primary-soft border border-default rounded-base shadow-sm p-6">
-                    <h2 id="titulo-confirmar-auxiliar" class="text-lg font-semibold text-heading">Confirmar creación</h2>
+                    <h2 id="titulo-confirmar-auxiliar" class="text-lg font-semibold text-heading">Confirmar creacion</h2>
 
                     <dl class="mt-4 space-y-1 text-sm text-body">
                         <div class="flex gap-2">
@@ -122,17 +122,13 @@
                         </div>
                     </dl>
 
-                    <p class="mt-4 text-sm font-medium text-heading">Podrá ver:</p>
+                    <p class="mt-4 text-sm font-medium text-heading">Podra ver:</p>
                     <ul class="mt-1 list-disc ps-5 text-sm text-body space-y-0.5">
                         <li>Cursos</li>
-                        <li>Exámenes › Ver exámenes</li>
-                        <li>Monitor en vivo › Próximos exámenes</li>
+                        <li>Examenes › Ver examenes</li>
+                        <li>Monitor en vivo › Proximos examenes</li>
                         <li>Ingreso y Monitor</li>
                         <li>Notificaciones</li>
-                        @if ($this->esDocente && $puedeCrearAuxiliares)
-                            <li>Auxiliares › Crear auxiliar</li>
-                            <li>Auxiliares › Asignar auxiliar</li>
-                        @endif
                     </ul>
 
                     <div class="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">

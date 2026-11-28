@@ -24,6 +24,7 @@
  *
  * @changelog
  * - 2026-11-27  [Diego Tejerina]  feat: creación inicial (alta con tipo de auxiliar).
+ * - 2026-11-28  [Valery D. Ortuno P]  fix: mensaje de SIS duplicado sin acento.
  *
  * @see  App\Services\Auxiliar\GeneradorContrasenaAuxiliarService
  * @see  App\Mail\CredencialesAuxiliarMail
@@ -46,7 +47,7 @@ use Illuminate\Validation\ValidationException;
 
 class CrearAuxiliarService
 {
-    public const MENSAJE_SIS_EN_USO = 'Ya existe un usuario con este código SIS.';
+    public const MENSAJE_SIS_EN_USO = 'Ya existe un usuario con este codigo SIS.';
 
     public const MENSAJE_CARNET_EN_USO = 'Ya existe un usuario con este carnet.';
 
