@@ -118,6 +118,8 @@
  * - 2026-11-27  [Alisson D. Alvarado <alvaradoalissondalet@gmail.com>]  feat: agregar desvinculación de auxiliares.
  * - 2026-11-28  [Valery D. Ortuno P]  feat: Crear y Eliminar auxiliar exigen el
  *   permiso de crear; Asignar auxiliar, el de asignar.
+ * - 2026-11-28  [Valery D. Ortuno P]  feat: /cursos/eliminar-estudiantes para
+ *   quitar la lista de estudiantes de un curso (HU 34).
  */
 
 use App\Http\Controllers\AuthController;
@@ -137,6 +139,7 @@ use App\Livewire\Auxiliares\EliminarAuxiliar;
 use App\Livewire\Auxiliares\ExamenesAuxiliar;
 use App\Livewire\Auxiliares\GestionAuxiliares;
 use App\Livewire\Cursos\ArchivarRestaurarCurso;
+use App\Livewire\Cursos\EliminarEstudiantes;
 use App\Livewire\Examenes\EstudiantesCurso;
 use App\Livewire\Invitaciones\Index as InvitacionesIndex;
 use App\Livewire\Monitoreo\AccesoMonitor;
@@ -271,6 +274,10 @@ Route::middleware(['auth', 'docente'])->group(function (): void {
     ))->name('cursos.ver');
     Route::get('/cursos/ver-estudiantes', [CursoController::class, 'verEstudiantes'])
         ->name('cursos.ver-estudiantes');
+    // Cursos · Eliminar estudiantes (HU 34): quita la lista de un curso activo
+    // si todavia no tomo examenes ni tiene ingresos.
+    Route::get('/cursos/eliminar-estudiantes', EliminarEstudiantes::class)
+        ->name('cursos.eliminar-estudiantes');
     Route::get('/cursos/habilitar-estudiantes', [CursoController::class, 'habilitarEstudiantes'])
         ->name('cursos.habilitar-estudiantes');
     Route::get('/cursos/cargar-csv', function (Request $request) {

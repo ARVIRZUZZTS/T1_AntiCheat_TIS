@@ -107,6 +107,8 @@
     - 2026-11-28  [Valery D. Ortuno P]  feat: el grupo Auxiliares del coordinador
       muestra Crear y Eliminar con el permiso de crear, y Asignar con el de
       asignar.
+    - 2026-11-28  [Valery D. Ortuno P]  feat: "Eliminar estudiantes" debajo de
+      "Ver estudiantes" (HU 34).
 --}}
 
 
@@ -178,6 +180,7 @@
             // El detalle de un curso (/cursos/{curso}) muestra las dos secciones;
             // se resalta "Ver estudiantes" como acceso principal.
             ['label' => 'Ver estudiantes', 'route' => 'cursos.ver-estudiantes', 'match' => ['cursos.detalle', 'cursos.ver']],
+            ['label' => 'Eliminar estudiantes', 'route' => 'cursos.eliminar-estudiantes'],
             ['label' => 'Habilitar estudiantes', 'route' => 'cursos.habilitar-estudiantes'],
         ]],
         ['label' => 'Examenes', 'children' => [
