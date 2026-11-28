@@ -18,6 +18,9 @@
  *   - `examen_modificado`: cambiaron los ambientes, la fecha o la hora de un
  *     examen; va a los auxiliares asignados y, si está compartido, a los
  *     docentes involucrados. Los cambios se guardan en `detalles`.
+ *   - `examen_eliminado`: un docente desvinculó un examen de uno de sus
+ *     cursos; va a los auxiliares activos del curso y a los docentes que
+ *     aceptaron compartir el examen. El detalle se guarda en `detalles`.
  *
  * Cada fila referencia el registro del caso en `central_riesgo` y el curso
  * (materia) del docente; el título, el auxiliar, el estudiante, el examen

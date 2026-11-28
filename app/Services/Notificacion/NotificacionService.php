@@ -625,16 +625,23 @@ class NotificacionService
      * primero) y el formato del tiempo sin tocar la base.
      *
      * @param  Collection<int, NotificacionDocente>  $notificaciones
-     * @return Collection<int, array<string, mixed>>
+     * @return Collection<int, array<string, mixed>> Cada aviso lleva
+     *                                               siempre sus claves fijas (id, tipo, titulo, ...) más `vence_en`.
      */
     public function preparar(Collection $notificaciones): Collection
     {
-        return $notificaciones
+        /** @var Collection<int, array<string, mixed>> $avisos */
+        $avisos = $notificaciones
             ->sortByDesc(fn (NotificacionDocente $notificacion): int => $this->fechaDe($notificacion)?->getTimestamp() ?? 0)
             ->values()
-            ->map(fn (NotificacionDocente $notificacion): array => $this->mapear($notificacion) + [
-                'vence_en' => $notificacion->fecha_lectura?->copy()->addDays(2)->toISOString(),
-            ]);
+            ->map(function (NotificacionDocente $notificacion): array {
+                $datos = $this->mapear($notificacion);
+                $datos['vence_en'] = $notificacion->fecha_lectura?->copy()->addDays(2)->toISOString();
+
+                return $datos;
+            });
+
+        return $avisos;
     }
 
     /**

@@ -38,14 +38,12 @@
       todas las notificaciones nuevas y el badge del sidebar baja a 0.
     - 2026-11-24  [Alisson D. Alvarado <alvaradoalissondalet@gmail.com>]  fix:
       identificar la bandeja del auxiliar con sus avisos de cambios de aula.
-     - 2026-11-24  [Alisson D. Alvarado <alvaradoalissondalet@gmail.com>]  fix:
-       identificar la bandeja del auxiliar con sus avisos de cambios de aula.
-     - 2026-11-24  [Equipo T1]  feat: los auxiliares consultan su bandeja y se
-        muestra el aviso de cambios de ambientes, fecha y hora de exámenes.
-     - 2026-11-24  [OchoaCesar]  feat: tarjeta del aviso «Examen eliminado»
-       (`examen_eliminado`) con icono rojo de papelera.
-     - 2026-11-27  [Alisson D. Alvarado <alvaradoalissondalet@gmail.com>]  feat:
-       mostrar el plazo de dos dias de los avisos leidos.
+    - 2026-11-24  [Equipo T1]  feat: los auxiliares consultan su bandeja y se
+      muestra el aviso de cambios de ambientes, fecha y hora de exámenes.
+    - 2026-11-24  [OchoaCesar]  feat: tarjeta del aviso «Examen eliminado»
+      (`examen_eliminado`) con icono rojo de papelera.
+    - 2026-11-27  [Alisson D. Alvarado <alvaradoalissondalet@gmail.com>]  feat:
+      mostrar el plazo de dos dias de los avisos leidos.
 
 
     @see  \resources\views\components\ui\notificacion-card.blade.php

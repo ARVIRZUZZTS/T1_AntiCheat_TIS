@@ -7,6 +7,8 @@
  *
  * @created 2026-11-24
  *
+ * @updated 2026-11-28
+ *
  * @description
  * Servicio de la feature Examen que avisa a los usuarios involucrados cuando
  * un docente elimina un examen de uno de sus cursos (desvinculación
@@ -30,6 +32,8 @@
  * @changelog
  * - 2026-11-24  [OchoaCesar]  feat: aviso «Examen eliminado» para auxiliares
  *   activos del curso y docentes que comparten el examen.
+ * - 2026-11-28  [OchoaCesar]  fix: excluir cuentas eliminadas lógicamente al
+ *   resolver destinatarios.
  */
 
 namespace App\Services\Examen;
@@ -106,7 +110,9 @@ class NotificarEliminacionExamenService
             ->whereIn('id_usuario', $ids->all())
             ->orderBy('apellido')
             ->orderBy('nombre_usuario')
-            ->get();
+            ->get()
+            ->reject(fn (Usuario $usuario): bool => $usuario->estaEliminado())
+            ->values();
     }
 
     /** @return Collection<int, int> */
