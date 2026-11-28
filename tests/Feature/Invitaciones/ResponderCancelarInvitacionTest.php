@@ -147,21 +147,6 @@ class ResponderCancelarInvitacionTest extends TestCase
         ]);
     }
 
-    public function test_no_se_puede_responder_una_invitacion_cancelada(): void
-    {
-        $this->crearInvitacion('cancelado');
-
-        $this->actingAs(Usuario::query()->findOrFail(self::INVITADO), 'web')
-            ->postJson(route('api.invitaciones.aceptar', self::INVITACION))
-            ->assertUnprocessable()
-            ->assertJsonPath('errors.estado.0', ResponderInvitacionExamenService::MENSAJE_NO_PENDIENTE);
-
-        $this->assertDatabaseHas('invitacion_examen_compartido', [
-            'id_invitacion' => self::INVITACION,
-            'estado' => 'cancelado',
-        ]);
-    }
-
     public function test_aceptar_dos_veces_no_cambia_el_estado_la_segunda(): void
     {
         $this->crearInvitacion('pendiente');

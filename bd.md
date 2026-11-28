@@ -23,7 +23,7 @@
 | `estado_notificacion` | `visto`, `recibido` |
 | `estado_usuario` | `Activo`, `Baja` |
 | `estudiante_examen_estado` | `habilitado`, `deshabilitado` |
-| `invitacion_estado` | `aceptado`, `rechazado`, `pendiente`, `cancelado` |
+| `invitacion_estado` | `aceptado`, `rechazado`, `pendiente` |
 | `motivo` | `intento de ingreso no autorizado`, `uso de dispositivos electronicos`, `copia o intercambio de respuestas`, `uso de material no autorizado`, `suplantacion de identidad`, `otro`, `intento de ingreso duplicado`, `aula equivocada`, `intento de ingreso de material no autorizado`, `en examen sin registro de ingreso` |
 | `nombre_tipo_gestion` | `primer semestre`, `invierno`, `segundo semestre`, `verano` |
 | `registrador_tipo` | `docente`, `auxiliar` |
