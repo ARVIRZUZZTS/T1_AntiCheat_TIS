@@ -41,9 +41,11 @@
      - 2026-11-24  [Alisson D. Alvarado <alvaradoalissondalet@gmail.com>]  fix:
        identificar la bandeja del auxiliar con sus avisos de cambios de aula.
      - 2026-11-24  [Equipo T1]  feat: los auxiliares consultan su bandeja y se
-       muestra el aviso de cambios de ambientes, fecha y hora de exámenes.
+        muestra el aviso de cambios de ambientes, fecha y hora de exámenes.
      - 2026-11-24  [OchoaCesar]  feat: tarjeta del aviso «Examen eliminado»
        (`examen_eliminado`) con icono rojo de papelera.
+     - 2026-11-27  [Alisson D. Alvarado <alvaradoalissondalet@gmail.com>]  feat:
+       mostrar el plazo de dos dias de los avisos leidos.
 
 
     @see  \resources\views\components\ui\notificacion-card.blade.php
@@ -258,15 +260,37 @@
                 if (descripcion) { descripcion.textContent = textoDescripcion; }
                 if (hace) { hace.textContent = notificacion.hace || ''; }
 
+                if (notificacion.vence_en) {
+                    var plazo = document.createElement('p');
+                    plazo.className = 'mt-2 text-xs text-muted';
+                    nodo.appendChild(plazo);
+
+                    // El aviso se retira de la vista al vencer, sin borrar sus datos.
+                    function actualizarPlazo() {
+                        var restante = new Date(notificacion.vence_en).getTime() - Date.now();
+                        if (restante <= 0) {
+                            nodo.remove();
+                            actualizarVacio();
+                            return;
+                        }
+                        var horas = Math.ceil(restante / 3600000);
+                        plazo.textContent = horas > 24
+                            ? 'Esta notificación se ocultará en ' + Math.ceil(horas / 24) + ' días.'
+                            : 'Esta notificación se ocultará en ' + horas + (horas === 1 ? ' hora.' : ' horas.');
+                        window.setTimeout(actualizarPlazo, Math.min(restante, 60000));
+                    }
+                    actualizarPlazo();
+                }
+
                 return nodo;
             }
 
             function marcarLeidas() {
                 if (!endpointLeidas) {
-                    return;
+                    return Promise.resolve();
                 }
 
-                fetch(endpointLeidas, {
+                return fetch(endpointLeidas, {
                     method: 'PATCH',
                     headers: {
                         'Accept': 'application/json',
@@ -302,12 +326,12 @@
                             lista.appendChild(crearTarjeta(notificacion));
                         });
                         actualizarVacio();
-                        marcarLeidas();
                     })
                     .catch(actualizarVacio);
             }
 
-            cargar();
+            // El servidor fija la fecha antes de devolver el plazo de cada aviso.
+            marcarLeidas().then(cargar);
         })();
     </script>
 @endsection

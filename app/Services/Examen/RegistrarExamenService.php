@@ -230,6 +230,9 @@ class RegistrarExamenService
      * lista `estudiante_examen` filtrado por examen, y esa tabla queda vacía si
      * el alta no la puebla. El monitor no "hereda" estudiantes del curso.
      *
+     * Nota: si el curso no tiene estudiantes, `$filas` queda vacío y no se
+     * inserta nada en `estudiante_examen`; por eso el monitor queda vacío.
+     *
      * `id_estudiante_examen` es entero sin secuencia (como `id_examen`), así que
      * el id se calcula como max()+1 dentro de la misma transacción que crea el
      * examen, con la tabla bloqueada igual que en siguienteIdExamen().

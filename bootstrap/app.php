@@ -23,6 +23,7 @@ $app = Application::configure(basePath: $basePath)
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->alias([
             'docente' => \App\Http\Middleware\EnsureDocente::class,
+            'puede-gestionar-auxiliares' => \App\Http\Middleware\EnsurePuedeGestionarAuxiliares::class,
         ]);
 
         // En produccion la app corre detras del proxy HTTPS de la UMSS: sin

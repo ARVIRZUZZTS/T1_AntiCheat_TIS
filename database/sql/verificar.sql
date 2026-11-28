@@ -26,8 +26,8 @@ SELECT
 
 
 -- ============================================================================
---  BLOQUE 2 - Las 25 tablas del dominio
---  Debe devolver 25 filas, todas con existe = true
+--  BLOQUE 2 - Las 35 tablas del dominio
+--  Debe devolver 35 filas, todas con existe = true
 -- ============================================================================
 
 WITH esperadas(nombre) AS (
@@ -40,7 +40,12 @@ WITH esperadas(nombre) AS (
         ('estudiante_examen'), ('estudiante_examen_ambiente'),
         ('registro_asistencia'), ('central_riesgo'),
         ('notificacion_docente'), ('notificacion_auxiliar'),
-        ('invitacion_examen_compartido')
+        ('invitacion_examen_compartido'),
+        ('auxiliar_examen'), ('central_riesgo_motivo'),
+        ('configuracion_examen_docente'), ('configuracion_examen_material'),
+        ('configuracion_examen_norma'), ('configuracion_material_personalizado'),
+        ('configuracion_norma_personalizada'), ('material_personalizado'),
+        ('norma_personalizada'), ('validacion_registro')
 )
 SELECT
     e.nombre                AS tabla,
@@ -64,7 +69,7 @@ SELECT
 FROM pg_type t
 JOIN pg_enum e ON e.enumtypid = t.oid
 WHERE t.typname IN (
-    'registrador_tipo', 'tipo_infraccion', 'estado_incidencia', 'curso_estado',
+    'registrador_tipo', 'tipo_infraccion', 'motivo', 'curso_estado',
     'nombre_tipo_gestion', 'estado_notificacion', 'tipo_examen_nombre',
     'estudiante_examen_estado', 'estado_usuario', 'invitacion_estado', 'roles'
 )
@@ -103,6 +108,16 @@ UNION ALL SELECT 'central_riesgo', COUNT(*) FROM central_riesgo
 UNION ALL SELECT 'notificacion_docente', COUNT(*) FROM notificacion_docente
 UNION ALL SELECT 'notificacion_auxiliar', COUNT(*) FROM notificacion_auxiliar
 UNION ALL SELECT 'invitacion_examen_compartido', COUNT(*) FROM invitacion_examen_compartido
+UNION ALL SELECT 'auxiliar_examen', COUNT(*) FROM auxiliar_examen
+UNION ALL SELECT 'central_riesgo_motivo', COUNT(*) FROM central_riesgo_motivo
+UNION ALL SELECT 'configuracion_examen_docente', COUNT(*) FROM configuracion_examen_docente
+UNION ALL SELECT 'configuracion_examen_material', COUNT(*) FROM configuracion_examen_material
+UNION ALL SELECT 'configuracion_examen_norma', COUNT(*) FROM configuracion_examen_norma
+UNION ALL SELECT 'configuracion_material_personalizado', COUNT(*) FROM configuracion_material_personalizado
+UNION ALL SELECT 'configuracion_norma_personalizada', COUNT(*) FROM configuracion_norma_personalizada
+UNION ALL SELECT 'material_personalizado', COUNT(*) FROM material_personalizado
+UNION ALL SELECT 'norma_personalizada', COUNT(*) FROM norma_personalizada
+UNION ALL SELECT 'validacion_registro', COUNT(*) FROM validacion_registro
 ORDER BY tabla;
 
 
@@ -152,7 +167,6 @@ SELECT
     es.nombre_estudiante || ' ' || es.apellido_estudiante AS estudiante,
     c.nombre_curso                              AS curso,
     cr.tipo_infraccion::text                     AS infraccion,
-    cr.estado_incidencia::text                   AS estado_incidencia,
     to_char(ra.hora_ingreso, 'HH24:MI')         AS hora_ingreso
 FROM central_riesgo cr
 JOIN registro_asistencia ra ON ra.id_ingreso   = cr.id_ingreso
@@ -166,7 +180,7 @@ ORDER BY cr.id_registro;
 
 -- ============================================================================
 --  BLOQUE 7 - Carga la tabla de migraciones de Laravel
---  Con 000_deploy_completo.sql trae 4 filas. Si la tabla NO existe es que
+--  Con 000_deploy_completo.sql trae 28 filas. Si la tabla NO existe es que
 --  cargaste solo 001/002/003: en el servidor no se corre php artisan migrate.
 -- ============================================================================
 

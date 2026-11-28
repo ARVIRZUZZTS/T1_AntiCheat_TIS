@@ -11,6 +11,7 @@
  * @updated 2026-10-25
  * @updated 2026-11-07
  * @updated 2026-11-22
+ * @updated 2026-11-23
  *
  * @description
  * Componente Livewire de página completa del monitor en vivo: resuelve el
@@ -79,6 +80,9 @@
  *   examen (con su docente a cargo) y las acciones valen para cualquiera de
  *   ellos; las reglas y materiales siguen siendo los del docente que mira.
  *   Una accion limpia la cache del monitor de todos los docentes del examen.
+ * - 2026-11-23  refactor: el modo de vista (ingreso/monitor) se fija por la
+ *   ruta (?modo=) en mount(); se eliminan los conteos y ajustarExamenPrueba();
+ *   en modo ingreso la tabla queda vacía hasta buscar.
  */
 
 namespace App\Livewire\Monitoreo;
@@ -101,6 +105,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
@@ -196,8 +201,10 @@ class MonitorEnVivo extends Component
     /**
      * Fija el examen más reciente, que es el que el monitor sigue.
      */
-    public function mount(): void
+    public function mount(string $modo = 'ingreso'): void
     {
+        $this->modoVista = $modo === 'monitor' ? 'monitor' : 'ingreso';
+
         $ahora = now();
 
         $consulta = $this->consultaExamenesAccesibles();
@@ -220,7 +227,13 @@ class MonitorEnVivo extends Component
             $examen = $fallback
                 ->orderByDesc('fecha')
                 ->orderByDesc('id_examen')
-                ->firstOrFail();
+                ->first();
+        }
+
+        if ($examen === null) {
+            $this->idExamen = 0;
+
+            return;
         }
 
         $this->idExamen = (int) $examen->id_examen;
@@ -246,6 +259,10 @@ class MonitorEnVivo extends Component
     #[Computed]
     public function informe(): array
     {
+        if ($this->idExamen === 0) {
+            return [];
+        }
+
         return Cache::remember(
             $this->claveCacheInforme(),
             now()->addMinutes(self::CACHE_INFORME_MINUTOS),
@@ -261,8 +278,12 @@ class MonitorEnVivo extends Component
      * Examen que sigue el monitor.
      */
     #[Computed]
-    public function examen(): Examen
+    public function examen(): ?Examen
     {
+        if ($this->idExamen === 0) {
+            return null;
+        }
+
         return $this->informe['examen'];
     }
 
@@ -275,6 +296,16 @@ class MonitorEnVivo extends Component
     #[Computed]
     public function estudiantes(): LengthAwarePaginator
     {
+        if ($this->idExamen === 0) {
+            return new LengthAwarePaginator(
+                collect(),
+                0,
+                (int) config('monitoreo.por_pagina', 10),
+                1,
+                ['path' => LengthAwarePaginator::resolveCurrentPath()],
+            );
+        }
+
         $todos = $this->estudiantesFiltrados();
         $porPagina = (int) config('monitoreo.por_pagina', 10);
         $pagina = max(1, $this->pagina);
@@ -302,7 +333,15 @@ class MonitorEnVivo extends Component
      */
     private function estudiantesFiltrados(): Collection
     {
-        $todos = $this->informe['estudiantes'];
+        if ($this->idExamen === 0) {
+            return collect();
+        }
+
+        if ($this->modoVista === 'ingreso' && trim($this->busqueda) === '') {
+            return collect();
+        }
+
+        $todos = $this->informe['estudiantes'] ?? collect();
 
         if ($this->modoVista === 'ingreso') {
             $todos = $todos->whereIn('estado_asistencia', ['pendiente', 'presente', 'rechazado'])->values();
@@ -360,33 +399,6 @@ class MonitorEnVivo extends Component
     }
 
     /**
-     * Conteos de las tarjetas del encabezado.
-     *
-     * `habilitados` y `deshabilitados` cuentan la habilitación de la
-     * inscripción; `sospechosos` y `tramposos` el tipo de incidencia vigente
-     * de cada estudiante. Son dos ejes distintos —un tramposo también está
-     * habilitado o deshabilitado—, así que las cuatro tarjetas no suman
-     * `inscritos`.
-     *
-     * @return array{inscritos: int, habilitados: int, deshabilitados: int, sospechosos: int, tramposos: int}
-     */
-    #[Computed]
-    public function conteos(): array
-    {
-        $estudiantes = $this->informe['estudiantes'];
-
-        $tipoIncidencia = fn (array $fila): ?string => $fila['incidencia']['tipo'] ?? null;
-
-        return [
-            'inscritos' => $estudiantes->count(),
-            'habilitados' => $estudiantes->where('habilitado', true)->count(),
-            'deshabilitados' => $estudiantes->where('habilitado', false)->count(),
-            'sospechosos' => $estudiantes->filter(fn (array $fila): bool => $tipoIncidencia($fila) === TipoInfraccion::Sospechoso->value)->count(),
-            'tramposos' => $estudiantes->filter(fn (array $fila): bool => $tipoIncidencia($fila) === TipoInfraccion::Tramposo->value)->count(),
-        ];
-    }
-
-    /**
      * Cambia la página visible de la tabla.
      *
      * @param  int  $pagina  Página solicitada por la paginación.
@@ -395,24 +407,6 @@ class MonitorEnVivo extends Component
      * Cambia la vista activa del monitor (ingreso / monitor) y vuelve a la
      * primera página.
      */
-    /**
-     * Ajusta la hora del examen actual para pruebas (mock). Se elimina en
-     * producción.
-     */
-    public function ajustarExamenPrueba(int $minutos): void
-    {
-        $examen = $this->examen;
-        app(\App\Services\Curso\AsegurarCursoEditableService::class)->asegurarExamenEditable($examen, 'examen');
-
-        $nuevaHora = now()->addMinutes($minutos);
-
-        $examen->fecha = $nuevaHora->toDateString();
-        $examen->hora_inicio = $nuevaHora->format('H:i:s');
-        $examen->save();
-
-        Cache::forget($this->claveCacheInforme());
-    }
-
     public function totalProximosExamenes(): int
     {
         return $this->consultaExamenesAccesibles()
@@ -428,7 +422,7 @@ class MonitorEnVivo extends Component
             return 'Próximos 5+ exámenes';
         }
 
-        return 'Próximos ' . $total . ' ' . ($total === 1 ? 'examen' : 'exámenes');
+        return 'Próximos '.$total.' '.($total === 1 ? 'examen' : 'exámenes');
     }
 
     public function seleccionarExamen(int $idExamen): void
@@ -475,21 +469,21 @@ class MonitorEnVivo extends Component
                 ->distinct('id_estudiante')
                 ->count('id_estudiante');
 
-            $inicio = Carbon::parse($examen->fecha . ' ' . $examen->hora_inicio);
+            $inicio = Carbon::parse($examen->fecha.' '.$examen->hora_inicio);
             $minutosParaInicio = (int) now()->diffInMinutes($inicio, false);
 
             if ($minutosParaInicio <= 0) {
                 $tiempoRestante = 'En curso';
             } elseif ($minutosParaInicio < 60) {
-                $tiempoRestante = 'En ' . $minutosParaInicio . ' min';
+                $tiempoRestante = 'En '.$minutosParaInicio.' min';
             } elseif ($minutosParaInicio < 1440) {
                 $horas = intdiv($minutosParaInicio, 60);
                 $minutos = $minutosParaInicio % 60;
-                $tiempoRestante = 'En ' . $horas . ' h ' . $minutos . ' min';
+                $tiempoRestante = 'En '.$horas.' h '.$minutos.' min';
             } elseif ($minutosParaInicio < 10080) {
                 $dias = intdiv($minutosParaInicio, 1440);
                 $horas = intdiv($minutosParaInicio % 1440, 60);
-                $tiempoRestante = 'En ' . $dias . ' días ' . $horas . ' h';
+                $tiempoRestante = 'En '.$dias.' días '.$horas.' h';
             } else {
                 $tiempoRestante = '+7 días';
             }
@@ -576,6 +570,7 @@ class MonitorEnVivo extends Component
      * los nombres y apellidos (separarNombreCompleto()).
      *
      * @author Valery D. Ortuno P <valerydariana98@gmail.com>
+     *
      * @since  2026-10-25
      */
     public function abrirRegistroNoInscrito(): void
@@ -606,6 +601,7 @@ class MonitorEnVivo extends Component
      * @return array{nombre: string, apellido: string}
      *
      * @author Valery D. Ortuno P <valerydariana98@gmail.com>
+     *
      * @since  2026-10-25
      */
     private function separarNombreCompleto(string $nombreCompleto): array
@@ -627,6 +623,7 @@ class MonitorEnVivo extends Component
      * @param  string  $sis  Código SIS escrito en el modal.
      *
      * @author Valery D. Ortuno P <valerydariana98@gmail.com>
+     *
      * @since  2026-10-25
      */
     #[On('consultar-no-inscrito')]
@@ -657,6 +654,7 @@ class MonitorEnVivo extends Component
      * un auxiliar registra "En revision" y un docente "Confirmado".
      *
      * @author Valery D. Ortuno P <valerydariana98@gmail.com>
+     *
      * @since  2026-10-25
      */
     #[Computed]
@@ -756,6 +754,7 @@ class MonitorEnVivo extends Component
      * apellidos que se escribieron (como no verificado).
      *
      * @author Valery D. Ortuno P <valerydariana98@gmail.com>
+     *
      * @since  2026-10-25
      */
     #[On('registrar-no-inscrito')]
@@ -802,14 +801,14 @@ class MonitorEnVivo extends Component
                 );
             } catch (InvalidArgumentException $e) {
                 // Estudiante no inscrito: no hay fila que deshabilitar.
-            } catch (\Illuminate\Validation\ValidationException $e) {
+            } catch (ValidationException $e) {
                 // No bloquear el registro ya realizado si no se puede deshabilitar.
             }
         } catch (InvalidArgumentException $e) {
             $this->mensajeError = $e->getMessage();
 
             return;
-        } catch (\Illuminate\Validation\ValidationException $e) {
+        } catch (ValidationException $e) {
             $this->mensajeError = (string) collect($e->errors())->flatten()->first();
 
             return;
@@ -833,6 +832,10 @@ class MonitorEnVivo extends Component
     public function estadoAcceso(): string
     {
         $examen = $this->examen;
+
+        if ($examen === null) {
+            return 'finalizado';
+        }
         $inicio = Carbon::parse($examen->fecha.' '.$examen->hora_inicio);
         $fin = $examen->hora_fin
             ? Carbon::parse($examen->fecha.' '.$examen->hora_fin)
@@ -856,6 +859,11 @@ class MonitorEnVivo extends Component
     public function minutosParaInicio(): int
     {
         $examen = $this->examen;
+
+        if ($examen === null) {
+            return 0;
+        }
+
         $inicio = Carbon::parse($examen->fecha.' '.$examen->hora_inicio);
 
         return (int) now()->diffInMinutes($inicio, false);
@@ -885,7 +893,7 @@ class MonitorEnVivo extends Component
             $this->filtro = 'todos';
         } catch (InvalidArgumentException $e) {
             $this->mensajeError = $e->getMessage();
-        } catch (\Illuminate\Validation\ValidationException $e) {
+        } catch (ValidationException $e) {
             $this->mensajeError = (string) collect($e->errors())->flatten()->first();
         }
     }
@@ -918,7 +926,13 @@ class MonitorEnVivo extends Component
     /** Usuario registrador como modelo (el servicio de incidencias lee sus roles). */
     private function registrador(): Usuario
     {
-        return auth()->user() ?? Usuario::query()->findOrFail((int) $this->examen->creador);
+        $creador = $this->examen?->creador;
+
+        if ($creador === null && auth()->user() === null) {
+            throw new \RuntimeException('No hay examen en curso ni usuario autenticado.');
+        }
+
+        return auth()->user() ?? Usuario::query()->findOrFail((int) $creador);
     }
 
     private function consultaExamenesAccesibles()

@@ -97,7 +97,7 @@ class ListarAuxiliaresDocenteServiceTest extends TestCase
         $this->assertCount(6, $filas);
     }
 
-    public function test_consulta_en_dos_queries_sin_n_mas_uno(): void
+    public function test_consulta_en_tres_queries_sin_n_mas_uno(): void
     {
         $consultas = 0;
         DB::listen(function () use (&$consultas): void {
@@ -107,7 +107,9 @@ class ListarAuxiliaresDocenteServiceTest extends TestCase
         $filas = $this->servicio()->ejecutar(self::DOCENTE);
 
         $this->assertCount(6, $filas);
-        $this->assertSame(2, $consultas, 'Cuentas y asignaciones salen en dos consultas, sin N+1.');
+        // Cuentas, asignaciones a cursos y asignaciones a examenes: tres
+        // consultas constantes, sin N+1 por auxiliar.
+        $this->assertSame(3, $consultas, 'Cuentas y asignaciones salen en tres consultas, sin N+1.');
     }
 
     public function test_el_orden_es_activos_luego_inactivos_y_apellido(): void

@@ -88,7 +88,7 @@ trait NormalizaDatosExamen
     /**
      * Id del tipo de examen en el catalogo.
      *
-     * El formulario manda el nombre del tipo ('examen parcial', 'examen final'...)
+     * El formulario manda el nombre del tipo ('examen primer parcial', 'examen final'...)
      * porque es lo que se muestra, y la columna guarda el id. Que el nombre sea
      * valido lo controla el request; esto cubre el otro caso: que este en el enum
      * pero no tenga fila en `tipo_examen`.

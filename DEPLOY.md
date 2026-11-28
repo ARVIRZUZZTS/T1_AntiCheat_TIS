@@ -297,7 +297,7 @@ muchos datos en sesion, van a necesitar `storage/` escribible igual.
    comoda es comprimirlo localmente y subir el `.zip`.
 2. **Cargar la base.** phpPgAdmin -> pestana SQL, con **"Paginar resultados"
    desmarcado**, y correr `database/sql/000_deploy_completo.sql`. Ese unico
-   archivo trae esquema (11 ENUM + 33 tablas), datos y sequences sincronizados:
+   archivo trae esquema (11 ENUM + 44 tablas), datos y sequences sincronizados:
    no hace falta correr `001`, `002` y `003` por separado. Si la base ya
    tiene tablas, no lo corras (ver seccion 8).
 3. Subir y descomprimir `1_raiz.zip` en la raiz.
@@ -415,9 +415,9 @@ Correr `database/sql/verificar.sql`. Debe dar:
 | 4 | 25 filas. Con el `000_deploy_completo.sql`: `estudiante` 54, `estudiante_examen` 53, `registro_asistencia` 31, `central_riesgo` 4, `notificacion_docente` 4, `tipo_gestion` 4, `rol` 2, y el resto 5. Con el `002_seed_data.sql` viejo todas dan 5 |
 | 5 | 5 filas, todas `huerfanos = 0` |
 | 6 | 4 filas de datos cruzados |
-| 7 | 4 filas (`0001_01_01_000000_create_users_table`, `..._create_cache_table`, `..._create_jobs_table`, `2026_09_27_000001_migracion_servidor_oficial`). Si la tabla no existe es que cargaste solo el `001`/`002` |
+| 7 | 28 filas (todas las migraciones del proyecto). Si la tabla no existe es que cargaste solo el `001`/`002` |
 
-La base completa son **34 tablas**: las 25 del proyecto, las 8 de Laravel y la
+La base completa son **44 tablas**: las 35 del proyecto, las 8 de Laravel y la
 tabla `migrations`. Para comprobar solo las 8 de Laravel:
 
 ```sql

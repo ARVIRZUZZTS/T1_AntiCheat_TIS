@@ -10,6 +10,7 @@
     @updated 2026-11-09
     @updated 2026-11-14
     @updated 2026-11-19
+    @updated 2026-11-27
 
     @description
     Componente UI Blade reutilizable con el formulario de alta de un examen en
@@ -21,6 +22,11 @@
     ahí recibe `cursos` y muestra un selector de curso obligatorio, mientras la
     URL de envío se arma con el curso elegido. Las páginas de compatibilidad por
     curso no pasan `cursos`, así que conservan el curso fijo de solo lectura.
+
+    Al crear o editar, el formulario consulta los exámenes del docente antes de
+    enviar: si la fecha elegida ya tiene otro examen, abre un aviso con un botón
+    principal ("Crear" o "Guardar cambios") y "Cancelar" para confirmar. En la
+    edición se compara contra la fecha original y se descarta el propio examen.
 
     La fecha se escribe dd/mm/aaaa con los separadores colocados a mano (así el
     formato no depende del navegador); las barras se ponen solas y el año en
@@ -193,7 +199,11 @@
       ya existe aunque este escrito distinto (espacios, guiones, acentos, ceros a
       la izquierda): se avisa cual es y se puede elegir. La busqueda tambien lo
       encuentra escrito asi.
+    - 2026-11-27  [Equipo T1]  feat: si la fecha ya tiene otro examen del docente,
+      se abre un aviso con "Crear"/"Cancelar" al alta y con "Guardar
+      cambios"/"Cancelar" al editar, descartando el propio examen.
 
+    @see  App\Http\Controllers\Api\ExamenDocenteController
     @see  resources/views/pages/examen-crear.blade.php
     @see  App\Enums\TipoExamen
     @see  App\Services\Ambiente\ListarAmbientesService
@@ -330,6 +340,16 @@
         normasPersonalizadas: @js(old('normas_personalizadas', '')),
         errores: @js($mensajes),
         mostrarErrores: @js($mensajes !== []),
+        // Aviso de fecha repetida, tanto al crear como al editar: compara la
+        // fecha elegida con los examenes del docente; el servidor sigue siendo
+        // quien valida el guardado.
+        urlListaExamenes: @js(route('api.examenes.listar')),
+        fechaOriginal: @js(old('fecha', '')),
+        confirmando: false,
+        confirmacionAceptada: false,
+        confirmacionEdicionAceptada: false,
+        avisoMismoDia: false,
+        mensajeMismoDia: '',
 
         // El catalogo de ambientes llega en el bloque de script de abajo. `termino` ya
         // viene en minusculas desde el servicio, asi que aca no se normaliza nada.
@@ -357,8 +377,11 @@
                 this.$watch(propiedad, () => {
                     this.limpiarErrores(campos);
                     // Tocar un campo tras guardar oculta el aviso de exito: lo
-                    // guardado ya no coincide del todo con lo que se ve.
+                    // guardado ya no coincide del todo con lo que se ve. Tambien
+                    // invalida una confirmacion de fecha ya aceptada.
                     this.exito = false;
+                    this.confirmacionAceptada = false;
+                    this.confirmacionEdicionAceptada = false;
                 });
             });
         },
@@ -423,6 +446,92 @@
             this.indiceAmbientes = ambientes ? JSON.parse(ambientes.textContent) : [];
         },
 
+        // La fecha del formulario va en dd/mm/aaaa; el listado de examenes
+        // devuelve la fecha de la base en aaaa-mm-dd.
+        fechaIso() {
+            const partes = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(this.fecha.trim());
+
+            return partes ? `${partes[3]}-${partes[2]}-${partes[1]}` : '';
+        },
+
+        // Consulta los examenes del docente. En edicion se descarta el examen
+        // que se esta modificando para que su propia fecha no dispare el aviso.
+        // Si la consulta falla, se deja pasar: el servidor vuelve a validar y no
+        // se bloquea el formulario por un problema de red.
+        async hayExamenEnFecha(fecha, idExcluido = null) {
+            this.confirmando = true;
+
+            try {
+                const respuesta = await fetch(this.urlListaExamenes, {
+                    headers: { 'Accept': 'application/json' },
+                    credentials: 'same-origin',
+                });
+
+                if (! respuesta.ok) {
+                    return false;
+                }
+
+                const cuerpo = await respuesta.json().catch(() => ({}));
+
+                return (cuerpo.datos ?? []).some((examen) =>
+                    String(examen.fecha ?? '').slice(0, 10) === fecha
+                    && String(examen.id ?? '') !== String(idExcluido ?? '')
+                );
+            } catch (error) {
+                return false;
+            } finally {
+                this.confirmando = false;
+            }
+        },
+
+        // El alta se frena solo cuando ya hay otro examen ese dia.
+        async confirmarCreacion(evento) {
+            if (this.confirmacionAceptada || this.confirmando || this.avisoMismoDia) {
+                return;
+            }
+
+            evento.preventDefault();
+
+            const fecha = this.fechaIso();
+
+            if (fecha === '') {
+                this.enviarCreacion();
+
+                return;
+            }
+
+            if (await this.hayExamenEnFecha(fecha)) {
+                this.mensajeMismoDia = `Ya tiene un examen programado para el ${this.fecha}. ¿Está seguro de crear otro examen para ese día?`;
+                this.avisoMismoDia = true;
+
+                return;
+            }
+
+            this.enviarCreacion();
+        },
+
+        // Confirmacion del aviso en modo edicion: reanuda guardar() con la
+        // bandera puesta para que vuelva a preguntar.
+        confirmarEdicion() {
+            this.avisoMismoDia = false;
+            this.confirmacionEdicionAceptada = true;
+            this.guardar();
+        },
+
+        // Segundo envio: la bandera evita que vuelva a abrirse el aviso.
+        enviarCreacion() {
+            this.avisoMismoDia = false;
+            this.confirmacionAceptada = true;
+
+            const formulario = this.$el.querySelector('form');
+
+            if (typeof formulario.requestSubmit === 'function') {
+                formulario.requestSubmit();
+            } else {
+                formulario.submit();
+            }
+        },
+
         // Precarga el formulario con lo que devuelve el endpoint de edicion.
         // Los ids se convierten a numero porque los valores de los checkbox y
         // del catalogo viajan como texto en el HTML.
@@ -436,6 +545,10 @@
             this.cursoId = datos.curso_id ?? this.cursoId;
             this.nombreCurso = datos.curso_nombre ?? this.nombreCurso;
             this.tipo = datos.tipo_examen ?? '';
+            this.fechaOriginal = datos.fecha ?? '';
+            this.confirmacionAceptada = false;
+            this.confirmacionEdicionAceptada = false;
+            this.avisoMismoDia = false;
             this.fecha = datos.fecha ?? '';
             this.horaInicio = datos.hora_inicio ?? '';
             this.duracion = datos.duracion === null || datos.duracion === undefined
@@ -460,8 +573,22 @@
         // fetch PUT: el endpoint responde JSON y hay que mostrar el exito o
         // repintar los errores por campo sin recargar la pagina.
         async guardar() {
-            if (this.guardando || this.examenId === '') {
+            if (this.guardando || this.confirmando || this.avisoMismoDia || this.examenId === '') {
                 return;
+            }
+
+            if (! this.confirmacionEdicionAceptada) {
+                const fecha = this.fechaIso();
+
+                if (fecha !== '' && this.fecha !== this.fechaOriginal
+                    && await this.hayExamenEnFecha(fecha, this.examenId)) {
+                    this.mensajeMismoDia = `Ya tiene un examen programado para el ${this.fecha}. ¿Está seguro de guardar el examen en ese día?`;
+                    this.avisoMismoDia = true;
+
+                    return;
+                }
+
+                this.confirmacionEdicionAceptada = true;
             }
 
             this.guardando = true;
@@ -503,6 +630,8 @@
                 this.errores = {};
                 this.mostrarErrores = false;
                 this.exito = true;
+                this.fechaOriginal = this.fecha;
+                this.confirmacionEdicionAceptada = false;
 
                 // El listado de la pestana filtra por fecha/hora futuras y arma
                 // las etiquetas: que se refresque para reflejar lo guardado.
@@ -897,7 +1026,13 @@
     @endif
     class="w-full"
 >
-    <form method="POST" x-bind:action="urlAccion" @if ($esEdicion) x-on:submit.prevent @endif>
+    <form method="POST" x-bind:action="urlAccion"
+        @if ($esEdicion)
+            x-on:submit.prevent
+        @else
+            x-on:submit="confirmarCreacion($event)"
+        @endif
+    >
         @csrf
         <input type="hidden" name="curso_id" x-bind:value="cursoId">
         @if ($tieneSelectorCurso)
@@ -1275,6 +1410,51 @@
         </div>
     @endif
 
+    {{-- Aviso de fecha repetida: sirve al crear y al editar. El formulario ya
+         verifico la fecha con el listado del docente. El boton principal
+         reenvia/guarda aceptando; "Cancelar" deja el formulario tal cual. --}}
+    <div
+            x-show="avisoMismoDia"
+            x-cloak
+            tabindex="-1"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="{{ $idPrefijo }}_titulo_aviso_mismo_dia"
+            @click.self="avisoMismoDia = false"
+            @keydown.escape.window="avisoMismoDia = false"
+            class="overflow-y-auto overflow-x-hidden fixed top-0 right-0 left-0 z-50 flex justify-center items-center w-full md:inset-0 h-full max-h-full bg-overlay-modal/50"
+        >
+            <div class="relative p-4 w-full max-w-md max-h-full">
+                <div class="relative bg-neutral-primary-soft border border-default rounded-base shadow-sm p-4 md:p-6">
+                    <div class="flex items-center justify-between border-b border-default pb-4 md:pb-5">
+                        <h3 id="{{ $idPrefijo }}_titulo_aviso_mismo_dia" class="text-lg font-medium text-heading">
+                            Examen ya programado
+                        </h3>
+                        <button type="button" @click="avisoMismoDia = false"
+                            class="text-body bg-transparent hover:bg-neutral-tertiary hover:text-heading rounded-base text-sm w-9 h-9 ms-auto inline-flex justify-center items-center cursor-pointer">
+                            <svg class="w-5 h-5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18 18 6M6 6l12 12"/></svg>
+                            <span class="sr-only">Cerrar aviso</span>
+                        </button>
+                    </div>
+
+                    <div class="py-4">
+                        <p class="text-sm text-body" x-text="mensajeMismoDia"></p>
+                    </div>
+
+                    <div class="flex flex-col gap-3 border-t border-default pt-4 sm:flex-row">
+                        <x-ui.button type="button" variant="default" class="w-full justify-center sm:w-auto"
+                            x-on:click="{{ $esEdicion ? 'confirmarEdicion()' : 'enviarCreacion()' }}">
+                            {{ $esEdicion ? 'Guardar cambios' : 'Crear' }}
+                        </x-ui.button>
+                        <x-ui.button-cancelar class="w-full justify-center sm:w-auto"
+                            @click="avisoMismoDia = false">
+                            Cancelar
+                        </x-ui.button-cancelar>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     <div class="border-t border-default pt-4 flex flex-col-reverse gap-[2vh] sm:flex-row">
         {{-- {{ }} y no la directiva js: dentro del atributo de un componente
              Blade las directivas no se compilan y llegaban tal cual al
@@ -1285,7 +1465,7 @@
              Al crear, el clic no hace nada extra y el botón envía el form. --}}
         <x-ui.button type="{{ $esEdicion ? 'button' : 'submit' }}" variant="default" class="flex-1"
             x-on:click="{{ $esEdicion ? 'guardar()' : '' }}"
-            x-bind:disabled="{{ $esEdicion ? 'guardando' : 'false' }}">
+            x-bind:disabled="{{ $esEdicion ? 'guardando || confirmando' : 'confirmando' }}">
             @if ($esEdicion)
                 <span x-text="guardando ? 'Guardando...' : 'Guardar cambios'"></span>
             @else

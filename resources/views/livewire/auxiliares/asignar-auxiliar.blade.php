@@ -77,11 +77,14 @@
              'i' => $indice,
              'az' => $posicionAlfabetica[$indice],
              'texto' => mb_strtolower(implode(' ', [
-                 $auxiliar['nombre'], $auxiliar['sis'],
+                 $auxiliar['nombre'], $auxiliar['sis'], $auxiliar['usuario'],
                  ...array_column($auxiliar['cursos'], 'nombre'),
                  ...array_column($auxiliar['examenes'], 'etiqueta'),
              ])),
          ])->values()),
+         // Auxiliar que llega preseleccionado desde Asignar ahora.
+         preseleccion: @js($auxiliarPreseleccionado),
+         fichas: @js(collect($auxiliares)->map(fn ($auxiliar) => ['id' => $auxiliar['id'], 'nombre' => $auxiliar['nombre']])->values()),
          // Paginacion en el navegador: buscar, ordenar y cambiar de pagina no
          // vuelven al servidor.
          pagina: 1,
@@ -89,6 +92,13 @@
          init() {
              this.$watch('busqueda', () => { this.pagina = 1; });
              this.$watch('orden', () => { this.pagina = 1; });
+             // Asignar ahora: abre el modal del auxiliar recien creado.
+             if (this.preseleccion) {
+                 const ficha = this.fichas.find((f) => f.id === this.preseleccion);
+                 if (ficha) {
+                     this.abrirAsignar(ficha);
+                 }
+             }
          },
          coincide(texto) {
              const termino = this.busqueda.trim().toLowerCase();
@@ -234,7 +244,7 @@
                     {{-- Auxiliar y su proximo examen. --}}
                     <div class="min-w-0 lg:pr-6">
                         <p class="text-lg font-semibold text-heading wrap-break-word">{{ $auxiliar['nombre'] }}</p>
-                        <p class="text-xs text-body">Codigo SIS: {{ $auxiliar['sis'] }}</p>
+                        <p class="text-xs text-body wrap-break-word">Usuario: {{ $auxiliar['usuario'] }}</p>
                         <p class="mt-2 text-xs font-semibold uppercase text-muted">Proximo examen:</p>
                         <p class="text-sm text-heading">{{ $proximo ? $proximo->format('d/m/Y H:i') : 'Sin examenes proximos' }}</p>
                     </div>

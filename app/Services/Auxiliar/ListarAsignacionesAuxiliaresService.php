@@ -46,6 +46,7 @@
 namespace App\Services\Auxiliar;
 
 use App\Enums\CursoEstado;
+use App\Enums\EstadoCuenta;
 use App\Models\Rol;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -56,6 +57,9 @@ class ListarAsignacionesAuxiliaresService
 {
     private const NOMBRE_USUARIO = "trim(coalesce(nullif(u.nombre, ''), u.nombre_usuario, '') || ' ' || coalesce(u.apellido, ''))";
 
+    /** Usuario de acceso que se muestra: el nombre de usuario (generado). */
+    private const USUARIO = 'u.nombre_usuario';
+
     /**
      * @return array{
      *     auxiliares: list<array{id: int, nombre: string, sis: string, proximo: ?string, cursos: list<array{id: int, nombre: string}>, examenes: list<array{id: int, etiqueta: string, ingreso: bool, monitor: bool}>}>,
@@ -63,19 +67,23 @@ class ListarAsignacionesAuxiliaresService
      *     examenes: list<array{id: int, etiqueta: string}>
      * }
      */
-    public function ejecutar(int $idDocente): array
+    public function ejecutar(int $idDocente, ?int $idCoordinador = null): array
     {
         $auxiliares = DB::table('usuario as u')
             ->join('rol_usuario as ru', 'ru.id_usuario', '=', 'u.id_usuario')
             ->join('rol as r', 'r.id_rol', '=', 'ru.id_rol')
             ->where('r.nombre_rol', Rol::NOMBRE_AUXILIAR)
-            ->selectRaw('u.id_usuario as id, u.cod_sis as sis, '.self::NOMBRE_USUARIO.' as nombre')
+            // Los auxiliares eliminados (borrado lógico) no se pueden asignar.
+            ->where('u.estado_cuenta', '!=', EstadoCuenta::Eliminada->value)
+            // Un coordinador no puede asignarse a si mismo: no aparece en la lista.
+            ->when($idCoordinador !== null, fn ($consulta) => $consulta->where('u.id_usuario', '!=', $idCoordinador))
+            ->selectRaw('u.id_usuario as id, u.cod_sis as sis, '.self::USUARIO.' as usuario, '.self::NOMBRE_USUARIO.' as nombre')
             ->orderBy('nombre')
             ->get();
 
         $ahora = now();
         // Asignaciones y opciones del modal en un solo viaje.
-        $consultas = [...$this->asignaciones($idDocente, $ahora), ...$this->opciones($idDocente, $ahora)];
+        $consultas = [...$this->asignaciones($idDocente, $ahora), ...$this->opciones($idDocente, $ahora, $idCoordinador)];
         $union = array_shift($consultas);
         foreach ($consultas as $consulta) {
             $union->unionAll($consulta);
@@ -94,6 +102,7 @@ class ListarAsignacionesAuxiliaresService
                 'id' => (int) $auxiliar->id,
                 'nombre' => trim((string) $auxiliar->nombre),
                 'sis' => trim((string) $auxiliar->sis),
+                'usuario' => trim((string) $auxiliar->usuario),
                 // El examen por venir mas cercano: el proximo de cada curso
                 // asignado o un examen asignado que aun no empezo.
                 'proximo' => $asignaciones->where('id_auxiliar', $auxiliar->id)
@@ -178,13 +187,18 @@ class ListarAsignacionesAuxiliaresService
      * Opciones del modal: cursos en curso del docente y examenes futuros de
      * sus cursos (una fila por examen y curso).
      *
+     * Si actua un coordinador (`$idCoordinador`), solo se ofrecen los cursos del
+     * docente responsable en los que el coordinador mismo esta asignado, y los
+     * examenes de esos cursos.
+     *
      * @return list<\Illuminate\Database\Query\Builder>
      */
-    private function opciones(int $idDocente, Carbon $ahora): array
+    private function opciones(int $idDocente, Carbon $ahora, ?int $idCoordinador = null): array
     {
         $cursos = DB::table('curso as c')
             ->where('c.sis_doc', $idDocente)
             ->where('c.estado', CursoEstado::EnCurso->value)
+            ->when($idCoordinador !== null, fn ($consulta) => $this->soloCursosDelCoordinador($consulta, $idCoordinador))
             ->selectRaw("'opcion' as origen, 'curso' as tipo, null as id_auxiliar, c.id_curso as id, c.nombre_curso as texto, null as tipo_examen, null as fecha, null as hora_inicio, null as ver_ingreso, null as ver_monitor, null as proximo");
 
         $examenes = DB::table('examen as e')
@@ -193,10 +207,21 @@ class ListarAsignacionesAuxiliaresService
             ->leftJoin('tipo_examen as t', 't.id_tipo_examen', '=', 'e.tipo_examen')
             ->where('c.sis_doc', $idDocente)
             ->where('c.estado', CursoEstado::EnCurso->value)
+            ->when($idCoordinador !== null, fn ($consulta) => $this->soloCursosDelCoordinador($consulta, $idCoordinador))
             ->where(fn ($consulta) => $this->futuro($consulta, $ahora))
             ->selectRaw("'opcion' as origen, 'examen' as tipo, null as id_auxiliar, e.id_examen as id, c.nombre_curso as texto, t.nombre_tipo_examen as tipo_examen, e.fecha, e.hora_inicio, null as ver_ingreso, null as ver_monitor, null as proximo");
 
         return [$cursos, $examenes];
+    }
+
+    /** Limita a los cursos (`c`) en los que el coordinador tiene asignacion activa. */
+    private function soloCursosDelCoordinador($consulta, int $idCoordinador)
+    {
+        return $consulta->whereExists(fn ($sub) => $sub->from('auxiliar_curso as acc')
+            ->whereColumn('acc.id_curso', 'c.id_curso')
+            ->where('acc.id_auxiliar', $idCoordinador)
+            ->where('acc.estado', AccesoAuxiliarService::ESTADO_ACTIVO)
+            ->selectRaw('1'));
     }
 
     /** Examen que aun no empezo: fecha posterior a hoy, o de hoy con hora por venir. */

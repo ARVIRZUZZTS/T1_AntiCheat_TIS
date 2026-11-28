@@ -66,7 +66,7 @@ class ConfiguracionSeparadaDocenteTest extends TestCase
         ]);
         DB::table('tipo_examen')->insert([
             'id_tipo_examen' => self::TIPO_EXAMEN,
-            'nombre_tipo_examen' => 'examen parcial',
+            'nombre_tipo_examen' => 'examen primer parcial',
         ]);
         DB::table('curso')->insert([
             ['id_curso' => self::CURSO_A, 'nombre_curso' => 'Curso A', 'sis_doc' => self::DOCENTE_A, 'fecha_creacion' => now()->toDateString(), 'estado' => 'EnCurso'],

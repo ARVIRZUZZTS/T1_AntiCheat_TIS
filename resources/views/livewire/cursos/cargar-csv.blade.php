@@ -2,13 +2,15 @@
     @file    cargar-csv.blade.php
     @author  Equipo T1
     @created 2026-11-21
-    @updated 2026-11-23
+    @updated 2026-11-24
 
     @description
     Vista de la subopción «Cargar CSV» (HU 25): selector de curso (solo cursos
     activos gestionables), zona de carga con arrastrar y soltar visible solo con
-    un curso elegido, y modal de confirmación de reemplazo cuando el curso ya
-    tiene estudiantes. La lógica vive en App\Livewire\Cursos\CargarCsv.
+    un curso elegido, y modal de confirmación de adición cuando el curso ya
+    tiene estudiantes (informa cuántos nuevos se añadirán y cuántos repetidos
+    se ignorarán; si no hay nuevos, avisa que no habrá cambios). La lógica
+    vive en App\Livewire\Cursos\CargarCsv.
 --}}
 
 <div class="px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
@@ -100,49 +102,68 @@
         @endif
     </div>
 
-    {{-- Modal de confirmación de reemplazo. --}}
-    @if ($mostrarModalReemplazo)
+    {{-- Modal de confirmación de adición de estudiantes nuevos. --}}
+    @if ($mostrarModalAgregados)
         <div
-            tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="titulo-reemplazo"
-            wire:click.self="cancelarReemplazo"
-            wire:keydown.escape.window="cancelarReemplazo"
+            tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="titulo-agregados"
+            wire:click.self="cancelarAgregacion"
+            wire:keydown.escape.window="cancelarAgregacion"
             class="fixed inset-0 z-50 flex h-full max-h-full w-full items-center justify-center overflow-y-auto overflow-x-hidden bg-overlay-modal/50"
         >
             <div class="relative w-full max-w-md p-4">
                 <div class="relative max-h-[calc(100vh-2rem)] overflow-y-auto rounded-base border border-default bg-neutral-primary-soft p-4 shadow-sm md:p-6">
                     <div class="flex items-center justify-between border-b border-default pb-4 md:pb-5">
-                        <h3 id="titulo-reemplazo" class="text-lg font-medium text-heading">Reemplazar estudiantes</h3>
-                        <button type="button" wire:click="cancelarReemplazo"
+                        <h3 id="titulo-agregados" class="text-lg font-medium text-heading">Añadir estudiantes</h3>
+                        <button type="button" wire:click="cancelarAgregacion"
                                 class="inline-flex h-11 w-11 items-center justify-center rounded-base bg-transparent text-body hover:bg-neutral-tertiary hover:text-heading">
                             <svg class="h-5 w-5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18 17.94 6M18 18 6.06 6"/></svg>
                             <span class="sr-only">Cerrar modal</span>
                         </button>
                     </div>
 
-                    <div class="space-y-3 py-4">
-                        <p class="text-sm text-body">
-                            Este curso ya tiene estudiantes registrados. Subir esta nueva lista
-                            <strong class="text-heading">reemplazará por completo</strong> a todos los estudiantes
-                            anteriores del curso.
-                        </p>
-                        <p class="text-sm text-body">¿Deseas continuar?</p>
-                    </div>
+                    @if ($nuevosConteo > 0)
+                        <div class="space-y-3 py-4">
+                            <p class="text-sm text-body">
+                                Este curso ya tiene estudiantes registrados. El archivo trae
+                                <strong class="text-heading">{{ $nuevosConteo }}</strong> estudiante(s) nuevo(s)
+                                que se añadirán; los
+                                <strong class="text-heading">{{ $repetidosConteo }}</strong> repetido(s)
+                                se ignorarán.
+                            </p>
+                            <p class="text-sm text-body">¿Deseas continuar?</p>
+                        </div>
 
-                    <div class="flex flex-col gap-3 border-t border-default pt-4 sm:flex-row sm:items-center">
-                        <x-ui.button type="button" variant="danger"
-                                     class="w-full min-h-11 justify-center sm:w-auto"
-                                     wire:click="confirmarReemplazo"
-                                     wire:loading.attr="disabled" wire:target="confirmarReemplazo">
-                            <span wire:loading.remove wire:target="confirmarReemplazo">Reemplazar</span>
-                            <span wire:loading wire:target="confirmarReemplazo">Reemplazando…</span>
-                        </x-ui.button>
-                        <x-ui.button-cancelar type="button"
-                                     class="w-full min-h-11 justify-center sm:w-auto"
-                                     wire:click="cancelarReemplazo"
-                                     wire:loading.attr="disabled" wire:target="confirmarReemplazo">
-                            Cancelar
-                        </x-ui.button-cancelar>
-                    </div>
+                        <div class="flex flex-col gap-3 border-t border-default pt-4 sm:flex-row sm:items-center">
+                            <x-ui.button type="button"
+                                         class="w-full min-h-11 justify-center sm:w-auto"
+                                         wire:click="confirmarAgregacion"
+                                         wire:loading.attr="disabled" wire:target="confirmarAgregacion">
+                                <span wire:loading.remove wire:target="confirmarAgregacion">Añadir {{ $nuevosConteo }} estudiante(s)</span>
+                                <span wire:loading wire:target="confirmarAgregacion">Añadiendo…</span>
+                            </x-ui.button>
+                            <x-ui.button-cancelar type="button"
+                                         class="w-full min-h-11 justify-center sm:w-auto"
+                                         wire:click="cancelarAgregacion"
+                                         wire:loading.attr="disabled" wire:target="confirmarAgregacion">
+                                Cancelar
+                            </x-ui.button-cancelar>
+                        </div>
+                    @else
+                        <div class="space-y-3 py-4">
+                            <p class="text-sm text-body">
+                                El archivo no trae estudiantes nuevos: todos ya están en el curso.
+                                <strong class="text-heading">No se realizará ningún cambio.</strong>
+                            </p>
+                        </div>
+
+                        <div class="flex flex-col gap-3 border-t border-default pt-4 sm:flex-row sm:items-center">
+                            <x-ui.button type="button" variant="secondary"
+                                         class="w-full min-h-11 justify-center sm:w-auto"
+                                         wire:click="cancelarAgregacion">
+                                Cerrar
+                            </x-ui.button>
+                        </div>
+                    @endif
                 </div>
             </div>
         </div>

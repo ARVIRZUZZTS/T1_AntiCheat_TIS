@@ -91,10 +91,14 @@
       auxiliar" y "Eliminar auxiliar".
     - 2026-11-24  [Equipo T1]  fix: el badge de notificaciones usa el conteo de
       avisos nuevos y baja a 0 cuando la bandeja los marca como leídos.
+    - 2026-11-24  refactor: reorganizacion de "Monitor en vivo": se agrega
+      "Proximos Examenes" (monitoreo.proximos) antes de Ingreso y Monitor.
     - 2026-11-24  [Alisson D. Alvarado <alvaradoalissondalet@gmail.com>]  feat:
       mostrar Ver cursos como unica opcion de Cursos para auxiliares.
     - 2026-11-24  [Alisson D. Alvarado <alvaradoalissondalet@gmail.com>]  fix:
       reconocer el rol auxiliar aunque no sea el primer rol del usuario.
+    - 2026-11-27  [Alisson D. Alvarado <alvaradoalissondalet@gmail.com>]  refactor:
+      retirar la opcion de editar cursos.
 --}}
 
 
@@ -119,7 +123,7 @@
     // el prop $active o con uno de sus patrones extra ($extra). El comodin
     // `ruta.*` solo se agrega cuando el nombre ya tiene punto (una hoja como
     // `cursos.crear`): si se aplicara al nombre pelado del listado (`cursos`)
-    // marcaria tambien a sus hermanas (`cursos.crear`, `cursos.editar`...) y se
+    // marcaria tambien a sus hermanas (`cursos.crear`, `cursos.eliminar`...) y se
     // resaltarian dos subopciones a la vez.
     $esActivo = function (?string $ruta, array $extra = []) use ($current, $active): bool {
         if ($ruta === null) {
@@ -158,7 +162,6 @@
         ['label' => 'Cursos', 'children' => [
             ['label' => 'Ver cursos', 'route' => 'cursos'],
             ['label' => 'Crear curso', 'route' => 'cursos.crear'],
-            ['label' => 'Editar curso', 'route' => 'cursos.editar'],
             ['label' => 'Eliminar curso', 'route' => 'cursos.eliminar'],
             // Archivar y restaurar comparten una sola lista de cursos. Los
             // archivados se ven con el filtro Archivados de "Ver cursos".
@@ -177,6 +180,7 @@
             ['label' => 'Dividir examen', 'route' => 'examenes.dividir'],
         ]],
         ['label' => 'Monitor en vivo', 'children' => [
+            ['label' => 'Próximos Exámenes', 'route' => 'monitoreo.proximos'],
             ['label' => 'Ingreso', 'route' => 'monitoreo.ingreso'],
             ['label' => 'Monitor', 'route' => 'monitoreo'],
         ]],
@@ -189,6 +193,7 @@
             ['label' => 'Ver auxiliares', 'route' => 'auxiliares'],
             ['label' => 'Crear auxiliar', 'route' => 'auxiliares.crear'],
             ['label' => 'Asignar auxiliar', 'route' => 'auxiliares.asignar'],
+            ['label' => 'Eliminar auxiliar', 'route' => 'auxiliares.eliminar'],
         ]],
         // Validacion del registro de docentes (HU 26): el contador muestra las
         // solicitudes pendientes y se actualiza al aprobar o rechazar.
@@ -214,6 +219,7 @@
         : ['ingreso' => false, 'monitor' => false];
 
     $monitorAuxiliar = array_values(array_filter([
+        $paginasAuxiliar['ingreso'] ? ['label' => 'Próximos Exámenes', 'route' => 'monitoreo.proximos'] : null,
         $paginasAuxiliar['ingreso'] ? ['label' => 'Ingreso', 'route' => 'monitoreo.ingreso'] : null,
         $paginasAuxiliar['monitor'] ? ['label' => 'Monitor', 'route' => 'monitoreo'] : null,
     ]));
@@ -228,6 +234,12 @@
             ['label' => 'Ver examenes', 'route' => 'auxiliar.examenes'],
         ]],
         $monitorAuxiliar !== [] ? ['label' => 'Monitor en vivo', 'children' => $monitorAuxiliar] : null,
+        // Coordinador: un auxiliar con permiso crea y asigna auxiliares.
+        $usuario && $usuario->puede_crear_auxiliares ? ['label' => 'Auxiliares', 'children' => [
+            ['label' => 'Crear auxiliar', 'route' => 'auxiliares.crear'],
+            ['label' => 'Asignar auxiliar', 'route' => 'auxiliares.asignar'],
+            ['label' => 'Eliminar auxiliar', 'route' => 'auxiliares.eliminar'],
+        ]] : null,
     ]));
 
     // El menu del auxiliar no debe sustituirse por opciones de otro rol.

@@ -77,13 +77,14 @@
       motivos; el badge «Incidencia» sale si alguno de ellos es de ingreso.
 --}}
 
-@section('title', 'Monitor en vivo')
+@section('title', $modoVista === 'monitor' ? 'Monitor en vivo' : 'Registro de ingresos')
 
 @php
     use Illuminate\View\ComponentAttributeBag;
     use Illuminate\View\ComponentSlot;
 
-    $examen = $this->examen;
+    if ($this->idExamen > 0) {
+        $examen = $this->examen;
     $finExamen = \Carbon\Carbon::parse($examen->hora_inicio)->addMinutes((int) $examen->duracion)->format('H:i');
     $materia = $examen->cursos->sortBy('id_curso')->first()?->nombre_curso ?? '—';
     $aula = $examen->ambientes->first()?->nombre_ambiente ?? '—';
@@ -281,6 +282,11 @@
     }
     $filas = array_merge($filas, $filasIngresados);
     $tarjetas = array_merge($tarjetas, $tarjetasIngresados);
+    } else {
+        $examen = null;
+        $filas = [];
+        $tarjetas = [];
+    }
 @endphp
 
 {{-- El título y el subtítulo los pinta x-ui.page-header (layouts/app.blade.php),
@@ -289,8 +295,6 @@
      componente compartido, y por eso se quedó sin la hamburguesa cuando se
      agregó ahí (el `@hasSection('header')` del layout hacía que esta vista
      nunca pasara por x-ui.page-header). --}}
-@section('subtitle', $this->textoProximosExamenes())
-
 <div class="flex flex-col gap-6 px-[2vh] mt-[2vh]">
     {{-- Los dos avisos se autodescartan a los 4s: antes se quedaban en
          pantalla para siempre hasta la próxima acción. `limpiarMensajes()`
@@ -310,60 +314,12 @@
         </div>
     @endif
 
-    {{-- Tarjetas de conteo: mismo componente y mismo grid (2 columnas en
-         mobile, 6 en desktop) que las 5 de /materias/{curso} — antes el
-         mobile tenA-a su propia card compacta distinta a la de desktop. --}}
-    <div class="grid grid-cols-2 gap-4 lg:grid-cols-6">
-        {{-- Sin ícono a propósito: "08:00 – 09:30" + el recuadro del ícono
-             no entran juntos en el ancho de la card con 6 (o 2) columnas. --}}
-        <x-ui.stat-card :value="substr($examen->hora_inicio, 0, 5) . ' – ' . $finExamen" label="En curso" tone="brand" label-first nowrap />
-
-        <x-ui.stat-card :value="$this->conteos['inscritos']" label="Inscritos" tone="brand">
-            <x-slot:icon>
-                <svg class="w-5 h-5 sm:w-6 sm:h-6" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-width="2" d="M16 19h4a1 1 0 0 0 1-1v-1a3 3 0 0 0-3-3h-2m-2.236-4a3 3 0 1 0 0-4M3 18v-1a3 3 0 0 1 3-3h4a3 3 0 0 1 3 3v1a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1Zm8-10a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg>
-            </x-slot:icon>
-        </x-ui.stat-card>
-
-        <x-ui.stat-card :value="$this->conteos['habilitados']" label="Habilitados" tone="success">
-            <x-slot:icon>
-                <svg class="w-5 h-5 sm:w-6 sm:h-6" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm-3-9 2 2 4-4"/></svg>
-            </x-slot:icon>
-        </x-ui.stat-card>
-
-        <x-ui.stat-card :value="$this->conteos['deshabilitados']" label="Deshabilitados" tone="danger">
-            <x-slot:icon>
-                <svg class="w-5 h-5 sm:w-6 sm:h-6" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18 17.94 6M18 18 6.06 6"/></svg>
-            </x-slot:icon>
-        </x-ui.stat-card>
-
-        <x-ui.stat-card :value="$this->conteos['sospechosos']" label="Sospechosos" tone="warning">
-            <x-slot:icon>
-                <svg class="w-5 h-5 sm:w-6 sm:h-6" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-width="2" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z"/><path stroke="currentColor" stroke-width="2" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg>
-            </x-slot:icon>
-        </x-ui.stat-card>
-
-        <x-ui.stat-card :value="$this->conteos['tramposos']" label="Tramposos" tone="danger">
-            <x-slot:icon>
-                <svg class="w-5 h-5 sm:w-6 sm:h-6" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3 5 6v5c0 4.2 2.8 7.6 7 9 4.2-1.4 7-4.8 7-9V6l-7-3Z"/><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.5 9.5l5 5m0-5-5 5"/></svg>
-            </x-slot:icon>
-        </x-ui.stat-card>
-    </div>
-
-    <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div class="flex gap-2">
-            <x-ui.button :variant="$modoVista === 'ingreso' ? 'default' : 'secondary'" wire:click="cambiarVista('ingreso')">Ingreso</x-ui.button>
-            <x-ui.button :variant="$modoVista === 'monitor' ? 'default' : 'secondary'" wire:click="cambiarVista('monitor')">Monitor</x-ui.button>
+    @if ($this->idExamen > 0 && in_array($this->estadoAcceso(), ['registro_abierto', 'en_curso']))
+    @if ($modoVista === 'ingreso')
+        <div class="mb-2">
+            <x-ui.button variant="secondary" :href="route('monitoreo.proximos')">Atrás</x-ui.button>
         </div>
-
-        <div class="flex flex-wrap gap-2 text-xs">
-            <x-ui.button variant="secondary" wire:click="ajustarExamenPrueba(30)">Iniciar en 30 min (mock)</x-ui.button>
-            <x-ui.button variant="secondary" wire:click="ajustarExamenPrueba(15)">Iniciar en 15 min (mock)</x-ui.button>
-            <x-ui.button variant="secondary" wire:click="ajustarExamenPrueba(5)">Iniciar en 5 min (mock)</x-ui.button>
-            <x-ui.button variant="secondary" wire:click="ajustarExamenPrueba(0)">Iniciar ahora (mock)</x-ui.button>
-        </div>
-    </div>
-
-    @if (in_array($this->estadoAcceso(), ['registro_abierto', 'en_curso']))
+    @endif
     <div class="bg-neutral-primary-soft border border-default rounded-base shadow-xs p-6">
         {{-- Una sola fila: título de la tabla, buscador y filtros, en ese
              orden. El buscador crece para ocupar el hueco (`flex-1`) y
@@ -413,7 +369,11 @@
 
         <div class="mt-4">
             @if ($this->estudiantes->total() === 0)
-                <p class="text-center text-sm text-body py-6">No se encontró ninguna coincidencia.</p>
+                @if ($modoVista === 'ingreso' && trim($busqueda) === '')
+                    <p class="text-center text-sm text-body py-6">Busque un estudiante para ver resultados.</p>
+                @else
+                    <p class="text-center text-sm text-body py-6">No se encontró ninguna coincidencia.</p>
+                @endif
                 {{-- Un estudiante que no está en la lista (no inscrito o no
                      registrado en la base) también se puede registrar: abre el
                      modal del no inscrito con el SIS buscado precargado. --}}
@@ -493,41 +453,7 @@
     </div>
 
     @else
-        <div class="flex flex-col gap-3">
-            <h2 class="text-lg font-semibold text-heading">Próximos exámenes</h2>
-            <ul class="flex flex-col gap-4">
-                @foreach ($this->proximosExamenes() as $examenProximo)
-                    <li class="flex cursor-pointer flex-col gap-4 border bg-neutral-primary-soft rounded-base shadow-xs px-5 py-6 sm:px-8
-                        {{ $examenProximo['id'] === $this->idExamen ? 'border-brand ring-2 ring-brand' : 'border-default hover:border-brand-subtle' }}"
-                        role="button" tabindex="0"
-                        wire:click="seleccionarExamen({{ $examenProximo['id'] }})">
-                        <div style="display:flex; justify-content:space-between; width:100%; gap:1rem; flex-wrap:wrap; align-items:center;">
-                        <div class="flex items-center gap-4 lg:w-72">
-                            <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-brand-softer text-fg-brand-strong">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-6 w-6" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>
-                            </div>
-                            <div class="flex min-w-0 flex-col items-start gap-1">
-                                <h3 class="text-xl font-bold text-heading">{{ $examenProximo['tipo'] }}</h3>
-                                <span class="inline-flex items-center px-1.5 py-0.5 text-xs font-medium rounded-full border bg-neutral-secondary-medium border-default-medium text-heading">
-                                    {{ $examenProximo['estado'] }}
-                                </span>
-                            </div>
-                        </div>
-
-                        <div class="font-bold text-heading">
-                            Faltan: {{ $examenProximo['tiempo_restante'] }}
-                        </div>
-
-                        <div class="flex flex-col gap-1 text-sm text-body">
-                            <span>Fecha: {{ \Carbon\Carbon::parse($examenProximo['fecha'])->format('d-m-Y') }}</span>
-                            <span>Horario: {{ $examenProximo['hora_inicio'] }}{{ $examenProximo['hora_fin'] ? ' - ' . $examenProximo['hora_fin'] : '' }}</span>
-                            <span>Ambientes: {{ $examenProximo['ambientes'] ?: '-' }}</span>
-                        </div>
-                        </div>
-                    </li>
-                @endforeach
-            </ul>
-        </div>
+        <p class="text-center text-base font-bold text-body py-6">No hay ningún examen en curso.</p>
     @endif
 
     <x-ui.modal-registro-ingreso />

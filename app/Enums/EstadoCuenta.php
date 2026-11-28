@@ -22,9 +22,12 @@
  * - 2026-11-23  [Diego Tejerina]  feat: estado `pendiente_correo` para las cuentas que se
  *   verifican por correo electrónico (HU 27); no entran a la bandeja de
  *   validación manual de HU 26.
+ * - 2026-11-27  [Diego Tejerina]  feat: estado `eliminada` para la eliminación
+ *   lógica de auxiliares; no puede iniciar sesión y sale de todas las listas.
  *
  * @see  App\Services\Docente\ValidarRegistroDocenteService
  * @see  App\Services\Auth\VerificarCorreoInstitucionalService
+ * @see  App\Services\Auxiliar\EliminarAuxiliarService
  * @see  database/migrations/2026_11_08_000001_validacion_registro_docente.php
  */
 
@@ -36,6 +39,7 @@ enum EstadoCuenta: string
     case PendienteCorreo = 'pendiente_correo';
     case Habilitada = 'habilitada';
     case Rechazada = 'rechazada';
+    case Eliminada = 'eliminada';
 
     /**
      * Mensaje del login para una cuenta que no puede ingresar, o null si puede.
@@ -50,6 +54,7 @@ enum EstadoCuenta: string
             self::Pendiente => 'Tu cuenta aun esta en proceso de validacion. Podras ingresar cuando dos docentes la aprueben.',
             self::PendienteCorreo => 'Debes confirmar tu correo electrónico antes de iniciar sesión.',
             self::Rechazada => 'Tu solicitud de registro fue rechazada.',
+            self::Eliminada => 'Tu cuenta fue eliminada.',
             default => null,
         };
     }

@@ -29,7 +29,9 @@
     @see  resources/views/livewire/monitoreo/monitor-en-vivo.blade.php
 --}}
 
-@section('title', 'Ingreso')
+@section('title', 'Próximos Exámenes')
+
+@section('subtitle', $this->textoProximosExamenes())
 
 @php
     use Illuminate\Support\Carbon;
@@ -45,15 +47,6 @@
 @endphp
 
 <div class="flex flex-col gap-6 px-[2vh] mt-[2vh]">
-    {{-- Barra de simulación de hora: solo una ayuda de prueba para ver los
-         estados sin esperar a la hora real. --}}
-    <div class="flex justify-end gap-2">
-        <a href="{{ route('monitoreo.ingreso', ['simular' => 30]) }}" class="px-2 py-1 text-xs text-white bg-brand rounded">30</a>
-        <a href="{{ route('monitoreo.ingreso', ['simular' => 15]) }}" class="px-2 py-1 text-xs text-white bg-brand rounded">15</a>
-        <a href="{{ route('monitoreo.ingreso', ['simular' => 5]) }}" class="px-2 py-1 text-xs text-white bg-brand rounded">5</a>
-        <a href="{{ route('monitoreo.ingreso', ['simular' => 0]) }}" class="px-2 py-1 text-xs text-white bg-brand rounded">Ahora</a>
-    </div>
-
     <h2 class="text-lg font-semibold text-heading">Próximos exámenes</h2>
 
     @if ($proximos->isEmpty())
@@ -91,7 +84,7 @@
                             Faltan: {{ $examen['tiempo_restante'] }}
                         </div>
 
-                        <div class="flex flex-col gap-1 text-sm text-body">
+                        <div class="flex flex-col gap-1 text-sm text-body w-[30%] min-w-0 break-words">
                             <span>Materia: {{ $examen['materias'] ?: '—' }}</span>
                             <span>Fecha: {{ Carbon::parse($examen['fecha'])->format('d-m-Y') }}</span>
                             <span>Horario: {{ $examen['hora_inicio'] }}{{ $examen['hora_fin'] ? ' - '.$examen['hora_fin'] : '' }}</span>
@@ -101,7 +94,7 @@
 
                     @if ($puedeIniciar)
                         <div class="flex justify-end">
-                            <x-ui.button variant="default" :href="route('monitoreo')">Iniciar</x-ui.button>
+                            <x-ui.button variant="default" :href="route('monitoreo', ['modo' => 'ingreso'])">Iniciar</x-ui.button>
                         </div>
                     @endif
                 </li>

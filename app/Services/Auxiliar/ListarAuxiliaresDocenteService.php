@@ -49,33 +49,66 @@ class ListarAuxiliaresDocenteService
      * Auxiliares del docente con el contrato de la fuente de la lista.
      *
      * @param  int  $idDocente  ID del usuario docente (`curso.sis_doc`).
-     * @return list<array{id: int, nombre: string, apellido: string, codigoSis: string, curso: string, estado: string}>
+     * @return list<array{id: int, nombre: string, apellido: string, nombreCompleto: string, usuario: string, correo: string, carnet: string, codigoSis: string, curso: string, cursos: list<string>, examenes: list<string>, coordinador: bool, estado: string}>
      */
     public function ejecutar(int $idDocente): array
     {
         $asignaciones = $this->repositorio->asignacionesActivas($idDocente)
             ->groupBy('id_auxiliar');
+        $asignacionesExamen = $this->repositorio->asignacionesExamen($idDocente)
+            ->groupBy('id_auxiliar');
 
         return $this->repositorio->auxiliares()
-            ->map(function (object $auxiliar) use ($asignaciones): array {
+            ->map(function (object $auxiliar) use ($asignaciones, $asignacionesExamen): array {
                 $cursos = $asignaciones->get($auxiliar->id_usuario, collect())
                     ->pluck('nombre_curso')
                     ->unique()
                     ->values()
                     ->all();
 
+                $examenes = $asignacionesExamen->get($auxiliar->id_usuario, collect())
+                    ->unique('id_examen')
+                    ->map(fn (object $examen): string => $this->etiquetaExamen($examen))
+                    ->values()
+                    ->all();
+
+                $nombre = (string) ($auxiliar->nombre !== null && trim((string) $auxiliar->nombre) !== ''
+                    ? $auxiliar->nombre
+                    : $auxiliar->nombre_usuario);
+                $correo = trim((string) $auxiliar->correo);
+
                 return [
                     'id' => (int) $auxiliar->id_usuario,
-                    'nombre' => (string) $auxiliar->nombre_usuario,
+                    'nombre' => $nombre,
                     'apellido' => (string) $auxiliar->apellido,
+                    'nombreCompleto' => trim($nombre.' '.$auxiliar->apellido),
+                    // El usuario de acceso es el nombre de usuario generado.
+                    'usuario' => (string) $auxiliar->nombre_usuario,
+                    'correo' => $correo,
+                    'carnet' => trim((string) $auxiliar->carnet),
                     'codigoSis' => (string) $auxiliar->cod_sis,
                     'curso' => implode(', ', $cursos),
-                    'estado' => $cursos === [] ? 'INACTIVO' : 'ACTIVO',
+                    'cursos' => $cursos,
+                    'examenes' => $examenes,
+                    'coordinador' => (bool) $auxiliar->puede_crear_auxiliares,
+                    'estado' => ($cursos === [] && $examenes === []) ? 'INACTIVO' : 'ACTIVO',
                 ];
             })
             ->sortBy(fn (array $fila): string => ($fila['estado'] === 'INACTIVO' ? '1 ' : '0 ')
                 .mb_strtolower($fila['apellido']).' '.mb_strtolower($fila['nombre']))
             ->values()
             ->all();
+    }
+
+    /** Etiqueta corta de un examen asignado: "Examen parcial · 22/11/2026". */
+    private function etiquetaExamen(object $examen): string
+    {
+        $tipo = trim((string) ($examen->nombre_tipo_examen ?? ''));
+        $tipo = $tipo === '' ? 'Examen' : ucfirst($tipo);
+        $fecha = $examen->fecha !== null
+            ? \Illuminate\Support\Carbon::parse($examen->fecha)->format('d/m/Y')
+            : 'sin fecha';
+
+        return $tipo.' · '.$fecha;
     }
 }

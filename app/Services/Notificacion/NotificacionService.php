@@ -55,6 +55,8 @@
  * - 2026-11-24  [OchoaCesar]  feat: aviso «Examen eliminado» (`examen_eliminado`)
  *   para los auxiliares activos del curso y los docentes que comparten el
  *   examen, generado al desvincularlo de un curso.
+ * - 2026-11-27  [Alisson D. Alvarado <alvaradoalissondalet@gmail.com>]  feat:
+ *   conservar la fecha de lectura y ocultar de la bandeja los avisos vencidos.
  */
 
 namespace App\Services\Notificacion;
@@ -295,7 +297,7 @@ class NotificacionService
             // Lo normal es que el aviso exista (lo creo el envio): se reapunta
             // en un solo viaje, sin bloquear la tabla.
             $fila = DB::selectOne(
-                'update notificacion_docente set id_central_riesgo = ?, id_curso = ?, id_docente_destinatario = ?, tipo = ?, estado = ?, oculta = ? '
+                'update notificacion_docente set id_central_riesgo = ?, id_curso = ?, id_docente_destinatario = ?, tipo = ?, estado = ?, oculta = ?, fecha_lectura = null '
                 .'where id_invitacion = ? returning id_notificacion',
                 [...array_values($datos), $invitacion->id_invitacion],
             );
@@ -577,9 +579,19 @@ class NotificacionService
      */
     public function marcarTodasLeidas(Usuario $usuario): int
     {
-        return $this->consultarPara($usuario)
+        $momento = now();
+
+        $cantidad = $this->consultarPara($usuario)
             ->where('estado', self::ESTADO_RECIBIDO)
-            ->update(['estado' => self::ESTADO_VISTO]);
+            ->update(['estado' => self::ESTADO_VISTO, 'fecha_lectura' => $momento]);
+
+        // Los avisos leídos antes de esta función empiezan su plazo al abrir la bandeja.
+        $this->consultarPara($usuario)
+            ->where('estado', self::ESTADO_VISTO)
+            ->whereNull('fecha_lectura')
+            ->update(['fecha_lectura' => $momento]);
+
+        return $cantidad;
     }
 
     /**
@@ -592,6 +604,10 @@ class NotificacionService
     {
         return NotificacionDocente::query()
             ->where('oculta', false)
+            ->where(function (Builder $query): void {
+                $query->whereNull('fecha_lectura')
+                    ->orWhere('fecha_lectura', '>', now()->subDays(2));
+            })
             ->where(function (Builder $query) use ($usuario): void {
                 $query->where('id_docente_destinatario', $usuario->id_usuario)
                     ->orWhere(function (Builder $notificacionLegacy) use ($usuario): void {
@@ -616,7 +632,9 @@ class NotificacionService
         return $notificaciones
             ->sortByDesc(fn (NotificacionDocente $notificacion): int => $this->fechaDe($notificacion)?->getTimestamp() ?? 0)
             ->values()
-            ->map(fn (NotificacionDocente $notificacion): array => $this->mapear($notificacion));
+            ->map(fn (NotificacionDocente $notificacion): array => $this->mapear($notificacion) + [
+                'vence_en' => $notificacion->fecha_lectura?->copy()->addDays(2)->toISOString(),
+            ]);
     }
 
     /**

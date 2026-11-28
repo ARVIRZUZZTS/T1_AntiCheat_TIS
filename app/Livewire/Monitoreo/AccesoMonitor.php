@@ -6,34 +6,18 @@ use App\Models\Examen;
 use App\Models\Rol;
 use App\Services\Auxiliar\AccesoAuxiliarService;
 use Carbon\Carbon;
-use Livewire\Attributes\Url;
+use Illuminate\Support\Collection;
 use Livewire\Component;
 
 class AccesoMonitor extends Component
 {
-    #[Url]
-    public ?int $simular = null;
-
-    public function mount(): void
-    {
-        $this->simular = $this->simular ?? (int) request()->query('simular', 0);
-        if ($this->simular === 0 && ! request()->has('simular')) {
-            $this->simular = null;
-        }
-    }
-
-    public function ahoraSimulada(): Carbon
-    {
-        return $this->simular === null ? now() : now()->addMinutes($this->simular);
-    }
-
     /**
      * Próximos exámenes (hasta 5) con los mismos datos que las tarjetas del
      * monitor, para que "Ingreso" mantenga la misma línea de diseño. Cada uno
      * trae su estado (proximo / registro_abierto / en_curso / finalizado),
-     * si es hoy y el tiempo que falta, calculados con la hora simulada.
+     * si es hoy y el tiempo que falta, calculados con la hora real.
      *
-     * @return \Illuminate\Support\Collection<int, array<string, mixed>>
+     * @return Collection<int, array<string, mixed>>
      */
     public function proximosExamenes()
     {
@@ -42,10 +26,9 @@ class AccesoMonitor extends Component
             ->where('fecha', '>=', now()->toDateString())
             ->orderBy('fecha')
             ->orderBy('hora_inicio')
-            ->limit(5)
             ->get();
 
-        $ahora = $this->ahoraSimulada();
+        $ahora = now();
         $hoy = $ahora->toDateString();
 
         // "Iniciar" abre el Monitor: un auxiliar asignado solo a Ingreso en un
@@ -88,7 +71,10 @@ class AccesoMonitor extends Component
                 'tiempo_restante' => $this->tiempoRestante((int) $ahora->diffInMinutes($inicio, false)),
                 'puede_monitor' => $idsMonitor === null || in_array((int) $examen->id_examen, $idsMonitor, true),
             ];
-        });
+        })->reject(fn (array $examen): bool => $examen['estado'] === 'finalizado')
+            ->values()
+            ->take(5)
+            ->values();
     }
 
     /**
@@ -111,6 +97,24 @@ class AccesoMonitor extends Component
         }
 
         return '+7 días';
+    }
+
+    public function totalProximosExamenes(): int
+    {
+        return $this->consultaExamenesAccesibles()
+            ->where('fecha', '>=', now()->toDateString())
+            ->count();
+    }
+
+    public function textoProximosExamenes(): string
+    {
+        $total = $this->totalProximosExamenes();
+
+        if ($total > 5) {
+            return 'Próximos 5+ exámenes';
+        }
+
+        return 'Próximos '.$total.' '.($total === 1 ? 'examen' : 'exámenes');
     }
 
     public function render()
