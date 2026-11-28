@@ -155,6 +155,28 @@ class ListaAuxiliaresVistaTest extends TestCase
             ->assertDontSee('Beto Gomez');
     }
 
+    public function test_el_detalle_muestra_datos_de_registro_y_usuario(): void
+    {
+        DB::table('usuario')->where('id_usuario', self::AUX_ASIGNADO)->update(['carnet' => '7654321']);
+
+        $this->actingAs(Usuario::findOrFail(self::DOCENTE));
+
+        Livewire::test(GestionAuxiliares::class)
+            ->call('verDetalle', self::AUX_ASIGNADO)
+            ->assertSee('Nombre completo')
+            ->assertSee('Ana Maria Perez Lopez')
+            ->assertSee('Tipo de auxiliar')
+            ->assertSee('UMSS')
+            ->assertSee('Codigo SIS')
+            ->assertSee('202300001')
+            ->assertSee('Carnet de identidad')
+            ->assertSee('7654321')
+            ->assertSee('Correo electronico')
+            ->assertSee('auxa@ejemplo.com')
+            ->assertSee('Usuario de acceso')
+            ->assertSee('Ana');
+    }
+
     public function test_el_docente_no_ve_ni_abre_detalle_de_auxiliares_ajenos(): void
     {
         $this->actingAs(Usuario::findOrFail(self::DOCENTE));

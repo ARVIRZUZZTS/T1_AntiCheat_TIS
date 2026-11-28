@@ -112,6 +112,7 @@
 
     <x-ui.modal-detalle-auxiliar
         :abierto="$detalleAbierto"
+        :auxiliar="$detalleAuxiliar"
         :cursos="$detalleCursos"
     />
 </div>

@@ -1,81 +1,77 @@
-{{--
-    @file    modal-detalle-auxiliar.blade.php
-    @author  OchoaCesar
-    @created 2026-11-24
-    @updated 2026-11-24
-
-    @description
-    Modal de detalle de un auxiliar de la lista «Auxiliares»: muestra todos
-    los cursos a los que el auxiliar pertenece (asignaciones activas en los
-    cursos del docente). Cierra con la X, Esc o un clic fuera. El componente
-    se usa dentro de `livewire.auxiliares.gestion-auxiliares`, que aporta los
-    cursos y la acción `cerrarDetalle()`.
-
-    @changelog
-    - 2026-11-24  [OchoaCesar]  feat: creación inicial del componente.
-    - 2026-11-24  [OchoaCesar]  style: el modal muestra solo la lista de
-      cursos (el nombre y el código SIS ya están en la tabla).
---}}
-
 @props([
     'abierto' => false,
+    'auxiliar' => [],
     'cursos' => [],
 ])
 
 @if ($abierto)
-    <div
-        {{ $attributes->merge([
-            'tabindex' => '-1',
-            'role' => 'dialog',
-            'aria-modal' => 'true',
-            'aria-labelledby' => 'titulo-detalle-auxiliar',
-            'wire:click.self' => 'cerrarDetalle',
-            'wire:keydown.escape.window' => 'cerrarDetalle',
-            'class' => 'overflow-y-auto overflow-x-hidden fixed top-0 right-0 left-0 z-50 flex justify-center items-center w-full md:inset-0 h-full max-h-full bg-overlay-modal/50',
-        ]) }}
-    >
-        <div class="relative p-4 w-full max-w-md max-h-full">
-            <div class="relative max-h-[calc(100vh-2rem)] overflow-y-auto bg-neutral-primary-soft border border-default rounded-base shadow-sm p-4 md:p-6">
-                <div class="flex items-center justify-between border-b border-default pb-4 md:pb-5">
-                    <h3 id="titulo-detalle-auxiliar" class="text-lg font-medium text-heading">
-                        Detalle del auxiliar
-                    </h3>
-
-                    <button
-                        type="button"
-                        wire:click="cerrarDetalle"
-                        class="text-body bg-transparent hover:bg-neutral-tertiary hover:text-heading rounded-base text-sm w-11 h-11 ms-auto inline-flex justify-center items-center cursor-pointer"
-                    >
-                        <svg class="w-5 h-5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18 17.94 6M18 18 6.06 6"/></svg>
-                        <span class="sr-only">Cerrar modal</span>
-                    </button>
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <button type="button" wire:click="cerrarDetalle" aria-label="Cerrar detalle" class="absolute inset-0 cursor-default bg-overlay backdrop-blur-xs"></button>
+        <div role="dialog" aria-modal="true" aria-label="Detalle del auxiliar" class="relative z-10 flex max-h-[85vh] w-full max-w-2xl flex-col rounded-xl border border-default bg-neutral-primary shadow-lg">
+            <div class="flex items-start justify-between gap-3 border-b border-default px-6 py-4">
+                <div>
+                    <p class="text-xs font-medium uppercase tracking-wide text-body-subtle">Detalle del auxiliar</p>
+                    <h2 class="mt-0.5 text-lg font-bold text-heading break-words">{{ $auxiliar['nombreCompleto'] ?? 'Auxiliar' }}</h2>
                 </div>
+                <button type="button" wire:click="cerrarDetalle" aria-label="Cerrar detalle"
+                    class="inline-flex size-9 shrink-0 items-center justify-center rounded-base text-body-subtle transition-colors hover:bg-neutral-secondary hover:text-heading focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-medium">
+                    <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                        <path stroke-linecap="round" d="m6 6 12 12M18 6 6 18" />
+                    </svg>
+                </button>
+            </div>
 
-                <div class="space-y-4 py-4">
+            <div class="space-y-4 overflow-y-auto px-6 py-4">
+                @php
+                    $datos = [
+                        'Nombre completo' => $auxiliar['nombreCompleto'] ?? '—',
+                        'Tipo de auxiliar' => ($auxiliar['tipo'] ?? '') !== '' ? $auxiliar['tipo'] : '—',
+                        'Codigo SIS' => ($auxiliar['codigoSis'] ?? '') !== '' ? $auxiliar['codigoSis'] : '—',
+                        'Carnet de identidad' => ($auxiliar['carnet'] ?? '') !== '' ? $auxiliar['carnet'] : '—',
+                        'Correo electronico' => ($auxiliar['correo'] ?? '') !== '' ? $auxiliar['correo'] : '—',
+                        'Usuario de acceso' => ($auxiliar['usuario'] ?? '') !== '' ? $auxiliar['usuario'] : '—',
+                    ];
+                @endphp
+
+                <dl class="grid grid-cols-1 gap-x-4 gap-y-3 text-sm sm:grid-cols-2">
+                    @foreach ($datos as $etiqueta => $valor)
+                        <div class="min-w-0">
+                            <dt class="text-xs font-medium text-muted">{{ $etiqueta }}</dt>
+                            <dd class="mt-0.5 break-words text-body">{{ $valor }}</dd>
+                        </div>
+                    @endforeach
+                </dl>
+
+                <div class="border-t border-default pt-4">
                     <p class="text-sm font-bold text-heading">Cursos asignados</p>
-
-                    @if (count($cursos) > 0)
-                        <ul class="space-y-2">
+                    @if ($cursos === [])
+                        <p class="mt-2 text-sm text-body-subtle">Sin cursos asignados.</p>
+                    @else
+                        <ul class="mt-2 space-y-2">
                             @foreach ($cursos as $curso)
-                                <li class="rounded-base border border-default bg-neutral-secondary-soft px-3 py-2 text-sm text-body">
-                                    {{ $curso }}
-                                </li>
+                                <li class="rounded-base border border-default bg-neutral-secondary-soft px-3 py-2 text-sm text-body">{{ $curso }}</li>
                             @endforeach
                         </ul>
-                    @else
-                        <p class="text-sm text-body-subtle">Este auxiliar no tiene cursos asignados.</p>
                     @endif
                 </div>
 
-                <div class="flex justify-end border-t border-default pt-4">
-                    <x-ui.button-cancelar
-                        class="w-full min-h-11 justify-center sm:w-auto"
-                        wire:click="cerrarDetalle"
-                    >
-                        Cerrar
-                    </x-ui.button-cancelar>
-                </div>
+                @if (($auxiliar['examenes'] ?? []) !== [])
+                    <div class="border-t border-default pt-4">
+                        <p class="text-sm font-bold text-heading">Examenes asignados</p>
+                        <ul class="mt-2 space-y-2">
+                            @foreach ($auxiliar['examenes'] as $examen)
+                                <li class="rounded-base border border-default bg-neutral-secondary-soft px-3 py-2 text-sm text-body">{{ $examen }}</li>
+                            @endforeach
+                        </ul>
+                    </div>
+                @endif
+            </div>
+
+            <div class="flex justify-end border-t border-default px-6 py-3">
+                <button type="button" wire:click="cerrarDetalle" class="inline-flex min-h-11 items-center rounded-base bg-neutral-tertiary px-4 text-sm font-medium text-body transition-colors hover:bg-neutral-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-medium">Cerrar</button>
             </div>
         </div>
     </div>
+@else
+    <div aria-hidden="true" class="hidden"></div>
 @endif

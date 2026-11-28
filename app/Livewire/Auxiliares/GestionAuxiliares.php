@@ -81,6 +81,13 @@ class GestionAuxiliares extends Component
     public bool $detalleAbierto = false;
 
     /**
+     * Datos del auxiliar elegido en «Ver detalle».
+     *
+     * @var array<string, mixed>
+     */
+    public array $detalleAuxiliar = [];
+
+    /**
      * Cursos activos del auxiliar elegido en «Ver detalle».
      *
      * @var list<string>
@@ -110,6 +117,7 @@ class GestionAuxiliares extends Component
             return;
         }
 
+        $this->detalleAuxiliar = $auxiliar;
         $this->detalleCursos = $this->cursosDelAuxiliar($idAuxiliar);
         $this->detalleAbierto = true;
     }
@@ -145,6 +153,7 @@ class GestionAuxiliares extends Component
     public function cerrarDetalle(): void
     {
         $this->detalleAbierto = false;
+        $this->detalleAuxiliar = [];
         $this->detalleCursos = [];
     }
 
