@@ -91,6 +91,8 @@
       auxiliar" y "Eliminar auxiliar".
     - 2026-11-24  [Equipo T1]  fix: el badge de notificaciones usa el conteo de
       avisos nuevos y baja a 0 cuando la bandeja los marca como leídos.
+    - 2026-11-24  refactor: reorganizacion de "Monitor en vivo": se agrega
+      "Proximos Examenes" (monitoreo.proximos) antes de Ingreso y Monitor.
     - 2026-11-24  [Alisson D. Alvarado <alvaradoalissondalet@gmail.com>]  feat:
       mostrar Ver cursos como unica opcion de Cursos para auxiliares.
     - 2026-11-24  [Alisson D. Alvarado <alvaradoalissondalet@gmail.com>]  fix:
@@ -177,6 +179,7 @@
             ['label' => 'Dividir examen', 'route' => 'examenes.dividir'],
         ]],
         ['label' => 'Monitor en vivo', 'children' => [
+            ['label' => 'Próximos Exámenes', 'route' => 'monitoreo.proximos'],
             ['label' => 'Ingreso', 'route' => 'monitoreo.ingreso'],
             ['label' => 'Monitor', 'route' => 'monitoreo'],
         ]],
@@ -214,6 +217,7 @@
         : ['ingreso' => false, 'monitor' => false];
 
     $monitorAuxiliar = array_values(array_filter([
+        $paginasAuxiliar['ingreso'] ? ['label' => 'Próximos Exámenes', 'route' => 'monitoreo.proximos'] : null,
         $paginasAuxiliar['ingreso'] ? ['label' => 'Ingreso', 'route' => 'monitoreo.ingreso'] : null,
         $paginasAuxiliar['monitor'] ? ['label' => 'Monitor', 'route' => 'monitoreo'] : null,
     ]));

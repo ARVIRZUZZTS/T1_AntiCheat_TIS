@@ -4,21 +4,22 @@
 
 - **BD oficial unica:** Supabase (PostgreSQL)
 - **Motor:** PostgreSQL (Supabase)
-- **Tablas totales:** 71
-- **Tablas del dominio (`public`):** 31
-- **Tablas de Supabase:** `auth.*` (27), `storage.*` (8)
+- **BD de desarrollo:** Supabase (PostgreSQL) — es la BD oficial y unica de desarrollo.
+- **BD de produccion:** PostgreSQL local del servidor WebTIS (UMSS) — se carga con `database/sql/000_deploy_completo.sql`.
+- **Tablas totales (schema `public`):** 44
+- **Tablas del dominio (`public`):** 44 (incluye 9 tablas de Laravel)
+- **Tablas de Supabase (esquemas internos):** `auth.*` (27), `storage.*` (8)
 - **Tablas de Laravel:** 9 (`users`, `sessions`, `cache`, `cache_locks`, `jobs`, `job_batches`, `failed_jobs`, `password_reset_tokens`, `migrations`)
-- **Desarrollo local:** ya no se usa BD local SQLite. Toda la configuracion apunta a Supabase.
-- **Migraciones:** se gestionan con `php artisan migrate` directamente contra Supabase.
+- **Migraciones:** 28 (gestionadas con `php artisan migrate` contra Supabase en desarrollo).
 
 ---
 
-## Enums (13)
+## Enums (11)
 
 | Enum | Valores |
 |---|---|
 | `curso_estado` | `EnCurso`, `Finalizo`, `Archivado` |
-| `estado_incidencia` | `Confirmado`, `Pendiente` |
+
 | `estado_notificacion` | `visto`, `recibido` |
 | `estado_usuario` | `Activo`, `Baja` |
 | `estudiante_examen_estado` | `habilitado`, `deshabilitado` |

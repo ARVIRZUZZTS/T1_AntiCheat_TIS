@@ -116,7 +116,6 @@
  *   conectar los cursos asignados al auxiliar con el listado compartido.
  */
 
-use App\Enums\CursoEstado;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ConfirmarRegistroController;
 use App\Http\Controllers\CursoController;
@@ -153,11 +152,11 @@ Route::middleware('auth')->group(function (): void {
     // Examenes > Ver examenes del auxiliar (HU 24): solo los examenes a los
     // que esta asignado (los de sus cursos y los sueltos). Solo auxiliares.
     Route::get('/mis-examenes', ExamenesAuxiliar::class)->name('auxiliar.examenes');
-    Route::get('/monitoreo', MonitorEnVivo::class)->name('monitoreo');
-    // Monitor en vivo · Ingreso: la vista de proximos examenes y el boton
-    // "Iniciar". Antes vivia en /monitoreo/acceso; la ruta vieja redirige.
-    Route::get('/monitoreo/ingreso', AccesoMonitor::class)->name('monitoreo.ingreso');
-    Route::redirect('/monitoreo/acceso', '/monitoreo/ingreso');
+    Route::get('/monitoreo/proximos', AccesoMonitor::class)->name('monitoreo.proximos');
+    Route::get('/monitoreo/ingreso', MonitorEnVivo::class)->defaults('modo', 'ingreso')->name('monitoreo.ingreso');
+    Route::get('/monitoreo', MonitorEnVivo::class)->defaults('modo', 'monitor')->name('monitoreo');
+    // Ruta vieja: redirige a la nueva pantalla de proximos examenes.
+    Route::redirect('/monitoreo/acceso', '/monitoreo/proximos');
 
     Route::get('/auxiliares', GestionAuxiliares::class)->name('auxiliares');
     // Auxiliares · Asignar (HU 24): asignar un auxiliar ya creado a un curso o
