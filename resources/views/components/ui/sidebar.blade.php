@@ -97,6 +97,8 @@
       mostrar Ver cursos como unica opcion de Cursos para auxiliares.
     - 2026-11-24  [Alisson D. Alvarado <alvaradoalissondalet@gmail.com>]  fix:
       reconocer el rol auxiliar aunque no sea el primer rol del usuario.
+    - 2026-11-27  [Alisson D. Alvarado <alvaradoalissondalet@gmail.com>]  refactor:
+      retirar la opcion de editar cursos.
 --}}
 
 
@@ -121,7 +123,7 @@
     // el prop $active o con uno de sus patrones extra ($extra). El comodin
     // `ruta.*` solo se agrega cuando el nombre ya tiene punto (una hoja como
     // `cursos.crear`): si se aplicara al nombre pelado del listado (`cursos`)
-    // marcaria tambien a sus hermanas (`cursos.crear`, `cursos.editar`...) y se
+    // marcaria tambien a sus hermanas (`cursos.crear`, `cursos.eliminar`...) y se
     // resaltarian dos subopciones a la vez.
     $esActivo = function (?string $ruta, array $extra = []) use ($current, $active): bool {
         if ($ruta === null) {
@@ -160,7 +162,6 @@
         ['label' => 'Cursos', 'children' => [
             ['label' => 'Ver cursos', 'route' => 'cursos'],
             ['label' => 'Crear curso', 'route' => 'cursos.crear'],
-            ['label' => 'Editar curso', 'route' => 'cursos.editar'],
             ['label' => 'Eliminar curso', 'route' => 'cursos.eliminar'],
             // Archivar y restaurar comparten una sola lista de cursos. Los
             // archivados se ven con el filtro Archivados de "Ver cursos".
