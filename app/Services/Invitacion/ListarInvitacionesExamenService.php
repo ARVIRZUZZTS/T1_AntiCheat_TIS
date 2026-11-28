@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Gate;
 class ListarInvitacionesExamenService
 {
     /**
-     * @return Collection<int, array{id: int, estado: 'aceptado'|'cancelado'|'pendiente'|'rechazado', enviada_en: string|null, invitado: array{id: int, nombre: string, correo: string|null}}>
+     * @return Collection<int, array{id: int, estado: 'aceptado'|'pendiente'|'rechazado', enviada_en: string|null, invitado: array{id: int, nombre: string, correo: string|null}}>
      */
     public function ejecutar(Usuario $docente, Examen $examen): Collection
     {

@@ -20,10 +20,10 @@
  * Enviar (HU 131): el docente elige uno de sus cursos activos con examenes
  * programados y un examen futuro de ese curso (con fecha y hora), busca al
  * docente mientras escribe y envía; ve el resumen de lo enviado y las
- * invitaciones de ese examen, con "Cancelar" en las pendientes.
+ * invitaciones de ese examen con su estado.
  *
  * Aceptar (HU 132): una sola lista con las invitaciones pendientes (Aceptar /
- * Rechazar) y las aceptadas que aun no tienen curso (Asociar a un curso).
+ * Rechazar); Aceptar pide los cursos a los que se asocia el examen.
  * Aceptar pide directamente los cursos activos a los que se asocia el examen.
  * Los métodos que llama el modal devuelven el error a mostrar ('' si salió
  * bien).
@@ -54,6 +54,10 @@
  * - 2026-11-23  [Valery D. Ortuno P]  refactor: `rechazar()` y `cancelar()`
  *   devuelven el error para el modal de confirmacion de la vista (antes el
  *   confirm del navegador y un aviso en la pagina).
+ * - 2026-11-28  [Valery D. Ortuno P]  refactor: se quita `cancelar()`: una
+ *   invitacion enviada ya no se cancela, la acepta o rechaza el invitado.
+ * - 2026-11-28  [Valery D. Ortuno P]  refactor: se quita `asociar()`: aceptar
+ *   elige los cursos en el mismo paso y no quedan aceptadas sin curso.
  *
  * @see  App\Services\Invitacion\AsociarCursosInvitacionService
  * @see  App\Services\Invitacion\EnviarInvitacionExamenService
@@ -65,10 +69,8 @@ use App\Enums\CursoEstado;
 use App\Enums\InvitacionEstado;
 use App\Enums\TipoExamen;
 use App\Models\Examen;
-use App\Models\InvitacionExamenCompartido;
 use App\Services\Invitacion\AsociarCursosInvitacionService;
 use App\Services\Invitacion\BuscarDocentesInvitablesService;
-use App\Services\Invitacion\CancelarInvitacionExamenService;
 use App\Services\Invitacion\EnviarInvitacionExamenService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Carbon;
@@ -95,7 +97,7 @@ class Index extends Component
     /** Resumen de la ultima invitacion enviada: curso, examen y docente. */
     public array $resumenEnvio = [];
 
-    /** Pendientes y aceptadas sin curso propio (pantalla Aceptar). */
+    /** Invitaciones pendientes (pantalla Aceptar). */
     public array $invitaciones = [];
 
     /** Cursos del docente: con examenes programados (Enviar) o activos (Aceptar). */
@@ -237,39 +239,6 @@ class Index extends Component
     }
 
     /**
-     * Cancela una invitacion pendiente. La confirmacion y el aviso de exito
-     * son modales de la vista.
-     *
-     * @return string Error para el modal, o '' si salio bien.
-     */
-    public function cancelar(int $idInvitacion, CancelarInvitacionExamenService $servicio): string
-    {
-        $this->mensajeExito = '';
-        $this->mensajeError = '';
-        $this->resumenEnvio = [];
-
-        $invitacion = InvitacionExamenCompartido::query()->find($idInvitacion);
-
-        if ($invitacion === null) {
-            return 'La invitacion ya no existe.';
-        }
-
-        try {
-            $servicio->cancelar(auth()->user(), $invitacion);
-        } catch (ValidationException $error) {
-            return (string) collect($error->errors())->flatten()->first();
-        }
-
-        $this->enviadas = collect($this->enviadas)
-            ->map(fn (array $enviada): array => $enviada['id'] === $idInvitacion
-                ? ['estado' => InvitacionEstado::Cancelada->value] + $enviada
-                : $enviada)
-            ->all();
-
-        return '';
-    }
-
-    /**
      * Acepta la invitacion y asocia el examen a los cursos elegidos.
      *
      * @param  list<int>  $idsCursos
@@ -281,21 +250,6 @@ class Index extends Component
             fn (AsociarCursosInvitacionService $servicio) => $servicio->aceptar(auth()->user(), $idInvitacion, $idsCursos),
             $idInvitacion,
             'Invitacion aceptada. El examen quedo en '.$this->nombresCursos($idsCursos).'.',
-        );
-    }
-
-    /**
-     * Asocia una invitacion ya aceptada a los cursos elegidos.
-     *
-     * @param  list<int>  $idsCursos
-     * @return string Error para el modal, o '' si salio bien.
-     */
-    public function asociar(int $idInvitacion, array $idsCursos): string
-    {
-        return $this->responder(
-            fn (AsociarCursosInvitacionService $servicio) => $servicio->asociar(auth()->user(), $idInvitacion, $idsCursos),
-            $idInvitacion,
-            'El examen quedo en '.$this->nombresCursos($idsCursos).'.',
         );
     }
 

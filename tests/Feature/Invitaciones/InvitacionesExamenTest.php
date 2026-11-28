@@ -240,17 +240,6 @@ class InvitacionesExamenTest extends TestCase
         $this->assertSame(2, DB::table('invitacion_examen_compartido')->count());
     }
 
-    public function test_permite_reinvitar_despues_de_una_cancelacion(): void
-    {
-        $this->crearInvitacion('cancelado');
-
-        $this->postJson(route('api.examenes.invitaciones.enviar', self::EXAMEN), [
-            'docente_invitado_id' => self::DOCENTE_INVITADO,
-        ])->assertCreated();
-
-        $this->assertSame(2, DB::table('invitacion_examen_compartido')->count());
-    }
-
     public function test_solo_el_creador_del_examen_puede_invitar(): void
     {
         $this->actingAs(Usuario::query()->findOrFail(self::OTRO_DOCENTE), 'web')

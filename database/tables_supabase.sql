@@ -395,7 +395,7 @@ CREATE TABLE public.auxiliar_examen (
 --    estado_notificacion	visto, recibido	
 --    estado_usuario	Activo, Baja	
 --    estudiante_examen_estado	habilitado, deshabilitado	
---    invitacion_estado	aceptado, rechazado, pendiente, cancelado	
+--    invitacion_estado	aceptado, rechazado, pendiente	
 --    nombre_tipo_gestion	primer semestre, invierno, segundo semestre, verano	
 --    registrador_tipo	docente, auxiliar	
 --    roles	docente, auxiliar	

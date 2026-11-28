@@ -147,41 +147,6 @@ class ResponderCancelarInvitacionTest extends TestCase
         ]);
     }
 
-    public function test_el_invitador_cancela_una_pendiente_y_se_oculta_el_aviso_del_invitado(): void
-    {
-        $this->crearInvitacion('pendiente');
-
-        $this->actingAs(Usuario::query()->findOrFail(self::INVITADOR), 'web')
-            ->postJson(route('api.invitaciones.cancelar', self::INVITACION))
-            ->assertOk()
-            ->assertJsonPath('data.estado', 'cancelado');
-
-        $this->assertDatabaseHas('invitacion_examen_compartido', [
-            'id_invitacion' => self::INVITACION,
-            'estado' => 'cancelado',
-        ]);
-        // El aviso del invitado queda oculto: ya no puede responder una cancelada.
-        $this->assertDatabaseHas('notificacion_docente', [
-            'id_invitacion' => self::INVITACION,
-            'oculta' => true,
-        ]);
-    }
-
-    public function test_no_se_puede_responder_una_invitacion_cancelada(): void
-    {
-        $this->crearInvitacion('cancelado');
-
-        $this->actingAs(Usuario::query()->findOrFail(self::INVITADO), 'web')
-            ->postJson(route('api.invitaciones.aceptar', self::INVITACION))
-            ->assertUnprocessable()
-            ->assertJsonPath('errors.estado.0', ResponderInvitacionExamenService::MENSAJE_NO_PENDIENTE);
-
-        $this->assertDatabaseHas('invitacion_examen_compartido', [
-            'id_invitacion' => self::INVITACION,
-            'estado' => 'cancelado',
-        ]);
-    }
-
     public function test_aceptar_dos_veces_no_cambia_el_estado_la_segunda(): void
     {
         $this->crearInvitacion('pendiente');
@@ -204,20 +169,6 @@ class ResponderCancelarInvitacionTest extends TestCase
 
         $this->actingAs(Usuario::query()->findOrFail(self::OTRO_DOCENTE), 'web')
             ->postJson(route('api.invitaciones.aceptar', self::INVITACION))
-            ->assertForbidden();
-
-        $this->assertDatabaseHas('invitacion_examen_compartido', [
-            'id_invitacion' => self::INVITACION,
-            'estado' => 'pendiente',
-        ]);
-    }
-
-    public function test_el_invitado_no_puede_cancelar_la_invitacion(): void
-    {
-        $this->crearInvitacion('pendiente');
-
-        $this->actingAs(Usuario::query()->findOrFail(self::INVITADO), 'web')
-            ->postJson(route('api.invitaciones.cancelar', self::INVITACION))
             ->assertForbidden();
 
         $this->assertDatabaseHas('invitacion_examen_compartido', [
