@@ -27,6 +27,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
  * @property ?int $id_ambiente
  * @property ?string $fecha_creacion
  * @property string $estado
+ * @property ?int $id_materia Materia del curso (FK a `materia`); null en cursos aún sin migrar.
+ * @property ?int $numero_grupo Grupo del curso (1-10); null si no se pudo deducir.
  */
 class Curso extends Model
 {
@@ -47,6 +49,8 @@ class Curso extends Model
         'id_ambiente',
         'fecha_creacion',
         'estado',
+        'id_materia',
+        'numero_grupo',
     ];
 
     /** @return BelongsToMany<Estudiante, $this> */
@@ -81,6 +85,12 @@ class Curso extends Model
     public function ambiente(): BelongsTo
     {
         return $this->belongsTo(Ambiente::class, 'id_ambiente');
+    }
+
+    /** @return BelongsTo<Materia, $this> */
+    public function materia(): BelongsTo
+    {
+        return $this->belongsTo(Materia::class, 'id_materia', 'id_materia');
     }
 
     public function estaArchivado(): bool
