@@ -192,6 +192,7 @@
             ['label' => 'Ver auxiliares', 'route' => 'auxiliares'],
             ['label' => 'Crear auxiliar', 'route' => 'auxiliares.crear'],
             ['label' => 'Asignar auxiliar', 'route' => 'auxiliares.asignar'],
+            ['label' => 'Eliminar auxiliar', 'route' => 'auxiliares.eliminar'],
         ]],
         // Validacion del registro de docentes (HU 26): el contador muestra las
         // solicitudes pendientes y se actualiza al aprobar o rechazar.
@@ -236,6 +237,7 @@
         $usuario && $usuario->puede_crear_auxiliares ? ['label' => 'Auxiliares', 'children' => [
             ['label' => 'Crear auxiliar', 'route' => 'auxiliares.crear'],
             ['label' => 'Asignar auxiliar', 'route' => 'auxiliares.asignar'],
+            ['label' => 'Eliminar auxiliar', 'route' => 'auxiliares.eliminar'],
         ]] : null,
     ]));
 
