@@ -45,14 +45,15 @@
 
 namespace App\Livewire\Auxiliares;
 
+use App\Enums\CursoEstado;
 use App\Models\Usuario;
+use App\Repositories\AuxiliarCursoRepository;
 use App\Services\Auxiliar\AccesoAuxiliarService;
 use App\Services\Auxiliar\ListarAuxiliaresDocenteService;
 use App\Services\Auxiliar\ReenviarCredencialesAuxiliarService;
 use App\Support\NombreCurso;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 
 /**
@@ -88,11 +89,11 @@ class GestionAuxiliares extends Component
     public array $detalleAuxiliar = [];
 
     /**
-     * Cursos activos del auxiliar elegido en «Ver detalle».
+     * Cursos activos y anteriores del auxiliar elegido en «Ver detalle».
      *
-     * @var list<string>
+     * @var array{activos: list<array{etiqueta: string, estado: string}>, anteriores: list<array{etiqueta: string, estado: string}>}
      */
-    public array $detalleCursos = [];
+    public array $detalleCursos = ['activos' => [], 'anteriores' => []];
 
     /** Aviso tras reenviar credenciales (vacío si no hay nada que mostrar). */
     public string $mensajeReenvio = '';
@@ -154,34 +155,50 @@ class GestionAuxiliares extends Component
     {
         $this->detalleAbierto = false;
         $this->detalleAuxiliar = [];
-        $this->detalleCursos = [];
+        $this->detalleCursos = ['activos' => [], 'anteriores' => []];
     }
 
     /**
-     * Cursos activos del auxiliar en los cursos del docente autenticado
-     * (mismo criterio con el que se deriva el estado de la lista).
+     * Cursos activos y anteriores del auxiliar en los cursos del docente autenticado.
      *
-     * @return list<string>
+     * @return array{activos: list<array{etiqueta: string, estado: string}>, anteriores: list<array{etiqueta: string, estado: string}>}
      */
     private function cursosDelAuxiliar(int $idAuxiliar): array
     {
-        return DB::table('auxiliar_curso as ac')
-            ->join('curso as c', 'c.id_curso', '=', 'ac.id_curso')
-            ->leftJoin('curso_tipo_gestion as ctg', 'ctg.id_curso', '=', 'c.id_curso')
-            ->leftJoin('tipo_gestion as tg', 'tg.id_tipo_gestion', '=', 'ctg.id_tg')
-            ->where('c.sis_doc', (int) auth()->id())
-            ->where('ac.id_auxiliar', $idAuxiliar)
-            ->where('ac.estado', AccesoAuxiliarService::ESTADO_ACTIVO)
-            ->orderBy('c.nombre_curso')
-            ->get(['c.nombre_curso', 'tg.nombre_tipo_gestion', 'ctg.anio'])
-            ->map(fn (object $curso): string => NombreCurso::conGestion(
-                (string) $curso->nombre_curso,
-                $curso->nombre_tipo_gestion !== null ? (string) $curso->nombre_tipo_gestion : null,
-                $curso->anio !== null ? (int) $curso->anio : null,
-            ))
-            ->unique()
-            ->values()
-            ->all();
+        $filas = app(AuxiliarCursoRepository::class)
+            ->cursosDelAuxiliar((int) auth()->id(), $idAuxiliar);
+
+        $activos = collect();
+        $anteriores = collect();
+
+        foreach ($filas as $fila) {
+            $etiqueta = NombreCurso::conGestion(
+                (string) $fila->nombre_curso,
+                $fila->nombre_tipo_gestion !== null ? (string) $fila->nombre_tipo_gestion : null,
+                $fila->anio !== null ? (int) $fila->anio : null,
+            );
+            $esActivo = $fila->estado_asignacion === AccesoAuxiliarService::ESTADO_ACTIVO
+                && $fila->estado_curso === CursoEstado::EnCurso->value;
+            $estado = match (true) {
+                $fila->estado_curso === CursoEstado::Archivado->value => CursoEstado::Archivado->etiqueta(),
+                $esActivo => 'Activo',
+                $fila->estado_curso === CursoEstado::Finalizo->value => CursoEstado::Finalizo->etiqueta(),
+                default => 'Anterior',
+            };
+            $curso = ['etiqueta' => $etiqueta, 'estado' => $estado];
+
+            if ($esActivo) {
+                $activos->put($etiqueta, $curso);
+                $anteriores->forget($etiqueta);
+            } else {
+                $anteriores->put($etiqueta, $curso);
+            }
+        }
+
+        return [
+            'activos' => $activos->values()->all(),
+            'anteriores' => $anteriores->values()->all(),
+        ];
     }
 
     /**

@@ -155,6 +155,43 @@ class ListaAuxiliaresVistaTest extends TestCase
             ->assertDontSee('Beto Gomez');
     }
 
+    public function test_el_detalle_separa_cursos_activos_y_anteriores_con_gestion(): void
+    {
+        $idGestion = (int) DB::table('tipo_gestion')->value('id_tipo_gestion');
+        $nombreGestion = Str::ucfirst((string) DB::table('tipo_gestion')
+            ->where('id_tipo_gestion', $idGestion)
+            ->value('nombre_tipo_gestion'));
+        $anio = now()->year;
+
+        DB::table('curso_tipo_gestion')->insert([
+            'id_curso' => self::CURSO,
+            'id_tg' => $idGestion,
+            'anio' => $anio,
+        ]);
+        DB::table('curso')->insert(['id_curso' => 3003, 'nombre_curso' => 'Calculo I', 'sis_doc' => self::DOCENTE, 'fecha_creacion' => '2024-01-10', 'estado' => 'Archivado']);
+        DB::table('curso_tipo_gestion')->insert([
+            'id_curso' => 3003,
+            'id_tg' => $idGestion,
+            'anio' => 2024,
+        ]);
+        DB::table('auxiliar_curso')->insert([
+            'id_auxiliar' => self::AUX_ASIGNADO,
+            'id_curso' => 3003,
+            'estado' => 'Activo',
+        ]);
+
+        $this->actingAs(Usuario::findOrFail(self::DOCENTE));
+
+        Livewire::test(GestionAuxiliares::class)
+            ->call('verDetalle', self::AUX_ASIGNADO)
+            ->assertSee('Cursos activos')
+            ->assertSee('Cursos anteriores')
+            ->assertSee('Calculo I - '.$nombreGestion.' '.$anio)
+            ->assertSee('Calculo I - '.$nombreGestion.' 2024')
+            ->assertSee('Activo')
+            ->assertSee('Archivado');
+    }
+
     public function test_el_detalle_muestra_datos_de_registro_y_usuario(): void
     {
         DB::table('usuario')->where('id_usuario', self::AUX_ASIGNADO)->update(['carnet' => '7654321']);

@@ -42,18 +42,28 @@
                     @endforeach
                 </dl>
 
-                <div class="border-t border-default pt-4">
-                    <p class="text-sm font-bold text-heading">Cursos asignados</p>
-                    @if ($cursos === [])
+                @if (($cursos['activos'] ?? []) === [] && ($cursos['anteriores'] ?? []) === [])
+                    <div class="border-t border-default pt-4">
+                        <p class="text-sm font-bold text-heading">Cursos asignados</p>
                         <p class="mt-2 text-sm text-body-subtle">Sin cursos asignados.</p>
-                    @else
-                        <ul class="mt-2 space-y-2">
-                            @foreach ($cursos as $curso)
-                                <li class="rounded-base border border-default bg-neutral-secondary-soft px-3 py-2 text-sm text-body">{{ $curso }}</li>
-                            @endforeach
-                        </ul>
+                    </div>
+                @endif
+
+                @foreach (['activos' => 'Cursos activos', 'anteriores' => 'Cursos anteriores'] as $clave => $titulo)
+                    @if (($cursos[$clave] ?? []) !== [])
+                        <div class="border-t border-default pt-4">
+                            <p class="text-sm font-bold text-heading">{{ $titulo }}</p>
+                            <ul class="mt-2 space-y-2">
+                                @foreach ($cursos[$clave] as $curso)
+                                    <li class="flex items-center justify-between gap-3 rounded-base border border-default bg-neutral-secondary-soft px-3 py-2 text-sm">
+                                        <span class="break-words text-body">{{ $curso['etiqueta'] }}</span>
+                                        <span class="inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-xs font-medium {{ $curso['estado'] === 'Activo' ? 'bg-brand-softer text-fg-brand' : 'bg-neutral-tertiary text-body-subtle' }}">{{ $curso['estado'] }}</span>
+                                    </li>
+                                @endforeach
+                            </ul>
+                        </div>
                     @endif
-                </div>
+                @endforeach
 
                 @if (($auxiliar['examenes'] ?? []) !== [])
                     <div class="border-t border-default pt-4">

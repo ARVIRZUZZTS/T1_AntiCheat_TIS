@@ -125,4 +125,23 @@ class AuxiliarCursoRepository
             ->distinct()
             ->pluck('ac.id_auxiliar');
     }
+
+    public function cursosDelAuxiliar(int $idDocente, int $idAuxiliar): Collection
+    {
+        return DB::table('auxiliar_curso as ac')
+            ->join('curso as c', 'c.id_curso', '=', 'ac.id_curso')
+            ->leftJoin('curso_tipo_gestion as ctg', 'ctg.id_curso', '=', 'c.id_curso')
+            ->leftJoin('tipo_gestion as tg', 'tg.id_tipo_gestion', '=', 'ctg.id_tg')
+            ->where('c.sis_doc', $idDocente)
+            ->where('ac.id_auxiliar', $idAuxiliar)
+            ->orderBy('c.nombre_curso')
+            ->get([
+                'c.id_curso',
+                'c.nombre_curso',
+                'c.estado as estado_curso',
+                'ac.estado as estado_asignacion',
+                'tg.nombre_tipo_gestion',
+                'ctg.anio',
+            ]);
+    }
 }
