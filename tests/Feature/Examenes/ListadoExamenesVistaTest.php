@@ -14,6 +14,7 @@
  * @updated 2026-11-05
  * @updated 2026-11-14
  * @updated 2026-11-24
+ * @updated 2026-11-27
  *
  * @description
  * Pruebas de la vista del listado de exámenes: verifican sobre la fuente de las
@@ -64,6 +65,8 @@
  *   mapa completo de cursos propios y texto de respaldo.
  * - 2026-11-24  [Equipo T1]  test: el alta toma los tipos de TipoExamen, que ya
  *   incluye primer/segundo parcial y evaluacion corriente.
+ * - 2026-11-27  [Equipo T1]  test: alta y edicion consultan los examenes del
+ *   docente y muestran el aviso cuando la fecha ya esta ocupada.
  */
 
 namespace Tests\Feature\Examenes;
@@ -293,6 +296,29 @@ class ListadoExamenesVistaTest extends TestCase
             'examen final' => 'Examen final',
             'segunda instancia' => 'Segunda instancia',
         ], TipoExamen::opciones());
+    }
+
+    public function test_el_formulario_avisa_si_el_docente_ya_tiene_examen_ese_dia(): void
+    {
+        $formulario = $this->fuente(resource_path('views/components/ui/form-crear-examen.blade.php'));
+
+        $this->assertStringContainsString('urlListaExamenes: @js(route(\'api.examenes.listar\'))', $formulario);
+        $this->assertStringContainsString('fechaOriginal: @js(old(\'fecha\', \'\'))', $formulario);
+        $this->assertStringContainsString('async hayExamenEnFecha(fecha, idExcluido = null)', $formulario);
+        $this->assertStringContainsString("String(examen.id ?? '') !== String(idExcluido ?? '')", $formulario);
+        $this->assertStringContainsString('x-on:submit="confirmarCreacion($event)"', $formulario);
+        $this->assertStringContainsString('async confirmarCreacion(evento)', $formulario);
+        $this->assertStringContainsString('¿Está seguro de crear otro examen para ese día?', $formulario);
+        $this->assertStringContainsString('this.fecha !== this.fechaOriginal', $formulario);
+        $this->assertStringContainsString('this.fechaOriginal = this.fecha;', $formulario);
+        $this->assertStringContainsString('async guardar()', $formulario);
+        $this->assertStringContainsString('¿Está seguro de guardar el examen en ese día?', $formulario);
+        $this->assertStringContainsString('confirmarEdicion()', $formulario);
+        $this->assertStringContainsString('Ya tiene un examen programado para el', $formulario);
+        $this->assertStringContainsString('Examen ya programado', $formulario);
+        $this->assertStringContainsString("{{ \$esEdicion ? 'Guardar cambios' : 'Crear' }}", $formulario);
+        $this->assertMatchesRegularExpression('/>\s*Cancelar\s*</', $formulario);
+        $this->assertStringContainsString('enviarCreacion()', $formulario);
     }
 
     public function test_el_detalle_del_curso_ya_no_tiene_pestana_examenes(): void
