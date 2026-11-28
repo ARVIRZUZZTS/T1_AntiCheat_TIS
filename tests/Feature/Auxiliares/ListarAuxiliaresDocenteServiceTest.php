@@ -29,6 +29,7 @@ use App\Models\Rol;
 use App\Services\Auxiliar\ListarAuxiliaresDocenteService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class ListarAuxiliaresDocenteServiceTest extends TestCase
@@ -140,6 +141,40 @@ class ListarAuxiliaresDocenteServiceTest extends TestCase
 
         $this->assertSame('INACTIVO', $ajeno['estado']);
         $this->assertSame('', $ajeno['curso']);
+    }
+
+    public function test_la_gestion_del_curso_aparece_junto_al_nombre(): void
+    {
+        $idGestion = (int) DB::table('tipo_gestion')->value('id_tipo_gestion');
+        $nombreGestion = Str::ucfirst((string) DB::table('tipo_gestion')
+            ->where('id_tipo_gestion', $idGestion)
+            ->value('nombre_tipo_gestion'));
+        $anio = now()->year;
+
+        DB::table('curso_tipo_gestion')->insert([
+            'id_curso' => self::CURSO_ALGORITMOS,
+            'id_tg' => $idGestion,
+            'anio' => $anio,
+        ]);
+
+        $filas = $this->servicio()->ejecutar(self::DOCENTE);
+        $alfa = $this->buscarPorSis($filas, '9100011');
+        $gamma = $this->buscarPorSis($filas, '9100013');
+        $etiqueta = 'Algoritmos - '.$nombreGestion.' '.$anio;
+
+        $this->assertSame($etiqueta, $alfa['cursos'][0]);
+        $this->assertSame($etiqueta, $alfa['curso']);
+        $this->assertSame($etiqueta, $gamma['cursos'][0]);
+    }
+
+    public function test_el_tipo_de_auxiliar_va_en_la_fila(): void
+    {
+        DB::table('usuario')->where('id_usuario', self::AUX_ZUNIGA)->update(['tipo_auxiliar' => 'externo']);
+
+        $filas = $this->servicio()->ejecutar(self::DOCENTE);
+
+        $this->assertSame('Externo', $this->buscarPorSis($filas, '9100014')['tipo']);
+        $this->assertSame('', $this->buscarPorSis($filas, '9100012')['tipo']);
     }
 
     private function servicio(): ListarAuxiliaresDocenteService
