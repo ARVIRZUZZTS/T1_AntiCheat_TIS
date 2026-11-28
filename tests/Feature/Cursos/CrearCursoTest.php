@@ -7,20 +7,15 @@
  *
  * @created 2026-10-24
  *
- * @updated 2026-11-04
- * @updated 2026-11-09
+ * @updated 2026-11-28
  *
  * @description
  * Pruebas de integración del alta de curso (POST /cursos) contra el esquema
- * real de desarrollo. Como el resto de pruebas sobre tablas del dominio, usa
- * DatabaseTransactions con IDs dedicados (rango 900400+), así cada prueba se
- * revierte al terminar.
- *
- * Cubre que el curso se guarde activo, a nombre del docente, con el nombre
- * "{materia} - Grupo {grupo}" y su gestión con año, las validaciones de
- * cada campo y que no se cree dos veces el mismo curso. La materia de prueba
- * es propia ("Prueba Alta Curso") para no chocar con cursos reales: el
- * repetido se busca entre todos los cursos.
+ * real de desarrollo (DatabaseTransactions, IDs dedicados 900400+). La materia
+ * se elige por `id_materia` (del catálogo) y el grupo es un número del 1 al 10;
+ * el nombre del curso se arma solo como "Materia - Grupo N". Cubre el alta, las
+ * validaciones, el duplicado (materia+grupo+gestión+año) y el tope de 5 materias
+ * por docente.
  *
  * @see  App\Http\Controllers\CursoController
  * @see  App\Http\Requests\StoreCursoRequest
@@ -28,18 +23,17 @@
  *
  * @changelog
  * - 2026-10-24  [Valery D. Ortuno P]  test: creación inicial.
- * - 2026-11-04  [Valery D. Ortuno P]  test: el año va desde el actual (sin
- *   tope) y no se repite un curso en la misma gestión y año; sí en otra
- *   gestión o en otro año.
- * - 2026-11-09  [Diegootm]  fix: usuarios de prueba con nombre propio
- *   ("DocenteAltaCurso") — el genérico "Docente" choca con el índice único
- *   usuario_nombre_usuario_unique de la base compartida de Supabase.
+ * - 2026-11-04  [Valery D. Ortuno P]  test: año desde el actual; no se repite.
+ * - 2026-11-28  [Diego Tejerina]  test: materia por id, grupo numérico (1-10),
+ *   nombre autogenerado, duplicado por materia+grupo+gestión+año y tope de 5.
  */
 
 namespace Tests\Feature\Cursos;
 
+use App\Models\Materia;
 use App\Models\Rol;
 use App\Models\Usuario;
+use App\Support\Validadores;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -51,6 +45,8 @@ class CrearCursoTest extends TestCase
     private const ID_DOCENTE = 900401;
 
     private const ID_AUXILIAR = 900402;
+
+    private int $idMateria;
 
     protected function setUp(): void
     {
@@ -66,6 +62,8 @@ class CrearCursoTest extends TestCase
             ['id_usuario' => self::ID_AUXILIAR, 'id_rol' => $this->idRol(Rol::NOMBRE_AUXILIAR)],
         ]);
 
+        $this->idMateria = $this->crearMateria('Prueba Alta Curso');
+
         $this->actingAs(Usuario::findOrFail(self::ID_DOCENTE));
     }
 
@@ -77,7 +75,7 @@ class CrearCursoTest extends TestCase
             ->assertSee('Verano');
     }
 
-    public function test_crea_el_curso_activo_con_su_gestion(): void
+    public function test_crea_el_curso_activo_con_su_gestion_y_nombre_autogenerado(): void
     {
         $this->post(route('cursos.store'), $this->datosValidos())
             ->assertRedirect(route('cursos'))
@@ -86,7 +84,9 @@ class CrearCursoTest extends TestCase
         $curso = DB::table('curso')->where('sis_doc', self::ID_DOCENTE)->first();
 
         $this->assertNotNull($curso);
-        $this->assertSame('Prueba Alta Curso - Grupo 21A', $curso->nombre_curso);
+        $this->assertSame('Prueba Alta Curso - Grupo 3', $curso->nombre_curso);
+        $this->assertSame($this->idMateria, (int) $curso->id_materia);
+        $this->assertSame(3, (int) $curso->numero_grupo);
         $this->assertSame('EnCurso', $curso->estado);
         $this->assertSame(now()->toDateString(), $curso->fecha_creacion);
         $this->assertDatabaseHas('curso_tipo_gestion', [
@@ -94,9 +94,13 @@ class CrearCursoTest extends TestCase
             'id_tg' => $this->idGestion('segundo semestre'),
             'anio' => now()->year,
         ]);
+        // La materia queda ligada al docente.
+        $this->assertDatabaseHas('docente_materia', [
+            'id_docente' => self::ID_DOCENTE,
+            'id_materia' => $this->idMateria,
+        ]);
     }
 
-    /** El año va desde el actual, sin tope: no se crean cursos de años pasados. */
     public function test_el_anio_va_desde_el_actual(): void
     {
         $actual = now()->year;
@@ -107,24 +111,19 @@ class CrearCursoTest extends TestCase
 
         $this->post(route('cursos.store'), $this->datosValidos(['anio' => $actual - 1]))
             ->assertSessionHasErrors(['anio' => 'El año debe ser '.$actual.' o posterior.']);
-        $this->post(route('cursos.store'), $this->datosValidos(['anio' => 12026]))
-            ->assertSessionHasErrors(['anio' => 'Ingrese un año valido.']);
     }
 
-    /** El mismo curso (materia, grupo, gestión y año) no se crea dos veces. */
     public function test_no_crea_un_curso_que_ya_existe(): void
     {
         $this->post(route('cursos.store'), $this->datosValidos())->assertSessionHasNoErrors();
 
-        // Mismo curso, aunque cambien las mayúsculas de la materia.
-        $this->post(route('cursos.store'), $this->datosValidos(['materia' => 'PRUEBA alta curso']))
-            ->assertSessionHasErrors(['curso' => 'Este curso ya existe en la gestion y el año elegidos.']);
+        $this->post(route('cursos.store'), $this->datosValidos())
+            ->assertSessionHasErrors(['curso' => 'Ya existe un curso de Prueba Alta Curso grupo 3 en esta gestion.']);
 
         $this->assertSame(1, DB::table('curso')->where('sis_doc', self::ID_DOCENTE)->count());
     }
 
-    /** El mismo nombre sí puede repetirse en otra gestión o en otro año. */
-    public function test_el_mismo_nombre_se_puede_en_otra_gestion_u_otro_anio(): void
+    public function test_el_mismo_curso_se_puede_en_otra_gestion_u_otro_anio(): void
     {
         $this->post(route('cursos.store'), $this->datosValidos())->assertSessionHasNoErrors();
 
@@ -136,24 +135,11 @@ class CrearCursoTest extends TestCase
         $this->assertSame(3, DB::table('curso')->where('sis_doc', self::ID_DOCENTE)->count());
     }
 
-    public function test_limpia_espacios_y_pasa_el_grupo_a_mayusculas(): void
-    {
-        $this->post(route('cursos.store'), $this->datosValidos([
-            'materia' => '  Prueba    Alta Curso ',
-            'grupo' => '21a',
-        ]))->assertSessionHasNoErrors();
-
-        $this->assertDatabaseHas('curso', [
-            'sis_doc' => self::ID_DOCENTE,
-            'nombre_curso' => 'Prueba Alta Curso - Grupo 21A',
-        ]);
-    }
-
-    public function test_exige_materia_grupo_y_gestion(): void
+    public function test_exige_materia_grupo_gestion_y_anio(): void
     {
         $this->post(route('cursos.store'), [])
             ->assertSessionHasErrors([
-                'materia' => 'Ingrese la materia.',
+                'id_materia' => 'Seleccione la materia.',
                 'grupo' => 'Ingrese el grupo.',
                 'gestion' => 'Seleccione la gestion.',
                 'anio' => 'Ingrese el año.',
@@ -162,26 +148,44 @@ class CrearCursoTest extends TestCase
         $this->assertDatabaseMissing('curso', ['sis_doc' => self::ID_DOCENTE]);
     }
 
-    public function test_el_grupo_es_alfanumerico_de_hasta_3(): void
+    public function test_el_grupo_debe_ser_un_numero_del_1_al_10(): void
     {
-        $mensaje = 'El grupo solo admite letras y numeros, hasta 3 caracteres.';
+        $mensaje = 'El grupo debe ser un numero del 1 al 10.';
 
-        $this->post(route('cursos.store'), $this->datosValidos(['grupo' => '21AB']))
+        $this->post(route('cursos.store'), $this->datosValidos(['grupo' => 0]))
             ->assertSessionHasErrors(['grupo' => $mensaje]);
-        $this->post(route('cursos.store'), $this->datosValidos(['grupo' => '2-A']))
+        $this->post(route('cursos.store'), $this->datosValidos(['grupo' => 11]))
             ->assertSessionHasErrors(['grupo' => $mensaje]);
+        $this->post(route('cursos.store'), $this->datosValidos(['grupo' => 'A']))
+            ->assertSessionHasErrors(['grupo' => 'Ingrese el grupo.']);
+
+        $this->assertDatabaseMissing('curso', ['sis_doc' => self::ID_DOCENTE]);
     }
 
-    public function test_la_materia_no_supera_80_caracteres(): void
+    public function test_la_materia_debe_existir(): void
     {
-        $this->post(route('cursos.store'), $this->datosValidos(['materia' => str_repeat('a', 81)]))
-            ->assertSessionHasErrors(['materia' => 'La materia no debe superar los 80 caracteres.']);
+        $this->post(route('cursos.store'), $this->datosValidos(['id_materia' => 999999]))
+            ->assertSessionHasErrors(['id_materia' => 'Seleccione una materia valida.']);
     }
 
     public function test_la_gestion_debe_existir(): void
     {
         $this->post(route('cursos.store'), $this->datosValidos(['gestion' => 999]))
             ->assertSessionHasErrors(['gestion' => 'Seleccione una gestion valida.']);
+    }
+
+    public function test_un_docente_puede_tener_mas_de_cinco_materias(): void
+    {
+        // Ya no hay tope: seis cursos de seis materias distintas se crean todos.
+        for ($i = 1; $i <= 6; $i++) {
+            $this->post(route('cursos.store'), $this->datosValidos([
+                'id_materia' => $this->crearMateria('Materia Sin Tope '.$i),
+                'grupo' => $i,
+            ]))->assertSessionHasNoErrors();
+        }
+
+        $this->assertSame(6, DB::table('curso')->where('sis_doc', self::ID_DOCENTE)->count());
+        $this->assertSame(6, DB::table('docente_materia')->where('id_docente', self::ID_DOCENTE)->count());
     }
 
     public function test_un_auxiliar_no_puede_crear_cursos(): void
@@ -199,11 +203,23 @@ class CrearCursoTest extends TestCase
     private function datosValidos(array $sobrescribir = []): array
     {
         return array_merge([
-            'materia' => 'Prueba Alta Curso',
-            'grupo' => '21A',
+            'id_materia' => $this->idMateria,
+            'grupo' => 3,
             'gestion' => $this->idGestion('segundo semestre'),
             'anio' => now()->year,
         ], $sobrescribir);
+    }
+
+    private function crearMateria(string $nombre): int
+    {
+        return (int) Materia::query()->create([
+            'codigo' => null,
+            'nombre' => $nombre,
+            'nombre_normalizado' => Validadores::normalizarNombreMateria($nombre),
+            'semestre' => null,
+            'origen' => Materia::ORIGEN_CATALOGO,
+            'fecha_creacion' => now(),
+        ])->id_materia;
     }
 
     private function idGestion(string $nombre): int

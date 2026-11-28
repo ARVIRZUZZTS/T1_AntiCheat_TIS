@@ -2,7 +2,9 @@
 
 namespace Tests\Feature\Cursos;
 
+use App\Models\Materia;
 use App\Models\Usuario;
+use App\Support\Validadores;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -40,8 +42,8 @@ class EditarCursoDuplicadoTest extends TestCase
         $gestiones = $this->gestiones();
 
         DB::table('curso')->insert([
-            ['id_curso' => self::CURSO_PROPIO, 'nombre_curso' => 'Calculo I - Grupo 2', 'sis_doc' => self::DOCENTE, 'estado' => 'EnCurso', 'fecha_creacion' => now()->toDateString()],
-            ['id_curso' => self::CURSO_AJENO, 'nombre_curso' => 'Otro Curso - Grupo 9', 'sis_doc' => self::DOCENTE, 'estado' => 'EnCurso', 'fecha_creacion' => now()->toDateString()],
+            ['id_curso' => self::CURSO_PROPIO, 'nombre_curso' => 'Calculo I - Grupo 2', 'sis_doc' => self::DOCENTE, 'estado' => 'EnCurso', 'fecha_creacion' => now()->toDateString(), 'id_materia' => $this->materiaId('Calculo I'), 'numero_grupo' => 2],
+            ['id_curso' => self::CURSO_AJENO, 'nombre_curso' => 'Otro Curso - Grupo 9', 'sis_doc' => self::DOCENTE, 'estado' => 'EnCurso', 'fecha_creacion' => now()->toDateString(), 'id_materia' => $this->materiaId('Otro Curso'), 'numero_grupo' => 9],
         ]);
         DB::table('curso_tipo_gestion')->insert([
             ['id_curso' => self::CURSO_PROPIO, 'id_tg' => $gestiones[1], 'anio' => now()->year + 1],
@@ -116,10 +118,10 @@ class EditarCursoDuplicadoTest extends TestCase
     {
         $this->putJson(route('api.cursos.actualizar', self::CURSO_PROPIO), $this->datosValidos())
             ->assertOk()
-            ->assertJsonPath('datos.nombre', 'Calculo I - Grupo 2');
+            ->assertJsonPath('datos.nombre', 'Cálculo I - Grupo 2');
 
         $this->assertSame(1, DB::table('curso')
-            ->where('nombre_curso', 'Calculo I - Grupo 2')
+            ->where('nombre_curso', 'Cálculo I - Grupo 2')
             ->count());
     }
 
@@ -137,18 +139,18 @@ class EditarCursoDuplicadoTest extends TestCase
     {
         $this->putJson(route('api.cursos.actualizar', self::CURSO_PROPIO), $this->datosValidos([
             'materia' => 'Calculo II',
-            'grupo' => '3a',
+            'grupo' => '3',
             'anio' => now()->year + 2,
         ]))
             ->assertOk()
-            ->assertJsonPath('datos.materia', 'Calculo II')
-            ->assertJsonPath('datos.grupo', '3A')
+            ->assertJsonPath('datos.materia', 'Cálculo II')
+            ->assertJsonPath('datos.grupo', '3')
             ->assertJsonPath('datos.anio', now()->year + 2)
-            ->assertJsonPath('datos.nombre', 'Calculo II - Grupo 3A');
+            ->assertJsonPath('datos.nombre', 'Cálculo II - Grupo 3');
 
         $this->assertDatabaseHas('curso', [
             'id_curso' => self::CURSO_PROPIO,
-            'nombre_curso' => 'Calculo II - Grupo 3A',
+            'nombre_curso' => 'Cálculo II - Grupo 3',
             'sis_doc' => self::DOCENTE,
             'estado' => 'EnCurso',
             'fecha_creacion' => now()->toDateString(),
@@ -186,6 +188,14 @@ class EditarCursoDuplicadoTest extends TestCase
             'gestion' => $this->gestiones()[1],
             'anio' => now()->year + 1,
         ], $sobrescribir);
+    }
+
+    private function materiaId(string $nombre): int
+    {
+        return (int) Materia::query()->firstOrCreate(
+            ['nombre_normalizado' => Validadores::normalizarNombreMateria($nombre)],
+            ['nombre' => $nombre, 'origen' => Materia::ORIGEN_CATALOGO, 'fecha_creacion' => now()],
+        )->id_materia;
     }
 
     /** @return list<int> */

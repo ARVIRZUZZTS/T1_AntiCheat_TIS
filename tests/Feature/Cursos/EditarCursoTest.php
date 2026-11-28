@@ -61,31 +61,37 @@ class EditarCursoTest extends TestCase
             ->assertJsonPath('errors.anio.0', 'Ingrese el año.');
     }
 
-    public function test_el_grupo_solo_acepta_letras_y_numeros_de_hasta_tres(): void
+    public function test_el_grupo_debe_ser_un_numero_del_1_al_10(): void
     {
-        $mensaje = 'El grupo solo admite letras y numeros, hasta 3 caracteres.';
-
-        foreach (['2-A', '21AB', 'group'] as $grupo) {
+        foreach ([0, 11, 25] as $grupo) {
             $this->putJson(route('api.cursos.actualizar', self::CURSO), $this->datosValidos(['grupo' => $grupo]))
                 ->assertStatus(422)
-                ->assertJsonPath('errors.grupo.0', $mensaje);
+                ->assertJsonPath('errors.grupo.0', 'El grupo debe ser un numero del 1 al 10.');
         }
+
+        // Sin dígitos, el grupo queda vacío: se pide ingresarlo.
+        $this->putJson(route('api.cursos.actualizar', self::CURSO), $this->datosValidos(['grupo' => 'A']))
+            ->assertStatus(422)
+            ->assertJsonPath('errors.grupo.0', 'Ingrese el grupo.');
     }
 
-    public function test_guarda_el_grupo_en_mayusculas_y_limpia_espacios(): void
+    public function test_guarda_el_grupo_numerico_y_arma_el_nombre(): void
     {
+        // El docente escribe sin tildes; el sistema engancha al catálogo y
+        // guarda el nombre canónico ("Cálculo I").
         $this->putJson(route('api.cursos.actualizar', self::CURSO), $this->datosValidos([
             'materia' => '  Calculo    I ',
-            'grupo' => ' 2a ',
+            'grupo' => ' 2 ',
         ]))
             ->assertOk()
-            ->assertJsonPath('datos.materia', 'Calculo I')
-            ->assertJsonPath('datos.grupo', '2A')
-            ->assertJsonPath('datos.nombre', 'Calculo I - Grupo 2A');
+            ->assertJsonPath('datos.materia', 'Cálculo I')
+            ->assertJsonPath('datos.grupo', '2')
+            ->assertJsonPath('datos.nombre', 'Cálculo I - Grupo 2');
 
         $this->assertDatabaseHas('curso', [
             'id_curso' => self::CURSO,
-            'nombre_curso' => 'Calculo I - Grupo 2A',
+            'nombre_curso' => 'Cálculo I - Grupo 2',
+            'numero_grupo' => 2,
         ]);
     }
 
@@ -96,17 +102,17 @@ class EditarCursoTest extends TestCase
             ->assertJsonPath('errors.gestion.0', 'Seleccione una gestion valida.');
     }
 
-    public function test_el_anio_va_desde_el_actual_y_la_materia_hasta_80(): void
+    public function test_el_anio_va_desde_el_actual_y_la_materia_hasta_120(): void
     {
         $this->putJson(route('api.cursos.actualizar', self::CURSO), $this->datosValidos(['anio' => now()->year - 1]))
             ->assertStatus(422)
             ->assertJsonPath('errors.anio.0', 'El año debe ser '.now()->year.' o posterior.');
 
         $this->putJson(route('api.cursos.actualizar', self::CURSO), $this->datosValidos([
-            'materia' => str_repeat('a', 81),
+            'materia' => str_repeat('a', 121),
         ]))
             ->assertStatus(422)
-            ->assertJsonPath('errors.materia.0', 'La materia no debe superar los 80 caracteres.');
+            ->assertJsonPath('errors.materia.0', 'La materia no debe superar los 120 caracteres.');
     }
 
     public function test_existencia_y_pertenencia_se_validan_antes_que_los_campos(): void
