@@ -29,12 +29,12 @@
 
 @section('content')
     <div class="w-full max-w-md" x-data="{
-        codSis: '{{ old('cod_sis') }}',
+        nombreUsuario: '{{ old('nombreUsuario') }}',
         password: '',
         verPassword: false,
         enviando: false,
         error: '',
-        rellenar(cod, pass) { this.codSis = cod; this.password = pass; },
+        rellenar(usuario, pass) { this.nombreUsuario = usuario; this.password = pass; },
         async ingresar() {
             if (this.enviando) return;
             this.enviando = true;
@@ -44,7 +44,7 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Accept': 'application/json',
                         'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content },
-                    body: JSON.stringify({ nombreUsuario: this.codSis, contrasena: this.password })
+                    body: JSON.stringify({ nombreUsuario: this.nombreUsuario, contrasena: this.password })
                 });
                 const datos = await respuesta.json();
                 if (!respuesta.ok) {
@@ -78,8 +78,8 @@
             @csrf
 
             <div class="mb-4">
-                <x-ui.input name="cod_sis" label="NOMBRE DE USUARIO" placeholder="Nombre de usuario"
-                            required autocomplete="username" x-model="codSis" />
+                <x-ui.input name="nombreUsuario" label="NOMBRE DE USUARIO" placeholder="nombre.apellido"
+                            required autocomplete="username" x-model="nombreUsuario" />
             </div>
 
             <div class="mb-4 relative">

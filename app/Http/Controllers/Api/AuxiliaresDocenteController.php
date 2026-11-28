@@ -47,6 +47,17 @@ class AuxiliaresDocenteController extends Controller
     {
         $filas = $servicio->ejecutar((int) $request->user()->id_usuario);
 
-        return response()->json($filas);
+        // El contrato del endpoint se mantiene en sus 6 campos historicos; los
+        // campos extra de la lista (correo, carnet, examenes...) viven en la UI.
+        $contrato = array_map(fn (array $fila): array => [
+            'id' => $fila['id'],
+            'nombre' => $fila['nombre'],
+            'apellido' => $fila['apellido'],
+            'codigoSis' => $fila['codigoSis'],
+            'curso' => $fila['curso'],
+            'estado' => $fila['estado'],
+        ], $filas);
+
+        return response()->json($contrato);
     }
 }

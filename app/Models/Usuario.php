@@ -51,6 +51,11 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
  * @property ?string $nombre
  * @property ?string $fecha_creacion
  * @property string $estado_cuenta Valor de App\Enums\EstadoCuenta.
+ * @property ?string $carnet Carnet de identidad del auxiliar externo (opcional).
+ * @property ?string $tipo_auxiliar 'UMSS' o 'externo'; null si no es auxiliar.
+ * @property bool $puede_crear_auxiliares Permiso de coordinador.
+ * @property ?int $id_docente_responsable Docente al que queda relacionado el auxiliar.
+ * @property ?int $id_creador Usuario que creó la cuenta.
  */
 class Usuario extends Authenticatable
 {
@@ -78,6 +83,16 @@ class Usuario extends Authenticatable
         'nombre',
         'fecha_creacion',
         'estado_cuenta',
+        'carnet',
+        'tipo_auxiliar',
+        'puede_crear_auxiliares',
+        'id_docente_responsable',
+        'id_creador',
+    ];
+
+    /** @var array<string, string> */
+    protected $casts = [
+        'puede_crear_auxiliares' => 'boolean',
     ];
 
     /**
@@ -100,6 +115,47 @@ class Usuario extends Authenticatable
             'id_usuario',
             'id_rol'
         );
+    }
+
+    /**
+     * Si el usuario tiene el rol indicado. Usa la relación ya cargada cuando
+     * existe para no repetir consultas.
+     *
+     * @param  string  $nombreRol  Valor de Rol::NOMBRE_*.
+     *
+     * @return bool  true si tiene el rol.
+     */
+    public function tieneRol(string $nombreRol): bool
+    {
+        if ($this->relationLoaded('roles')) {
+            return $this->roles->contains('nombre_rol', $nombreRol);
+        }
+
+        return $this->roles()->where('nombre_rol', $nombreRol)->exists();
+    }
+
+    /** Si el usuario es docente. */
+    public function esDocente(): bool
+    {
+        return $this->tieneRol(Rol::NOMBRE_DOCENTE);
+    }
+
+    /** Si el usuario es auxiliar. */
+    public function esAuxiliar(): bool
+    {
+        return $this->tieneRol(Rol::NOMBRE_AUXILIAR);
+    }
+
+    /**
+     * Quién puede entrar a "Crear auxiliar" y "Asignar auxiliar": los docentes y
+     * los auxiliares con el permiso de coordinador.
+     *
+     * @return bool  true si puede gestionar auxiliares.
+     */
+    public function puedeGestionarAuxiliares(): bool
+    {
+        return $this->esDocente()
+            || ($this->esAuxiliar() && (bool) $this->puede_crear_auxiliares);
     }
 
     /** @return HasMany<RegistroAsistencia, $this> */

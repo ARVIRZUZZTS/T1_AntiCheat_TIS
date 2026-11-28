@@ -437,6 +437,7 @@ class AsignarAuxiliarTest extends TestCase
             $tabla->string('nombre_usuario');
             $tabla->string('apellido');
             $tabla->string('nombre')->nullable();
+            $tabla->string('correo')->nullable();
             $tabla->string('estado_cuenta')->default('habilitada');
         });
         Schema::create('rol', function (Blueprint $tabla): void {

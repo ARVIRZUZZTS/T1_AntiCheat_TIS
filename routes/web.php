@@ -161,13 +161,16 @@ Route::middleware('auth')->group(function (): void {
     Route::get('/auxiliares', GestionAuxiliares::class)->name('auxiliares');
     // Auxiliares · Asignar (HU 24): asignar un auxiliar ya creado a un curso o
     // a un examen futuro del docente, eligiendo si ve Ingreso, Monitor o las
-    // dos. Solo docentes.
+    // dos. Docentes y auxiliares con permiso de coordinador.
     Route::get('/auxiliares/asignar', AsignarAuxiliar::class)
-        ->middleware('docente')
+        ->middleware('puede-gestionar-auxiliares')
         ->name('auxiliares.asignar');
     // Auxiliares · Crear: el alta de auxiliar como pagina propia (antes era un
     // modal dentro de GestionAuxiliares). Al guardar vuelve a la lista.
-    Route::get('/auxiliares/crear', CrearAuxiliar::class)->name('auxiliares.crear');
+    // Docentes y auxiliares con permiso de coordinador.
+    Route::get('/auxiliares/crear', CrearAuxiliar::class)
+        ->middleware('puede-gestionar-auxiliares')
+        ->name('auxiliares.crear');
     // Auxiliares · Editar / Eliminar: marcadores hasta que se implementen.
     Route::view('/auxiliares/editar', 'pages.en-desarrollo', [
         'titulo' => 'Editar auxiliar',

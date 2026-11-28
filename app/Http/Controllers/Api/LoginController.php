@@ -4,14 +4,27 @@ namespace App\Http\Controllers\Api;
 
 use App\Enums\EstadoCuenta;
 use App\Http\Controllers\Controller;
-use App\Models\Usuario;
+use App\Services\Auth\AutenticarUsuarioService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
 
 class LoginController extends Controller
 {
+    public function __construct(
+        private readonly AutenticarUsuarioService $autenticador,
+    ) {
+    }
+
+    /**
+     * Inicia sesión con el nombre de usuario (estándar) o el `cod_sis`
+     * (alternativa) más la contraseña.
+     *
+     * @param  Request  $request  Trae `nombreUsuario` (identificador) y `contrasena`.
+     *
+     * @return JsonResponse  200 si entra; 401 si las credenciales no son
+     *                       válidas; 403 si la cuenta no puede ingresar aún.
+     */
     public function login(Request $request): JsonResponse
     {
         $datos = $request->validate([
@@ -19,14 +32,9 @@ class LoginController extends Controller
             'contrasena' => ['required', 'string'],
         ]);
 
-        $nombreUsuario = trim($datos['nombreUsuario']);
-        $contrasena = trim($datos['contrasena']);
+        $usuario = $this->autenticador->porCredenciales($datos['nombreUsuario'], $datos['contrasena']);
 
-        $usuario = Usuario::query()
-            ->whereRaw('lower(btrim(nombre_usuario)) = lower(btrim(?))', [$nombreUsuario])
-            ->first();
-
-        if (! $usuario || ! Hash::check($contrasena, $usuario->password)) {
+        if ($usuario === null) {
             return response()->json(['mensaje' => 'Credenciales inválidas'], 401);
         }
 

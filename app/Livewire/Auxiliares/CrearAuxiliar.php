@@ -2,38 +2,43 @@
 
 /**
  * @file    CrearAuxiliar.php
- * @author  David E. Chavez T. <virzuzz12345@gmail.com>
+ *
+ * @author  Diego Tejerina <josediegotejerinamolina@gmail.com>
+ *
  * @created 2026-11-15
  *
+ * @updated 2026-11-27
+ *
  * @description
- * Componente Livewire del alta de un auxiliar como página propia (subopción
- * "Crear auxiliar" del sidebar). La lógica y las validaciones
- * (Validadores::reglasAuxiliar) son las del modal original de GestionAuxiliares
- * (David E. Chavez T.); solo cambia el contenedor (de modal a página). Al
- * guardar, crea el usuario con rol auxiliar, lo asigna al curso elegido
- * (auxiliar_curso) y redirige a la lista con un aviso de éxito.
+ * Página "Crear auxiliar" (Auxiliares › Crear auxiliar). Pide nombre, apellido,
+ * tipo de auxiliar (UMSS con código SIS o externo con carnet opcional), correo
+ * y, solo para docentes, el permiso de coordinador. Ya no se elige curso: la
+ * asignación se hace después en "Asignar auxiliar".
+ *
+ * Orquesta: valida en el servidor, muestra el modal de confirmación y, al
+ * confirmar, delega el alta y el envío de credenciales a CrearAuxiliarService.
+ * Al terminar vuelve a la lista con el aviso de éxito.
  *
  * @changelog
- * - 2026-11-08  [David E. Chavez T.]  feat: alta de auxiliar (originalmente el
- *   modal de GestionAuxiliares).
- * - 2026-11-15  [Diego Tejerina]  refactor: se mueve esa alta a una página
- *   propia (mismo código y validaciones), que redirige a la lista al terminar.
+ * - 2026-11-15  [Diego Tejerina]  refactor: el alta pasa de modal a página propia.
+ * - 2026-11-27  [Diego Tejerina]  feat: tipo de auxiliar (UMSS/externo), carnet
+ *   opcional, correo obligatorio, permiso de coordinador, modal de confirmación
+ *   y envío de credenciales por correo. Se quita la elección de curso.
  *
- * @see  App\Livewire\Auxiliares\GestionAuxiliares
+ * @see  App\Services\Auxiliar\CrearAuxiliarService
  * @see  App\Support\Validadores
  */
 
 namespace App\Livewire\Auxiliares;
 
-use App\Models\Curso;
-use App\Models\Rol;
 use App\Models\Usuario;
+use App\Services\Auxiliar\CrearAuxiliarService;
+use App\Services\Usuario\GeneradorNombreUsuarioService;
+use App\Support\DTO\DatosNuevoAuxiliar;
 use App\Support\Validadores;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
+use Livewire\Attributes\Computed;
 use Livewire\Component;
 
 class CrearAuxiliar extends Component
@@ -42,99 +47,113 @@ class CrearAuxiliar extends Component
 
     public string $apellido = '';
 
+    public string $tipoAuxiliar = DatosNuevoAuxiliar::TIPO_UMSS;
+
     public string $codSis = '';
 
-    public string $password = '';
+    public string $carnet = '';
 
-    public ?int $idCurso = null;
+    public string $correo = '';
 
-    public string $mensajeError = '';
+    public bool $puedeCrearAuxiliares = false;
 
-    public function mount(): void
+    /** true mientras se muestra el modal de confirmación. */
+    public bool $confirmando = false;
+
+    /** Usuario generado que se mostrará en la confirmación (aux.nombre.apellido). */
+    public string $usuarioPreview = '';
+
+    /** El permiso de coordinador solo lo otorga un docente. */
+    #[Computed]
+    public function esDocente(): bool
     {
-        $this->idCurso = $this->cursos()->first()?->id_curso;
+        return $this->creador()->esDocente();
     }
 
-    /**
-     * Cursos del docente autenticado, para asignar el auxiliar.
-     *
-     * @return Collection<int, Curso>
-     */
-    public function cursos(): Collection
+    /** Al pasar a externo se limpia el código SIS (el carnet aplica a ambos). */
+    public function updatedTipoAuxiliar(): void
     {
-        return Curso::query()
-            ->where('sis_doc', auth()->id())
-            ->orderBy('nombre_curso')
-            ->get();
-    }
-
-    /**
-     * Registra el auxiliar y lo asigna al curso elegido. Al terminar vuelve a la
-     * lista con el aviso de éxito.
-     *
-     * @throws \Illuminate\Validation\ValidationException  Si los datos no son válidos.
-     * @throws \Illuminate\Database\Eloquent\ModelNotFoundException  Si no existe el rol auxiliar.
-     */
-    public function crear(): ?RedirectResponse
-    {
-        if (trim($this->password) === '') {
-            $this->password = '12345678';
+        if ($this->tipoAuxiliar !== DatosNuevoAuxiliar::TIPO_UMSS) {
+            $this->codSis = '';
         }
+    }
 
+    /**
+     * Valida los datos y, si están bien y no hay duplicados, calcula el usuario
+     * generado y abre el modal de confirmación.
+     */
+    public function revisar(): void
+    {
         $this->validate(
-            Validadores::reglasAuxiliar(),
+            Validadores::reglasAuxiliar($this->tipoAuxiliar),
             Validadores::mensajesAuxiliar(),
         );
 
-        if (Usuario::query()->where('cod_sis', $this->codSis)->exists()) {
-            $this->addError('codSis', 'Ya existe un usuario con este código SIS.');
+        $datos = $this->datos();
+        app(CrearAuxiliarService::class)->revisarDuplicados($datos);
 
-            return null;
-        }
+        $this->usuarioPreview = app(GeneradorNombreUsuarioService::class)->generar(
+            $datos->nombre,
+            $datos->apellido,
+            GeneradorNombreUsuarioService::PREFIJO_AUXILIAR,
+        );
 
-        $curso = Curso::query()
-            ->where('id_curso', $this->idCurso)
-            ->where('sis_doc', auth()->id())
-            ->first();
+        $this->confirmando = true;
+    }
 
-        if ($curso === null) {
-            $this->mensajeError = 'Curso no válido.';
+    /** Cierra el modal sin crear y vuelve al formulario. */
+    public function cancelarConfirmacion(): void
+    {
+        $this->confirmando = false;
+    }
 
-            return null;
-        }
-
-        $rolAuxiliar = Rol::query()->where('nombre_rol', Rol::NOMBRE_AUXILIAR)->firstOrFail();
-
-        $idUsuario = ((int) Usuario::query()->max('id_usuario')) + 1;
-
-        $usuario = Usuario::create([
-            'id_usuario' => $idUsuario,
-            'cod_sis' => $this->codSis,
-            'password' => Hash::make($this->password),
-            'nombre_usuario' => $this->nombre,
-            'apellido' => $this->apellido,
-        ]);
-
-        DB::table('rol_usuario')->insert([
-            'id_usuario' => $usuario->id_usuario,
-            'id_rol' => $rolAuxiliar->id_rol,
-        ]);
-
-        DB::table('auxiliar_curso')->insert([
-            'id_auxiliar' => $usuario->id_usuario,
-            'id_curso' => $curso->id_curso,
-            'estado' => 'Activo',
-        ]);
+    /**
+     * Crea el auxiliar y vuelve a la lista con el aviso de éxito. Si el correo
+     * con las credenciales no se pudo enviar, lo indica para que se reenvíe.
+     */
+    public function confirmar(): RedirectResponse
+    {
+        $resultado = app(CrearAuxiliarService::class)->crear($this->datos(), $this->creador());
 
         return redirect()
             ->route('auxiliares')
-            ->with('mensaje', 'Auxiliar creado y asignado.');
+            ->with('auxiliarCreado', [
+                'id' => $resultado->auxiliar->id_usuario,
+                'credencialesEnviadas' => $resultado->credencialesEnviadas,
+            ]);
     }
 
     public function render(): View
     {
-        return view('livewire.auxiliares.crear-auxiliar', [
-            'cursos' => $this->cursos(),
-        ])->extends('layouts.app');
+        return view('livewire.auxiliares.crear-auxiliar')->extends('layouts.app');
+    }
+
+    /** Datos normalizados del formulario. */
+    private function datos(): DatosNuevoAuxiliar
+    {
+        return new DatosNuevoAuxiliar(
+            nombre: $this->limpiar($this->nombre),
+            apellido: $this->limpiar($this->apellido),
+            tipoAuxiliar: $this->tipoAuxiliar,
+            codSis: trim($this->codSis),
+            carnet: trim($this->carnet),
+            correo: trim($this->correo),
+            // Un coordinador no puede otorgar el permiso aunque llegue marcado.
+            puedeCrearAuxiliares: $this->esDocente() && $this->puedeCrearAuxiliares,
+        );
+    }
+
+    private function creador(): Usuario
+    {
+        $usuario = auth()->user();
+        abort_unless($usuario instanceof Usuario, 401);
+
+        return $usuario;
+    }
+
+    /** Recorta y colapsa espacios internos sin tocar letras, apóstrofos ni guiones. */
+    private function limpiar(string $valor): string
+    {
+        return (string) preg_replace('/\s+/u', ' ', trim($valor));
     }
 }
