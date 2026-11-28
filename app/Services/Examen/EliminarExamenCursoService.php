@@ -7,12 +7,18 @@
  *
  * @created 2026-11-16
  *
+ * @updated 2026-11-24
+ *
  * @description
  * Elimina lógicamente un examen de un curso: revoca la vinculación
  * `examen_curso` del curso elegido y borra las inscripciones de ese curso
  * (`estudiante_examen` y sus ambientes), sin tocar la fila del examen ni los
  * datos de otros cursos ni de otros docentes (configuraciones, invitaciones,
  * ingresos e incidencias quedan intactos).
+ *
+ * Al desvincularlo avisa a los auxiliares activos del curso y a los docentes
+ * que comparten el examen (no a quien elimina); el aviso se crea dentro de
+ * la transacción y solo cuando el borrado es manual (no `$forzar`).
  *
  * Si el examen estaba compartido en varios cursos, solo se desvincula el
  * curso pedido y el examen sigue vivo para los demás; si era su único curso,
@@ -25,17 +31,22 @@
  *     (central_riesgo) registrados.
  *
  * Eliminar un curso completo necesita desvincular sus exámenes aunque tengan
- * historia; para ese caso el parámetro `$forzar` omite las dos guardas. El
- * examen sigue vivo para otros cursos con los que se comparta.
+ * historia; para ese caso el parámetro `$forzar` omite las dos guardas y no
+ * genera avisos de examen eliminado. El examen sigue vivo para otros cursos
+ * con los que se comparta.
  *
  * @changelog
  * - 2026-11-16  [OchoaCesar]  feat: creación inicial del servicio.
  * - 2026-11-16  [Alex Candia]  feat: parámetro $forzar para desvincular
  *   exámenes desde la eliminación de un curso.
+ * - 2026-11-24  [OchoaCesar]  feat: aviso «Examen eliminado» a los auxiliares
+ *   activos del curso y a los docentes que comparten el examen (solo en el
+ *   borrado manual, no al eliminar el curso completo).
  *
  * @see  App\Http\Controllers\Api\ConfiguracionExamenDocenteController
  * @see  App\Services\Curso\EliminarCursoService
  * @see  App\Services\Examen\ListarExamenesCursoService
+ * @see  App\Services\Examen\NotificarEliminacionExamenService
  * @see  resources/views/partials/examenes-curso.blade.php
  */
 
@@ -47,6 +58,7 @@ use App\Models\EstudianteExamen;
 use App\Models\Examen;
 use App\Models\RegistroAsistencia;
 use App\Models\Usuario;
+use App\Services\Curso\AsegurarCursoEditableService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -62,7 +74,8 @@ class EliminarExamenCursoService
     public const MENSAJE_CON_DATOS = 'No se puede eliminar un examen con ingresos o incidencias registradas:';
 
     public function __construct(
-        private readonly \App\Services\Curso\AsegurarCursoEditableService $editable,
+        private readonly AsegurarCursoEditableService $editable,
+        private readonly NotificarEliminacionExamenService $notificaciones,
     ) {}
 
     /**
@@ -108,7 +121,7 @@ class EliminarExamenCursoService
             ]);
         }
 
-        DB::transaction(function () use ($examen, $curso): void {
+        DB::transaction(function () use ($docente, $examen, $curso, $forzar): void {
             $this->limpiarInscripciones($examen, $curso);
 
             $examen->cursos()->detach($curso->id_curso);
@@ -119,6 +132,12 @@ class EliminarExamenCursoService
 
             foreach ($examen->configuracionesDocentes()->pluck('id_docente') as $idDocente) {
                 Cache::forget($examenes.'.docente.'.$idDocente);
+            }
+
+            // Aviso dentro de la transacción (atomico, como al editar): solo
+            // en el borrado manual; al eliminar el curso completo no aplica.
+            if (! $forzar) {
+                $this->notificaciones->notificar($examen, $curso, $docente);
             }
         });
     }

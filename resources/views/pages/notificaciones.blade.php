@@ -15,6 +15,8 @@
       - `central_riesgo`: icono rojo y orientación a la central de riesgos.
       - `examen_modificado`: icono ámbar con el detalle de lo que se cambió en
         un examen (ambientes, fecha u hora).
+      - `examen_eliminado`: icono rojo con el examen eliminado, el curso del
+        que se quitó y quién lo eliminó.
 
     Si no queda ninguna, aparece el mensaje "No tienes notificaciones".
 
@@ -40,6 +42,8 @@
        identificar la bandeja del auxiliar con sus avisos de cambios de aula.
      - 2026-11-24  [Equipo T1]  feat: los auxiliares consultan su bandeja y se
        muestra el aviso de cambios de ambientes, fecha y hora de exámenes.
+     - 2026-11-24  [OchoaCesar]  feat: tarjeta del aviso «Examen eliminado»
+       (`examen_eliminado`) con icono rojo de papelera.
 
 
     @see  \resources\views\components\ui\notificacion-card.blade.php
@@ -142,6 +146,19 @@
              </div>
          </template>
 
+         <template id="notificacion-template-examen-eliminado">
+             <div class="js-notificacion relative flex items-start gap-3 sm:gap-4 rounded-2xl border border-light bg-neutral-primary-soft p-4 sm:p-5 shadow-xs">
+                 <span class="shrink-0 inline-flex items-center justify-center w-11 h-11 bg-danger-soft rounded-xl">
+                     <svg class="w-6 h-6 text-danger" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0 1 16.138 21H7.862a2 2 0 0 1-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v3M4 7h16"/></svg>
+                 </span>
+                 <div class="flex-1 min-w-0">
+                     <h3 class="js-titulo text-sm font-bold leading-snug text-heading break-words"></h3>
+                     <p class="js-descripcion mt-1 text-sm text-body break-words"></p>
+                     <span class="js-hace mt-3 block text-xs text-muted"></span>
+                 </div>
+             </div>
+         </template>
+
          <div id="notificaciones-lista"
               class="mt-6 flex flex-col gap-4"
                data-endpoint="{{ route('api.notificaciones.index') }}"
@@ -177,7 +194,8 @@
                 invitacion_examen: document.getElementById('notificacion-template-invitacion'),
                 respuesta_invitacion: document.getElementById('notificacion-template-respuesta'),
                 respaldo_bd: document.getElementById('notificacion-template-respaldo'),
-                examen_modificado: document.getElementById('notificacion-template-examen')
+                examen_modificado: document.getElementById('notificacion-template-examen'),
+                examen_eliminado: document.getElementById('notificacion-template-examen-eliminado')
             };
 
             var titulos = {
@@ -186,7 +204,8 @@
                 invitacion_examen: 'Invitacion para compartir un examen',
                 respuesta_invitacion: 'Respuesta a tu invitacion de examen',
                 respaldo_bd: 'Respaldo automático de la base de datos',
-                examen_modificado: 'Cambios en un examen'
+                examen_modificado: 'Cambios en un examen',
+                examen_eliminado: 'Examen eliminado'
             };
 
             function actualizarVacio() {
