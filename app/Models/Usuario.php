@@ -146,6 +146,12 @@ class Usuario extends Authenticatable
         return $this->tieneRol(Rol::NOMBRE_AUXILIAR);
     }
 
+    /** Si la cuenta fue eliminada de forma lógica (no puede ingresar). */
+    public function estaEliminado(): bool
+    {
+        return $this->estado_cuenta === \App\Enums\EstadoCuenta::Eliminada->value;
+    }
+
     /**
      * Quién puede entrar a "Crear auxiliar" y "Asignar auxiliar": los docentes y
      * los auxiliares con el permiso de coordinador.

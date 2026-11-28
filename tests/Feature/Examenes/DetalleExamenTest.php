@@ -75,7 +75,7 @@ class DetalleExamenTest extends TestCase
             ->assertOk()
             ->assertExactJson(['datos' => [
                 'id' => self::EXAMEN,
-                'tipo' => 'Examen parcial',
+                'tipo' => 'Examen primer parcial',
                 'fecha' => '02/12/2026',
                 'hora_inicio' => '08:15',
                 'hora_fin' => '09:45',
@@ -339,7 +339,7 @@ class DetalleExamenTest extends TestCase
             ['id_usuario' => self::AUXILIAR, 'id_rol' => 2],
         ]);
 
-        DB::table('tipo_examen')->insert(['id_tipo_examen' => 1, 'nombre_tipo_examen' => 'examen parcial']);
+        DB::table('tipo_examen')->insert(['id_tipo_examen' => 1, 'nombre_tipo_examen' => 'examen primer parcial']);
         DB::table('examen')->insert([
             'id_examen' => self::EXAMEN, 'fecha' => '2026-12-02', 'hora_inicio' => '08:15:00',
             'duracion' => 90, 'creador' => self::ROBERTO, 'tipo_examen' => 1,

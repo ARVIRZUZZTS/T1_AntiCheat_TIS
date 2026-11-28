@@ -345,7 +345,7 @@
                     :show-button="false"
                     wire:model.live.debounce.350ms="busqueda"
                     wireSubmit="buscar"
-                    @input="$event.target.value = $event.target.value.replace(/[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9 ]/g, '')"
+                    @input="$event.target.value = $event.target.value.replace(/[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9 '’\-]/g, '')"
                 />
                 @if ($busqueda !== '')
                     <button type="button" wire:click="limpiarBusqueda"

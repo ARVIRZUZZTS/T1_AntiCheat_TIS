@@ -18,6 +18,9 @@
  *   - `examen_modificado`: cambiaron los ambientes, la fecha o la hora de un
  *     examen; va a los auxiliares asignados y, si está compartido, a los
  *     docentes involucrados. Los cambios se guardan en `detalles`.
+ *   - `examen_eliminado`: un docente desvinculó un examen de uno de sus
+ *     cursos; va a los auxiliares activos del curso y a los docentes que
+ *     aceptaron compartir el examen. El detalle se guarda en `detalles`.
  *
  * Cada fila referencia el registro del caso en `central_riesgo` y el curso
  * (materia) del docente; el título, el auxiliar, el estudiante, el examen
@@ -40,6 +43,7 @@
  *   entidad de origen, como el respaldo automático de la base de datos (#HU33).
  * - 2026-11-24  [Equipo T1]  feat: columna `detalles` para el aviso de cambios
  *   de ambientes, fecha u hora de un examen.
+ * - 2026-11-27  [Alisson D. Alvarado <alvaradoalissondalet@gmail.com>]  feat: registrar la lectura del aviso.
  */
 
 namespace App\Models;
@@ -58,6 +62,7 @@ use Illuminate\Support\Carbon;
  * @property string $estado
  * @property bool $oculta
  * @property ?Carbon $fecha_evento
+ * @property ?Carbon $fecha_lectura
  * @property ?array<string, mixed> $detalles
  */
 class NotificacionDocente extends Model
@@ -83,6 +88,7 @@ class NotificacionDocente extends Model
         'estado',
         'oculta',
         'fecha_evento',
+        'fecha_lectura',
         'detalles',
     ];
 
@@ -91,6 +97,7 @@ class NotificacionDocente extends Model
         return [
             'oculta' => 'boolean',
             'fecha_evento' => 'datetime',
+            'fecha_lectura' => 'datetime',
             'detalles' => 'array',
         ];
     }

@@ -5,7 +5,7 @@
     @updated 2026-11-16
 
     @description
-    Página "Eliminar curso" (subopción del sidebar, debajo de "Editar curso"):
+    Página "Eliminar curso" (subopción del sidebar):
     la tabla de cursos activos del docente autenticado. Cada fila muestra el
     curso, su gestión, la cantidad de estudiantes y su botón "Eliminar".
 
@@ -23,6 +23,8 @@
     - 2026-11-16  [Alex Candia]  feat: lista de cursos con botón de eliminación.
     - 2026-11-16  [Alex Candia]  feat: modal de confirmación con conteo de
       auxiliares y estudiantes, borrado por fetch y actualización de la lista.
+    - 2026-11-27  [Alisson D. Alvarado <alvaradoalissondalet@gmail.com>]  docs:
+      actualizar la descripcion del menu de cursos.
 
     @see  App\Http\Controllers\CursoController::eliminar()
     @see  App\Http\Controllers\CursoController::afectados()

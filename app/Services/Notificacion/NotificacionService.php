@@ -23,6 +23,10 @@
  *   editan los ambientes, la fecha o la hora. Va a los auxiliares asignados y,
  *   si el examen está compartido, a los docentes involucrados; el detalle de lo
  *   cambiado se guarda en `detalles` para no desincronizarlo con el examen.
+ * - `notificarExamenEliminado()` crea el aviso "Examen eliminado" cuando un
+ *   docente desvincula un examen de un curso: va a los auxiliares activos de
+ *   ese curso y a los docentes que aceptaron compartir el examen. El nombre
+ *   del examen, el curso y quien lo eliminó se guardan en `detalles`.
  * - `listarPara()` devuelve las notificaciones no ocultas del usuario
  *   autenticado (docente o auxiliar), de la más reciente a la más antigua, con
  *   el tiempo transcurrido en español. Un auxiliar ve solo los avisos que se le
@@ -48,6 +52,11 @@
  *   abrir la bandeja se marcan todos como `visto`.
  * - 2026-11-24  [Equipo T1]  feat: aviso de cambios de ambientes, fecha u hora
  *   de un examen, visible también para auxiliares asignados.
+ * - 2026-11-24  [OchoaCesar]  feat: aviso «Examen eliminado» (`examen_eliminado`)
+ *   para los auxiliares activos del curso y los docentes que comparten el
+ *   examen, generado al desvincularlo de un curso.
+ * - 2026-11-27  [Alisson D. Alvarado <alvaradoalissondalet@gmail.com>]  feat:
+ *   conservar la fecha de lectura y ocultar de la bandeja los avisos vencidos.
  */
 
 namespace App\Services\Notificacion;
@@ -87,6 +96,9 @@ class NotificacionService
     /** Título del aviso de cambios de ambientes, fecha u hora de un examen. */
     public const TITULO_CAMBIO_EXAMEN = 'Cambios en un examen';
 
+    /** Título del aviso cuando el docente elimina un examen de un curso. */
+    public const TITULO_EXAMEN_ELIMINADO = 'Examen eliminado';
+
     /**
      * Tipos de aviso (columna `tipo` de `notificacion_docente`). La pantalla
      * pinta una tarjeta distinta según el valor.
@@ -105,6 +117,9 @@ class NotificacionService
 
     /** Aviso de cambios de ambientes, fecha u hora de un examen ya programado. */
     public const TIPO_CAMBIO_EXAMEN = 'examen_modificado';
+
+    /** Aviso cuando el docente elimina un examen de uno de sus cursos. */
+    public const TIPO_EXAMEN_ELIMINADO = 'examen_eliminado';
 
     /** Estado inicial con el que nace un aviso, del enum `estado_notificacion`. */
     public const ESTADO_RECIBIDO = 'recibido';
@@ -282,7 +297,7 @@ class NotificacionService
             // Lo normal es que el aviso exista (lo creo el envio): se reapunta
             // en un solo viaje, sin bloquear la tabla.
             $fila = DB::selectOne(
-                'update notificacion_docente set id_central_riesgo = ?, id_curso = ?, id_docente_destinatario = ?, tipo = ?, estado = ?, oculta = ? '
+                'update notificacion_docente set id_central_riesgo = ?, id_curso = ?, id_docente_destinatario = ?, tipo = ?, estado = ?, oculta = ?, fecha_lectura = null '
                 .'where id_invitacion = ? returning id_notificacion',
                 [...array_values($datos), $invitacion->id_invitacion],
             );
@@ -409,6 +424,63 @@ class NotificacionService
     }
 
     /**
+     * Crea el aviso "Examen eliminado" para cada destinatario. Se llama desde
+     * `EliminarExamenCursoService` cuando un docente desvincula un examen de
+     * uno de sus cursos, dentro de la transacción del borrado.
+     *
+     * La columna `id_curso` se guarda para que el aviso se limpie solo si
+     * después se elimina el curso completo (`EliminarCursoService`). El texto
+     * (examen, curso y quién eliminó) vive en `detalles` y el momento en
+     * `fecha_evento`, igual que el aviso de cambios de examen. Se reutiliza
+     * `id_docente_destinatario` como columna genérica de usuario (docente o
+     * auxiliar), que es un FK a `usuario.id_usuario`.
+     *
+     * @param  Collection<int, Usuario>  $destinatarios  Auxiliares y docentes que deben recibir el aviso.
+     * @param  array<string, mixed>  $detalles  Examen, curso y docente que eliminó.
+     * @param  CarbonInterface  $momento  Momento en que se eliminó.
+     * @return array<int, NotificacionDocente> Avisos creados, uno por destinatario.
+     *
+     * @author OchoaCesar <cesareduardonick@gmail.com>
+     *
+     * @since  2026-11-24
+     */
+    public function notificarExamenEliminado(
+        Collection $destinatarios,
+        array $detalles,
+        CarbonInterface $momento,
+    ): array {
+        if ($destinatarios->isEmpty()) {
+            return [];
+        }
+
+        $idCurso = isset($detalles['curso_id']) ? (int) $detalles['curso_id'] : null;
+
+        return DB::transaction(function () use ($destinatarios, $detalles, $momento, $idCurso): array {
+            $this->bloquearTabla();
+
+            $siguiente = (int) NotificacionDocente::query()->max('id_notificacion');
+            $creados = [];
+
+            foreach ($destinatarios as $destinatario) {
+                $siguiente++;
+
+                $creados[] = NotificacionDocente::create([
+                    'id_notificacion' => $siguiente,
+                    'id_docente_destinatario' => $destinatario->id_usuario,
+                    'id_curso' => $idCurso,
+                    'tipo' => self::TIPO_EXAMEN_ELIMINADO,
+                    'estado' => self::ESTADO_RECIBIDO,
+                    'oculta' => false,
+                    'fecha_evento' => $momento,
+                    'detalles' => $detalles,
+                ]);
+            }
+
+            return $creados;
+        });
+    }
+
+    /**
      * Texto del aviso de respaldo con la fecha y hora exactas.
      *
      * @param  ?CarbonInterface  $fecha  Momento del respaldo.
@@ -507,9 +579,19 @@ class NotificacionService
      */
     public function marcarTodasLeidas(Usuario $usuario): int
     {
-        return $this->consultarPara($usuario)
+        $momento = now();
+
+        $cantidad = $this->consultarPara($usuario)
             ->where('estado', self::ESTADO_RECIBIDO)
-            ->update(['estado' => self::ESTADO_VISTO]);
+            ->update(['estado' => self::ESTADO_VISTO, 'fecha_lectura' => $momento]);
+
+        // Los avisos leídos antes de esta función empiezan su plazo al abrir la bandeja.
+        $this->consultarPara($usuario)
+            ->where('estado', self::ESTADO_VISTO)
+            ->whereNull('fecha_lectura')
+            ->update(['fecha_lectura' => $momento]);
+
+        return $cantidad;
     }
 
     /**
@@ -522,6 +604,10 @@ class NotificacionService
     {
         return NotificacionDocente::query()
             ->where('oculta', false)
+            ->where(function (Builder $query): void {
+                $query->whereNull('fecha_lectura')
+                    ->orWhere('fecha_lectura', '>', now()->subDays(2));
+            })
             ->where(function (Builder $query) use ($usuario): void {
                 $query->where('id_docente_destinatario', $usuario->id_usuario)
                     ->orWhere(function (Builder $notificacionLegacy) use ($usuario): void {
@@ -539,14 +625,23 @@ class NotificacionService
      * primero) y el formato del tiempo sin tocar la base.
      *
      * @param  Collection<int, NotificacionDocente>  $notificaciones
-     * @return Collection<int, array<string, mixed>>
+     * @return Collection<int, array<string, mixed>> Cada aviso lleva
+     *                                               siempre sus claves fijas (id, tipo, titulo, ...) más `vence_en`.
      */
     public function preparar(Collection $notificaciones): Collection
     {
-        return $notificaciones
+        /** @var Collection<int, array<string, mixed>> $avisos */
+        $avisos = $notificaciones
             ->sortByDesc(fn (NotificacionDocente $notificacion): int => $this->fechaDe($notificacion)?->getTimestamp() ?? 0)
             ->values()
-            ->map(fn (NotificacionDocente $notificacion): array => $this->mapear($notificacion));
+            ->map(function (NotificacionDocente $notificacion): array {
+                $datos = $this->mapear($notificacion);
+                $datos['vence_en'] = $notificacion->fecha_lectura?->copy()->addDays(2)->toISOString();
+
+                return $datos;
+            });
+
+        return $avisos;
     }
 
     /**
@@ -602,6 +697,10 @@ class NotificacionService
 
         if ($notificacion->tipo === self::TIPO_CAMBIO_EXAMEN) {
             return $this->mapearCambioExamen($notificacion);
+        }
+
+        if ($notificacion->tipo === self::TIPO_EXAMEN_ELIMINADO) {
+            return $this->mapearExamenEliminado($notificacion);
         }
 
         $registro = $notificacion->centralRiesgo;
@@ -791,6 +890,48 @@ class NotificacionService
         ];
     }
 
+    /**
+     * Mapea el aviso de examen eliminado desde `detalles`. El mensaje es texto
+     * plano y no lleva acción: la tarjeta solo informa qué examen se eliminó
+     * de qué curso y por quién.
+     *
+     * @param  NotificacionDocente  $notificacion  Aviso de tipo `examen_eliminado`.
+     * @return array<string, mixed> Datos para la pantalla/API.
+     *
+     * @author OchoaCesar <cesareduardonick@gmail.com>
+     *
+     * @since  2026-11-24
+     */
+    private function mapearExamenEliminado(NotificacionDocente $notificacion): array
+    {
+        $detalles = $notificacion->detalles ?? [];
+        $examen = (string) ($detalles['examen'] ?? 'Examen');
+        $curso = (string) ($detalles['curso'] ?? '');
+        $eliminadoPor = (string) ($detalles['eliminado_por'] ?? '');
+        $fecha = $notificacion->fecha_evento;
+
+        return [
+            'id' => (int) $notificacion->id_notificacion,
+            'tipo' => self::TIPO_EXAMEN_ELIMINADO,
+            'titulo' => self::TITULO_EXAMEN_ELIMINADO,
+            'descripcion' => sprintf(
+                'El examen %s fue eliminado del curso %s%s.',
+                $examen,
+                $curso,
+                $eliminadoPor !== '' ? ' por '.$eliminadoPor : '',
+            ),
+            'referencia' => (int) ($detalles['examen_id'] ?? 0),
+            'fecha_registro' => $fecha?->toDateTimeString(),
+            'hace' => $fecha !== null ? $this->tiempo->enEspanol($fecha) : '',
+            'datos' => [
+                'examen_id' => (int) ($detalles['examen_id'] ?? 0),
+                'examen' => $examen,
+                'curso' => $curso,
+                'eliminado_por' => $eliminadoPor,
+            ],
+        ];
+    }
+
     private function fechaDe(NotificacionDocente $notificacion): ?CarbonInterface
     {
         return match ($notificacion->tipo) {
@@ -798,6 +939,7 @@ class NotificacionService
             self::TIPO_RESPUESTA_INVITACION => $notificacion->invitacion?->updated_at,
             self::TIPO_RESPALDO_BD => $notificacion->fecha_evento,
             self::TIPO_CAMBIO_EXAMEN => $notificacion->fecha_evento,
+            self::TIPO_EXAMEN_ELIMINADO => $notificacion->fecha_evento,
             default => $notificacion->centralRiesgo?->fecha_registro,
         };
     }

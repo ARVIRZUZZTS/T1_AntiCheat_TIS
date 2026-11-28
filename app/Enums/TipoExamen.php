@@ -7,14 +7,15 @@
  *
  * @created 2026-10-05
  *
- * @updated 2026-10-10
+ * @updated 2026-11-24
  *
  * @description
  * Enum de dominio con los tipos de examen admitidos por la base de datos
  * (tipo `tipo_examen_nombre`, tabla `tipo_examen`). Es la única fuente de los
  * valores válidos y de su significado: el listado de exámenes de la materia y
  * el selector del formulario de alta toman de acá el nombre a mostrar, en vez
- * de dejar los valores crudos del catálogo sueltos en las pantallas.
+ * de dejar los valores crudos del catálogo sueltos en las pantallas. `examen
+ * parcial` se dividió en primer parcial, segundo parcial y evaluación corriente.
  *
  * Ojo con el nombre: este enum NO es {@see \App\Models\TipoExamen}, que mapea la
  * tabla `tipo_examen` para leerla con Eloquent.
@@ -25,10 +26,9 @@
  *   etiquetaDe() para mapear un valor de la base y opciones() con el nombre
  *   legible. Antes las etiquetas eran el propio código, que resultaba ambiguo
  *   en la lista de exámenes.
- * - 2026-10-10  [Valery D. Ortuno P]  fix: el enum queda con los tres tipos del
- *   catálogo de Supabase (examen parcial, examen final, segunda instancia) y sus
- *   etiquetas. Antes tenía seis códigos (PP, SP...) que no existían en la base,
- *   así que el alta de examen fallaba al resolver el tipo.
+ * - 2026-10-10  [Valery D. Ortuno P]  fix: el enum queda alineado con el catálogo
+ *   de Supabase y sus etiquetas. Antes tenía seis códigos (PP, SP...) que no
+ *   existían en la base, así que el alta de examen fallaba al resolver el tipo.
  *
  * @see  App\Services\Examen\ListarExamenesCursoService
  * @see  resources/views/components/ui/form-crear-examen.blade.php
@@ -38,7 +38,11 @@ namespace App\Enums;
 
 enum TipoExamen: string
 {
-    case ExamenParcial = 'examen parcial';
+    case ExamenPrimerParcial = 'examen primer parcial';
+
+    case ExamenSegundoParcial = 'examen segundo parcial';
+
+    case EvaluacionCorriente = 'evaluacion corriente';
 
     case ExamenFinal = 'examen final';
 
@@ -51,7 +55,9 @@ enum TipoExamen: string
     public function etiqueta(): string
     {
         return match ($this) {
-            self::ExamenParcial => 'Examen parcial',
+            self::ExamenPrimerParcial => 'Examen primer parcial',
+            self::ExamenSegundoParcial => 'Examen segundo parcial',
+            self::EvaluacionCorriente => 'Evaluacion corriente',
             self::ExamenFinal => 'Examen final',
             self::SegundaInstancia => 'Segunda instancia',
         };

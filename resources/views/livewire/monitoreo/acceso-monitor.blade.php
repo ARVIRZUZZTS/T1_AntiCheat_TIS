@@ -94,7 +94,7 @@
 
                     @if ($puedeIniciar)
                         <div class="flex justify-end">
-                            <x-ui.button variant="default" :href="route('monitoreo', ['modo' => 'ingreso'])">Iniciar</x-ui.button>
+                            <x-ui.button variant="default" :href="route('monitoreo.ingreso')">Iniciar</x-ui.button>
                         </div>
                     @endif
                 </li>

@@ -114,13 +114,14 @@
  *   muestra una sola lista con los archivados al final.
  * - 2026-11-24  [Alisson D. Alvarado <alvaradoalissondalet@gmail.com>]  fix:
  *   conectar los cursos asignados al auxiliar con el listado compartido.
+ * - 2026-11-27  [Alisson D. Alvarado <alvaradoalissondalet@gmail.com>]  refactor: retirar la ruta de edición de cursos.
+ * - 2026-11-27  [Alisson D. Alvarado <alvaradoalissondalet@gmail.com>]  feat: agregar desvinculación de auxiliares.
  */
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ConfirmarRegistroController;
 use App\Http\Controllers\CursoController;
 use App\Http\Controllers\CursosAuxiliarController;
-use App\Http\Controllers\EditarCursoVistaController;
 use App\Http\Controllers\ExamenController;
 use App\Http\Controllers\InicioController;
 use App\Http\Controllers\Reporte\ExportarReporteAsistenciaController;
@@ -129,6 +130,8 @@ use App\Http\Controllers\Reporte\ListarReporteIngresosIlegalesController;
 use App\Http\Controllers\Reporte\ReporteController;
 use App\Livewire\Auxiliares\AsignarAuxiliar;
 use App\Livewire\Auxiliares\CrearAuxiliar;
+use App\Livewire\Auxiliares\DesvincularAuxiliar;
+use App\Livewire\Auxiliares\EliminarAuxiliar;
 use App\Livewire\Auxiliares\ExamenesAuxiliar;
 use App\Livewire\Auxiliares\GestionAuxiliares;
 use App\Livewire\Cursos\ArchivarRestaurarCurso;
@@ -165,21 +168,26 @@ Route::middleware('auth')->group(function (): void {
     Route::get('/auxiliares/asignar', AsignarAuxiliar::class)
         ->middleware('puede-gestionar-auxiliares')
         ->name('auxiliares.asignar');
+    // Solo el docente propietario puede desvincular auxiliares de sus cursos.
+    Route::get('/auxiliares/desvincular', DesvincularAuxiliar::class)
+        ->middleware('docente')
+        ->name('auxiliares.desvincular');
     // Auxiliares · Crear: el alta de auxiliar como pagina propia (antes era un
     // modal dentro de GestionAuxiliares). Al guardar vuelve a la lista.
     // Docentes y auxiliares con permiso de coordinador.
     Route::get('/auxiliares/crear', CrearAuxiliar::class)
         ->middleware('puede-gestionar-auxiliares')
         ->name('auxiliares.crear');
-    // Auxiliares · Editar / Eliminar: marcadores hasta que se implementen.
+    // Auxiliares · Editar: marcador hasta que se implemente.
     Route::view('/auxiliares/editar', 'pages.en-desarrollo', [
         'titulo' => 'Editar auxiliar',
         'descripcion' => 'La edicion de auxiliares esta en desarrollo.',
     ])->name('auxiliares.editar');
-    Route::view('/auxiliares/eliminar', 'pages.en-desarrollo', [
-        'titulo' => 'Eliminar auxiliar',
-        'descripcion' => 'La eliminacion de auxiliares esta en desarrollo.',
-    ])->name('auxiliares.eliminar');
+    // Auxiliares · Eliminar: eliminación lógica de un auxiliar. El docente
+    // responsable y el coordinador (solo a los que creó) pueden eliminar.
+    Route::get('/auxiliares/eliminar', EliminarAuxiliar::class)
+        ->middleware('puede-gestionar-auxiliares')
+        ->name('auxiliares.eliminar');
 
     // Invitaciones: hoy un solo componente con pestanhas Enviar/Recibir. Se
     // separa en dos subopciones; ambas sirven el mismo componente de momento y
@@ -263,7 +271,6 @@ Route::middleware(['auth', 'docente'])->group(function (): void {
         ->name('cursos.ver-estudiantes');
     Route::get('/cursos/habilitar-estudiantes', [CursoController::class, 'habilitarEstudiantes'])
         ->name('cursos.habilitar-estudiantes');
-    Route::get('/cursos/editar', EditarCursoVistaController::class)->name('cursos.editar');
     Route::get('/cursos/cargar-csv', function (Request $request) {
         $cursoId = $request->integer('curso');
 

@@ -19,6 +19,9 @@
  *   - `examen_modificado`: cambiaron los ambientes, la fecha o la hora de un
  *     examen; lo reciben los auxiliares asignados y, si está compartido, los
  *     docentes involucrados.
+ *   - `examen_eliminado`: un docente desvinculó un examen de uno de sus
+ *     cursos; lo reciben los auxiliares activos del curso y los docentes que
+ *     aceptaron compartir el examen.
  *
  * - `index`   GET  `/api/notificaciones` — lista las notificaciones no ocultas
  *   del usuario autenticado, de la más reciente a la más antigua. Lista vacía

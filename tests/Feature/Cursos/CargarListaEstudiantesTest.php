@@ -57,7 +57,7 @@ class CargarListaEstudiantesTest extends TestCase
 
         DB::table('tipo_examen')->insert([
             'id_tipo_examen' => self::TIPO_EXAMEN,
-            'nombre_tipo_examen' => 'examen parcial',
+            'nombre_tipo_examen' => 'examen primer parcial',
         ]);
 
         foreach ([self::DOCENTE, self::OTRO_DOCENTE] as $id) {
