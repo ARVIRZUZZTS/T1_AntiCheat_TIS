@@ -11,7 +11,7 @@
  *
  * @description
  * Invitaciones recibidas a un examen compartido (HU 132): listar, aceptar
- * asociando el examen a cursos propios, asociar una ya aceptada y rechazar.
+ * asociando el examen a cursos propios (en el mismo paso) y rechazar.
  *
  * Un examen compartido es el mismo examen para los docentes que lo comparten;
  * asociarlo a cursos del invitado sirve para que los estudiantes de esos
@@ -40,6 +40,8 @@
  *   materiales al invitado; el examen compartido usa los del examen.
  * - 2026-11-23  [Valery D. Ortuno P]  perf: la validacion de los cursos viaja en
  *   la misma consulta que bloquea la invitacion.
+ * - 2026-11-28  [Valery D. Ortuno P]  refactor: se quita `asociar()` y la lista
+ *   ya no trae aceptadas sin curso: aceptar elige los cursos en el mismo paso.
  *
  * @see  App\Livewire\Invitaciones\Index
  * @see  App\Services\Examen\ConfiguracionExamenDocenteService::crearPara()
@@ -70,7 +72,6 @@ class AsociarCursosInvitacionService
 
     public const MENSAJE_NO_PENDIENTE = 'Esta invitacion ya fue respondida.';
 
-    public const MENSAJE_NO_ACEPTADA = 'La invitacion todavia no fue aceptada.';
 
     public const MENSAJE_ARCHIVADO = 'El examen esta en un curso archivado y ya no se puede modificar.';
 
@@ -79,9 +80,9 @@ class AsociarCursosInvitacionService
     ) {}
 
     /**
-     * Invitaciones del docente para la pantalla "Aceptar invitacion": las
-     * pendientes y las aceptadas cuyo examen aun no esta en un curso suyo, en
-     * una sola consulta.
+     * Invitaciones pendientes del docente para la pantalla "Aceptar
+     * invitacion", en una sola consulta. Al aceptar se eligen los cursos en el
+     * mismo paso, asi que no quedan aceptadas sin curso por asociar.
      *
      * @return list<array{id: int, estado: string, examen: string, fecha_examen: ?string, curso: ?string, invitador: string, enviada_en: ?string}>
      */
@@ -94,15 +95,7 @@ class AsociarCursosInvitacionService
             ->leftJoin('tipo_examen as t', 't.id_tipo_examen', '=', 'e.tipo_examen')
             ->join('usuario as u', 'u.id_usuario', '=', 'i.id_docente_invitador')
             ->where('i.id_docente_invitado', $idDocente)
-            ->where(fn ($consulta) => $consulta
-                ->where('i.estado', InvitacionEstado::Pendiente->value)
-                ->orWhere(fn ($aceptadas) => $aceptadas
-                    ->where('i.estado', InvitacionEstado::Aceptada->value)
-                    ->whereNotExists(fn ($curso) => $curso->from('examen_curso as ec')
-                        ->join('curso as c', 'c.id_curso', '=', 'ec.id_curso')
-                        ->whereColumn('ec.id_examen', 'i.id_examen')
-                        ->where('c.sis_doc', $idDocente)
-                        ->selectRaw('1'))))
+            ->where('i.estado', InvitacionEstado::Pendiente->value)
             ->orderByDesc('i.created_at')
             ->selectRaw(
                 'i.id_invitacion, i.estado, i.created_at, e.id_examen, e.nombre_examen, e.fecha, e.hora_inicio,'
@@ -182,35 +175,6 @@ class AsociarCursosInvitacionService
                 ])
             );
 
-            $this->olvidarMonitor((int) $invitacion->id_examen, (int) $docente->id_usuario);
-        });
-    }
-
-    /**
-     * Asocia el examen de una invitacion ya aceptada a los cursos elegidos.
-     *
-     * @param  list<int>  $idsCursos
-     *
-     * @throws ValidationException
-     */
-    public function asociar(Usuario $docente, int $idInvitacion, array $idsCursos): void
-    {
-        $idsCursos = $this->idsLimpios($idsCursos);
-
-        DB::transaction(function () use ($docente, $idInvitacion, $idsCursos): void {
-            $invitacion = $this->invitacionBloqueada($docente, $idInvitacion, $idsCursos);
-
-            if ($invitacion->estado !== InvitacionEstado::Aceptada->value) {
-                $this->rechazarCon('invitacion', self::MENSAJE_NO_ACEPTADA);
-            }
-
-            $this->exigirCursos($idsCursos, (int) $invitacion->cursos_validos);
-
-            $idConfiguracion = $invitacion->config_propia !== null
-                ? (int) $invitacion->config_propia
-                : $this->crearConfiguracion((int) $invitacion->id_examen, (int) $docente->id_usuario);
-
-            $this->vincular((int) $invitacion->id_examen, $idConfiguracion, $idsCursos);
             $this->olvidarMonitor((int) $invitacion->id_examen, (int) $docente->id_usuario);
         });
     }

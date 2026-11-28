@@ -14,6 +14,8 @@
  *
  * @changelog
  * - 2026-11-27  [Diego Tejerina]  feat: creación inicial (permiso de coordinador).
+ * - 2026-11-28  [Valery D. Ortuno P]  feat: parametro `crear` / `asignar` para
+ *   exigir uno de los dos permisos de coordinador.
  *
  * @see  App\Models\Usuario::puedeGestionarAuxiliares()
  */
@@ -26,11 +28,22 @@ use Symfony\Component\HttpFoundation\Response;
 
 class EnsurePuedeGestionarAuxiliares
 {
-    public function handle(Request $request, Closure $next): Response
+    /**
+     * @param  string|null  $permiso  'crear' (Crear y Eliminar auxiliar),
+     *                                'asignar' (Asignar auxiliar) o null
+     *                                (cualquiera de los dos).
+     */
+    public function handle(Request $request, Closure $next, ?string $permiso = null): Response
     {
         $usuario = $request->user();
 
-        if (! $usuario || ! $usuario->puedeGestionarAuxiliares()) {
+        $permitido = $usuario !== null && match ($permiso) {
+            'crear' => $usuario->puedeCrearAuxiliares(),
+            'asignar' => $usuario->puedeAsignarAuxiliares(),
+            default => $usuario->puedeGestionarAuxiliares(),
+        };
+
+        if (! $permitido) {
             abort(403);
         }
 

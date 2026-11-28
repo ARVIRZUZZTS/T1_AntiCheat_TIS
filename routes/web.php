@@ -116,6 +116,8 @@
  *   conectar los cursos asignados al auxiliar con el listado compartido.
  * - 2026-11-27  [Alisson D. Alvarado <alvaradoalissondalet@gmail.com>]  refactor: retirar la ruta de edición de cursos.
  * - 2026-11-27  [Alisson D. Alvarado <alvaradoalissondalet@gmail.com>]  feat: agregar desvinculación de auxiliares.
+ * - 2026-11-28  [Valery D. Ortuno P]  feat: Crear y Eliminar auxiliar exigen el
+ *   permiso de crear; Asignar auxiliar, el de asignar.
  */
 
 use App\Http\Controllers\AuthController;
@@ -166,7 +168,7 @@ Route::middleware('auth')->group(function (): void {
     // a un examen futuro del docente, eligiendo si ve Ingreso, Monitor o las
     // dos. Docentes y auxiliares con permiso de coordinador.
     Route::get('/auxiliares/asignar', AsignarAuxiliar::class)
-        ->middleware('puede-gestionar-auxiliares')
+        ->middleware('puede-gestionar-auxiliares:asignar')
         ->name('auxiliares.asignar');
     // Solo el docente propietario puede desvincular auxiliares de sus cursos.
     Route::get('/auxiliares/desvincular', DesvincularAuxiliar::class)
@@ -176,7 +178,7 @@ Route::middleware('auth')->group(function (): void {
     // modal dentro de GestionAuxiliares). Al guardar vuelve a la lista.
     // Docentes y auxiliares con permiso de coordinador.
     Route::get('/auxiliares/crear', CrearAuxiliar::class)
-        ->middleware('puede-gestionar-auxiliares')
+        ->middleware('puede-gestionar-auxiliares:crear')
         ->name('auxiliares.crear');
     // Auxiliares · Editar: marcador hasta que se implemente.
     Route::view('/auxiliares/editar', 'pages.en-desarrollo', [
@@ -186,7 +188,7 @@ Route::middleware('auth')->group(function (): void {
     // Auxiliares · Eliminar: eliminación lógica de un auxiliar. El docente
     // responsable y el coordinador (solo a los que creó) pueden eliminar.
     Route::get('/auxiliares/eliminar', EliminarAuxiliar::class)
-        ->middleware('puede-gestionar-auxiliares')
+        ->middleware('puede-gestionar-auxiliares:crear')
         ->name('auxiliares.eliminar');
 
     // Invitaciones: hoy un solo componente con pestanhas Enviar/Recibir. Se

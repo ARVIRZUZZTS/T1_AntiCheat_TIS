@@ -7,7 +7,6 @@ enum InvitacionEstado: string
     case Pendiente = 'pendiente';
     case Aceptada = 'aceptado';
     case Rechazada = 'rechazado';
-    case Cancelada = 'cancelado';
 
     public function etiqueta(): string
     {
@@ -15,7 +14,6 @@ enum InvitacionEstado: string
             self::Pendiente => 'Pendiente',
             self::Aceptada => 'Aceptada',
             self::Rechazada => 'Rechazada',
-            self::Cancelada => 'Cancelada',
         };
     }
 

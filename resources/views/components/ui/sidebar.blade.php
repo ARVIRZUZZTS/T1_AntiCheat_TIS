@@ -12,6 +12,7 @@
     @updated 2026-11-22
     @updated 2026-11-23
     @updated 2026-11-24
+    @updated 2026-11-28
 
     @description
     Sidebar de navegacion del panel, en formato acordeon. Cada seccion
@@ -101,6 +102,11 @@
       retirar la opcion de editar cursos.
     - 2026-11-27  [Alisson D. Alvarado <alvaradoalissondalet@gmail.com>]  feat:
       agregar la opcion de desvincular auxiliares por curso.
+    - 2026-11-28  [Valery D. Ortuno P]  refactor: "Eliminar auxiliar" va debajo de
+      "Crear auxiliar" en el grupo Auxiliares (docente y auxiliar con permiso).
+    - 2026-11-28  [Valery D. Ortuno P]  feat: el grupo Auxiliares del coordinador
+      muestra Crear y Eliminar con el permiso de crear, y Asignar con el de
+      asignar.
 --}}
 
 
@@ -194,8 +200,8 @@
         ['label' => 'Auxiliares', 'children' => [
             ['label' => 'Ver auxiliares', 'route' => 'auxiliares'],
             ['label' => 'Crear auxiliar', 'route' => 'auxiliares.crear'],
-            ['label' => 'Asignar auxiliar', 'route' => 'auxiliares.asignar'],
             ['label' => 'Eliminar auxiliar', 'route' => 'auxiliares.eliminar'],
+            ['label' => 'Asignar auxiliar', 'route' => 'auxiliares.asignar'],
             ['label' => 'Desvincular auxiliar', 'route' => 'auxiliares.desvincular'],
         ]],
         // Validacion del registro de docentes (HU 26): el contador muestra las
@@ -237,12 +243,13 @@
             ['label' => 'Ver examenes', 'route' => 'auxiliar.examenes'],
         ]],
         $monitorAuxiliar !== [] ? ['label' => 'Monitor en vivo', 'children' => $monitorAuxiliar] : null,
-        // Coordinador: un auxiliar con permiso crea y asigna auxiliares.
-        $usuario && $usuario->puede_crear_auxiliares ? ['label' => 'Auxiliares', 'children' => [
-            ['label' => 'Crear auxiliar', 'route' => 'auxiliares.crear'],
-            ['label' => 'Asignar auxiliar', 'route' => 'auxiliares.asignar'],
-            ['label' => 'Eliminar auxiliar', 'route' => 'auxiliares.eliminar'],
-        ]] : null,
+        // Coordinador: un auxiliar con permiso de crear (Crear y Eliminar) y/o
+        // de asignar (Asignar) auxiliares.
+        $usuario && ($usuario->puede_crear_auxiliares || $usuario->puede_asignar_auxiliares) ? ['label' => 'Auxiliares', 'children' => array_values(array_filter([
+            $usuario->puede_crear_auxiliares ? ['label' => 'Crear auxiliar', 'route' => 'auxiliares.crear'] : null,
+            $usuario->puede_crear_auxiliares ? ['label' => 'Eliminar auxiliar', 'route' => 'auxiliares.eliminar'] : null,
+            $usuario->puede_asignar_auxiliares ? ['label' => 'Asignar auxiliar', 'route' => 'auxiliares.asignar'] : null,
+        ]))] : null,
     ]));
 
     // El menu del auxiliar no debe sustituirse por opciones de otro rol.

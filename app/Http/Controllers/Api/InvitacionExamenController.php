@@ -9,7 +9,6 @@ use App\Models\Examen;
 use App\Models\InvitacionExamenCompartido;
 use App\Models\Usuario;
 use App\Services\Invitacion\BuscarDocentesInvitablesService;
-use App\Services\Invitacion\CancelarInvitacionExamenService;
 use App\Services\Invitacion\ListarInvitacionesExamenService;
 use App\Services\Invitacion\EnviarInvitacionExamenService;
 use App\Services\Invitacion\ResponderInvitacionExamenService;
@@ -91,20 +90,6 @@ class InvitacionExamenController extends Controller
         return response()->json([
             'mensaje' => 'Invitación rechazada.',
             'data' => $servicio->rechazar($usuario, $invitacion),
-        ]);
-    }
-
-    public function cancelar(
-        Request $request,
-        InvitacionExamenCompartido $invitacion,
-        CancelarInvitacionExamenService $servicio,
-    ): JsonResponse {
-        /** @var Usuario $usuario */
-        $usuario = $request->user('web');
-
-        return response()->json([
-            'mensaje' => 'Invitación cancelada.',
-            'data' => $servicio->cancelar($usuario, $invitacion),
         ]);
     }
 }

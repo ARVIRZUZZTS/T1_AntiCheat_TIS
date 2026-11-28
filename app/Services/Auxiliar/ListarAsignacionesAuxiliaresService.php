@@ -39,6 +39,10 @@
  * - 2026-11-24  [Valery D. Ortuno P]  fix/perf: no se muestran asignaciones a
  *   cursos archivados ni a examenes que ya empezaron (siguen en la base); las
  *   asignaciones y las opciones salen en una sola consulta (antes dos).
+ * - 2026-11-28  [Valery D. Ortuno P]  feat: cada auxiliar trae sus permisos de
+ *   coordinador (`puedeCrear`, `puedeAsignar`); el coordinador solo ve a los
+ *   auxiliares que creo y, ademas de los examenes de sus cursos, los que tiene
+ *   asignados.
  *
  * @see  App\Livewire\Auxiliares\AsignarAuxiliar
  */
@@ -75,9 +79,12 @@ class ListarAsignacionesAuxiliaresService
             ->where('r.nombre_rol', Rol::NOMBRE_AUXILIAR)
             // Los auxiliares eliminados (borrado lógico) no se pueden asignar.
             ->where('u.estado_cuenta', '!=', EstadoCuenta::Eliminada->value)
-            // Un coordinador no puede asignarse a si mismo: no aparece en la lista.
-            ->when($idCoordinador !== null, fn ($consulta) => $consulta->where('u.id_usuario', '!=', $idCoordinador))
-            ->selectRaw('u.id_usuario as id, u.cod_sis as sis, '.self::USUARIO.' as usuario, '.self::NOMBRE_USUARIO.' as nombre')
+            // Un coordinador solo ve a los auxiliares que el creo (nunca a si mismo).
+            ->when($idCoordinador !== null, fn ($consulta) => $consulta
+                ->where('u.id_usuario', '!=', $idCoordinador)
+                ->where('u.id_creador', $idCoordinador))
+            ->selectRaw('u.id_usuario as id, u.cod_sis as sis, '.self::USUARIO.' as usuario, '.self::NOMBRE_USUARIO.' as nombre,'
+                .' u.puede_crear_auxiliares as puede_crear, u.puede_asignar_auxiliares as puede_asignar')
             ->orderBy('nombre')
             ->get();
 
@@ -102,6 +109,8 @@ class ListarAsignacionesAuxiliaresService
                 'id' => (int) $auxiliar->id,
                 'nombre' => trim((string) $auxiliar->nombre),
                 'sis' => trim((string) $auxiliar->sis),
+                'puedeCrear' => (bool) $auxiliar->puede_crear,
+                'puedeAsignar' => (bool) $auxiliar->puede_asignar,
                 'usuario' => trim((string) $auxiliar->usuario),
                 // El examen por venir mas cercano: el proximo de cada curso
                 // asignado o un examen asignado que aun no empezo.
@@ -207,7 +216,17 @@ class ListarAsignacionesAuxiliaresService
             ->leftJoin('tipo_examen as t', 't.id_tipo_examen', '=', 'e.tipo_examen')
             ->where('c.sis_doc', $idDocente)
             ->where('c.estado', CursoEstado::EnCurso->value)
-            ->when($idCoordinador !== null, fn ($consulta) => $this->soloCursosDelCoordinador($consulta, $idCoordinador))
+            // El coordinador: examenes de sus cursos o los que tiene asignados.
+            ->when($idCoordinador !== null, fn ($consulta) => $consulta->where(fn ($alcance) => $alcance
+                ->whereExists(fn ($sub) => $sub->from('auxiliar_curso as acc')
+                    ->whereColumn('acc.id_curso', 'c.id_curso')
+                    ->where('acc.id_auxiliar', $idCoordinador)
+                    ->where('acc.estado', AccesoAuxiliarService::ESTADO_ACTIVO)
+                    ->selectRaw('1'))
+                ->orWhereExists(fn ($sub) => $sub->from('auxiliar_examen as aec')
+                    ->whereColumn('aec.id_examen', 'e.id_examen')
+                    ->where('aec.id_auxiliar', $idCoordinador)
+                    ->selectRaw('1'))))
             ->where(fn ($consulta) => $this->futuro($consulta, $ahora))
             ->selectRaw("'opcion' as origen, 'examen' as tipo, null as id_auxiliar, e.id_examen as id, c.nombre_curso as texto, t.nombre_tipo_examen as tipo_examen, e.fecha, e.hora_inicio, null as ver_ingreso, null as ver_monitor, null as proximo");
 

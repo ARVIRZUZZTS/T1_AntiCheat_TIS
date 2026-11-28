@@ -209,6 +209,8 @@
     @see  App\Services\Ambiente\ListarAmbientesService
     @see  App\Services\Material\ListarMaterialesService
     @see  App\Services\Norma\ListarNormasService
+    - 2026-11-28  [Valery D. Ortuno P]  fix: aviso de examen el mismo dia sin
+      acentos.
 --}}
 
 @php
@@ -501,7 +503,7 @@
             }
 
             if (await this.hayExamenEnFecha(fecha)) {
-                this.mensajeMismoDia = `Ya tiene un examen programado para el ${this.fecha}. ¿Está seguro de crear otro examen para ese día?`;
+                this.mensajeMismoDia = `Ya tiene un examen programado para el ${this.fecha}. ¿Esta seguro de crear otro examen para ese dia?`;
                 this.avisoMismoDia = true;
 
                 return;
@@ -582,7 +584,7 @@
 
                 if (fecha !== '' && this.fecha !== this.fechaOriginal
                     && await this.hayExamenEnFecha(fecha, this.examenId)) {
-                    this.mensajeMismoDia = `Ya tiene un examen programado para el ${this.fecha}. ¿Está seguro de guardar el examen en ese día?`;
+                    this.mensajeMismoDia = `Ya tiene un examen programado para el ${this.fecha}. ¿Esta seguro de guardar el examen en ese dia?`;
                     this.avisoMismoDia = true;
 
                     return;

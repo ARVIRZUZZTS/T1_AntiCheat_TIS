@@ -14,6 +14,9 @@
  *
  * @changelog
  * - 2026-11-27  [Diego Tejerina]  feat: creación inicial.
+ * - 2026-11-28  [Valery D. Ortuno P]  test: crear auxiliar ya no da el permiso
+ *   de coordinador; el usuario de acceso se ve en vivo. El carnet de identidad
+ *   es obligatorio (salen los casos sin carnet con contraseña aleatoria).
  *
  * @see  App\Livewire\Auxiliares\CrearAuxiliar
  * @see  App\Services\Auxiliar\CrearAuxiliarService
@@ -95,20 +98,24 @@ class CrearAuxiliarTest extends TestCase
             && $correo->contrasenaPlana === 'AUX-MJ1234567CF');
     }
 
-    public function test_un_auxiliar_umss_sin_cedula_recibe_contrasena_aleatoria(): void
+    public function test_sin_carnet_de_identidad_no_se_crea(): void
     {
         $this->actingAs(Usuario::findOrFail(self::DOCENTE));
 
-        Livewire::test(CrearAuxiliar::class)
-            ->set('nombre', 'Rosa')->set('apellido', 'Vega')
-            ->set('tipoAuxiliar', 'UMSS')->set('codSis', '123123123')
-            ->set('correo', 'umss.sincedula@ejemplo.com')
-            ->call('revisar')->call('confirmar');
+        // El carnet de identidad es obligatorio para UMSS y para externos.
+        foreach ([['UMSS', '123123123'], ['externo', '']] as [$tipo, $sis]) {
+            Livewire::test(CrearAuxiliar::class)
+                ->set('nombre', 'Rosa')->set('apellido', 'Vega')
+                ->set('tipoAuxiliar', $tipo)->set('codSis', $sis)
+                ->set('carnet', '')
+                ->set('correo', 'sin.carnet.'.$tipo.'@ejemplo.com')
+                ->call('revisar')
+                ->assertHasErrors(['carnet' => 'required'])
+                ->assertSet('confirmando', false);
+        }
 
-        $auxiliar = Usuario::query()->where('correo', 'umss.sincedula@ejemplo.com')->firstOrFail();
-        $this->assertNull($auxiliar->carnet);
-
-        Mail::assertSent(CredencialesAuxiliarMail::class, fn (CredencialesAuxiliarMail $correo): bool => preg_match('/^AUX-[A-Za-z0-9]{10}$/', $correo->contrasenaPlana) === 1);
+        $this->assertDatabaseMissing('usuario', ['correo' => 'sin.carnet.UMSS@ejemplo.com']);
+        Mail::assertNothingSent();
     }
 
     public function test_crea_un_auxiliar_externo_con_codigo_interno_y_carnet(): void
@@ -132,26 +139,6 @@ class CrearAuxiliarTest extends TestCase
         $this->assertTrue(Hash::check('AUX-JJ9479386MM', $auxiliar->password));
     }
 
-    public function test_un_externo_sin_carnet_recibe_contrasena_aleatoria(): void
-    {
-        $this->actingAs(Usuario::findOrFail(self::DOCENTE));
-
-        Livewire::test(CrearAuxiliar::class)
-            ->set('nombre', 'Ana')
-            ->set('apellido', 'Perez')
-            ->set('tipoAuxiliar', 'externo')
-            ->set('carnet', '')
-            ->set('correo', 'sincarnet@gmail.com')
-            ->call('revisar')
-            ->call('confirmar');
-
-        $auxiliar = Usuario::query()->where('correo', 'sincarnet@gmail.com')->firstOrFail();
-        $this->assertNull($auxiliar->carnet);
-
-        Mail::assertSent(CredencialesAuxiliarMail::class, fn (CredencialesAuxiliarMail $correo): bool => $correo->hasTo('sincarnet@gmail.com')
-            && preg_match('/^AUX-[A-Za-z0-9]{10}$/', $correo->contrasenaPlana) === 1);
-    }
-
     public function test_el_usuario_generado_agrega_numero_si_ya_existe(): void
     {
         $this->actingAs(Usuario::findOrFail(self::DOCENTE));
@@ -163,6 +150,7 @@ class CrearAuxiliarTest extends TestCase
             ->set('nombre', 'Ana')->set('apellido', 'Perez')
             ->set('tipoAuxiliar', 'externo')
             ->set('correo', 'ana.nueva@ejemplo.com')
+            ->set('carnet', '7100001')
             ->call('revisar')->call('confirmar');
 
         $auxiliar = Usuario::query()->where('correo', 'ana.nueva@ejemplo.com')->firstOrFail();
@@ -177,6 +165,7 @@ class CrearAuxiliarTest extends TestCase
             ->set('nombre', 'Ana')->set('apellido', 'Perez')
             ->set('tipoAuxiliar', 'UMSS')->set('codSis', '111111111')
             ->set('correo', 'avisa@ejemplo.com')
+            ->set('carnet', '7100002')
             ->call('revisar')->call('confirmar');
 
         Mail::assertSent(AuxiliarCreadoMail::class, fn (AuxiliarCreadoMail $correo): bool => $correo->hasTo('docente701@umss.edu'));
@@ -192,6 +181,7 @@ class CrearAuxiliarTest extends TestCase
             ->set('nombre', 'Luis')->set('apellido', 'Gomez')
             ->set('tipoAuxiliar', 'UMSS')->set('codSis', '222222222')
             ->set('correo', 'delcoord@ejemplo.com')
+            ->set('carnet', '7100003')
             ->call('revisar')->call('confirmar');
 
         $auxiliar = Usuario::query()->where('correo', 'delcoord@ejemplo.com')->firstOrFail();
@@ -203,19 +193,23 @@ class CrearAuxiliarTest extends TestCase
         Mail::assertSent(AuxiliarCreadoMail::class, fn (AuxiliarCreadoMail $correo): bool => $correo->hasTo('docente701@umss.edu'));
     }
 
-    public function test_un_docente_puede_otorgar_el_permiso_de_coordinador(): void
+    public function test_crear_auxiliar_no_da_el_permiso_de_coordinador_y_muestra_el_usuario_en_vivo(): void
     {
         $this->actingAs(Usuario::findOrFail(self::DOCENTE));
 
         Livewire::test(CrearAuxiliar::class)
             ->set('nombre', 'Coord')->set('apellido', 'Nuevo')
+            // El usuario de acceso se ve apenas hay nombre y apellido.
+            ->assertSee('aux.coord.nuevo')
+            ->assertDontSee('Puede crear y asignar auxiliares')
             ->set('tipoAuxiliar', 'UMSS')->set('codSis', '333333333')
             ->set('correo', 'coordinador.nuevo@ejemplo.com')
-            ->set('puedeCrearAuxiliares', true)
+            ->set('carnet', '7100004')
             ->call('revisar')->call('confirmar');
 
+        // El permiso de coordinador se dara en las asignaciones, no al crear.
         $auxiliar = Usuario::query()->where('correo', 'coordinador.nuevo@ejemplo.com')->firstOrFail();
-        $this->assertTrue((bool) $auxiliar->puede_crear_auxiliares);
+        $this->assertFalse((bool) $auxiliar->puede_crear_auxiliares);
     }
 
     public function test_cancelar_la_confirmacion_no_crea_y_cierra_el_modal(): void
@@ -226,6 +220,7 @@ class CrearAuxiliarTest extends TestCase
             ->set('nombre', 'Ana')->set('apellido', 'Perez')
             ->set('tipoAuxiliar', 'UMSS')->set('codSis', '555555555')
             ->set('correo', 'cancela@ejemplo.com')
+            ->set('carnet', '7100005')
             ->call('revisar')
             ->assertSet('confirmando', true)
             ->call('cancelarConfirmacion')
@@ -243,6 +238,7 @@ class CrearAuxiliarTest extends TestCase
             ->set('nombre', 'Ana')->set('apellido', 'Perez')
             ->set('tipoAuxiliar', 'UMSS')->set('codSis', 'DOC701')
             ->set('correo', 'otro@ejemplo.com')
+            ->set('carnet', '7100006')
             ->call('revisar')
             ->assertHasErrors('codSis')
             ->assertSet('confirmando', false);
@@ -256,6 +252,7 @@ class CrearAuxiliarTest extends TestCase
             ->set('nombre', 'Ana')->set('apellido', 'Perez')
             ->set('tipoAuxiliar', 'UMSS')->set('codSis', '444444444')
             ->set('correo', 'docente701@umss.edu')
+            ->set('carnet', '7100007')
             ->call('revisar')
             ->assertHasErrors('correo')
             ->assertSet('confirmando', false);
@@ -285,6 +282,7 @@ class CrearAuxiliarTest extends TestCase
             ->set('tipoAuxiliar', 'UMSS')
             ->set('codSis', '123')
             ->set('correo', 'no-es-correo')
+            ->set('carnet', '7100008')
             ->call('revisar')
             ->assertHasErrors(['nombre', 'apellido', 'codSis', 'correo']);
     }

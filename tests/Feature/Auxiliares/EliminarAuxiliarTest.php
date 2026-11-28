@@ -16,6 +16,9 @@
  *
  * @changelog
  * - 2026-11-27  [Diego Tejerina]  feat: creación inicial.
+ * - 2026-11-28  [Valery D. Ortuno P]  test: solo se elimina al auxiliar sin nada
+ *   asociado (cursos activos o anteriores, examenes); el aviso sale en su fila.
+ *   Se quitan los tests de los filtros de estado y materia.
  */
 
 namespace Tests\Feature\Auxiliares;
@@ -117,37 +120,48 @@ class EliminarAuxiliarTest extends TestCase
         $this->assertTrue($auxiliar->estaEliminado());
     }
 
-    public function test_eliminar_pasa_las_asignaciones_activas_a_baja(): void
+    public function test_no_se_puede_eliminar_con_cursos_activos(): void
     {
-        app(EliminarAuxiliarService::class)->ejecutar(
-            Usuario::findOrFail(self::DOCENTE),
-            Usuario::findOrFail(self::AUX_A),
-        );
-
-        // La fila de asignación se conserva (historial) pero pasa a Baja.
-        $estado = DB::table('auxiliar_curso')
-            ->where('id_auxiliar', self::AUX_A)->where('id_curso', self::CURSO)->value('estado');
-        $this->assertSame('Baja', $estado);
-    }
-
-    public function test_no_se_puede_eliminar_con_examen_en_curso(): void
-    {
-        // Examen hoy 09:30 + 120 min → en curso a las 10:00 (now).
-        DB::table('examen')->insert([
-            'id_examen' => 950, 'fecha' => '2026-11-27', 'hora_inicio' => '09:30:00',
-            'duracion' => 120, 'creador' => self::DOCENTE, 'tipo_examen' => 1,
-        ]);
-        DB::table('examen_curso')->insert(['id_examen' => 950, 'id_curso' => self::CURSO]);
-
+        // AUX_A esta asignado activo a Calculo I (en curso).
         Livewire::actingAs(Usuario::findOrFail(self::DOCENTE))
             ->test(EliminarAuxiliar::class)
             ->call('abrirModal', self::AUX_A)
-            ->call('eliminar')
-            ->assertSet('mostrarExito', false)
-            ->assertSet('errorEliminar', EliminarAuxiliarService::MENSAJE_EXAMEN_EN_CURSO);
+            ->assertSet('modalAbierto', false)
+            ->assertSet('avisoId', self::AUX_A)
+            ->assertSet('avisoMensaje', EliminarAuxiliarService::MENSAJE_CURSOS_ACTIVOS);
 
-        // Sigue habilitado: no se eliminó.
+        // El servidor tambien lo rechaza aunque se intente.
+        try {
+            app(EliminarAuxiliarService::class)->ejecutar(Usuario::findOrFail(self::DOCENTE), Usuario::findOrFail(self::AUX_A));
+            $this->fail('Se elimino un auxiliar con cursos activos.');
+        } catch (\Illuminate\Validation\ValidationException $error) {
+            $this->assertSame([EliminarAuxiliarService::MENSAJE_CURSOS_ACTIVOS], $error->errors()['auxiliar']);
+        }
         $this->assertSame('habilitada', Usuario::findOrFail(self::AUX_A)->estado_cuenta);
+    }
+
+    public function test_no_se_puede_eliminar_a_quien_estuvo_asignado_a_un_curso_o_examen(): void
+    {
+        // AUX_SIN tuvo un curso (asignacion dada de baja); AUX_PLANO, un examen.
+        DB::table('auxiliar_curso')->insert([
+            'id_auxiliar' => self::AUX_SIN, 'id_curso' => self::CURSO, 'estado' => 'Baja',
+        ]);
+        DB::table('examen')->insert([
+            'id_examen' => 950, 'fecha' => '2026-11-01', 'hora_inicio' => '09:30:00',
+            'duracion' => 120, 'creador' => self::DOCENTE, 'tipo_examen' => 1,
+        ]);
+        DB::table('auxiliar_examen')->insert([
+            'id_auxiliar' => self::AUX_PLANO, 'id_examen' => 950,
+            'ver_ingreso' => true, 'ver_monitor' => true, 'asignado_por' => self::DOCENTE,
+        ]);
+
+        $componente = Livewire::actingAs(Usuario::findOrFail(self::DOCENTE))->test(EliminarAuxiliar::class);
+        foreach ([self::AUX_SIN, self::AUX_PLANO] as $id) {
+            $componente->call('abrirModal', $id)
+                ->assertSet('modalAbierto', false)
+                ->assertSet('avisoMensaje', EliminarAuxiliarService::MENSAJE_CON_HISTORIAL);
+            $this->assertSame('habilitada', Usuario::findOrFail($id)->estado_cuenta);
+        }
     }
 
     public function test_el_coordinador_solo_elimina_a_los_que_creo(): void
@@ -217,56 +231,42 @@ class EliminarAuxiliarTest extends TestCase
     {
         app(EliminarAuxiliarService::class)->ejecutar(
             Usuario::findOrFail(self::DOCENTE),
-            Usuario::findOrFail(self::AUX_A),
+            Usuario::findOrFail(self::AUX_SIN),
         );
 
         // Ver lista (repositorio compartido) ya no lo trae.
         $ids = app(AuxiliarCursoRepository::class)->auxiliares()->pluck('id_usuario')->all();
-        $this->assertNotContains(self::AUX_A, $ids);
+        $this->assertNotContains(self::AUX_SIN, $ids);
 
         // Asignar auxiliar: tampoco aparece.
         $this->actingAs(Usuario::findOrFail(self::DOCENTE))
             ->get(route('auxiliares.asignar'))
             ->assertOk()
-            ->assertDontSee('auxa804@ej.com');
+            ->assertDontSee('Usuario807');
 
         // Y sale de la propia lista de "Eliminar auxiliar".
         $ids = Livewire::actingAs(Usuario::findOrFail(self::DOCENTE))->test(EliminarAuxiliar::class)
             ->instance()->filtradas()->pluck('id')->all();
-        $this->assertNotContains(self::AUX_A, $ids);
+        $this->assertNotContains(self::AUX_SIN, $ids);
     }
 
-    public function test_filtro_de_estado_habilitado_y_deshabilitado(): void
+    public function test_busqueda_por_correo_o_curso(): void
     {
         $componente = Livewire::actingAs(Usuario::findOrFail(self::DOCENTE))->test(EliminarAuxiliar::class);
 
-        // Habilitados: solo los que tienen asignación activa (AUX_A).
-        $habilitados = $componente->call('filtrarEstado', 'Habilitado')->instance()->filtradas()->pluck('id')->all();
-        $this->assertSame([self::AUX_A], $habilitados);
-
-        // Deshabilitados: los demás del docente (COORD, AUX_B, AUX_SIN, AUX_PLANO), sin AUX_A.
-        $deshabilitados = $componente->call('filtrarEstado', 'Deshabilitado')->instance()->filtradas()->pluck('id')->all();
-        $this->assertContains(self::AUX_SIN, $deshabilitados);
-        $this->assertNotContains(self::AUX_A, $deshabilitados);
-    }
-
-    public function test_filtros_de_busqueda_y_curso(): void
-    {
-        $componente = Livewire::actingAs(Usuario::findOrFail(self::DOCENTE))->test(EliminarAuxiliar::class);
-
-        // Búsqueda por correo.
+        // Busqueda por correo.
         $this->assertSame(
             [self::AUX_B],
             $componente->set('busqueda', 'auxb805')->instance()->filtradas()->pluck('id')->all(),
         );
 
-        // Filtro por curso: solo AUX_A está asignado a Calculo I.
+        // Busqueda por curso: solo AUX_A tiene Calculo I.
         $this->assertSame(
             [self::AUX_A],
-            $componente->set('busqueda', '')->set('filtroCurso', 'Calculo I')->instance()->filtradas()->pluck('id')->all(),
+            $componente->set('busqueda', 'calculo')->instance()->filtradas()->pluck('id')->all(),
         );
 
-        // Cambiar un filtro vuelve a la página 1.
+        // Buscar vuelve a la pagina 1.
         $componente->set('pagina', 3)->set('busqueda', 'x')->assertSet('pagina', 1);
     }
 

@@ -7,18 +7,24 @@
  *
  * @created 2026-11-27
  *
+ * @updated 2026-11-28
+ *
  * @description
- * Componente Livewire de la subsección "Eliminar auxiliar": lista paginada
- * (8 por página) de los auxiliares que el usuario puede eliminar, con búsqueda
- * dinámica (nombre, correo, SIS o carnet), filtro por curso, filtro por fecha de
- * creación (desde/hasta) y filtro de estado (Todos / Habilitados /
- * Deshabilitados). Cada fila solo tiene el botón "Eliminar", que abre un modal
- * de confirmación y delega la eliminación lógica en EliminarAuxiliarService
- * (policy + transacción + lockForUpdate). Al cambiar cualquier filtro se vuelve
- * a la página 1.
+ * Componente Livewire de la subsección "Eliminar auxiliar", con el formato de
+ * "Eliminar examen": tabla paginada (8 por página) de los auxiliares del
+ * usuario con lo que tienen asociado y la acción "Eliminar", más una búsqueda
+ * dinámica (nombre, correo, SIS o carnet, o curso). Al presionar "Eliminar":
+ * si el auxiliar tiene algo asociado (cursos activos, cursos o exámenes de
+ * antes) se muestra el aviso dentro de su fila y no se abre el modal; si no,
+ * se abre el modal de confirmación y la eliminación lógica la hace
+ * EliminarAuxiliarService (policy + guardas + transacción + lockForUpdate). Al
+ * terminar se muestra el modal "Auxiliar eliminado con exito".
  *
  * @changelog
  * - 2026-11-27  [Diego Tejerina]  feat: creación inicial.
+ * - 2026-11-28  [Valery D. Ortuno P]  refactor: formato de Eliminar examen; solo
+ *   se elimina al auxiliar sin nada asociado y, si no, el aviso sale en su fila;
+ *   se quitan los filtros de materia y estado (la búsqueda incluye los cursos).
  *
  * @see  App\Services\Auxiliar\ListarAuxiliaresEliminablesService
  * @see  App\Services\Auxiliar\EliminarAuxiliarService
@@ -44,10 +50,10 @@ class EliminarAuxiliar extends Component
 
     public string $busqueda = '';
 
-    public string $filtroCurso = '';
+    /** Fila con el aviso de que no se puede eliminar, y su mensaje. */
+    public ?int $avisoId = null;
 
-    /** todos / Habilitado / Deshabilitado. */
-    public string $filtroEstado = 'todos';
+    public string $avisoMensaje = '';
 
     public int $pagina = 1;
 
@@ -69,27 +75,23 @@ class EliminarAuxiliar extends Component
      * Resultado del servicio cacheado por request (auxiliares del viewer +
      * cursos para el filtro). No es público: se recalcula en cada request.
      *
-     * @var array{auxiliares: list<array<string, mixed>>, cursos: list<string>}|null
+     * @var array{auxiliares: list<array<string, mixed>>}|null
      */
     private ?array $datosCache = null;
 
     /** Cualquier cambio de filtro vuelve a la primera página. */
     public function updated(string $propiedad): void
     {
-        if (in_array($propiedad, ['busqueda', 'filtroCurso', 'filtroEstado'], true)) {
+        if ($propiedad === 'busqueda') {
             $this->pagina = 1;
+            $this->avisoId = null;
         }
-    }
-
-    public function filtrarEstado(string $estado): void
-    {
-        $this->filtroEstado = in_array($estado, ['Habilitado', 'Deshabilitado'], true) ? $estado : 'todos';
-        $this->pagina = 1;
     }
 
     public function irAPagina(int $pagina): void
     {
         $this->pagina = max(1, $pagina);
+        $this->avisoId = null;
     }
 
     public function abrirModal(int $idAuxiliar): void
@@ -100,6 +102,15 @@ class EliminarAuxiliar extends Component
             return;
         }
 
+        // Con algo asociado no se abre el modal: el aviso sale en su fila.
+        if (! $fila['eliminable']) {
+            $this->avisoId = $idAuxiliar;
+            $this->avisoMensaje = (string) $fila['motivo'];
+
+            return;
+        }
+
+        $this->avisoId = null;
         $this->auxiliarId = $idAuxiliar;
         $this->auxiliarNombre = (string) $fila['nombreCompleto'];
         $this->errorEliminar = '';
@@ -171,21 +182,13 @@ class EliminarAuxiliar extends Component
             $filas = $filas->filter(fn (array $fila): bool => $this->coincide($fila, $termino));
         }
 
-        if ($this->filtroCurso !== '') {
-            $filas = $filas->filter(fn (array $fila): bool => in_array($this->filtroCurso, $fila['cursos'], true));
-        }
-
-        if ($this->filtroEstado !== 'todos') {
-            $filas = $filas->filter(fn (array $fila): bool => $fila['estado'] === $this->filtroEstado);
-        }
-
         return $filas->values();
     }
 
     /**
      * Resultado del servicio para el viewer, calculado una sola vez por request.
      *
-     * @return array{auxiliares: list<array<string, mixed>>, cursos: list<string>}
+     * @return array{auxiliares: list<array<string, mixed>>}
      */
     private function datos(): array
     {
@@ -202,19 +205,16 @@ class EliminarAuxiliar extends Component
     /** @param array<string, mixed> $fila */
     private function coincide(array $fila, string $termino): bool
     {
-        foreach (['nombreCompleto', 'correo', 'documento'] as $campo) {
-            if (mb_strpos(mb_strtolower((string) $fila[$campo]), $termino) !== false) {
-                return true;
-            }
-        }
+        $texto = mb_strtolower(implode(' ', [
+            $fila['nombreCompleto'], $fila['correo'], $fila['documento'],
+            ...$fila['cursosActivos'], ...$fila['cursosPasados'],
+        ]));
 
-        return false;
+        return mb_strpos($texto, $termino) !== false;
     }
 
     public function render(): View
     {
-        $cursos = $this->datos()['cursos'];
-
         $filtradas = $this->filtradas();
         $total = $filtradas->count();
         $totalPaginas = max(1, (int) ceil($total / self::POR_PAGINA));
@@ -226,7 +226,7 @@ class EliminarAuxiliar extends Component
 
         return view('livewire.auxiliares.eliminar-auxiliar', [
             'auxiliares' => $auxiliares,
-            'cursos' => $cursos,
+            'hayAuxiliares' => $this->datos()['auxiliares'] !== [],
             'total' => $total,
             'totalPaginas' => $totalPaginas,
         ])->extends('layouts.app');

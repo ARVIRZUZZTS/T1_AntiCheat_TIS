@@ -31,6 +31,8 @@
  * - 2026-11-08  [Valery D. Ortuno P]  feat: `estado_cuenta` (pendiente,
  *   habilitada o rechazada, ver EstadoCuenta): una cuenta del registro no
  *   ingresa hasta que dos docentes la aprueban (HU 26).
+ * - 2026-11-28  [Valery D. Ortuno P]  feat: permisos separados de coordinador:
+ *   `puedeCrearAuxiliares()` y `puedeAsignarAuxiliares()`.
  *
  * @see  RegistroAsistencia
  */
@@ -53,7 +55,8 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
  * @property string $estado_cuenta Valor de App\Enums\EstadoCuenta.
  * @property ?string $carnet Carnet de identidad del auxiliar externo (opcional).
  * @property ?string $tipo_auxiliar 'UMSS' o 'externo'; null si no es auxiliar.
- * @property bool $puede_crear_auxiliares Permiso de coordinador.
+ * @property bool $puede_crear_auxiliares Permiso de coordinador para crear auxiliares.
+ * @property bool $puede_asignar_auxiliares Permiso de coordinador para asignar auxiliares.
  * @property ?int $id_docente_responsable Docente al que queda relacionado el auxiliar.
  * @property ?int $id_creador Usuario que creó la cuenta.
  */
@@ -86,6 +89,7 @@ class Usuario extends Authenticatable
         'carnet',
         'tipo_auxiliar',
         'puede_crear_auxiliares',
+        'puede_asignar_auxiliares',
         'id_docente_responsable',
         'id_creador',
     ];
@@ -93,6 +97,7 @@ class Usuario extends Authenticatable
     /** @var array<string, string> */
     protected $casts = [
         'puede_crear_auxiliares' => 'boolean',
+        'puede_asignar_auxiliares' => 'boolean',
     ];
 
     /**
@@ -160,8 +165,21 @@ class Usuario extends Authenticatable
      */
     public function puedeGestionarAuxiliares(): bool
     {
+        return $this->puedeCrearAuxiliares() || $this->puedeAsignarAuxiliares();
+    }
+
+    /** Quién puede entrar a "Crear auxiliar" y "Eliminar auxiliar": docentes y coordinadores con ese permiso. */
+    public function puedeCrearAuxiliares(): bool
+    {
         return $this->esDocente()
             || ($this->esAuxiliar() && (bool) $this->puede_crear_auxiliares);
+    }
+
+    /** Quién puede entrar a "Asignar auxiliar": docentes y coordinadores con ese permiso. */
+    public function puedeAsignarAuxiliares(): bool
+    {
+        return $this->esDocente()
+            || ($this->esAuxiliar() && (bool) $this->puede_asignar_auxiliares);
     }
 
     /** @return HasMany<RegistroAsistencia, $this> */
