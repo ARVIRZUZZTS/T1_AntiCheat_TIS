@@ -40,6 +40,7 @@
  *   entidad de origen, como el respaldo automático de la base de datos (#HU33).
  * - 2026-11-24  [Equipo T1]  feat: columna `detalles` para el aviso de cambios
  *   de ambientes, fecha u hora de un examen.
+ * - 2026-11-27  [Alisson D. Alvarado <alvaradoalissondalet@gmail.com>]  feat: registrar la lectura del aviso.
  */
 
 namespace App\Models;
@@ -58,6 +59,7 @@ use Illuminate\Support\Carbon;
  * @property string $estado
  * @property bool $oculta
  * @property ?Carbon $fecha_evento
+ * @property ?Carbon $fecha_lectura
  * @property ?array<string, mixed> $detalles
  */
 class NotificacionDocente extends Model
@@ -83,6 +85,7 @@ class NotificacionDocente extends Model
         'estado',
         'oculta',
         'fecha_evento',
+        'fecha_lectura',
         'detalles',
     ];
 
@@ -91,6 +94,7 @@ class NotificacionDocente extends Model
         return [
             'oculta' => 'boolean',
             'fecha_evento' => 'datetime',
+            'fecha_lectura' => 'datetime',
             'detalles' => 'array',
         ];
     }
