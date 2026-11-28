@@ -69,6 +69,7 @@ use App\Services\Curso\ContarAfectadosCursoService;
 use App\Services\Curso\EliminarCursoService;
 use App\Services\Curso\ListarCursosDocenteService;
 use App\Services\Curso\ListarGestionesService;
+use App\Services\Curso\ListarMateriasSelectorService;
 use App\Services\Curso\RegistrarCursoService;
 use App\Services\Curso\RestaurarCursoService;
 use App\Services\Examen\ListarEstudiantesCursoConEstadoService;
@@ -111,12 +112,13 @@ class CursoController extends Controller
      *
      * @since  2026-10-24
      */
-    public function crear(ListarGestionesService $gestiones): View
+    public function crear(ListarGestionesService $gestiones, ListarMateriasSelectorService $materias, Request $request): View
     {
         // Sin backRoute: "Crear curso" es una subopción del sidebar, no una
         // vista de detalle, así que x-ui.page-header no muestra flecha de volver.
         return view('pages.curso-crear', [
             'gestiones' => $gestiones->ejecutar(),
+            'materias' => $materias->ejecutar((int) $request->user()->id_usuario),
         ]);
     }
 
@@ -155,7 +157,8 @@ class CursoController extends Controller
     {
         try {
             $servicio->ejecutar(
-                $request->nombreCurso(),
+                $request->idMateria(),
+                $request->numeroGrupo(),
                 (int) $request->user()->id_usuario,
                 $request->gestion(),
             );

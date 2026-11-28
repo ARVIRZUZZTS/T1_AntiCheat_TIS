@@ -40,7 +40,6 @@ namespace App\Http\Requests;
 
 use App\Services\Curso\ListarGestionesService;
 use App\Support\DTO\GestionCursoDTO;
-use App\Support\NombreCurso;
 use App\Support\Validadores;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -70,7 +69,6 @@ class StoreCursoRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         $this->merge([
-            'materia' => Validadores::normalizarMateria($this->input('materia')),
             'grupo' => Validadores::normalizarGrupo($this->input('grupo')),
         ]);
     }
@@ -80,7 +78,12 @@ class StoreCursoRequest extends FormRequest
      */
     public function rules(ListarGestionesService $gestiones): array
     {
-        return Validadores::reglasCurso(array_keys($gestiones->ejecutar()), $this->anioMinimo());
+        return [
+            'id_materia' => Validadores::reglaMateriaId(),
+            'grupo' => Validadores::reglaGrupo(),
+            'gestion' => Validadores::reglaGestion(array_keys($gestiones->ejecutar())),
+            'anio' => Validadores::reglaAnio($this->anioMinimo()),
+        ];
     }
 
     /**
@@ -124,16 +127,15 @@ class StoreCursoRequest extends FormRequest
         return Validadores::mensajesCurso($this->anioMinimo());
     }
 
-    /**
-     * Nombre de curso concatenado: "{materia} - Grupo {grupo}".
-     *
-     * @return string  Nombre listo para `curso.nombre_curso`.
-     *
-     * @author Valery D. Ortuno P <valerydariana98@gmail.com>
-     * @since  2026-10-24
-     */
-    public function nombreCurso(): string
+    /** Materia elegida del catálogo. */
+    public function idMateria(): int
     {
-        return NombreCurso::formatear($this->validated('materia'), $this->validated('grupo'));
+        return (int) $this->validated('id_materia');
+    }
+
+    /** Grupo (1-10). */
+    public function numeroGrupo(): int
+    {
+        return (int) $this->validated('grupo');
     }
 }

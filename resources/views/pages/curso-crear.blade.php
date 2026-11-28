@@ -2,41 +2,30 @@
     @file    curso-crear.blade.php
     @author  Valery D. Ortuno P <valerydariana98@gmail.com>
     @created 2026-10-24
-    @updated 2026-10-24
-    @updated 2026-11-04
+    @updated 2026-11-28
 
     @description
-    "Crear curso": página propia (subopción del sidebar, sin flecha de volver)
-    con el formulario de alta de un curso: se piden materia, grupo, gestión y año, y
-    debajo, en texto corrido, va el nombre del curso, que se arma solo con la
-    materia y el grupo mientras se escriben ("{materia} - Grupo {grupo}"); no
-    es un campo ni lo parece, para que nadie intente escribir ahí. El curso se
-    crea activo, a nombre del docente, y al guardar se vuelve a la lista de
-    cursos.
+    "Crear curso": formulario de alta. La materia se elige con un buscador
+    (x-ui.selector-materia) que filtra el catálogo por nombre o código, muestra
+    el semestre y deja agregar una materia nueva si no existe. El grupo es un
+    número del 1 al 10. Debajo van la gestión y el año. El nombre del curso lo
+    arma el servidor como "Materia - Grupo N". Todo se valida en
+    StoreCursoRequest / RegistrarCursoService.
 
-    El grupo es alfanumérico de hasta 3 caracteres (2, 10, 21A): el campo
-    descarta lo demás y lo pasa a mayúsculas mientras se escribe. El año
-    arranca en el actual: solo dígitos, hasta 4; el servidor exige el actual o
-    uno posterior. Todo se vuelve a validar en StoreCursoRequest.
-
-    Los errores del último envío los maneja Alpine (como en
-    form-crear-examen): al corregir un campo se borran su rojo y su mensaje.
-    Si el curso ya existe, el aviso va arriba y los cuatro campos quedan en
-    rojo hasta que se cambie alguno.
+    Los errores del último envío los maneja Alpine: al corregir un campo se
+    borran su rojo y su mensaje. Si el curso ya existe, el aviso va arriba y los
+    campos quedan en rojo hasta que se cambie alguno.
 
     @changelog
     - 2026-10-24  [Valery D. Ortuno P]  feat: creación inicial de la página.
-    - 2026-10-24  [Valery D. Ortuno P]  feat: formulario de materia, grupo,
-      gestión y año (libre, el actual por defecto) con el nombre del curso
-      arriba, que se llena solo, validaciones y guardado.
-    - 2026-11-04  [Valery D. Ortuno P]  fix: el nombre del curso pasa a ser texto
-      corrido debajo de los campos (ya no parece un campo); aviso arriba si el
-      curso ya existe, con los campos implicados en rojo; al corregir un campo
-      se borran su rojo y su mensaje (antes quedaban hasta el siguiente envío).
+    - 2026-11-04  [Valery D. Ortuno P]  fix: nombre del curso como texto corrido;
+      aviso de curso repetido arriba.
+    - 2026-11-28  [Diego Tejerina]  feat: la materia se elige con el buscador del
+      catálogo (y "Agregar materia"); el grupo pasa a ser un número del 1 al 10.
 
     @see  App\Http\Controllers\CursoController
     @see  App\Http\Requests\StoreCursoRequest
-    @see  App\Services\Curso\RegistrarCursoService
+    @see  resources/views/components/ui/selector-materia.blade.php
 --}}
 
 @php
@@ -56,18 +45,13 @@
     <div class="px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
         <div class="mx-auto w-full max-w-2xl rounded-base border border-default bg-neutral-primary-soft p-4 shadow-sm md:p-6"
              x-data="{
-                 materia: @js(old('materia', '')),
                  grupo: @js(old('grupo', '')),
                  gestion: @js((string) old('gestion', '')),
                  anio: @js((string) old('anio', now()->year)),
                  errores: @js($mensajes),
 
-                 // Al corregir un campo se borra su error. Tocar cualquiera de
-                 // los cuatro borra tambien el aviso de curso repetido, porque
-                 // cambiar uno ya lo vuelve otro curso; el servidor revisa de
-                 // nuevo al guardar.
                  init() {
-                     ['materia', 'grupo', 'gestion', 'anio'].forEach((campo) => {
+                     ['grupo', 'gestion', 'anio'].forEach((campo) => {
                          this.$watch(campo, () => this.limpiarErrores([campo, 'curso']));
                      });
                  },
@@ -79,25 +63,15 @@
                  errorDe(campo) {
                      return this.errores[campo] ?? '';
                  },
-                 // Rojo si el campo tiene su error o si el curso ya existe
-                 // (los cuatro campos forman el curso).
                  claseErrorDe(campo) {
                      return this.errorDe(campo) || this.errorDe('curso') ? '{{ $claseError }}' : '';
                  },
-
-                 // Solo letras y numeros, hasta 3, en mayusculas: 21a -> 21A.
+                 // Solo digitos, hasta 2 (1 a 10); el rango lo valida el servidor.
                  sanearGrupo() {
-                     this.grupo = this.grupo.replace(/[^a-zA-Z0-9]/g, '').slice(0, 3).toUpperCase();
+                     this.grupo = this.grupo.replace(/\D/g, '').slice(0, 2);
                  },
-                 // Solo digitos, hasta 4; que sea el actual o posterior lo
-                 // valida el servidor.
                  sanearAnio() {
                      this.anio = this.anio.replace(/\D/g, '').slice(0, 4);
-                 },
-                 nombreCurso() {
-                     const materia = this.materia.trim().replace(/\s+/g, ' ');
-
-                     return materia !== '' && this.grupo !== '' ? materia + ' - Grupo ' + this.grupo : '';
                  }
              }">
             <form method="POST" action="{{ route('cursos.store') }}" class="space-y-4">
@@ -110,29 +84,21 @@
                     </x-ui.alert>
                 </div>
 
-                <div>
-                    <x-ui.input
-                        label="Materia"
-                        id="materia_curso"
-                        name="materia"
-                        maxlength="80"
-                        placeholder="Ingrese el nombre de la materia"
-                        x-model="materia"
-                        x-bind:class="claseErrorDe('materia')"
-                        x-bind:aria-invalid="claseErrorDe('materia') ? 'true' : null"
-                        required
-                    />
-                    <p x-show="errorDe('materia')" x-text="errorDe('materia')" x-cloak
-                       class="mt-1 text-sm text-fg-danger-strong"></p>
-                </div>
+                <x-ui.selector-materia
+                    name="id_materia"
+                    :materias="$materias"
+                    :selected="old('id_materia')"
+                    :error="$errors->first('id_materia') ?: $errors->first('materia')"
+                />
 
                 <div>
                     <x-ui.input
                         label="Grupo"
                         id="grupo_curso"
                         name="grupo"
-                        maxlength="3"
-                        placeholder="Ingrese el grupo"
+                        inputmode="numeric"
+                        maxlength="2"
+                        placeholder="Numero del 1 al 10"
                         x-model="grupo"
                         @input="sanearGrupo()"
                         x-bind:class="claseErrorDe('grupo')"
@@ -177,16 +143,6 @@
                     <p x-show="errorDe('anio')" x-text="errorDe('anio')" x-cloak
                        class="mt-1 text-sm text-fg-danger-strong"></p>
                 </div>
-
-                {{-- Vista previa en texto corrido, debajo de los campos y sin
-                     recuadro, para que no parezca otro campo. Se arma sola con
-                     la materia y el grupo y no se envía (el servidor vuelve a
-                     armar el nombre). --}}
-                <p class="text-sm text-body break-words" aria-live="polite">
-                    Nombre del curso:
-                    <span x-show="nombreCurso()" x-text="nombreCurso()" class="font-semibold text-heading"></span>
-                    <span x-show="! nombreCurso()" class="text-muted">se forma con la materia y el grupo</span>
-                </p>
 
                 <div class="flex flex-col-reverse gap-[2vh] border-t border-default pt-4 sm:flex-row">
                     <x-ui.button-cancelar class="flex-1" @click="window.location.href = {{ \Illuminate\Support\Js::from(route('cursos')) }}">Cancelar</x-ui.button-cancelar>

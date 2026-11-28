@@ -121,13 +121,31 @@ class Validadores
     /** @return list<string> */
     public static function reglaMateria(): array
     {
-        return ['required', 'string', 'max:80'];
+        return ['required', 'string', 'max:120'];
     }
 
-    /** @return list<string> */
+    /** Id de materia del catálogo, elegida en el buscador. @return list<mixed> */
+    public static function reglaMateriaId(): array
+    {
+        return ['required', 'integer', Rule::exists('materia', 'id_materia')];
+    }
+
+    /** Código SIS de una materia nueva: opcional, 7 dígitos. @return list<string> */
+    public static function reglaCodigoMateria(): array
+    {
+        return ['nullable', 'string', 'regex:/^[0-9]{7}$/'];
+    }
+
+    /** Semestre de una materia nueva: opcional, 1 a 12. @return list<mixed> */
+    public static function reglaSemestreMateria(): array
+    {
+        return ['nullable', 'integer', 'between:1,12'];
+    }
+
+    /** Grupo del curso: entero de 1 a 10. @return list<string> */
     public static function reglaGrupo(): array
     {
-        return ['required', 'regex:/^[A-Z0-9]{1,3}$/'];
+        return ['required', 'integer', 'between:1,10'];
     }
 
     /**
@@ -150,9 +168,13 @@ class Validadores
     {
         return [
             'materia.required' => 'Ingrese la materia.',
-            'materia.max' => 'La materia no debe superar los 80 caracteres.',
+            'materia.max' => 'La materia no debe superar los 120 caracteres.',
+            'id_materia.required' => 'Seleccione la materia.',
+            'id_materia.integer' => 'Seleccione una materia valida.',
+            'id_materia.exists' => 'Seleccione una materia valida.',
             'grupo.required' => 'Ingrese el grupo.',
-            'grupo.regex' => 'El grupo solo admite letras y numeros, hasta 3 caracteres.',
+            'grupo.integer' => 'El grupo debe ser un numero del 1 al 10.',
+            'grupo.between' => 'El grupo debe ser un numero del 1 al 10.',
             'gestion.required' => 'Seleccione la gestion.',
             'gestion.integer' => 'Seleccione una gestion valida.',
             'gestion.in' => 'Seleccione una gestion valida.',
@@ -170,6 +192,26 @@ class Validadores
 
     public static function normalizarGrupo(mixed $valor): string
     {
-        return mb_strtoupper(trim((string) $valor));
+        // El grupo pasa a ser un numero (1-10): se dejan solo digitos.
+        return (string) preg_replace('/\D/', '', (string) $valor);
+    }
+
+    /**
+     * Forma canónica del nombre de una materia para comparar duplicados: sin
+     * espacios de más, en minúsculas y sin tildes ("Cálculo I" y "calculo i"
+     * son la misma materia).
+     *
+     * @param  mixed  $valor  Nombre escrito por el usuario.
+     *
+     * @return string  Nombre normalizado.
+     */
+    public static function normalizarNombreMateria(mixed $valor): string
+    {
+        $limpio = mb_strtolower(self::normalizarMateria($valor));
+
+        return strtr($limpio, [
+            'á' => 'a', 'é' => 'e', 'í' => 'i', 'ó' => 'o', 'ú' => 'u',
+            'ü' => 'u', 'ñ' => 'n',
+        ]);
     }
 }

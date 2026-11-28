@@ -39,6 +39,7 @@
  */
 
 use App\Http\Controllers\Api\AmbienteController;
+use App\Http\Controllers\Api\MateriaController;
 use App\Http\Controllers\Api\AuxiliaresDocenteController;
 use App\Http\Controllers\Api\CentralRiesgoController;
 use App\Http\Controllers\Api\ConfiguracionExamenDocenteController;
@@ -149,6 +150,12 @@ Route::middleware(['web', 'auth:web'])->group(function (): void {
     Route::post('/ambientes', [AmbienteController::class, 'store'])
         ->middleware('docente')
         ->name('api.ambientes.crear');
+
+    // Buscador de materias de Crear curso: agregar una materia que no esta en
+    // el catalogo.
+    Route::post('/materias', [MateriaController::class, 'store'])
+        ->middleware('docente')
+        ->name('api.materias.crear');
 
     // Detalle de solo lectura de un examen (Ver examenes): datos, reglas y
     // materiales permitidos con la configuracion del docente que lo consulta.
