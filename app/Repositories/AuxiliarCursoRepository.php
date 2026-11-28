@@ -103,6 +103,8 @@ class AuxiliarCursoRepository
     {
         return DB::table('auxiliar_curso as ac')
             ->join('curso as c', 'c.id_curso', '=', 'ac.id_curso')
+            ->leftJoin('curso_tipo_gestion as ctg', 'ctg.id_curso', '=', 'c.id_curso')
+            ->leftJoin('tipo_gestion as tg', 'tg.id_tipo_gestion', '=', 'ctg.id_tg')
             ->where('c.sis_doc', $idDocente)
             ->where('ac.estado', AccesoAuxiliarService::ESTADO_ACTIVO)
             ->orderBy('c.nombre_curso')
@@ -110,6 +112,8 @@ class AuxiliarCursoRepository
                 'ac.id_auxiliar',
                 'c.id_curso',
                 'c.nombre_curso',
+                'tg.nombre_tipo_gestion',
+                'ctg.anio',
             ]);
     }
 }

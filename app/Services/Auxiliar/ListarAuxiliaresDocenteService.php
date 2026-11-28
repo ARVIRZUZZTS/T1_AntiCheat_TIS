@@ -38,6 +38,8 @@
 namespace App\Services\Auxiliar;
 
 use App\Repositories\AuxiliarCursoRepository;
+use App\Support\NombreCurso;
+use Illuminate\Support\Carbon;
 
 class ListarAuxiliaresDocenteService
 {
@@ -61,7 +63,11 @@ class ListarAuxiliaresDocenteService
         return $this->repositorio->auxiliares()
             ->map(function (object $auxiliar) use ($asignaciones, $asignacionesExamen): array {
                 $cursos = $asignaciones->get($auxiliar->id_usuario, collect())
-                    ->pluck('nombre_curso')
+                    ->map(fn (object $asignacion): string => NombreCurso::conGestion(
+                        (string) $asignacion->nombre_curso,
+                        $asignacion->nombre_tipo_gestion !== null ? (string) $asignacion->nombre_tipo_gestion : null,
+                        $asignacion->anio !== null ? (int) $asignacion->anio : null,
+                    ))
                     ->unique()
                     ->values()
                     ->all();
@@ -106,7 +112,7 @@ class ListarAuxiliaresDocenteService
         $tipo = trim((string) ($examen->nombre_tipo_examen ?? ''));
         $tipo = $tipo === '' ? 'Examen' : ucfirst($tipo);
         $fecha = $examen->fecha !== null
-            ? \Illuminate\Support\Carbon::parse($examen->fecha)->format('d/m/Y')
+            ? Carbon::parse($examen->fecha)->format('d/m/Y')
             : 'sin fecha';
 
         return $tipo.' · '.$fecha;
