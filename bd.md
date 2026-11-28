@@ -28,7 +28,7 @@
 | `nombre_tipo_gestion` | `primer semestre`, `invierno`, `segundo semestre`, `verano` |
 | `registrador_tipo` | `docente`, `auxiliar` |
 | `roles` | `docente`, `auxiliar` |
-| `tipo_examen_nombre` | `examen parcial`, `examen final`, `segunda instancia` |
+| `tipo_examen_nombre` | `examen primer parcial`, `examen segundo parcial`, `evaluacion corriente`, `examen final`, `segunda instancia` |
 | `tipo_infraccion` | `tramposo`, `sospechoso` |
 
 ---
@@ -176,13 +176,13 @@ Clave primaria `(id_solicitante, id_validador)`; ambas FK a `usuario.id_usuario`
 
 ---
 
-### tipo_examen (3 filas)
+### tipo_examen (5 filas)
 | Columna | Tipo | Nullable | Default |
 |---|---|---|---|
 | id_tipo_examen | integer | NO | NULL |
 | nombre_tipo_examen | enum `tipo_examen_nombre` | NO | NULL |
 
-**Datos:** `1=examen parcial`, `2=examen final`, `3=segunda instancia`
+**Datos:** `1=examen primer parcial`, `2=examen final`, `3=segunda instancia`, `4=examen segundo parcial`, `5=evaluacion corriente`
 
 ---
 

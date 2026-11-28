@@ -168,7 +168,7 @@ class RegistrarExamenTest extends TestCase
         $this->assertSame(now()->addMonth()->format('Y-m-d'), $examen->fecha);
         $this->assertSame('08:30:00', $examen->hora_inicio);
         $this->assertSame(90, (int) $examen->duracion);
-        $this->assertSame($this->idTipoExamenParcial(), (int) $examen->tipo_examen);
+        $this->assertSame($this->idTipoExamenPrimerParcial(), (int) $examen->tipo_examen);
         // La hora de fin se deriva: 08:30 más 90 minutos.
         $this->assertSame('10:00:00', $examen->hora_fin);
         $this->assertSame($examen->id_examen, $this->ultimoIdExamen());
@@ -562,7 +562,7 @@ class RegistrarExamenTest extends TestCase
     private function datosValidos(array $sobrescribir = []): array
     {
         return array_merge([
-            'tipo_examen' => 'examen parcial',
+            'tipo_examen' => 'examen primer parcial',
             // Siempre en el futuro, para que la prueba no venza con el tiempo.
             'fecha' => now()->addMonth()->format('d/m/Y'),
             'hora_inicio' => '08:30',
@@ -592,7 +592,7 @@ class RegistrarExamenTest extends TestCase
         $examen->hora_inicio = $horaInicio.':00';
         $examen->duracion = $duracion;
         $examen->creador = $creador;
-        $examen->tipo_examen = $this->idTipoExamenParcial();
+        $examen->tipo_examen = $this->idTipoExamenPrimerParcial();
         $examen->save();
         $examen->cursos()->attach($cursos);
         $examen->ambientes()->attach($ambientes);
@@ -610,10 +610,10 @@ class RegistrarExamenTest extends TestCase
      * Id del catálogo que el servicio resuelve por nombre: no se crea uno propio
      * para no duplicar una fila que ya existe en la base real.
      */
-    private function idTipoExamenParcial(): int
+    private function idTipoExamenPrimerParcial(): int
     {
         return (int) DB::table('tipo_examen')
-            ->where('nombre_tipo_examen', 'examen parcial')
+            ->where('nombre_tipo_examen', 'examen primer parcial')
             ->value('id_tipo_examen');
     }
 }
