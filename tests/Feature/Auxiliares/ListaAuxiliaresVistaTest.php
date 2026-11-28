@@ -42,7 +42,13 @@ class ListaAuxiliaresVistaTest extends TestCase
 
     private const COORDINADOR = 1103;
 
+    private const OTRO_DOCENTE = 1104;
+
+    private const AUX_AJENO = 1105;
+
     private const CURSO = 3001;
+
+    private const CURSO_AJENO = 3002;
 
     protected function setUp(): void
     {
@@ -53,15 +59,24 @@ class ListaAuxiliaresVistaTest extends TestCase
         DB::table('usuario')->insert(['id_usuario' => self::DOCENTE, 'cod_sis' => 'DOC1101', 'correo' => 'doc1101@umss.edu', 'password' => $clave, 'nombre_usuario' => 'Doc', 'nombre' => 'Doc', 'apellido' => 'Uno', 'estado_cuenta' => 'habilitada', 'puede_crear_auxiliares' => false, 'tipo_auxiliar' => null, 'carnet' => null]);
         DB::table('usuario')->insert(['id_usuario' => self::AUX_ASIGNADO, 'cod_sis' => '202300001', 'correo' => 'auxa@ejemplo.com', 'password' => $clave, 'nombre_usuario' => 'Ana', 'nombre' => 'Ana Maria', 'apellido' => 'Perez Lopez', 'estado_cuenta' => 'habilitada', 'puede_crear_auxiliares' => false, 'tipo_auxiliar' => 'UMSS', 'carnet' => null]);
         DB::table('usuario')->insert(['id_usuario' => self::COORDINADOR, 'cod_sis' => 'EXT-1103', 'correo' => 'coordb@ejemplo.com', 'password' => $clave, 'nombre_usuario' => 'Beto', 'nombre' => 'Beto', 'apellido' => 'Gomez', 'estado_cuenta' => 'habilitada', 'puede_crear_auxiliares' => true, 'tipo_auxiliar' => 'externo', 'carnet' => '5551234']);
+        DB::table('usuario')->insert(['id_usuario' => self::OTRO_DOCENTE, 'cod_sis' => 'DOC1104', 'correo' => 'doc1104@umss.edu', 'password' => $clave, 'nombre_usuario' => 'Otra', 'nombre' => 'Otra', 'apellido' => 'Docente', 'estado_cuenta' => 'habilitada', 'puede_crear_auxiliares' => false, 'tipo_auxiliar' => null, 'carnet' => null]);
+        DB::table('usuario')->insert(['id_usuario' => self::AUX_AJENO, 'cod_sis' => 'EXT-1105', 'correo' => 'auxc@ejemplo.com', 'password' => $clave, 'nombre_usuario' => 'Luis', 'nombre' => 'Luis', 'apellido' => 'Ajeno', 'estado_cuenta' => 'habilitada', 'puede_crear_auxiliares' => false, 'tipo_auxiliar' => 'externo', 'carnet' => '9999999']);
 
         DB::table('rol_usuario')->insert([
             ['id_usuario' => self::DOCENTE, 'id_rol' => 1],
             ['id_usuario' => self::AUX_ASIGNADO, 'id_rol' => 2],
             ['id_usuario' => self::COORDINADOR, 'id_rol' => 2],
+            ['id_usuario' => self::AUX_AJENO, 'id_rol' => 2],
         ]);
 
-        DB::table('curso')->insert(['id_curso' => self::CURSO, 'nombre_curso' => 'Calculo I', 'sis_doc' => self::DOCENTE, 'fecha_creacion' => '2026-02-01', 'estado' => 'EnCurso']);
-        DB::table('auxiliar_curso')->insert(['id_auxiliar' => self::AUX_ASIGNADO, 'id_curso' => self::CURSO, 'estado' => 'Activo']);
+        DB::table('curso')->insert([
+            ['id_curso' => self::CURSO, 'nombre_curso' => 'Calculo I', 'sis_doc' => self::DOCENTE, 'fecha_creacion' => '2026-02-01', 'estado' => 'EnCurso'],
+            ['id_curso' => self::CURSO_AJENO, 'nombre_curso' => 'Calculo I', 'sis_doc' => self::OTRO_DOCENTE, 'fecha_creacion' => '2026-02-01', 'estado' => 'EnCurso'],
+        ]);
+        DB::table('auxiliar_curso')->insert([
+            ['id_auxiliar' => self::AUX_ASIGNADO, 'id_curso' => self::CURSO, 'estado' => 'Activo'],
+            ['id_auxiliar' => self::AUX_AJENO, 'id_curso' => self::CURSO_AJENO, 'estado' => 'Activo'],
+        ]);
     }
 
     public function test_la_lista_muestra_solo_nombre_correo_usuario_y_ver_detalle(): void
@@ -102,9 +117,9 @@ class ListaAuxiliaresVistaTest extends TestCase
         $this->actingAs(Usuario::findOrFail(self::DOCENTE));
 
         Livewire::test(GestionAuxiliares::class)
-            ->set('busqueda', 'coordb@ejemplo.com')
-            ->assertSee('Beto Gomez')
-            ->assertDontSee('Ana Maria Perez Lopez');
+            ->set('busqueda', 'auxa@ejemplo.com')
+            ->assertSee('Ana Maria Perez Lopez')
+            ->assertDontSee('Beto Gomez');
     }
 
     public function test_la_lista_y_el_detalle_muestran_gestion_tipo_y_codigo_sis(): void
@@ -138,5 +153,16 @@ class ListaAuxiliaresVistaTest extends TestCase
             ->set('busqueda', 'umss')
             ->assertSee('Ana Maria Perez Lopez')
             ->assertDontSee('Beto Gomez');
+    }
+
+    public function test_el_docente_no_ve_ni_abre_detalle_de_auxiliares_ajenos(): void
+    {
+        $this->actingAs(Usuario::findOrFail(self::DOCENTE));
+
+        Livewire::test(GestionAuxiliares::class)
+            ->assertDontSee('Luis Ajeno')
+            ->assertDontSee('auxc@ejemplo.com')
+            ->call('verDetalle', self::AUX_AJENO)
+            ->assertSet('detalleAbierto', false);
     }
 }

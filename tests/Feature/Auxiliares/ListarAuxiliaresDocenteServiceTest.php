@@ -167,6 +167,16 @@ class ListarAuxiliaresDocenteServiceTest extends TestCase
         $this->assertSame($etiqueta, $gamma['cursos'][0]);
     }
 
+    public function test_la_opcion_solo_del_docente_excluye_ajenos_y_sin_curso(): void
+    {
+        $filas = $this->servicio()->ejecutar(self::DOCENTE, true);
+
+        $this->assertSame(
+            ['9100011', '9100013', '9100014', '9100012'],
+            array_column($filas, 'codigoSis'),
+        );
+    }
+
     public function test_el_tipo_de_auxiliar_va_en_la_fila(): void
     {
         DB::table('usuario')->where('id_usuario', self::AUX_ZUNIGA)->update(['tipo_auxiliar' => 'externo']);

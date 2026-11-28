@@ -185,7 +185,7 @@ class GestionAuxiliares extends Component
     public function auxiliares(): Collection
     {
         $idDocente = (int) auth()->id();
-        $filas = collect(app(ListarAuxiliaresDocenteService::class)->ejecutar($idDocente));
+        $filas = collect(app(ListarAuxiliaresDocenteService::class)->ejecutar($idDocente, true));
 
         $estado = $this->filtroEstado === 'todos' ? null : strtoupper($this->filtroEstado);
 

@@ -54,14 +54,26 @@ class ListarAuxiliaresDocenteService
      * @param  int  $idDocente  ID del usuario docente (`curso.sis_doc`).
      * @return list<array{id: int, nombre: string, apellido: string, nombreCompleto: string, usuario: string, correo: string, carnet: string, codigoSis: string, curso: string, cursos: list<string>, examenes: list<string>, coordinador: bool, estado: string}>
      */
-    public function ejecutar(int $idDocente): array
+    public function ejecutar(int $idDocente, bool $soloDelDocente = false): array
     {
         $asignaciones = $this->repositorio->asignacionesActivas($idDocente)
             ->groupBy('id_auxiliar');
-        $asignacionesExamen = $this->repositorio->asignacionesExamen($idDocente)
-            ->groupBy('id_auxiliar');
+        $asignacionesExamenCrudas = $this->repositorio->asignacionesExamen($idDocente);
+        $asignacionesExamen = $asignacionesExamenCrudas->groupBy('id_auxiliar');
 
-        return $this->repositorio->auxiliares()
+        $auxiliares = $this->repositorio->auxiliares();
+
+        if ($soloDelDocente) {
+            $ids = $this->repositorio->idsConAsignacion($idDocente)
+                ->merge($asignacionesExamenCrudas->pluck('id_auxiliar'))
+                ->map(fn (mixed $id): int => (int) $id)
+                ->unique()
+                ->values()
+                ->all();
+            $auxiliares = $auxiliares->whereIn('id_usuario', $ids);
+        }
+
+        return $auxiliares
             ->map(function (object $auxiliar) use ($asignaciones, $asignacionesExamen): array {
                 $cursos = $asignaciones->get($auxiliar->id_usuario, collect())
                     ->map(fn (object $asignacion): string => NombreCurso::conGestion(

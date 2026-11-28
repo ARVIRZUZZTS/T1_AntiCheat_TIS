@@ -116,4 +116,13 @@ class AuxiliarCursoRepository
                 'ctg.anio',
             ]);
     }
+
+    public function idsConAsignacion(int $idDocente): Collection
+    {
+        return DB::table('auxiliar_curso as ac')
+            ->join('curso as c', 'c.id_curso', '=', 'ac.id_curso')
+            ->where('c.sis_doc', $idDocente)
+            ->distinct()
+            ->pluck('ac.id_auxiliar');
+    }
 }
