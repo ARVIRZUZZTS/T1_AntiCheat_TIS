@@ -3,6 +3,7 @@
     @author  AI Assistant
     @created 2026-10-24
     @updated 2026-10-26
+    @updated 2026-11-27
 
     @description
     Pestaña "Reporte de asistencia" (HU-7). Parcial con su propio x-data
@@ -19,6 +20,8 @@
     - 2026-10-26  [Alex Candia]  feat: el título y el subtítulo usan la materia,
       el tipo y la fecha enviados por la selección, igual que horarios de
       ingreso.
+    - 2026-11-27  [Alex Candia]  fix: se elimina el conjunto de estudiantes de
+      prueba; el reporte solo consume el endpoint real.
 --}}
 <div
     x-data="{
@@ -36,39 +39,13 @@
         abortController: null,
         filtroAula: '',
         filtroDocente: '',
-        mostrarPrueba: @js(config('app.debug') || request()->has('pruebas_reporte')),
 
         get hayDatos() {
-            if (this.mostrarPrueba && this.datosPrueba) {
-                return true;
-            }
             return this.datos && Array.isArray(this.datos.estudiantes) && this.datos.estudiantes.length > 0;
         },
 
-        get datosPrueba() {
-            if (! this.mostrarPrueba) {
-                return null;
-            }
-            if (localStorage.getItem('reportes_pruebas') === 'off') {
-                return null;
-            }
-            return {
-                examen: { tipo_examen: { nombre_tipo_examen: 'Examen primer parcial' }, fecha: new Date().toISOString().slice(0,10), hora_inicio: '08:00' },
-                estudiantes: [
-                    { sis: '20180001', nombre: 'Juan Carlos', apellido: 'Pérez López de Mendoza', aula: 'Aula 101 - Edificio A', hora_ingreso: '08:05', estado_asistencia: 'presente', registrador: 'Docente Titular', docente_cargo: 'Docente Titular' },
-                    { sis: '20180002', nombre: 'María Fernanda', apellido: 'González Rodríguez', aula: 'Aula 101 - Edificio A', hora_ingreso: null, estado_asistencia: 'pendiente', registrador: null, docente_cargo: 'Docente Titular' },
-                    { sis: '20180003', nombre: 'Luis Alberto', apellido: 'Quispe Mamani', aula: 'Aula 102 - Edificio B', hora_ingreso: '08:12', estado_asistencia: 'presente', registrador: 'Auxiliar de Laboratorio', docente_cargo: 'Docente Titular' },
-                    { sis: '99999999', nombre: 'Nombre Extremadamente Largo Para Probar', apellido: 'Apellido También Muy Largo Que Podría Romper El Diseño', aula: 'Aula con Nombre Extremadamente Largo Para Pruebas', hora_ingreso: null, estado_asistencia: 'pendiente', registrador: null, docente_cargo: 'Docente Titular' },
-                ]
-            };
-        },
-
-        get fuente() {
-            return this.mostrarPrueba && this.datosPrueba ? this.datosPrueba : this.datos;
-        },
-
         get estudiantes() {
-            const f = this.fuente;
+            const f = this.datos;
             if (! f || ! Array.isArray(f.estudiantes)) return [];
             let lista = f.estudiantes;
             if (this.filtroAula) {
@@ -96,13 +73,13 @@
         },
 
         get aulas() {
-            const f = this.fuente;
+            const f = this.datos;
             if (! f || ! Array.isArray(f.estudiantes)) return [];
             return [...new Set(f.estudiantes.map(e => e.aula).filter(Boolean))];
         },
 
         get docentes() {
-            const f = this.fuente;
+            const f = this.datos;
             if (! f || ! Array.isArray(f.estudiantes)) return [];
             const set = new Set();
             f.estudiantes.forEach(e => {
@@ -142,7 +119,7 @@
                 return this.materiaSeleccionada;
             }
 
-            const f = this.fuente;
+            const f = this.datos;
             return f && f.examen && f.examen.curso ? f.examen.curso.nombre_curso : (f && f.materia ? f.materia.nombre : 'Materia');
         },
 
@@ -151,7 +128,7 @@
                 return this.tipoSeleccionado;
             }
 
-            const f = this.fuente;
+            const f = this.datos;
             if (! f || ! f.examen) return '';
             return f.examen.tipo_examen ? f.examen.tipo_examen.nombre_tipo_examen : (f.examen.tipo || '');
         },
@@ -161,7 +138,7 @@
                 return this.fechaSeleccionada;
             }
 
-            const f = this.fuente;
+            const f = this.datos;
             return f && f.examen ? (f.examen.fecha || '') : '';
         },
 

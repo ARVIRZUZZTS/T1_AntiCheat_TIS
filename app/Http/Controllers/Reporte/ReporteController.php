@@ -7,14 +7,20 @@
  *
  * @created 2026-11-15
  *
+ * @updated 2026-11-27
+ *
  * @description
  * Controlador de las subopciones de Reportes del sidebar. Cada método
  * renderiza la vista de reportes acotada a una sola pestaña; los selectores de
  * materia y examen y el contenido de cada reporte se comparten con la vista
- * pages.reportes.
+ * pages.reportes. La pestaña se pasa al servicio de filtros para que solo
+ * aparezcan cursos y exámenes con datos de ese reporte.
  *
  * @see  App\Services\Reporte\ListarFiltrosReporteService
  * @see  resources/views/pages/reportes.blade.php
+ *
+ * @changelog
+ * - 2026-11-27  [Alex Candia]  fix: los selectores se filtran según la pestaña.
  */
 
 namespace App\Http\Controllers\Reporte;
@@ -51,7 +57,7 @@ class ReporteController extends Controller
         string $titulo,
     ): View {
         return view('pages.reportes', array_merge(
-            $filtros->ejecutar($request->user()),
+            $filtros->ejecutar($request->user(), $soloTab),
             [
                 'soloTab' => $soloTab,
                 'titulo' => $titulo,
