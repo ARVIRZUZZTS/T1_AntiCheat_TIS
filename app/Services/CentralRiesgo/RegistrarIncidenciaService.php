@@ -128,7 +128,7 @@ class RegistrarIncidenciaService
             $idInscripcion = $estudiante->getAttribute('inscripcion_id');
             $idCursoInscripcion = $estudiante->getAttribute('inscripcion_curso');
 
-            DB::statement('LOCK TABLE central_riesgo IN SHARE ROW EXCLUSIVE MODE');
+            DB::statement('LOCK TABLE central_riesgo IN EXCLUSIVE MODE');
 
             $incidencia = CentralRiesgo::create([
                 'id_registro' => (int) CentralRiesgo::query()->max('id_registro') + 1,

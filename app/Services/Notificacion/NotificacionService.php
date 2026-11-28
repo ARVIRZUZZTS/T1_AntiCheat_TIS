@@ -19,9 +19,14 @@
  *   riesgo" (HU 6) cuando un estudiante queda registrado o confirmado como
  *   tramposo: un aviso por cada materia activa del estudiante, para que cada
  *   docente vea solo el de su curso.
+ * - `notificarCambioExamen()` crea el aviso "Cambios en un examen" cuando se
+ *   editan los ambientes, la fecha o la hora. Va a los auxiliares asignados y,
+ *   si el examen está compartido, a los docentes involucrados; el detalle de lo
+ *   cambiado se guarda en `detalles` para no desincronizarlo con el examen.
  * - `listarPara()` devuelve las notificaciones no ocultas del usuario
- *   autenticado, de la más reciente a la más antigua, con el tiempo transcurrido
- *   en español. Un auxiliar nunca recibe notificaciones.
+ *   autenticado (docente o auxiliar), de la más reciente a la más antigua, con
+ *   el tiempo transcurrido en español. Un auxiliar ve solo los avisos que se le
+ *   dirigen por su `id_usuario`.
  * - `contarNuevas()` y `marcarTodasLeidas()` separan el badge de avisos nuevos
  *   del historial: solo cuentan/marcan las filas `recibido` y no ocultas.
  * - `ocultar()` hace el borrado lógico de una notificación propia.
@@ -41,6 +46,8 @@
  *   solo bloquea e inserta si no existia.
  * - 2026-11-24  [Equipo T1]  fix: el badge cuenta solo avisos `recibido` y al
  *   abrir la bandeja se marcan todos como `visto`.
+ * - 2026-11-24  [Equipo T1]  feat: aviso de cambios de ambientes, fecha u hora
+ *   de un examen, visible también para auxiliares asignados.
  */
 
 namespace App\Services\Notificacion;
@@ -77,6 +84,9 @@ class NotificacionService
     /** Título del aviso informativo del respaldo automático de la base de datos (HU 33). */
     public const TITULO_RESPALDO_BD = 'Respaldo automático de la base de datos';
 
+    /** Título del aviso de cambios de ambientes, fecha u hora de un examen. */
+    public const TITULO_CAMBIO_EXAMEN = 'Cambios en un examen';
+
     /**
      * Tipos de aviso (columna `tipo` de `notificacion_docente`). La pantalla
      * pinta una tarjeta distinta según el valor.
@@ -92,6 +102,9 @@ class NotificacionService
 
     /** Aviso informativo (solo lectura) del respaldo automático de la base de datos. */
     public const TIPO_RESPALDO_BD = 'respaldo_bd';
+
+    /** Aviso de cambios de ambientes, fecha u hora de un examen ya programado. */
+    public const TIPO_CAMBIO_EXAMEN = 'examen_modificado';
 
     /** Estado inicial con el que nace un aviso, del enum `estado_notificacion`. */
     public const ESTADO_RECIBIDO = 'recibido';
@@ -347,6 +360,55 @@ class NotificacionService
     }
 
     /**
+     * Avisa a los usuarios involucrados que cambiaron los ambientes, la fecha
+     * o la hora de un examen ya programado.
+     *
+     * La tabla no tiene una entidad propia para este evento: `detalles` guarda
+     * el examen, las materias, el editor y el texto de cada cambio, y
+     * `fecha_evento` guarda cuándo se hizo. Así el historial muestra lo que se
+     * modificó aunque después se vuelva a editar el examen. Se reutiliza
+     * `id_docente_destinatario` como columna genérica de usuario (docente o
+     * auxiliar), que es un FK a `usuario.id_usuario`.
+     *
+     * @param  Collection<int, Usuario>  $destinatarios  Usuarios que deben recibir el aviso.
+     * @param  array<string, mixed>  $detalles  Examen, materias, editor y cambios.
+     * @param  CarbonInterface  $momento  Momento en que se guardaron los cambios.
+     * @return array<int, NotificacionDocente> Avisos creados, uno por destinatario.
+     */
+    public function notificarCambioExamen(
+        Collection $destinatarios,
+        array $detalles,
+        CarbonInterface $momento,
+    ): array {
+        if ($destinatarios->isEmpty()) {
+            return [];
+        }
+
+        return DB::transaction(function () use ($destinatarios, $detalles, $momento): array {
+            $this->bloquearTabla();
+
+            $siguiente = (int) NotificacionDocente::query()->max('id_notificacion');
+            $creados = [];
+
+            foreach ($destinatarios as $destinatario) {
+                $siguiente++;
+
+                $creados[] = NotificacionDocente::create([
+                    'id_notificacion' => $siguiente,
+                    'id_docente_destinatario' => $destinatario->id_usuario,
+                    'tipo' => self::TIPO_CAMBIO_EXAMEN,
+                    'estado' => self::ESTADO_RECIBIDO,
+                    'oculta' => false,
+                    'fecha_evento' => $momento,
+                    'detalles' => $detalles,
+                ]);
+            }
+
+            return $creados;
+        });
+    }
+
+    /**
      * Texto del aviso de respaldo con la fecha y hora exactas.
      *
      * @param  ?CarbonInterface  $fecha  Momento del respaldo.
@@ -403,20 +465,15 @@ class NotificacionService
 
     /**
      * Notificaciones no ocultas del usuario autenticado, de la más reciente a la
-     * más antigua.
-     *
-     * Un auxiliar no recibe notificaciones "Posible Tramposo": se corta antes de
-     * consultar. Si no hay ninguna, devuelve una colección vacía.
+     * más antigua. Sirve para docentes y auxiliares: cada uno ve solo las filas
+     * dirigidas a su `id_usuario`. Si no hay ninguna, devuelve una colección
+     * vacía.
      *
      * @param  Usuario  $usuario  Usuario de la sesión.
      * @return Collection<int, array<string, mixed>> Avisos mapeados para la API.
      */
     public function listarPara(Usuario $usuario): Collection
     {
-        if ($this->esAuxiliar($usuario)) {
-            return collect();
-        }
-
         $notificaciones = $this->consultarPara($usuario)
             ->with([
                 'curso',
@@ -439,10 +496,6 @@ class NotificacionService
      */
     public function contarNuevas(Usuario $usuario): int
     {
-        if ($this->esAuxiliar($usuario)) {
-            return 0;
-        }
-
         return $this->consultarPara($usuario)
             ->where('estado', self::ESTADO_RECIBIDO)
             ->count();
@@ -454,18 +507,14 @@ class NotificacionService
      */
     public function marcarTodasLeidas(Usuario $usuario): int
     {
-        if ($this->esAuxiliar($usuario)) {
-            return 0;
-        }
-
         return $this->consultarPara($usuario)
             ->where('estado', self::ESTADO_RECIBIDO)
             ->update(['estado' => self::ESTADO_VISTO]);
     }
 
     /**
-     * Consulta base de los avisos visibles del usuario: destinatario directo o,
-     * en las filas legacy, el docente dueño del curso.
+     * Consulta base de los avisos visibles del usuario: destinatario directo
+     * (docente o auxiliar) o, en las filas legacy, el docente dueño del curso.
      *
      * @return Builder<NotificacionDocente>
      */
@@ -520,12 +569,6 @@ class NotificacionService
         $notificacion->save();
     }
 
-    /** Un auxiliar nunca recibe notificaciones "Posible Tramposo". */
-    public function esAuxiliar(Usuario $usuario): bool
-    {
-        return $usuario->roles->contains('nombre_rol', Rol::NOMBRE_AUXILIAR);
-    }
-
     /**
      * Curso (materia) del aviso: el elegido en el caso o, si no, el primero del
      * examen.
@@ -555,6 +598,10 @@ class NotificacionService
 
         if ($notificacion->tipo === self::TIPO_RESPALDO_BD) {
             return $this->mapearRespaldo($notificacion);
+        }
+
+        if ($notificacion->tipo === self::TIPO_CAMBIO_EXAMEN) {
+            return $this->mapearCambioExamen($notificacion);
         }
 
         $registro = $notificacion->centralRiesgo;
@@ -705,12 +752,52 @@ class NotificacionService
         ];
     }
 
+    /**
+     * Mapea el aviso de cambios de examen desde `detalles`. El mensaje es texto
+     * plano y no lleva acción: la tarjeta solo informa lo que se modificó.
+     *
+     * @param  NotificacionDocente  $notificacion  Aviso de tipo `examen_modificado`.
+     * @return array<string, mixed> Datos para la pantalla/API.
+     */
+    private function mapearCambioExamen(NotificacionDocente $notificacion): array
+    {
+        $detalles = $notificacion->detalles ?? [];
+        $examen = (string) ($detalles['examen'] ?? 'Examen');
+        $materias = array_values(array_filter((array) ($detalles['materias'] ?? [])));
+        $cambios = array_values(array_filter((array) ($detalles['cambios'] ?? [])));
+        $detalleMaterias = $materias !== [] ? ' de '.implode(', ', $materias) : '';
+        $fecha = $notificacion->fecha_evento;
+
+        return [
+            'id' => (int) $notificacion->id_notificacion,
+            'tipo' => self::TIPO_CAMBIO_EXAMEN,
+            'titulo' => self::TITULO_CAMBIO_EXAMEN,
+            'descripcion' => sprintf(
+                'El examen de %s%s cambió: %s.',
+                $examen,
+                $detalleMaterias,
+                implode('; ', $cambios),
+            ),
+            'referencia' => (int) ($detalles['examen_id'] ?? 0),
+            'fecha_registro' => $fecha?->toDateTimeString(),
+            'hace' => $fecha !== null ? $this->tiempo->enEspanol($fecha) : '',
+            'datos' => [
+                'examen_id' => (int) ($detalles['examen_id'] ?? 0),
+                'examen' => $examen,
+                'materias' => $materias,
+                'cambios' => $cambios,
+                'editor' => (string) ($detalles['editor'] ?? ''),
+            ],
+        ];
+    }
+
     private function fechaDe(NotificacionDocente $notificacion): ?CarbonInterface
     {
         return match ($notificacion->tipo) {
             self::TIPO_INVITACION_EXAMEN => $notificacion->invitacion?->created_at,
             self::TIPO_RESPUESTA_INVITACION => $notificacion->invitacion?->updated_at,
             self::TIPO_RESPALDO_BD => $notificacion->fecha_evento,
+            self::TIPO_CAMBIO_EXAMEN => $notificacion->fecha_evento,
             default => $notificacion->centralRiesgo?->fecha_registro,
         };
     }

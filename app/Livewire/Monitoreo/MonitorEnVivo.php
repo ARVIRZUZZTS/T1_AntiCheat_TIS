@@ -87,6 +87,7 @@
 
 namespace App\Livewire\Monitoreo;
 
+use App\Enums\CursoEstado;
 use App\Enums\TipoInfraccion;
 use App\Models\Estudiante;
 use App\Models\Examen;
@@ -209,22 +210,45 @@ class MonitorEnVivo extends Component
 
         $consulta = $this->consultaExamenesAccesibles();
 
-        $examen = $consulta
-            ->where(function ($query) use ($ahora): void {
-                $query->where('fecha', '>', $ahora->toDateString())
-                    ->orWhere(function ($subquery) use ($ahora): void {
-                        $subquery->where('fecha', $ahora->toDateString())
-                            ->where('hora_inicio', '>=', $ahora->format('H:i:s'));
-                    });
-            })
-            ->orderBy('fecha')
-            ->orderBy('hora_inicio')
-            ->first();
+        // 1. Se prioriza un examen cuya ventana incluya el momento actual
+        //    (registro abierto o en curso), para que el monitor no "pierda" el
+        //    examen cuando llega su hora de inicio.
+        $examen = null;
+        foreach ($consulta->get() as $candidato) {
+            $inicio = Carbon::parse($candidato->fecha.' '.$candidato->hora_inicio);
+            $fin = $candidato->duracion !== null
+                ? $inicio->copy()->addMinutes((int) $candidato->duracion)
+                : ($candidato->hora_fin !== null
+                    ? Carbon::parse($candidato->fecha.' '.$candidato->hora_fin)->addDays(
+                        Carbon::parse($candidato->fecha.' '.$candidato->hora_fin)->lte($inicio) ? 1 : 0
+                    )
+                    : $inicio->copy()->addMinutes(60));
+            $apertura = $inicio->copy()->subMinutes(15);
 
+            if ($ahora->between($apertura, $fin)) {
+                $examen = $candidato;
+                break;
+            }
+        }
+
+        // 2. Si no hay uno en curso, el más próximo a futuro.
         if ($examen === null) {
-            $fallback = $this->consultaExamenesAccesibles();
+            $examen = $consulta
+                ->where(function ($query) use ($ahora): void {
+                    $query->where('fecha', '>', $ahora->toDateString())
+                        ->orWhere(function ($subquery) use ($ahora): void {
+                            $subquery->where('fecha', $ahora->toDateString())
+                                ->where('hora_inicio', '>=', $ahora->format('H:i:s'));
+                        });
+                })
+                ->orderBy('fecha')
+                ->orderBy('hora_inicio')
+                ->first();
+        }
 
-            $examen = $fallback
+        // 3. Último recurso: el más reciente.
+        if ($examen === null) {
+            $examen = $this->consultaExamenesAccesibles()
                 ->orderByDesc('fecha')
                 ->orderByDesc('id_examen')
                 ->first();
@@ -837,9 +861,16 @@ class MonitorEnVivo extends Component
             return 'finalizado';
         }
         $inicio = Carbon::parse($examen->fecha.' '.$examen->hora_inicio);
-        $fin = $examen->hora_fin
-            ? Carbon::parse($examen->fecha.' '.$examen->hora_fin)
-            : $inicio->copy()->addMinutes((int) $examen->duracion);
+        if ($examen->duracion !== null) {
+            $fin = $inicio->copy()->addMinutes((int) $examen->duracion);
+        } elseif ($examen->hora_fin !== null) {
+            $fin = Carbon::parse($examen->fecha.' '.$examen->hora_fin);
+            if ($fin->lte($inicio)) {
+                $fin->addDay();
+            }
+        } else {
+            $fin = $inicio->copy()->addMinutes(60);
+        }
         $apertura = $inicio->copy()->subMinutes(15);
         $ahora = now();
 
@@ -937,7 +968,9 @@ class MonitorEnVivo extends Component
 
     private function consultaExamenesAccesibles()
     {
-        $consulta = Examen::query();
+        $consulta = Examen::query()
+            ->whereDoesntHave('cursos', fn ($cursos) => $cursos
+                ->where('curso.estado', CursoEstado::Archivado->value));
 
         if (! auth()->check()) {
             return $consulta;

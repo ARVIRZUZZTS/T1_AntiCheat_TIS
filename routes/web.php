@@ -112,11 +112,14 @@
  *   dos pestanas); se conservan los POST *.store de cada accion.
  * - 2026-11-23  [OchoaCesar]  refactor: la pagina unica deja las pestanas y
  *   muestra una sola lista con los archivados al final.
+ * - 2026-11-24  [Alisson D. Alvarado <alvaradoalissondalet@gmail.com>]  fix:
+ *   conectar los cursos asignados al auxiliar con el listado compartido.
  */
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ConfirmarRegistroController;
 use App\Http\Controllers\CursoController;
+use App\Http\Controllers\CursosAuxiliarController;
 use App\Http\Controllers\EditarCursoVistaController;
 use App\Http\Controllers\ExamenController;
 use App\Http\Controllers\InicioController;
@@ -144,9 +147,8 @@ use Illuminate\Validation\ValidationException;
 Route::middleware('auth')->group(function (): void {
     Route::get('/', InicioController::class)->name('inicio');
     Route::redirect('/inicio', '/');
-    // Destino de "Cursos" en el sidebar del auxiliar. Su contenido (cursos a los
-    // que está asignado y sus exámenes) se define en una HU posterior.
-    Route::view('/mis-cursos', 'pages.auxiliar-cursos')->name('auxiliar.cursos');
+    // El auxiliar solo consulta los cursos con asignacion activa.
+    Route::get('/mis-cursos', CursosAuxiliarController::class)->name('auxiliar.cursos');
     // Examenes > Ver examenes del auxiliar (HU 24): solo los examenes a los
     // que esta asignado (los de sus cursos y los sueltos). Solo auxiliares.
     Route::get('/mis-examenes', ExamenesAuxiliar::class)->name('auxiliar.examenes');

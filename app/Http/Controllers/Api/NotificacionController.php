@@ -10,12 +10,15 @@
  * @updated 2026-11-24
  *
  * @description
- * Endpoints JSON de las notificaciones del docente. Sirven a las dos HU que
- * generan avisos (el campo `tipo` del payload indica cuál):
+ * Endpoints JSON de las notificaciones del usuario autenticado (docente o
+ * auxiliar). El campo `tipo` del payload indica cuál:
  *
  *   - `posible_tramposo` (HU 12): el auxiliar reportó a un sospechoso.
  *   - `central_riesgo` (HU 6): el estudiante ingresó o fue confirmado en la
  *     central de riesgos.
+ *   - `examen_modificado`: cambiaron los ambientes, la fecha o la hora de un
+ *     examen; lo reciben los auxiliares asignados y, si está compartido, los
+ *     docentes involucrados.
  *
  * - `index`   GET  `/api/notificaciones` — lista las notificaciones no ocultas
  *   del usuario autenticado, de la más reciente a la más antigua. Lista vacía
@@ -37,6 +40,8 @@
  *   avisos "central_riesgo" de la HU 6 (#HU6).
  * - 2026-11-24  [Equipo T1]  fix: conteo de nuevas y marcado de leídas para que
  *   el badge baje a 0 al abrir la bandeja.
+ * - 2026-11-24  [Equipo T1]  feat: los auxiliares consultan sus avisos de
+ *   cambios de examen por la misma API.
  */
 
 namespace App\Http\Controllers\Api;
