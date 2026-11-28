@@ -5,6 +5,7 @@
     @updated 2026-10-23
     @updated 2026-10-24
     @updated 2026-10-26
+    @updated 2026-11-27
 
     @description
     Pantalla de reportes por materia y examen. Dos selectores dinámicos
@@ -44,6 +45,9 @@
       mismo título y subtítulo.
     - 2026-11-15  [Alex Candia]  refactor: $soloTab acota la vista a un solo
       reporte y oculta las pestañas; cada subopción del sidebar usa su ruta.
+    - 2026-11-27  [Alex Candia]  fix: se quitan los datos de prueba de los
+      reportes y los selectores traen solo cursos/exámenes con datos del
+      reporte, con la gestión en la etiqueta del curso.
 
     @see  resources/views/partials/reportes/horario-ingreso.blade.php
 --}}
@@ -183,6 +187,5 @@
                 </section>
             @endif
         </div>
-        @include('partials.reportes.test-datos')
     </div>
 @endsection

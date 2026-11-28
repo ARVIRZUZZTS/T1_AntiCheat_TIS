@@ -1,9 +1,10 @@
-﻿{{--
+{{--
     @file    ingresos-ilegales.blade.php
     @author  Alex Candia <alex.leonar.candia@gmail.com>
     @created 2026-10-23
     @updated 2026-10-23
     @updated 2026-10-26
+    @updated 2026-11-27
 
     @description
     Pestaña "Reporte de intentos no autorizados". Parcial con su propio x-data
@@ -15,6 +16,8 @@
     - 2026-10-26  [Alex Candia]  feat: el título y el subtítulo usan la materia,
       el tipo y la fecha enviados por la selección, igual que horarios de
       ingreso.
+    - 2026-11-27  [Alex Candia]  fix: se eliminan los intentos de prueba; el
+      reporte solo consume el endpoint real.
 
     @see  resources/views/pages/reportes.blade.php
 --}}
@@ -33,34 +36,9 @@
         errorReporte: '',
         cache: {},
         abortController: null,
-        mostrarPrueba: @js(config('app.debug') || request()->has('pruebas_reporte')),
 
         get hayDatos() {
-            if (this.mostrarPrueba && typeof localStorage !== 'undefined' && localStorage.getItem('reportes_pruebas') !== 'off') {
-                return this.datosPrueba().length > 0;
-            }
             return this.ingresos.length > 0;
-        },
-
-        datosPrueba() {
-            if (! this.mostrarPrueba) {
-                return [];
-            }
-            if (typeof localStorage !== 'undefined' && localStorage.getItem('reportes_pruebas') === 'off') {
-                return [];
-            }
-            return [
-                { sis: '20180001', nombre: 'Juan Carlos', apellido: 'Pérez López de Mendoza', estudiante: 'Juan Carlos Pérez López de Mendoza', aula: 'Aula 101', motivo: 'Intento sin estar inscrito', tipo: 'No autorizado', estado: 'Registrado', fecha: new Date().toISOString().replace('T',' ').slice(0,16), materia: 'Materia de Prueba' },
-                { sis: '20180002', nombre: 'María Fernanda', apellido: 'González Rodríguez', estudiante: 'María Fernanda González Rodríguez', aula: 'Aula con Nombre Extremadamente Largo', motivo: 'Intento sin estar inscrito', tipo: 'No autorizado', estado: 'Registrado', fecha: new Date(Date.now()-3600000).toISOString().replace('T',' ').slice(0,16), materia: 'Materia de Prueba' },
-                { sis: '20180001', nombre: 'Juan Carlos', apellido: 'Pérez López de Mendoza', estudiante: 'Juan Carlos Pérez López de Mendoza', aula: 'Aula 101', motivo: 'Intento sin estar inscrito', tipo: 'No autorizado', estado: 'Registrado', fecha: new Date(Date.now()-7200000).toISOString().replace('T',' ').slice(0,16), materia: 'Materia de Prueba' },
-            ];
-        },
-
-        get fuente() {
-            if (this.mostrarPrueba && typeof localStorage !== 'undefined' && localStorage.getItem('reportes_pruebas') !== 'off') {
-                return this.datosPrueba();
-            }
-            return this.ingresos;
         },
 
         get nombreMateria() {
@@ -68,7 +46,7 @@
                 return this.materiaSeleccionada;
             }
 
-            const primero = this.fuente[0];
+            const primero = this.ingresos[0];
             return primero && primero.materia ? primero.materia : 'Materia';
         },
 
@@ -85,11 +63,11 @@
         },
 
         get totalIntentos() {
-            return this.fuente.length;
+            return this.ingresos.length;
         },
 
         get estudiantesDistintos() {
-            return new Set(this.fuente.map(r => r.sis)).size;
+            return new Set(this.ingresos.map(r => r.sis)).size;
         },
 
         actualizarSeleccion(evento) {
@@ -231,14 +209,14 @@
     </x-ui.alert>
 
             <div x-show="! cargando && ! errorReporte">
-                <p x-show="fuente.length === 0" class="rounded-base border border-default bg-neutral-primary-soft p-8 text-center text-sm text-body">
+                <p x-show="ingresos.length === 0" class="rounded-base border border-default bg-neutral-primary-soft p-8 text-center text-sm text-body">
                     No hay intentos de ingreso no autorizados.
                 </p>
 
-                <div x-show="fuente.length > 0" class="overflow-x-auto">
+                <div x-show="ingresos.length > 0" class="overflow-x-auto">
                     <x-ui.table :headers="['Nombres', 'Apellidos', 'Código SIS', 'Aula', 'Fecha y hora del intento']" min-width="min-w-[720px]">
                         <x-slot:body>
-                            <template x-for="registro in [...fuente].sort((a,b)=> (b.fecha||'').localeCompare(a.fecha||''))" :key="registro.sis + registro.fecha + Math.random()">
+                            <template x-for="registro in [...ingresos].sort((a,b)=> (b.fecha||'').localeCompare(a.fecha||''))" :key="registro.sis + registro.fecha + Math.random()">
                                 <tr class="border-b border-default bg-neutral-primary last:border-0">
                                     <td class="px-6 py-4" x-text="registro.nombre"></td>
                                     <td class="px-6 py-4" x-text="registro.apellido"></td>
