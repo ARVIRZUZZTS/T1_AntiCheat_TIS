@@ -114,13 +114,13 @@
  *   muestra una sola lista con los archivados al final.
  * - 2026-11-24  [Alisson D. Alvarado <alvaradoalissondalet@gmail.com>]  fix:
  *   conectar los cursos asignados al auxiliar con el listado compartido.
+ * - 2026-11-27  [Alisson D. Alvarado <alvaradoalissondalet@gmail.com>]  refactor: retirar la ruta de edición de cursos.
  */
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ConfirmarRegistroController;
 use App\Http\Controllers\CursoController;
 use App\Http\Controllers\CursosAuxiliarController;
-use App\Http\Controllers\EditarCursoVistaController;
 use App\Http\Controllers\ExamenController;
 use App\Http\Controllers\InicioController;
 use App\Http\Controllers\Reporte\ExportarReporteAsistenciaController;
@@ -263,7 +263,6 @@ Route::middleware(['auth', 'docente'])->group(function (): void {
         ->name('cursos.ver-estudiantes');
     Route::get('/cursos/habilitar-estudiantes', [CursoController::class, 'habilitarEstudiantes'])
         ->name('cursos.habilitar-estudiantes');
-    Route::get('/cursos/editar', EditarCursoVistaController::class)->name('cursos.editar');
     Route::get('/cursos/cargar-csv', function (Request $request) {
         $cursoId = $request->integer('curso');
 
