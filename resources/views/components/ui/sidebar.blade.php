@@ -99,6 +99,8 @@
       reconocer el rol auxiliar aunque no sea el primer rol del usuario.
     - 2026-11-27  [Alisson D. Alvarado <alvaradoalissondalet@gmail.com>]  refactor:
       retirar la opcion de editar cursos.
+    - 2026-11-27  [Alisson D. Alvarado <alvaradoalissondalet@gmail.com>]  feat:
+      agregar la opcion de desvincular auxiliares por curso.
 --}}
 
 
@@ -194,6 +196,7 @@
             ['label' => 'Crear auxiliar', 'route' => 'auxiliares.crear'],
             ['label' => 'Asignar auxiliar', 'route' => 'auxiliares.asignar'],
             ['label' => 'Eliminar auxiliar', 'route' => 'auxiliares.eliminar'],
+            ['label' => 'Desvincular auxiliar', 'route' => 'auxiliares.desvincular'],
         ]],
         // Validacion del registro de docentes (HU 26): el contador muestra las
         // solicitudes pendientes y se actualiza al aprobar o rechazar.
