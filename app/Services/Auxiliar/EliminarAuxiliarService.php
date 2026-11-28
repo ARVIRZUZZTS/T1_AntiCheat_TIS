@@ -7,6 +7,8 @@
  *
  * @created 2026-11-27
  *
+ * @updated 2026-11-28
+ *
  * @description
  * Elimina de forma **lógica** a un auxiliar (subsección "Eliminar auxiliar").
  * Reutiliza el patrón de columna de estado de "Archivar curso": en vez de
@@ -20,15 +22,19 @@
  *    historial, igual que `quitarCurso`);
  *  - cierra sus sesiones activas (`sessions`).
  *
- * Guardas (igual que las de Eliminar examen, que bloquean lo que tiene historia
- * en curso): si el auxiliar tiene un examen **en curso** ahora mismo, no se
- * puede eliminar.
+ * Guardas (igual que las de Eliminar examen, que bloquean lo que tiene
+ * historia): solo se elimina al auxiliar que no tiene nada asociado. Con
+ * cursos activos asignados, o si estuvo asignado a algun curso (pasado) o a
+ * algun examen, no se puede eliminar. Tampoco con un examen **en curso**.
  *
  * Permisos: ver `UsuarioPolicy::eliminar` (docente responsable; coordinador solo
  * a los que creó; nadie a sí mismo).
  *
  * @changelog
  * - 2026-11-27  [Diego Tejerina]  feat: creación inicial (eliminación lógica).
+ * - 2026-11-28  [Valery D. Ortuno P]  fix: no se elimina a un auxiliar con
+ *   cursos activos ni a uno que estuvo asignado a cursos o exámenes; solo al
+ *   que no tiene nada asociado.
  *
  * @see  App\Policies\UsuarioPolicy
  * @see  App\Enums\EstadoCuenta
@@ -48,11 +54,15 @@ use Illuminate\Validation\ValidationException;
 
 class EliminarAuxiliarService
 {
-    public const MENSAJE_EXITO = 'Auxiliar eliminado';
+    public const MENSAJE_EXITO = 'Auxiliar eliminado con exito';
 
     public const MENSAJE_EXAMEN_EN_CURSO = 'No se puede eliminar: tiene un examen en curso';
 
     public const MENSAJE_NO_AUXILIAR = 'El usuario elegido no es un auxiliar.';
+
+    public const MENSAJE_CURSOS_ACTIVOS = ListarAuxiliaresEliminablesService::MOTIVO_CURSOS_ACTIVOS;
+
+    public const MENSAJE_CON_HISTORIAL = ListarAuxiliaresEliminablesService::MOTIVO_CON_HISTORIAL;
 
     /** Hora de inicio por defecto cuando el examen no la tiene (igual que Listar exámenes). */
     private const HORA_INICIO_POR_DEFECTO = '00:00:00';
@@ -82,6 +92,11 @@ class EliminarAuxiliarService
             throw ValidationException::withMessages(['auxiliar' => self::MENSAJE_NO_AUXILIAR]);
         }
 
+        $motivo = $this->motivoBloqueo((int) $auxiliar->id_usuario);
+        if ($motivo !== null) {
+            throw ValidationException::withMessages(['auxiliar' => $motivo]);
+        }
+
         if ($this->tieneExamenEnCurso((int) $auxiliar->id_usuario)) {
             throw ValidationException::withMessages(['auxiliar' => self::MENSAJE_EXAMEN_EN_CURSO]);
         }
@@ -107,6 +122,28 @@ class EliminarAuxiliarService
 
             $this->cerrarSesiones($id);
         });
+    }
+
+    /**
+     * Por que no se puede eliminar al auxiliar (null si no tiene nada
+     * asociado): cursos activos asignados, o cursos o examenes de antes. Una
+     * sola consulta.
+     */
+    private function motivoBloqueo(int $idAuxiliar): ?string
+    {
+        $fila = DB::selectOne(
+            'select exists (select 1 from auxiliar_curso ac join curso c on c.id_curso = ac.id_curso'
+            .' where ac.id_auxiliar = ? and ac.estado = ? and c.estado = ?) as activos,'
+            .' (exists (select 1 from auxiliar_curso where id_auxiliar = ?)'
+            .' or exists (select 1 from auxiliar_examen where id_auxiliar = ?)) as historial',
+            [$idAuxiliar, AccesoAuxiliarService::ESTADO_ACTIVO, \App\Enums\CursoEstado::EnCurso->value, $idAuxiliar, $idAuxiliar],
+        );
+
+        return match (true) {
+            (bool) $fila->activos => self::MENSAJE_CURSOS_ACTIVOS,
+            (bool) $fila->historial => self::MENSAJE_CON_HISTORIAL,
+            default => null,
+        };
     }
 
     /**
