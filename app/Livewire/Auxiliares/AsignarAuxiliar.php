@@ -12,13 +12,17 @@
  * sus asignaciones dentro de los cursos del docente y el boton "Asignar".
  * El modal asigna a un curso (ve Ingreso y Monitor en todos sus examenes) o a
  * un examen futuro, eligiendo que paginas ve (Ingreso, Monitor o las dos).
- * Cada asignacion se puede quitar.
+ * Las asignaciones se quitan en "Desvincular auxiliar".
  *
  * Los metodos que llama el modal devuelven el error a mostrar ('' si salio
  * bien) para que el modal quede abierto con el mensaje cuando algo falla.
  *
  * @changelog
  * - 2026-11-22  [Valery D. Ortuno P]  feat: creacion inicial (HU 24).
+ * - 2026-11-28  [Valery D. Ortuno P]  feat: al asignar a un curso el docente da
+ *   los permisos "Puede crear auxiliares" y "Puede asignar auxiliares";
+ *   reasignar el mismo curso solo actualiza esos permisos. Se quitan
+ *   `quitarCurso()` y `quitarExamen()`: eso se hace en "Desvincular auxiliar".
  *
  * @see  App\Services\Auxiliar\AsignarAuxiliarService
  * @see  App\Services\Auxiliar\ListarAsignacionesAuxiliaresService
@@ -61,13 +65,42 @@ class AsignarAuxiliar extends Component
             ->ejecutar($this->idDocenteObjetivo(), $this->idCoordinador());
     }
 
-    public function asignarCurso(int $idAuxiliar, int $idCurso): string
+    /**
+     * Asigna el auxiliar a un curso. Si quien asigna es un docente, ademas
+     * guarda los permisos de coordinador (crear y/o asignar auxiliares); si el
+     * auxiliar ya estaba en ese curso, solo se actualizan esos permisos.
+     */
+    public function asignarCurso(int $idAuxiliar, int $idCurso, bool $puedeCrear = false, bool $puedeAsignar = false): string
     {
-        return $this->ejecutar(function (AsignarAuxiliarService $servicio) use ($idAuxiliar, $idCurso): string {
-            $curso = $servicio->asignarCurso($this->idDocenteObjetivo(), $idAuxiliar, $idCurso, $this->idCoordinador());
+        return $this->ejecutar(function (AsignarAuxiliarService $servicio) use ($idAuxiliar, $idCurso, $puedeCrear, $puedeAsignar): string {
+            $nombre = $this->nombreAuxiliar($idAuxiliar);
+            $daPermisos = $this->idCoordinador() === null;
 
-            return 'Se asigno a '.$this->nombreAuxiliar($idAuxiliar).' al curso '.$curso.'. Vera Ingreso y Monitor en todos sus examenes.';
+            try {
+                $curso = $servicio->asignarCurso($this->idDocenteObjetivo(), $idAuxiliar, $idCurso, $this->idCoordinador());
+            } catch (ValidationException $error) {
+                // Ya estaba en el curso: si cambio algun permiso, se guarda.
+                $yaEstaba = in_array(AsignarAuxiliarService::MENSAJE_YA_EN_CURSO, collect($error->errors())->flatten()->all(), true);
+                if ($daPermisos && $yaEstaba && $servicio->actualizarPermisos($idAuxiliar, $puedeCrear, $puedeAsignar)) {
+                    return 'Se actualizaron los permisos de '.$nombre.'.';
+                }
+
+                throw $error;
+            }
+
+            if ($daPermisos) {
+                $servicio->actualizarPermisos($idAuxiliar, $puedeCrear, $puedeAsignar);
+            }
+
+            return 'Se asigno a '.$nombre.' al curso '.$curso.'. Podra ver Ingreso y Monitor de todos sus examenes.';
         });
+    }
+
+    /** Solo un docente da los permisos de coordinador. */
+    #[Computed]
+    public function esDocente(): bool
+    {
+        return $this->usuario()->esDocente();
     }
 
     public function asignarExamen(int $idAuxiliar, int $idExamen, bool $verIngreso, bool $verMonitor): string
@@ -78,24 +111,6 @@ class AsignarAuxiliar extends Component
 
             return ($resultado['actualizada'] ? 'Se actualizo la asignacion de ' : 'Se asigno a ')
                 .$this->nombreAuxiliar($idAuxiliar).' al examen. Vera '.$paginas.'.';
-        });
-    }
-
-    public function quitarCurso(int $idAuxiliar, int $idCurso): string
-    {
-        return $this->ejecutar(function (AsignarAuxiliarService $servicio) use ($idAuxiliar, $idCurso): string {
-            $servicio->quitarCurso($this->idDocenteObjetivo(), $idAuxiliar, $idCurso, $this->idCoordinador());
-
-            return 'Se quito la asignacion de '.$this->nombreAuxiliar($idAuxiliar).' al curso.';
-        });
-    }
-
-    public function quitarExamen(int $idAuxiliar, int $idExamen): string
-    {
-        return $this->ejecutar(function (AsignarAuxiliarService $servicio) use ($idAuxiliar, $idExamen): string {
-            $servicio->quitarExamen($this->idDocenteObjetivo(), $idAuxiliar, $idExamen, $this->idCoordinador());
-
-            return 'Se quito la asignacion de '.$this->nombreAuxiliar($idAuxiliar).' al examen.';
         });
     }
 

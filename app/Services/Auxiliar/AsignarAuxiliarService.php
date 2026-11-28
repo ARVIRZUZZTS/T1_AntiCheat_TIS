@@ -24,6 +24,9 @@
  *
  * @changelog
  * - 2026-11-22  [Valery D. Ortuno P]  feat: creacion inicial (HU 24).
+ * - 2026-11-28  [Valery D. Ortuno P]  feat: `actualizarPermisos()` (crear y/o
+ *   asignar auxiliares, lo da el docente al asignar a un curso); el coordinador
+ *   tambien puede asignar en los examenes que tiene asignados.
  *
  * @see  App\Livewire\Auxiliares\AsignarAuxiliar
  * @see  App\Services\Auxiliar\AccesoAuxiliarService
@@ -110,6 +113,27 @@ class AsignarAuxiliarService
 
             return (string) $curso->nombre_curso;
         });
+    }
+
+    /**
+     * Permisos de coordinador del auxiliar (solo los da un docente, al
+     * asignarlo a un curso): crear auxiliares y/o asignar auxiliares, siempre
+     * limitados a los auxiliares que el cree y a sus cursos y examenes.
+     *
+     * @return bool true si algun permiso cambio.
+     *
+     * @throws ValidationException
+     */
+    public function actualizarPermisos(int $idAuxiliar, bool $puedeCrear, bool $puedeAsignar): bool
+    {
+        $this->exigirAuxiliar($idAuxiliar);
+
+        return DB::table('usuario')
+            ->where('id_usuario', $idAuxiliar)
+            ->where(fn ($distinto) => $distinto
+                ->where('puede_crear_auxiliares', '!=', $puedeCrear)
+                ->orWhere('puede_asignar_auxiliares', '!=', $puedeAsignar))
+            ->update(['puede_crear_auxiliares' => $puedeCrear, 'puede_asignar_auxiliares' => $puedeAsignar]) > 0;
     }
 
     /**
@@ -273,12 +297,18 @@ class AsignarAuxiliarService
 
         $this->exigirNoSiMismo($idCoordinador, $idAuxiliar);
 
+        // Examen de un curso donde el coordinador es auxiliar, o examen que el
+        // coordinador tiene asignado.
         $asignado = DB::table('examen_curso as ec')
             ->join('auxiliar_curso as ac', 'ac.id_curso', '=', 'ec.id_curso')
             ->where('ec.id_examen', $idExamen)
             ->where('ac.id_auxiliar', $idCoordinador)
             ->where('ac.estado', AccesoAuxiliarService::ESTADO_ACTIVO)
-            ->exists();
+            ->exists()
+            || DB::table('auxiliar_examen')
+                ->where('id_examen', $idExamen)
+                ->where('id_auxiliar', $idCoordinador)
+                ->exists();
 
         if (! $asignado) {
             throw ValidationException::withMessages(['examen' => self::MENSAJE_FUERA_DE_ALCANCE]);
