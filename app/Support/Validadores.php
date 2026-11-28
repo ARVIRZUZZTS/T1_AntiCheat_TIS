@@ -32,13 +32,14 @@ use Illuminate\Validation\Rule;
 class Validadores
 {
     /**
-     * Reglas para nombre y apellido.
+     * Reglas para nombre y apellido. Se permiten letras (con tildes y ñ),
+     * espacios, apóstrofos y guiones (nombres como "D'Angelo" o "Saavedra-Lima").
      *
      * @return array<int, string>
      */
     public static function nombreApellido(): array
     {
-        return ['required', 'string', 'min:2', 'max:50', 'regex:/^[\p{L}\s]+$/u'];
+        return ['required', 'string', 'min:2', 'max:50', "regex:/^[\p{L}\s'\\-]+$/u"];
     }
 
     /**
@@ -52,28 +53,27 @@ class Validadores
     }
 
     /**
-     * Reglas para la contraseña.
+     * Reglas del alta de un auxiliar según su tipo. El código SIS es
+     * obligatorio para los de la UMSS; el carnet es opcional y solo aplica a los
+     * externos.
      *
-     * @return array<int, string>
-     */
-    public static function contrasena(): array
-    {
-        return ['required', 'string', 'min:8', 'max:50'];
-    }
-
-    /**
-     * Reglas completas para el alta de un auxiliar.
+     * @param  string  $tipo  'UMSS' o 'externo'.
      *
      * @return array<string, array<int, string>>
      */
-    public static function reglasAuxiliar(): array
+    public static function reglasAuxiliar(string $tipo): array
     {
+        $esUmss = $tipo === \App\Support\DTO\DatosNuevoAuxiliar::TIPO_UMSS;
+
         return [
             'nombre' => self::nombreApellido(),
             'apellido' => self::nombreApellido(),
-            'codSis' => self::codigoSis(),
-            'password' => self::contrasena(),
-            'idCurso' => ['required', 'integer'],
+            'tipoAuxiliar' => ['required', 'in:UMSS,externo'],
+            'codSis' => $esUmss ? self::codigoSis() : ['nullable'],
+            // El carnet (cédula) es opcional para cualquier tipo.
+            'carnet' => ['nullable', 'digits_between:6,8'],
+            'correo' => ['required', 'email', 'max:100'],
+            'puedeCrearAuxiliares' => ['boolean'],
         ];
     }
 
@@ -88,17 +88,19 @@ class Validadores
             'nombre.required' => 'El nombre es obligatorio.',
             'nombre.min' => 'El nombre debe tener al menos 2 letras.',
             'nombre.max' => 'El nombre no debe superar 50 caracteres.',
-            'nombre.regex' => 'El nombre solo puede contener letras.',
+            'nombre.regex' => 'El nombre solo admite letras, espacios, apóstrofos y guiones.',
             'apellido.required' => 'El apellido es obligatorio.',
             'apellido.min' => 'El apellido debe tener al menos 2 letras.',
             'apellido.max' => 'El apellido no debe superar 50 caracteres.',
-            'apellido.regex' => 'El apellido solo puede contener letras.',
+            'apellido.regex' => 'El apellido solo admite letras, espacios, apóstrofos y guiones.',
+            'tipoAuxiliar.required' => 'Elige el tipo de auxiliar.',
+            'tipoAuxiliar.in' => 'Elige el tipo de auxiliar.',
             'codSis.required' => 'El código SIS es obligatorio.',
             'codSis.digits' => 'El código SIS debe tener 9 dígitos numéricos.',
-            'password.required' => 'La contraseña es obligatoria.',
-            'password.min' => 'La contraseña debe tener al menos 8 caracteres.',
-            'password.max' => 'La contraseña no debe superar 50 caracteres.',
-            'idCurso.required' => 'Debe seleccionar un curso.',
+            'carnet.digits_between' => 'El carnet debe tener entre 6 y 8 dígitos.',
+            'correo.required' => 'El correo es obligatorio.',
+            'correo.email' => 'Ingresa un correo válido.',
+            'correo.max' => 'El correo no debe superar 100 caracteres.',
         ];
     }
 

@@ -67,7 +67,7 @@ utilizar ni modificar la base compartida:
 & C:\xampp\php\php.exe vendor/phpunit/phpunit/phpunit tests/Feature/Examenes/ListarExamenesCursoTest.php
 ```
 
-## Detalle y edición de un curso (HU #333, task #334)
+## Detalle de un curso (HU #333, task #334)
 
 Requieren sesión de docente (`web`, `auth:web`, `docente`) y que el curso
 pertenezca al docente autenticado. La ruta JSON usa el prefijo `/api` del
@@ -75,7 +75,7 @@ proyecto: `/cursos/{id}` sin prefijo ya es la vista HTML de detalle.
 
 ### `GET /api/cursos/{id}`
 
-Nombre de ruta: `api.cursos.detalle`. Precarga el formulario de edición.
+Nombre de ruta: `api.cursos.detalle`.
 
 `200`:
 
@@ -97,78 +97,6 @@ Nombre de ruta: `api.cursos.detalle`. Precarga el formulario de edición.
 formulario de alta) y `gestion_nombre` su etiqueta. `materia` y `grupo` se
 separan del nombre guardado con `App\Support\NombreCurso`.
 
-### `PUT /api/cursos/{id}`
-
-Nombre de ruta: `api.cursos.actualizar`. Request:
-
-```json
-{
-  "materia": "Calculo I",
-  "grupo": "2a",
-  "gestion": 3,
-  "anio": 2026
-}
-```
-
-`200` devuelve el curso ya guardado, con el nombre recalculado:
-
-```json
-{
-  "datos": {
-    "id": 12,
-    "materia": "Calculo I",
-    "grupo": "2A",
-    "gestion": 3,
-    "gestion_nombre": "Segundo semestre",
-    "anio": 2026,
-    "nombre": "Calculo I - Grupo 2A"
-  }
-}
-```
-
-Reglas: los cuatro campos son obligatorios; materia hasta 80 caracteres;
-grupo alfanumérico de 1 a 3 caracteres guardado en mayúsculas; gestión válida
-según el catálogo; año de cuatro cifras desde el año actual. Se recortan los
-espacios sobrantes antes de validar.
-
-`422` errores por campo, formato Laravel:
-
-```json
-{
-  "message": "The given data was invalid.",
-  "errors": {
-    "grupo": ["El grupo solo admite letras y numeros, hasta 3 caracteres."],
-    "gestion": ["Seleccione una gestion valida."]
-  }
-}
-```
-
-`409` cuando otro curso tiene la misma materia y grupo (sin distinguir
-mayúsculas) en la misma gestión y año, de cualquier docente, igual que en el
-alta. El curso que se edita se excluye de la búsqueda:
-
-```json
-{
-  "message": "Este curso ya existe en la gestión y el año elegidos.",
-  "errors": {
-    "materia": ["Este curso ya existe en la gestión y el año elegidos."],
-    "grupo": ["Este curso ya existe en la gestión y el año elegidos."],
-    "gestion": ["Este curso ya existe en la gestión y el año elegidos."],
-    "anio": ["Este curso ya existe en la gestión y el año elegidos."]
-  },
-  "campos": {
-    "materia": "Calculo I",
-    "grupo": "2",
-    "gestion": 3,
-    "anio": 2026
-  }
-}
-```
-
 `401` sin sesión, `403` si el curso es de otro docente y `404` si no existe.
-La comprobación de existencia y pertenencia va antes de validar los campos.
-La actualización toca solo `curso.nombre_curso` y su fila de
-`curso_tipo_gestion`; estudiantes, exámenes e incidencias quedan intactos.
 
-Pruebas: `php artisan test tests/Feature/Cursos/DetalleCursoTest.php`,
-`EditarCursoTest.php` y `EditarCursoDuplicadoTest.php`.
+Prueba: `php artisan test tests/Feature/Cursos/DetalleCursoTest.php`.

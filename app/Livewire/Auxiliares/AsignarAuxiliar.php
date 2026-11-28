@@ -26,6 +26,7 @@
 
 namespace App\Livewire\Auxiliares;
 
+use App\Models\Usuario;
 use App\Services\Auxiliar\AsignarAuxiliarService;
 use App\Services\Auxiliar\ListarAsignacionesAuxiliaresService;
 use Illuminate\Contracts\View\View;
@@ -37,19 +38,33 @@ class AsignarAuxiliar extends Component
 {
     public string $mensaje = '';
 
+    /** Auxiliar que llega preseleccionado desde "Asignar ahora" (o null). */
+    public ?int $auxiliarPreseleccionado = null;
+
+    /**
+     * "Asignar ahora" llega como `?auxiliar=<id>` en la URL. Livewire no pasa el
+     * query string a los argumentos de mount, así que se lee del request.
+     */
+    public function mount(): void
+    {
+        $id = (int) request()->query('auxiliar', 0);
+        $this->auxiliarPreseleccionado = $id > 0 ? $id : null;
+    }
+
     /**
      * @return array{auxiliares: list<array<string, mixed>>, cursos: list<array{id: int, nombre: string}>, examenes: list<array{id: int, etiqueta: string}>}
      */
     #[Computed]
     public function datos(): array
     {
-        return app(ListarAsignacionesAuxiliaresService::class)->ejecutar($this->idDocente());
+        return app(ListarAsignacionesAuxiliaresService::class)
+            ->ejecutar($this->idDocenteObjetivo(), $this->idCoordinador());
     }
 
     public function asignarCurso(int $idAuxiliar, int $idCurso): string
     {
         return $this->ejecutar(function (AsignarAuxiliarService $servicio) use ($idAuxiliar, $idCurso): string {
-            $curso = $servicio->asignarCurso($this->idDocente(), $idAuxiliar, $idCurso);
+            $curso = $servicio->asignarCurso($this->idDocenteObjetivo(), $idAuxiliar, $idCurso, $this->idCoordinador());
 
             return 'Se asigno a '.$this->nombreAuxiliar($idAuxiliar).' al curso '.$curso.'. Vera Ingreso y Monitor en todos sus examenes.';
         });
@@ -58,7 +73,7 @@ class AsignarAuxiliar extends Component
     public function asignarExamen(int $idAuxiliar, int $idExamen, bool $verIngreso, bool $verMonitor): string
     {
         return $this->ejecutar(function (AsignarAuxiliarService $servicio) use ($idAuxiliar, $idExamen, $verIngreso, $verMonitor): string {
-            $resultado = $servicio->asignarExamen($this->idDocente(), $idAuxiliar, $idExamen, $verIngreso, $verMonitor);
+            $resultado = $servicio->asignarExamen($this->idDocenteObjetivo(), $idAuxiliar, $idExamen, $verIngreso, $verMonitor, $this->idCoordinador());
             $paginas = $verIngreso && $verMonitor ? 'Ingreso y Monitor' : ($verIngreso ? 'solo Ingreso' : 'solo Monitor');
 
             return ($resultado['actualizada'] ? 'Se actualizo la asignacion de ' : 'Se asigno a ')
@@ -69,7 +84,7 @@ class AsignarAuxiliar extends Component
     public function quitarCurso(int $idAuxiliar, int $idCurso): string
     {
         return $this->ejecutar(function (AsignarAuxiliarService $servicio) use ($idAuxiliar, $idCurso): string {
-            $servicio->quitarCurso($this->idDocente(), $idAuxiliar, $idCurso);
+            $servicio->quitarCurso($this->idDocenteObjetivo(), $idAuxiliar, $idCurso, $this->idCoordinador());
 
             return 'Se quito la asignacion de '.$this->nombreAuxiliar($idAuxiliar).' al curso.';
         });
@@ -78,7 +93,7 @@ class AsignarAuxiliar extends Component
     public function quitarExamen(int $idAuxiliar, int $idExamen): string
     {
         return $this->ejecutar(function (AsignarAuxiliarService $servicio) use ($idAuxiliar, $idExamen): string {
-            $servicio->quitarExamen($this->idDocente(), $idAuxiliar, $idExamen);
+            $servicio->quitarExamen($this->idDocenteObjetivo(), $idAuxiliar, $idExamen, $this->idCoordinador());
 
             return 'Se quito la asignacion de '.$this->nombreAuxiliar($idAuxiliar).' al examen.';
         });
@@ -118,8 +133,34 @@ class AsignarAuxiliar extends Component
         return $auxiliar['nombre'] ?? 'el auxiliar';
     }
 
-    private function idDocente(): int
+    /**
+     * Docente cuyos cursos y examenes entran en juego: el propio usuario si es
+     * docente, o el docente responsable del coordinador que esta actuando.
+     */
+    private function idDocenteObjetivo(): int
     {
-        return (int) auth()->id();
+        $usuario = $this->usuario();
+
+        if ($usuario->esDocente()) {
+            return (int) $usuario->id_usuario;
+        }
+
+        return (int) ($usuario->id_docente_responsable ?? 0);
+    }
+
+    /** ID del coordinador cuando quien actua es un auxiliar con permiso; null si es docente. */
+    private function idCoordinador(): ?int
+    {
+        $usuario = $this->usuario();
+
+        return $usuario->esDocente() ? null : (int) $usuario->id_usuario;
+    }
+
+    private function usuario(): Usuario
+    {
+        $usuario = auth()->user();
+        abort_unless($usuario instanceof Usuario, 401);
+
+        return $usuario;
     }
 }

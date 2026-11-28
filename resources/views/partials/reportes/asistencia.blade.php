@@ -53,7 +53,7 @@
                 return null;
             }
             return {
-                examen: { tipo_examen: { nombre_tipo_examen: 'Examen Parcial' }, fecha: new Date().toISOString().slice(0,10), hora_inicio: '08:00' },
+                examen: { tipo_examen: { nombre_tipo_examen: 'Examen primer parcial' }, fecha: new Date().toISOString().slice(0,10), hora_inicio: '08:00' },
                 estudiantes: [
                     { sis: '20180001', nombre: 'Juan Carlos', apellido: 'Pérez López de Mendoza', aula: 'Aula 101 - Edificio A', hora_ingreso: '08:05', estado_asistencia: 'presente', registrador: 'Docente Titular', docente_cargo: 'Docente Titular' },
                     { sis: '20180002', nombre: 'María Fernanda', apellido: 'González Rodríguez', aula: 'Aula 101 - Edificio A', hora_ingreso: null, estado_asistencia: 'pendiente', registrador: null, docente_cargo: 'Docente Titular' },

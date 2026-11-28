@@ -11,6 +11,7 @@ use App\Models\Estudiante;
 use App\Models\EstudianteExamen;
 use App\Models\Examen;
 use App\Support\DTO\CargarListaEstudiantesResultado;
+use App\Support\DTO\CargarListaPrevia;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -25,7 +26,7 @@ use PhpOffice\PhpSpreadsheet\IOFactory;
  *
  * @created 2026-11-21
  *
- * @updated 2026-11-23
+ * @updated 2026-11-24
  *
  * @description
  * Carga una lista de estudiantes a un curso a partir de un archivo Excel o CSV.
@@ -33,7 +34,10 @@ use PhpOffice\PhpSpreadsheet\IOFactory;
  * datos), crea o actualiza los estudiantes, los inscribe en el curso y crea su
  * fila de habilitación en `estudiante_examen` para los exámenes del curso. Los
  * estudiantes reportados como tramposos en la central de riesgos se inscriben
- * como «deshabilitado»; el resto, como «habilitado».
+ * como «deshabilitado»; el resto, como «habilitado». La carga solo añade:
+ * los códigos SIS ya inscritos en el curso se ignoran (nunca se borra la
+ * lista previa); `previsualizar()` permite contar nuevos y repetidos antes
+ * de confirmar.
  *
  * El formato oficial del archivo es:
  * `#,Estudiante,Apellidos,Nombres,Carrera,1er PARCIAL,...,Resul. Final`, donde
@@ -47,6 +51,9 @@ use PhpOffice\PhpSpreadsheet\IOFactory;
  *   (estudiante/codigo_sis/cod_sis/sis) y escritura envuelta en transacción.
  * - 2026-11-23  [Equipo T1]  feat: tramposos de la central de riesgos quedan
  *   «deshabilitado» y modo reemplazo que vacía la lista previa del curso (HU 25).
+ * - 2026-11-24  [OchoaCesar]  feat: `previsualizar()` para contar nuevos y
+ *   repetidos antes de confirmar; se elimina el modo reemplazo: la carga solo
+ *   añade estudiantes e ignora los repetidos del curso (HU 25).
  *
  * @see  App\Livewire\Cursos\CargarCsv
  */
@@ -69,12 +76,12 @@ class CargarListaEstudiantesService
     ) {}
 
     /**
-     * Ejecuta la carga.
+     * Ejecuta la carga: añade al curso los estudiantes del archivo que aún no
+     * están inscritos e ignora los repetidos; nunca borra la lista previa.
      *
      * @param  Curso  $curso  Curso destino (ya autorizado por el caller).
      * @param  UploadedFile  $archivo  Archivo .xlsx/.xls/.csv.
      * @param  ?int  $idUsuarioModificador  Docente que realiza la carga.
-     * @param  bool  $reemplazar  Si vacía la lista previa del curso antes de inscribir la nueva.
      * @return CargarListaEstudiantesResultado Resumen de la operación.
      *
      * @throws InvalidArgumentException Si el archivo es inválido o no contiene estudiantes o columna SIS.
@@ -88,10 +95,64 @@ class CargarListaEstudiantesService
         Curso $curso,
         UploadedFile $archivo,
         ?int $idUsuarioModificador = null,
-        bool $reemplazar = false,
     ): CargarListaEstudiantesResultado {
         set_time_limit(300);
 
+        [$clasificadas, $sisList, $columnas] = $this->procesarArchivo($curso, $archivo);
+
+        return $this->persistir($curso, $clasificadas, $sisList, $columnas, $idUsuarioModificador);
+    }
+
+    /**
+     * Previsualiza un archivo contra el curso: cuenta cuántos de sus códigos
+     * SIS aún no están inscritos (nuevos) y cuántos ya lo están (repetidos),
+     * sin escribir en la base. Lanza las mismas excepciones que `ejecutar`.
+     *
+     * @param  Curso  $curso  Curso destino (ya autorizado por el caller).
+     * @param  UploadedFile  $archivo  Archivo .xlsx/.xls/.csv.
+     * @return CargarListaPrevia Conteo de nuevos y repetidos en el curso.
+     *
+     * @throws InvalidArgumentException Si el archivo es inválido o no contiene estudiantes o columna SIS.
+     * @throws ValidationException Si el curso está archivado.
+     *
+     * @author Equipo T1
+     *
+     * @since  2026-11-24
+     */
+    public function previsualizar(Curso $curso, UploadedFile $archivo): CargarListaPrevia
+    {
+        [, $sisList] = $this->procesarArchivo($curso, $archivo);
+
+        $existentes = DB::table('estudiante_curso')
+            ->where('id_curso', $curso->id_curso)
+            ->whereIn('sis_estudiante', $sisList)
+            ->pluck('sis_estudiante')
+            ->all();
+
+        return new CargarListaPrevia(
+            nuevos: count($sisList) - count($existentes),
+            repetidos: count($existentes),
+        );
+    }
+
+    /**
+     * Valida el archivo, lo lee y clasifica sus filas. Es el paso común de
+     * `previsualizar` y `ejecutar`: devuelve las filas clasificadas, la lista
+     * de códigos SIS válidos únicos y los índices de columnas.
+     *
+     * @param  Curso  $curso  Curso destino (para validar que sea editable).
+     * @param  UploadedFile  $archivo  Archivo .xlsx/.xls/.csv.
+     * @return array{0: array{validos: array<string, array<int, string>>, invalidos: list<string>, duplicados: list<string>}, 1: list<string>, 2: array{sis: int, nombre: ?int, apellido: ?int, carrera: ?int}}
+     *
+     * @throws InvalidArgumentException Si el archivo es inválido o no contiene estudiantes o columna SIS.
+     * @throws ValidationException Si el curso está archivado.
+     *
+     * @author Equipo T1
+     *
+     * @since  2026-11-24
+     */
+    private function procesarArchivo(Curso $curso, UploadedFile $archivo): array
+    {
         $extension = strtolower((string) $archivo->getClientOriginalExtension());
         if (! in_array($extension, ['xlsx', 'xls', 'csv'], true)) {
             throw new InvalidArgumentException('Formato de archivo no válido. Suba un archivo Excel o CSV.');
@@ -107,14 +168,14 @@ class CargarListaEstudiantesService
 
         $columnas = $this->detectarColumnas($encabezado, $filasDatos);
 
-        $validos = $this->clasificarFilas($filasDatos, $columnas['sis']);
-        $sisList = array_keys($validos['validos']);
+        $clasificadas = $this->clasificarFilas($filasDatos, $columnas['sis']);
+        $sisList = array_keys($clasificadas['validos']);
 
         if ($sisList === []) {
             throw new InvalidArgumentException('El archivo no contiene estudiantes.');
         }
 
-        return $this->persistir($curso, $validos, $sisList, $columnas, $idUsuarioModificador, $reemplazar);
+        return [$clasificadas, $sisList, $columnas];
     }
 
     /**
@@ -343,15 +404,14 @@ class CargarListaEstudiantesService
     }
 
     /**
-     * Escribe la lista en la base dentro de una transacción. En modo reemplazo,
-     * primero desvincula a los estudiantes previos del curso.
+     * Escribe la lista en la base dentro de una transacción: añade los
+     * estudiantes que aún no están en el curso e ignora los repetidos.
      *
      * @param  Curso  $curso  Curso destino.
      * @param  array{validos: array<string, array<int, string>>, invalidos: list<string>, duplicados: list<string>}  $clasificadas  Filas clasificadas.
      * @param  list<string>  $sisList  Códigos SIS válidos únicos.
      * @param  array{sis: int, nombre: ?int, apellido: ?int, carrera: ?int}  $columnas  Índices de columnas.
      * @param  ?int  $idUsuarioModificador  Docente que realiza la carga.
-     * @param  bool  $reemplazar  Si vacía la lista previa del curso.
      * @return CargarListaEstudiantesResultado Resumen de la operación.
      */
     private function persistir(
@@ -360,7 +420,6 @@ class CargarListaEstudiantesService
         array $sisList,
         array $columnas,
         ?int $idUsuarioModificador,
-        bool $reemplazar,
     ): CargarListaEstudiantesResultado {
         $validos = $clasificadas['validos'];
         $examenes = $curso->examenes()->with('configuracionesDocentes')->get();
@@ -371,15 +430,9 @@ class CargarListaEstudiantesService
             $sisList,
             $columnas,
             $idUsuarioModificador,
-            $reemplazar,
             $examenes,
             $clasificadas,
         ): CargarListaEstudiantesResultado {
-            if ($reemplazar) {
-                EstudianteExamen::query()->where('id_curso', $curso->id_curso)->delete();
-                DB::table('estudiante_curso')->where('id_curso', $curso->id_curso)->delete();
-            }
-
             $existentesEstudiantes = array_flip(
                 Estudiante::query()->whereIn('sis_estudiante', $sisList)->pluck('sis_estudiante')->all()
             );
@@ -421,7 +474,6 @@ class CargarListaEstudiantesService
                 estudianteExamenesCreados: $estudianteExamenesCreados,
                 habilitados: count($sisList) - $deshabilitados,
                 deshabilitados: $deshabilitados,
-                reemplazo: $reemplazar,
                 sisDuplicadosEnArchivo: $clasificadas['duplicados'],
                 sisInvalidos: $clasificadas['invalidos'],
             );

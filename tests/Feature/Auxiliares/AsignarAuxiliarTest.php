@@ -108,7 +108,7 @@ class AsignarAuxiliarTest extends TestCase
             ->assertSee('Ana Rojas')
             ->assertSee('Luis Perez')
             ->assertSee('Curso: Calculo I - Grupo 1')
-            ->assertSee('Examen: Examen parcial - Algebra I - Grupo 1 · 05/12/2026 08:15')
+            ->assertSee('Examen: Examen primer parcial - Algebra I - Grupo 1 · 05/12/2026 08:15')
             ->assertSee('Solo Ingreso')
             // El curso de Patricia no es asunto de Roberto.
             ->assertDontSee('Fisica - Grupo 3');
@@ -370,7 +370,7 @@ class AsignarAuxiliarTest extends TestCase
         $this->assertSame([self::PARCIAL_CALCULO, self::FINAL_CALCULO, self::PASADO_CALCULO], array_column($examenes, 'id'));
         $this->assertSame([
             'id' => self::PARCIAL_CALCULO,
-            'tipo' => 'Examen parcial',
+            'tipo' => 'Examen primer parcial',
             'cursos' => 'Calculo I - Grupo 1',
             'fecha' => '22/11/2026',
             'horario' => '14:00 - 15:30',
@@ -402,7 +402,7 @@ class AsignarAuxiliarTest extends TestCase
         $this->actingAs($this->usuario(self::LUIS))
             ->get(route('auxiliar.examenes'))
             ->assertOk()
-            ->assertSee('Examen parcial - Calculo I - Grupo 1')
+            ->assertSee('Examen primer parcial - Calculo I - Grupo 1')
             ->assertSee('Por el curso Calculo I - Grupo 1')
             ->assertSee('Proximos 2')
             ->assertSee('Finalizados 1')
@@ -437,6 +437,7 @@ class AsignarAuxiliarTest extends TestCase
             $tabla->string('nombre_usuario');
             $tabla->string('apellido');
             $tabla->string('nombre')->nullable();
+            $tabla->string('correo')->nullable();
             $tabla->string('estado_cuenta')->default('habilitada');
         });
         Schema::create('rol', function (Blueprint $tabla): void {
@@ -518,7 +519,7 @@ class AsignarAuxiliarTest extends TestCase
             ['id_curso' => self::ARCHIVADO, 'nombre_curso' => 'Fisica Vieja', 'sis_doc' => self::ROBERTO, 'estado' => 'Archivado'],
             ['id_curso' => self::AJENO, 'nombre_curso' => 'Fisica - Grupo 3', 'sis_doc' => self::PATRICIA, 'estado' => 'EnCurso'],
         ]);
-        DB::table('tipo_examen')->insert(['id_tipo_examen' => 1, 'nombre_tipo_examen' => 'examen parcial']);
+        DB::table('tipo_examen')->insert(['id_tipo_examen' => 1, 'nombre_tipo_examen' => 'examen primer parcial']);
 
         $examen = fn (int $id, string $fecha, string $hora): array => [
             'id_examen' => $id, 'fecha' => $fecha, 'hora_inicio' => $hora, 'duracion' => 90, 'creador' => self::ROBERTO, 'tipo_examen' => 1,

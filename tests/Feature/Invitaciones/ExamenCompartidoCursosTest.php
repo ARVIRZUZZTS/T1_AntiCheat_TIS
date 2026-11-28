@@ -120,7 +120,7 @@ class ExamenCompartidoCursosTest extends TestCase
             ->assertSet('examenes', fn (array $examenes): bool => array_map(
                 fn (array $examen): array => ['id' => $examen['id'], 'nombre' => $examen['nombre']],
                 $examenes,
-            ) === [['id' => self::NUEVO, 'nombre' => 'Examen parcial · 05/12/2026 08:15']]);
+            ) === [['id' => self::NUEVO, 'nombre' => 'Examen primer parcial · 05/12/2026 08:15']]);
     }
 
     public function test_busca_en_vivo_envia_y_muestra_el_resumen(): void
@@ -137,7 +137,7 @@ class ExamenCompartidoCursosTest extends TestCase
             ->call('enviar')
             ->assertSet('mensajeExito', 'Invitacion enviada con exito')
             ->assertSet('resumenEnvio', [
-                'examen' => 'Examen parcial · 05/12/2026 08:15',
+                'examen' => 'Examen primer parcial · 05/12/2026 08:15',
                 'curso' => 'Calculo I - Grupo 1',
                 'docente' => 'Patricia Rojas',
             ])
@@ -468,7 +468,7 @@ class ExamenCompartidoCursosTest extends TestCase
             ['id_curso' => self::FISICA_PATRICIA, 'nombre_curso' => 'Fisica I', 'sis_doc' => self::PATRICIA, 'estado' => 'EnCurso'],
             ['id_curso' => self::QUIMICA_PATRICIA, 'nombre_curso' => 'Quimica General', 'sis_doc' => self::PATRICIA, 'estado' => 'EnCurso'],
         ]);
-        DB::table('tipo_examen')->insert(['id_tipo_examen' => 1, 'nombre_tipo_examen' => 'examen parcial']);
+        DB::table('tipo_examen')->insert(['id_tipo_examen' => 1, 'nombre_tipo_examen' => 'examen primer parcial']);
         DB::table('examen')->insert([
             ['id_examen' => self::NUEVO, 'fecha' => '2026-12-05', 'hora_inicio' => '08:15:00', 'duracion' => 90, 'creador' => self::ROBERTO, 'tipo_examen' => 1],
             ['id_examen' => self::PASADO, 'fecha' => '2026-11-01', 'hora_inicio' => '08:15:00', 'duracion' => 90, 'creador' => self::ROBERTO, 'tipo_examen' => 1],

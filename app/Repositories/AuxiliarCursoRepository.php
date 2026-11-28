@@ -56,7 +56,37 @@ class AuxiliarCursoRepository
                 'u.id_usuario',
                 'u.cod_sis',
                 'u.nombre_usuario',
+                'u.nombre',
                 'u.apellido',
+                'u.correo',
+                'u.carnet',
+                'u.tipo_auxiliar',
+                'u.puede_crear_auxiliares',
+            ]);
+    }
+
+    /**
+     * Asignaciones a examenes sueltos dentro de los cursos del docente, una fila
+     * por (auxiliar, examen). Sirve para mostrar las asignaciones vigentes de la
+     * lista junto con las de curso.
+     *
+     * @param  int  $idDocente  ID del usuario docente (`curso.sis_doc`).
+     * @return Collection<int, \stdClass>
+     */
+    public function asignacionesExamen(int $idDocente): Collection
+    {
+        return DB::table('auxiliar_examen as ae')
+            ->join('examen as e', 'e.id_examen', '=', 'ae.id_examen')
+            ->join('examen_curso as ec', 'ec.id_examen', '=', 'e.id_examen')
+            ->join('curso as c', 'c.id_curso', '=', 'ec.id_curso')
+            ->leftJoin('tipo_examen as t', 't.id_tipo_examen', '=', 'e.tipo_examen')
+            ->where('c.sis_doc', $idDocente)
+            ->orderBy('e.fecha')
+            ->get([
+                'ae.id_auxiliar',
+                'e.id_examen',
+                'e.fecha',
+                't.nombre_tipo_examen',
             ]);
     }
 

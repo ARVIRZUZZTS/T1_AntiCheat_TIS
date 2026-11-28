@@ -25,20 +25,24 @@ use Livewire\WithFileUploads;
  *
  * @created 2026-11-21
  *
- * @updated 2026-11-23
+ * @updated 2026-11-24
  *
  * @description
  * Componente Livewire de la subopción «Cargar CSV» (HU 25). Reúne en una sola
  * pantalla el selector de curso (solo cursos activos y gestionables, al estilo
  * de «Habilitar estudiantes»), la zona de carga con arrastrar y soltar (visible
- * solo con un curso elegido) y el modal de confirmación de reemplazo cuando el
- * curso ya tiene estudiantes. Al terminar muestra el resumen en la misma
- * pantalla y descarta el archivo.
+ * solo con un curso elegido) y el modal de confirmación de adición cuando el
+ * curso ya tiene estudiantes: el archivo se previsualiza y el modal informa
+ * cuántos estudiantes nuevos se añadirán y cuántos repetidos se ignorarán
+ * (si no hay nuevos, avisa y no se realiza ningún cambio). Al terminar muestra
+ * el resumen en la misma pantalla y descarta el archivo.
  *
  * @changelog
  * - 2026-11-21  [Equipo T1]  feat: carga de lista de estudiantes por Excel/CSV (HU 25).
  * - 2026-11-23  [Equipo T1]  feat: selector de curso integrado, drag & drop y
  *   modal de reemplazo; el curso puede llegar preseleccionado por ?curso (HU 25).
+ * - 2026-11-24  [OchoaCesar]  feat: el modal de reemplazo pasa a ser de adición
+ *   con previsualización (nuevos/repetidos) y la carga solo añade estudiantes (HU 25).
  *
  * @see  App\Services\Curso\CargarListaEstudiantesService
  */
@@ -62,7 +66,11 @@ class CargarCsv extends Component
 
     public string $mensajeExito = '';
 
-    public bool $mostrarModalReemplazo = false;
+    public bool $mostrarModalAgregados = false;
+
+    public int $nuevosConteo = 0;
+
+    public int $repetidosConteo = 0;
 
     /**
      * Inicializa el componente. El curso puede llegar preseleccionado por la
@@ -97,7 +105,9 @@ class CargarCsv extends Component
         $this->archivo = null;
         $this->mensajeError = '';
         $this->mensajeExito = '';
-        $this->mostrarModalReemplazo = false;
+        $this->mostrarModalAgregados = false;
+        $this->nuevosConteo = 0;
+        $this->repetidosConteo = 0;
 
         if ($this->cursoId === null) {
             return;
@@ -133,8 +143,9 @@ class CargarCsv extends Component
     }
 
     /**
-     * Procesa la carga. Si el curso ya tiene estudiantes, abre el modal de
-     * confirmación en vez de guardar; si no, carga directamente.
+     * Procesa la carga. Si el curso ya tiene estudiantes, previsualiza el
+     * archivo (nuevos vs. repetidos) y abre el modal de confirmación de
+     * adición en vez de guardar; si no, carga directamente.
      *
      * @param  CargarListaEstudiantesService  $servicio  Servicio de carga.
      */
@@ -145,34 +156,62 @@ class CargarCsv extends Component
         $this->asegurarCursoValido($curso);
 
         if ($this->cursoTieneEstudiantes($curso)) {
-            $this->mostrarModalReemplazo = true;
+            try {
+                $previa = $servicio->previsualizar($curso, $this->archivo);
+            } catch (ValidationException $error) {
+                $this->mensajeError = $error->validator->errors()->first() ?: 'No se pudo leer el archivo.';
+
+                return;
+            } catch (InvalidArgumentException $error) {
+                $this->mensajeError = $error->getMessage();
+
+                return;
+            } catch (\Throwable) {
+                $this->mensajeError = 'No se pudo leer el archivo. Inténtalo de nuevo.';
+
+                return;
+            }
+
+            $this->mensajeError = '';
+            $this->nuevosConteo = $previa->nuevos;
+            $this->repetidosConteo = $previa->repetidos;
+            $this->mostrarModalAgregados = true;
 
             return;
         }
 
-        $this->procesar($servicio, $curso, reemplazar: false);
+        $this->procesar($servicio, $curso);
     }
 
     /**
-     * Confirma el reemplazo total de la lista anterior desde el modal.
+     * Confirma la adición de los estudiantes nuevos desde el modal. Si el
+     * archivo no trae ninguno nuevo, solo cierra el modal: no se sube nada.
      *
      * @param  CargarListaEstudiantesService  $servicio  Servicio de carga.
      */
-    public function confirmarReemplazo(CargarListaEstudiantesService $servicio): void
+    public function confirmarAgregacion(CargarListaEstudiantesService $servicio): void
     {
+        if ($this->nuevosConteo === 0) {
+            $this->cancelarAgregacion();
+
+            return;
+        }
+
         $this->validate();
         $curso = $this->cursoSeleccionado();
         $this->asegurarCursoValido($curso);
 
-        $this->procesar($servicio, $curso, reemplazar: true);
+        $this->procesar($servicio, $curso);
     }
 
     /**
-     * Cierra el modal de reemplazo sin tocar la base de datos.
+     * Cierra el modal de adición sin tocar la base de datos.
      */
-    public function cancelarReemplazo(): void
+    public function cancelarAgregacion(): void
     {
-        $this->mostrarModalReemplazo = false;
+        $this->mostrarModalAgregados = false;
+        $this->nuevosConteo = 0;
+        $this->repetidosConteo = 0;
     }
 
     /**
@@ -183,7 +222,9 @@ class CargarCsv extends Component
         $this->archivo = null;
         $this->mensajeError = '';
         $this->mensajeExito = '';
-        $this->mostrarModalReemplazo = false;
+        $this->mostrarModalAgregados = false;
+        $this->nuevosConteo = 0;
+        $this->repetidosConteo = 0;
     }
 
     public function render(): mixed
@@ -192,29 +233,31 @@ class CargarCsv extends Component
     }
 
     /**
-     * Ejecuta la carga, arma el banner de resumen y redirige a «Ver estudiantes».
+     * Ejecuta la carga, arma el banner de resumen y cierra el modal si estaba
+     * abierto. La carga solo añade estudiantes; los repetidos se ignoran.
      *
      * @param  CargarListaEstudiantesService  $servicio  Servicio de carga.
      * @param  Curso  $curso  Curso destino.
-     * @param  bool  $reemplazar  Si reemplaza la lista anterior.
      */
-    private function procesar(CargarListaEstudiantesService $servicio, Curso $curso, bool $reemplazar): void
+    private function procesar(CargarListaEstudiantesService $servicio, Curso $curso): void
     {
         try {
-            $resultado = $servicio->ejecutar($curso, $this->archivo, (int) auth()->id(), $reemplazar);
+            $resultado = $servicio->ejecutar($curso, $this->archivo, (int) auth()->id());
 
             $this->archivo = null;
             $this->mensajeError = '';
-            $this->mostrarModalReemplazo = false;
+            $this->mostrarModalAgregados = false;
+            $this->nuevosConteo = 0;
+            $this->repetidosConteo = 0;
             $this->mensajeExito = $this->resumen($resultado);
         } catch (ValidationException $error) {
-            $this->mostrarModalReemplazo = false;
+            $this->mostrarModalAgregados = false;
             $this->mensajeError = $error->validator->errors()->first() ?: 'No se pudo completar la carga.';
         } catch (InvalidArgumentException $error) {
-            $this->mostrarModalReemplazo = false;
+            $this->mostrarModalAgregados = false;
             $this->mensajeError = $error->getMessage();
         } catch (\Throwable) {
-            $this->mostrarModalReemplazo = false;
+            $this->mostrarModalAgregados = false;
             $this->mensajeError = 'No se pudo completar la carga. Inténtalo de nuevo.';
         }
     }
@@ -223,19 +266,17 @@ class CargarCsv extends Component
      * Resumen legible de la carga para el banner de éxito.
      *
      * @param  CargarListaEstudiantesResultado  $resultado  Resultado de la carga.
-     * @return string Mensaje con inscritos, habilitados, deshabilitados, duplicados y omitidos.
+     * @return string Mensaje con añadidos, habilitados, deshabilitados, repetidos, duplicados y omitidos.
      */
     private function resumen(CargarListaEstudiantesResultado $resultado): string
     {
-        $inscritos = $resultado->inscripcionesNuevas + $resultado->yaInscritos;
-
         return sprintf(
-            '%s %d estudiante(s): %d habilitado(s), %d deshabilitado(s) por la central de riesgos. '
-            .'Duplicados en el archivo: %d. Filas omitidas: %d.',
-            $resultado->reemplazo ? 'Se reemplazó la lista con' : 'Se inscribieron',
-            $inscritos,
+            'Se añadieron %d estudiante(s) nuevo(s): %d habilitado(s), %d deshabilitado(s) por la central de riesgos. '
+            .'Repetidos ignorados: %d. Duplicados en el archivo: %d. Filas omitidas: %d.',
+            $resultado->inscripcionesNuevas,
             $resultado->habilitados,
             $resultado->deshabilitados,
+            $resultado->yaInscritos,
             count($resultado->sisDuplicadosEnArchivo),
             count($resultado->sisInvalidos),
         );

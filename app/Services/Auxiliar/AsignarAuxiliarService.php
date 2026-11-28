@@ -54,15 +54,25 @@ class AsignarAuxiliarService
 
     public const MENSAJE_NO_EXISTE = 'Esa asignacion ya no existe.';
 
+    public const MENSAJE_NO_A_SI_MISMO = 'No puedes asignarte a ti mismo.';
+
+    public const MENSAJE_FUERA_DE_ALCANCE = 'Solo puedes asignar en los cursos y examenes en los que estas asignado.';
+
     /**
+     * @param  int       $idDocente      Docente dueño de los cursos/examenes.
+     * @param  int       $idAuxiliar     Auxiliar al que se asigna.
+     * @param  int       $idCurso        Curso a asignar.
+     * @param  int|null  $idCoordinador  Coordinador que actua (null si es el docente).
+     *
      * @return string Nombre del curso asignado.
      *
      * @throws ValidationException
      */
-    public function asignarCurso(int $idDocente, int $idAuxiliar, int $idCurso): string
+    public function asignarCurso(int $idDocente, int $idAuxiliar, int $idCurso, ?int $idCoordinador = null): string
     {
-        return DB::transaction(function () use ($idDocente, $idAuxiliar, $idCurso): string {
+        return DB::transaction(function () use ($idDocente, $idAuxiliar, $idCurso, $idCoordinador): string {
             $this->exigirAuxiliar($idAuxiliar);
+            $this->exigirAlcanceCurso($idCoordinador, $idAuxiliar, $idCurso);
 
             $curso = DB::table('curso')
                 ->where('id_curso', $idCurso)
@@ -107,14 +117,15 @@ class AsignarAuxiliarService
      *
      * @throws ValidationException
      */
-    public function asignarExamen(int $idDocente, int $idAuxiliar, int $idExamen, bool $verIngreso, bool $verMonitor): array
+    public function asignarExamen(int $idDocente, int $idAuxiliar, int $idExamen, bool $verIngreso, bool $verMonitor, ?int $idCoordinador = null): array
     {
         if (! $verIngreso && ! $verMonitor) {
             throw ValidationException::withMessages(['paginas' => self::MENSAJE_SIN_PAGINA]);
         }
 
-        return DB::transaction(function () use ($idDocente, $idAuxiliar, $idExamen, $verIngreso, $verMonitor): array {
+        return DB::transaction(function () use ($idDocente, $idAuxiliar, $idExamen, $verIngreso, $verMonitor, $idCoordinador): array {
             $this->exigirAuxiliar($idAuxiliar);
+            $this->exigirAlcanceExamen($idCoordinador, $idAuxiliar, $idExamen);
 
             $ahora = now();
             $examenValido = DB::table('examen as e')
@@ -179,8 +190,10 @@ class AsignarAuxiliarService
      *
      * @throws ValidationException
      */
-    public function quitarCurso(int $idDocente, int $idAuxiliar, int $idCurso): void
+    public function quitarCurso(int $idDocente, int $idAuxiliar, int $idCurso, ?int $idCoordinador = null): void
     {
+        $this->exigirAlcanceCurso($idCoordinador, $idAuxiliar, $idCurso);
+
         $filas = DB::table('auxiliar_curso')
             ->where('id_auxiliar', $idAuxiliar)
             ->where('id_curso', $idCurso)
@@ -201,8 +214,10 @@ class AsignarAuxiliarService
      *
      * @throws ValidationException
      */
-    public function quitarExamen(int $idDocente, int $idAuxiliar, int $idExamen): void
+    public function quitarExamen(int $idDocente, int $idAuxiliar, int $idExamen, ?int $idCoordinador = null): void
     {
+        $this->exigirAlcanceExamen($idCoordinador, $idAuxiliar, $idExamen);
+
         $filas = DB::table('auxiliar_examen')
             ->where('id_auxiliar', $idAuxiliar)
             ->where('id_examen', $idExamen)
@@ -215,6 +230,66 @@ class AsignarAuxiliarService
 
         if ($filas === 0) {
             throw ValidationException::withMessages(['asignacion' => self::MENSAJE_NO_EXISTE]);
+        }
+    }
+
+    /**
+     * Si actua un coordinador: no puede asignarse a si mismo y el curso debe ser
+     * uno en el que el coordinador tiene asignacion activa. Sin coordinador (lo
+     * hace el docente) no aplica ninguna restriccion extra.
+     *
+     * @throws ValidationException
+     */
+    private function exigirAlcanceCurso(?int $idCoordinador, int $idAuxiliar, int $idCurso): void
+    {
+        if ($idCoordinador === null) {
+            return;
+        }
+
+        $this->exigirNoSiMismo($idCoordinador, $idAuxiliar);
+
+        $asignado = DB::table('auxiliar_curso')
+            ->where('id_auxiliar', $idCoordinador)
+            ->where('id_curso', $idCurso)
+            ->where('estado', AccesoAuxiliarService::ESTADO_ACTIVO)
+            ->exists();
+
+        if (! $asignado) {
+            throw ValidationException::withMessages(['curso' => self::MENSAJE_FUERA_DE_ALCANCE]);
+        }
+    }
+
+    /**
+     * Si actua un coordinador: no puede asignarse a si mismo y el examen debe
+     * pertenecer a un curso en el que el coordinador esta asignado.
+     *
+     * @throws ValidationException
+     */
+    private function exigirAlcanceExamen(?int $idCoordinador, int $idAuxiliar, int $idExamen): void
+    {
+        if ($idCoordinador === null) {
+            return;
+        }
+
+        $this->exigirNoSiMismo($idCoordinador, $idAuxiliar);
+
+        $asignado = DB::table('examen_curso as ec')
+            ->join('auxiliar_curso as ac', 'ac.id_curso', '=', 'ec.id_curso')
+            ->where('ec.id_examen', $idExamen)
+            ->where('ac.id_auxiliar', $idCoordinador)
+            ->where('ac.estado', AccesoAuxiliarService::ESTADO_ACTIVO)
+            ->exists();
+
+        if (! $asignado) {
+            throw ValidationException::withMessages(['examen' => self::MENSAJE_FUERA_DE_ALCANCE]);
+        }
+    }
+
+    /** @throws ValidationException */
+    private function exigirNoSiMismo(int $idCoordinador, int $idAuxiliar): void
+    {
+        if ($idCoordinador === $idAuxiliar) {
+            throw ValidationException::withMessages(['auxiliar' => self::MENSAJE_NO_A_SI_MISMO]);
         }
     }
 
