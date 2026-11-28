@@ -13,7 +13,7 @@
  *  - Enviar: solo cursos activos propios con examenes programados, solo
  *    examenes futuros con fecha y
  *    hora (incluido uno recien creado), busqueda en vivo, resumen del envio,
- *    duplicado y cancelar una pendiente. Solo el anfitrion invita y no se
+ *    duplicado y la lista de invitaciones del examen (sin cancelar). Solo el anfitrion invita y no se
  *    ofrece a quien ya comparte el examen.
  *  - Aceptar eligiendo los cursos del invitado en el mismo paso: el examen
  *    queda en esos cursos (`examen_curso`) con sus estudiantes inscritos bajo
@@ -35,6 +35,9 @@
  *   y materiales (las del examen); aceptar ya no las copia.
  * - 2026-11-23  [Valery D. Ortuno P]  test: solo el anfitrion invita y no se
  *   ofrece ni se invita a quien ya comparte el examen.
+ * - 2026-11-28  [Valery D. Ortuno P]  test: ya no se cancela una invitacion
+ *   enviada; la lista del examen muestra su estado sin "Cancelar".
+ *   `notificacion_docente.fecha_lectura` en el esquema sqlite.
  * - 2026-11-23  [Valery D. Ortuno P]  test: rechazar y cancelar devuelven el
  *   error para el modal (los avisos son modales de la vista).
  *
@@ -163,7 +166,7 @@ class ExamenCompartidoCursosTest extends TestCase
             ->assertSet('mensajeError', EnviarInvitacionExamenService::MENSAJE_DUPLICADA);
     }
 
-    public function test_el_que_invita_cancela_una_pendiente(): void
+    public function test_las_invitaciones_del_examen_se_ven_sin_opcion_de_cancelar(): void
     {
         $this->invitar();
 
@@ -171,11 +174,13 @@ class ExamenCompartidoCursosTest extends TestCase
             ->test(Index::class, ['tab' => 'enviar'])
             ->set('idCurso', self::CALCULO_ROBERTO)
             ->set('idExamen', self::NUEVO)
-            ->call('cancelar', self::INVITACION)
-            // El aviso "Invitacion cancelada." es un modal de la vista.
-            ->assertReturned('');
+            ->assertSee('Invitaciones de este examen')
+            ->assertSee('Pendiente')
+            ->assertDontSee('Cancelar invitacion');
 
-        $this->assertSame(['cancelado'], array_column($componente->get('enviadas'), 'estado'));
+        // Una invitacion enviada no se cancela: la responde el invitado.
+        $this->assertSame(['pendiente'], array_column($componente->get('enviadas'), 'estado'));
+        $this->assertFalse(method_exists(Index::class, 'cancelar'));
     }
 
     public function test_aceptar_asocia_el_examen_a_los_cursos_elegidos_con_sus_estudiantes(): void
@@ -445,6 +450,8 @@ class ExamenCompartidoCursosTest extends TestCase
                 $t->string('estado')->nullable();
                 $t->boolean('oculta')->default(false);
                 $t->timestamp('fecha')->nullable();
+                // Lo agrego "fix: notificaciones" (marcado de leidas).
+                $t->timestamp('fecha_lectura')->nullable();
             },
         ];
 
