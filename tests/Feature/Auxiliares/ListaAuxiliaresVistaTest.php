@@ -64,17 +64,18 @@ class ListaAuxiliaresVistaTest extends TestCase
         DB::table('auxiliar_curso')->insert(['id_auxiliar' => self::AUX_ASIGNADO, 'id_curso' => self::CURSO, 'estado' => 'Activo']);
     }
 
-    public function test_la_lista_muestra_usuario_carnet_correo_asignaciones_y_coordinador(): void
+    public function test_la_lista_muestra_solo_nombre_correo_usuario_y_ver_detalle(): void
     {
         $this->actingAs(Usuario::findOrFail(self::DOCENTE));
 
         Livewire::test(GestionAuxiliares::class)
             ->assertSee('Ana Maria Perez Lopez')
             ->assertSee('auxa@ejemplo.com')
-            ->assertSee('Curso: Calculo I')
-            ->assertSee('Coordinador')
-            ->assertSee('5551234')
-            ->assertSee('coordb@ejemplo.com')
+            ->assertSee('Ana')
+            ->assertSee('Ver detalle')
+            ->assertDontSee('Curso: Calculo I')
+            ->assertDontSee('5551234')
+            ->assertDontSee('Coordinador')
             // El reenvío se moverá a "Editar auxiliar"; ya no está en la lista.
             ->assertDontSee('Reenviar credenciales');
     }
@@ -124,9 +125,7 @@ class ListaAuxiliaresVistaTest extends TestCase
         $this->actingAs(Usuario::findOrFail(self::DOCENTE));
 
         Livewire::test(GestionAuxiliares::class)
-            ->assertSee('202300001')
-            ->assertSee('Tipo: UMSS')
-            ->assertSee('Curso: '.$etiqueta)
+            ->assertDontSee('Curso: '.$etiqueta)
             ->call('verDetalle', self::AUX_ASIGNADO)
             ->assertSee($etiqueta);
     }

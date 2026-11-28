@@ -92,48 +92,21 @@
             // Celdas largas (usuario, correo, asignaciones) con ancho acotado y
             // quiebre de texto para que la tabla no desborde el ancho.
             $filas = $auxiliares->map(function (array $a) {
-                $badge = $a['coordinador']
-                    ? '<span class="ms-2 inline-flex items-center rounded-full bg-brand-softer px-2 py-0.5 text-xs font-medium text-fg-brand align-middle">Coordinador</span>'
-                    : '';
-                $datos = [];
-                if ($a['tipo'] !== '') {
-                    $datos[] = 'Tipo: '.e($a['tipo']);
-                }
-                if ($a['codigoSis'] !== '') {
-                    $datos[] = 'Código: '.e($a['codigoSis']);
-                }
-                $datosHtml = $datos === []
-                    ? ''
-                    : '<span class="mt-0.5 block text-xs text-body-subtle">'.implode(' · ', $datos).'</span>';
-                $nombreHtml = '<span class="font-medium text-heading break-words">'.e($a['nombreCompleto']).'</span>'.$badge.$datosHtml;
-
-                $usuarioHtml = '<span class="break-all">'.e($a['usuario']).'</span>';
-                $correoHtml = '<span class="break-all">'.($a['correo'] !== '' ? e($a['correo']) : '—').'</span>';
-
-                $asignaciones = array_merge(
-                    array_map(fn (string $c): string => 'Curso: '.e($c), $a['cursos']),
-                    array_map(fn (string $x): string => 'Examen: '.e($x), $a['examenes']),
-                );
-                $asignacionesHtml = $asignaciones === []
-                    ? '<span class="text-muted">Sin asignaciones</span>'
-                    : '<ul class="space-y-0.5">'.implode('', array_map(fn (string $t): string => '<li>'.$t.'</li>', $asignaciones)).'</ul>';
+                $contactoHtml = '<span class="block break-all">'.($a['correo'] !== '' ? e($a['correo']) : '—').'</span>'
+                    .'<span class="mt-0.5 block text-xs text-body-subtle">'.e($a['usuario']).'</span>';
 
                 $verDetalle = '<button type="button" wire:click="verDetalle('.$a['id'].')" aria-label="Ver detalle de '.e($a['nombreCompleto']).'" aria-haspopup="dialog" class="inline-flex min-h-11 shrink-0 items-center px-2 text-sm font-medium text-fg-brand underline-offset-2 hover:underline focus:rounded-base focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-medium">Ver detalle</button>';
 
                 return [
-                    ['html' => '<div class="min-w-[9rem] max-w-[14rem]">'.$nombreHtml.'</div>'],
-                    ['html' => '<div class="max-w-[12rem]">'.$usuarioHtml.'</div>'],
-                    $a['carnet'] !== '' ? $a['carnet'] : '—',
-                    ['html' => '<div class="max-w-[14rem]">'.$correoHtml.'</div>'],
-                    ['html' => '<div class="max-w-[16rem]">'.$asignacionesHtml.'</div>'],
-                    $a['estadoEtiqueta'],
+                    ['html' => '<div class="min-w-[9rem] max-w-[14rem]"><span class="font-medium text-heading break-words">'.e($a['nombreCompleto']).'</span></div>'],
+                    ['html' => '<div class="max-w-[16rem]">'.$contactoHtml.'</div>'],
                     ['html' => $verDetalle],
                 ];
             })->toArray();
         @endphp
 
         <x-ui.table compact empty="No hay auxiliares registrados"
-            :headers="['Auxiliar', 'Usuario', 'Carnet', 'Correo', 'Asignaciones', 'Estado', 'Acciones']"
+            :headers="['Auxiliar', 'Correo / usuario', 'Acciones']"
             :rows="$filas" />
     </div>
 
