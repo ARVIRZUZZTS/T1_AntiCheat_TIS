@@ -32,6 +32,7 @@
 
 namespace App\Repositories;
 
+use App\Enums\EstadoCuenta;
 use App\Models\Rol;
 use App\Services\Auxiliar\AccesoAuxiliarService;
 use Illuminate\Support\Collection;
@@ -50,6 +51,8 @@ class AuxiliarCursoRepository
             ->join('rol_usuario as ru', 'ru.id_usuario', '=', 'u.id_usuario')
             ->join('rol as r', 'r.id_rol', '=', 'ru.id_rol')
             ->where('r.nombre_rol', Rol::NOMBRE_AUXILIAR)
+            // Los auxiliares eliminados (borrado lógico) salen de toda lista.
+            ->where('u.estado_cuenta', '!=', EstadoCuenta::Eliminada->value)
             ->orderBy('u.apellido')
             ->orderBy('u.nombre_usuario')
             ->get([

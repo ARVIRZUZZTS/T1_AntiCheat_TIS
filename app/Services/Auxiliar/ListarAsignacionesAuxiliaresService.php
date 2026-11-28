@@ -46,6 +46,7 @@
 namespace App\Services\Auxiliar;
 
 use App\Enums\CursoEstado;
+use App\Enums\EstadoCuenta;
 use App\Models\Rol;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -72,6 +73,8 @@ class ListarAsignacionesAuxiliaresService
             ->join('rol_usuario as ru', 'ru.id_usuario', '=', 'u.id_usuario')
             ->join('rol as r', 'r.id_rol', '=', 'ru.id_rol')
             ->where('r.nombre_rol', Rol::NOMBRE_AUXILIAR)
+            // Los auxiliares eliminados (borrado lógico) no se pueden asignar.
+            ->where('u.estado_cuenta', '!=', EstadoCuenta::Eliminada->value)
             // Un coordinador no puede asignarse a si mismo: no aparece en la lista.
             ->when($idCoordinador !== null, fn ($consulta) => $consulta->where('u.id_usuario', '!=', $idCoordinador))
             ->selectRaw('u.id_usuario as id, u.cod_sis as sis, '.self::USUARIO.' as usuario, '.self::NOMBRE_USUARIO.' as nombre')
