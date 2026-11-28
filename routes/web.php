@@ -137,6 +137,7 @@ use App\Livewire\Auxiliares\GestionAuxiliares;
 use App\Livewire\Cursos\ArchivarRestaurarCurso;
 use App\Livewire\Examenes\EstudiantesCurso;
 use App\Livewire\Invitaciones\Index as InvitacionesIndex;
+use App\Enums\CursoEstado;
 use App\Livewire\Monitoreo\AccesoMonitor;
 use App\Livewire\Monitoreo\MonitorEnVivo;
 use App\Models\Curso;
