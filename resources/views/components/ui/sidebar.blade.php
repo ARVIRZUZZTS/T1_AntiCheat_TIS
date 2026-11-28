@@ -12,6 +12,7 @@
     @updated 2026-11-22
     @updated 2026-11-23
     @updated 2026-11-24
+    @updated 2026-11-28
 
     @description
     Sidebar de navegacion del panel, en formato acordeon. Cada seccion
@@ -101,6 +102,8 @@
       retirar la opcion de editar cursos.
     - 2026-11-27  [Alisson D. Alvarado <alvaradoalissondalet@gmail.com>]  feat:
       agregar la opcion de desvincular auxiliares por curso.
+    - 2026-11-28  [Valery D. Ortuno P]  refactor: "Eliminar auxiliar" va debajo de
+      "Crear auxiliar" en el grupo Auxiliares (docente y auxiliar con permiso).
 --}}
 
 
@@ -194,8 +197,8 @@
         ['label' => 'Auxiliares', 'children' => [
             ['label' => 'Ver auxiliares', 'route' => 'auxiliares'],
             ['label' => 'Crear auxiliar', 'route' => 'auxiliares.crear'],
-            ['label' => 'Asignar auxiliar', 'route' => 'auxiliares.asignar'],
             ['label' => 'Eliminar auxiliar', 'route' => 'auxiliares.eliminar'],
+            ['label' => 'Asignar auxiliar', 'route' => 'auxiliares.asignar'],
             ['label' => 'Desvincular auxiliar', 'route' => 'auxiliares.desvincular'],
         ]],
         // Validacion del registro de docentes (HU 26): el contador muestra las
@@ -240,8 +243,8 @@
         // Coordinador: un auxiliar con permiso crea y asigna auxiliares.
         $usuario && $usuario->puede_crear_auxiliares ? ['label' => 'Auxiliares', 'children' => [
             ['label' => 'Crear auxiliar', 'route' => 'auxiliares.crear'],
-            ['label' => 'Asignar auxiliar', 'route' => 'auxiliares.asignar'],
             ['label' => 'Eliminar auxiliar', 'route' => 'auxiliares.eliminar'],
+            ['label' => 'Asignar auxiliar', 'route' => 'auxiliares.asignar'],
         ]] : null,
     ]));
 
