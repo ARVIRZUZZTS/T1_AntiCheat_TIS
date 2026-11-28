@@ -28,6 +28,7 @@ use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -103,5 +104,40 @@ class ListaAuxiliaresVistaTest extends TestCase
             ->set('busqueda', 'coordb@ejemplo.com')
             ->assertSee('Beto Gomez')
             ->assertDontSee('Ana Maria Perez Lopez');
+    }
+
+    public function test_la_lista_y_el_detalle_muestran_gestion_tipo_y_codigo_sis(): void
+    {
+        $idGestion = (int) DB::table('tipo_gestion')->value('id_tipo_gestion');
+        $nombreGestion = Str::ucfirst((string) DB::table('tipo_gestion')
+            ->where('id_tipo_gestion', $idGestion)
+            ->value('nombre_tipo_gestion'));
+        $anio = now()->year;
+        $etiqueta = 'Calculo I - '.$nombreGestion.' '.$anio;
+
+        DB::table('curso_tipo_gestion')->insert([
+            'id_curso' => self::CURSO,
+            'id_tg' => $idGestion,
+            'anio' => $anio,
+        ]);
+
+        $this->actingAs(Usuario::findOrFail(self::DOCENTE));
+
+        Livewire::test(GestionAuxiliares::class)
+            ->assertSee('202300001')
+            ->assertSee('Tipo: UMSS')
+            ->assertSee('Curso: '.$etiqueta)
+            ->call('verDetalle', self::AUX_ASIGNADO)
+            ->assertSee($etiqueta);
+    }
+
+    public function test_la_busqueda_encuentra_por_tipo_de_auxiliar(): void
+    {
+        $this->actingAs(Usuario::findOrFail(self::DOCENTE));
+
+        Livewire::test(GestionAuxiliares::class)
+            ->set('busqueda', 'umss')
+            ->assertSee('Ana Maria Perez Lopez')
+            ->assertDontSee('Beto Gomez');
     }
 }

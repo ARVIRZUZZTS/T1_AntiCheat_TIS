@@ -25,6 +25,8 @@
 
 namespace App\Support;
 
+use Illuminate\Support\Str;
+
 final class NombreCurso
 {
     private const SEPARADOR = ' - Grupo ';
@@ -38,10 +40,10 @@ final class NombreCurso
      * Materia del curso: "Calculo I - Grupo 2" -> "Calculo I".
      *
      * @param  string  $nombreCurso  Nombre completo del curso.
-     *
-     * @return string  La materia, o el nombre entero si no trae grupo.
+     * @return string La materia, o el nombre entero si no trae grupo.
      *
      * @author Valery D. Ortuno P <valerydariana98@gmail.com>
+     *
      * @since  2026-10-24
      */
     public static function materia(string $nombreCurso): string
@@ -55,10 +57,10 @@ final class NombreCurso
      * Grupo del curso: "Calculo I - Grupo 2" -> "2".
      *
      * @param  string  $nombreCurso  Nombre completo del curso.
-     *
-     * @return ?string  El grupo, o null si el nombre no trae grupo.
+     * @return ?string El grupo, o null si el nombre no trae grupo.
      *
      * @author Valery D. Ortuno P <valerydariana98@gmail.com>
+     *
      * @since  2026-10-24
      */
     public static function grupo(string $nombreCurso): ?string
@@ -68,5 +70,17 @@ final class NombreCurso
         return $posicion === false
             ? null
             : mb_substr($nombreCurso, $posicion + mb_strlen(self::SEPARADOR));
+    }
+
+    public static function conGestion(string $nombreCurso, ?string $tipoGestion, int|string|null $anio): string
+    {
+        $tipo = $tipoGestion !== null ? trim($tipoGestion) : '';
+        $periodo = $anio !== null ? trim((string) $anio) : '';
+
+        if ($tipo === '' || $periodo === '') {
+            return $nombreCurso;
+        }
+
+        return $nombreCurso.' - '.Str::ucfirst($tipo).' '.$periodo;
     }
 }

@@ -49,6 +49,7 @@ use App\Models\Usuario;
 use App\Services\Auxiliar\AccesoAuxiliarService;
 use App\Services\Auxiliar\ListarAuxiliaresDocenteService;
 use App\Services\Auxiliar\ReenviarCredencialesAuxiliarService;
+use App\Support\NombreCurso;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -157,12 +158,18 @@ class GestionAuxiliares extends Component
     {
         return DB::table('auxiliar_curso as ac')
             ->join('curso as c', 'c.id_curso', '=', 'ac.id_curso')
+            ->leftJoin('curso_tipo_gestion as ctg', 'ctg.id_curso', '=', 'c.id_curso')
+            ->leftJoin('tipo_gestion as tg', 'tg.id_tipo_gestion', '=', 'ctg.id_tg')
             ->where('c.sis_doc', (int) auth()->id())
             ->where('ac.id_auxiliar', $idAuxiliar)
             ->where('ac.estado', AccesoAuxiliarService::ESTADO_ACTIVO)
             ->orderBy('c.nombre_curso')
-            ->pluck('c.nombre_curso')
-            ->map(fn (mixed $nombre): string => (string) $nombre)
+            ->get(['c.nombre_curso', 'tg.nombre_tipo_gestion', 'ctg.anio'])
+            ->map(fn (object $curso): string => NombreCurso::conGestion(
+                (string) $curso->nombre_curso,
+                $curso->nombre_tipo_gestion !== null ? (string) $curso->nombre_tipo_gestion : null,
+                $curso->anio !== null ? (int) $curso->anio : null,
+            ))
             ->unique()
             ->values()
             ->all();
@@ -204,7 +211,7 @@ class GestionAuxiliares extends Component
     /** @param array<string, mixed> $fila */
     private function coincide(array $fila, string $termino): bool
     {
-        foreach (['nombreCompleto', 'usuario', 'correo', 'carnet', 'codigoSis'] as $campo) {
+        foreach (['nombreCompleto', 'usuario', 'correo', 'carnet', 'codigoSis', 'tipo', 'curso'] as $campo) {
             if (mb_strpos(mb_strtolower((string) $fila[$campo]), $termino) !== false) {
                 return true;
             }
