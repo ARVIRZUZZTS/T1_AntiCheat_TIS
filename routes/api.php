@@ -14,6 +14,7 @@
  * @updated 2026-11-16
  * @updated 2026-11-19
  * @updated 2026-11-24
+ * @updated 2026-11-28
  *
  * @description Rutas JSON del backend.
  *
@@ -37,6 +38,9 @@
  *   los ambientes solo se agregan.
  * - 2026-11-24  [Equipo T1]  fix: conteo y marcado de leídas de notificaciones.
  * - 2026-11-27  [Alisson D. Alvarado <alvaradoalissondalet@gmail.com>]  refactor: retirar la actualización de cursos.
+ * - 2026-11-28  [Valery D. Ortuno P]  refactor: se quita POST
+ *   /invitaciones/{invitacion}/cancelar: una invitación enviada ya no se
+ *   cancela, la responde el invitado (HU 131).
  */
 
 use App\Http\Controllers\Api\AmbienteController;
@@ -132,11 +136,6 @@ Route::middleware(['web', 'auth:web'])->group(function (): void {
         ->whereNumber('invitacion')
         ->middleware('docente')
         ->name('api.invitaciones.rechazar');
-
-    Route::post('/invitaciones/{invitacion}/cancelar', [InvitacionExamenController::class, 'cancelar'])
-        ->whereNumber('invitacion')
-        ->middleware('docente')
-        ->name('api.invitaciones.cancelar');
 
     Route::get('/reportes/horarios-ingreso', [ReporteHorarioIngresoController::class, 'index'])
         ->name('api.reportes.horarios-ingreso');
