@@ -82,8 +82,8 @@
             <div class="space-y-4 py-4">
                 @include('partials.modales.banner-estado', [
                     'variante' => 'puede-ingresar',
-                    'titulo' => 'Puede ingresar?',
-                    'subtitulo' => 'Habilitar a Estudiante para este examen?',
+                    'titulo' => 'Ingreso de Estudiante',
+                    'subtitulo' => 'Habilitar a Estudiante para este examen',
                 ])
 
                 @include('partials.modales.ficha-estudiante', [
