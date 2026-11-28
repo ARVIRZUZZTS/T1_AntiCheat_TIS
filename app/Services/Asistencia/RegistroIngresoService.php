@@ -240,6 +240,9 @@ class RegistroIngresoService
      */
     private function siguienteId(string $modelo, string $columna): int
     {
+        $tabla = (new $modelo)->getTable();
+        DB::statement("LOCK TABLE {$tabla} IN EXCLUSIVE MODE");
+
         return ((int) $modelo::query()->max($columna)) + 1;
     }
 }

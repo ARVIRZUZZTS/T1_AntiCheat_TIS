@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Monitoreo;
 
+use App\Enums\CursoEstado;
 use App\Models\Examen;
 use App\Models\Rol;
 use App\Services\Auxiliar\AccesoAuxiliarService;
@@ -43,9 +44,16 @@ class AccesoMonitor extends Component
 
         return $examenes->map(function (Examen $examen) use ($ahora, $hoy, $idsMonitor): array {
             $inicio = Carbon::parse($examen->fecha.' '.$examen->hora_inicio);
-            $fin = $examen->hora_fin
-                ? Carbon::parse($examen->fecha.' '.$examen->hora_fin)
-                : $inicio->copy()->addMinutes((int) $examen->duracion);
+            if ($examen->duracion !== null && $examen->hora_fin === null) {
+                $fin = $inicio->copy()->addMinutes((int) $examen->duracion);
+            } elseif ($examen->hora_fin !== null) {
+                $fin = Carbon::parse($examen->fecha.' '.$examen->hora_fin);
+                if ($fin->lte($inicio)) {
+                    $fin->addDay();
+                }
+            } else {
+                $fin = $inicio->copy()->addMinutes((int) ($examen->duracion ?? 60));
+            }
             $apertura = $inicio->copy()->subMinutes(15);
 
             if ($ahora < $apertura) {
@@ -101,8 +109,23 @@ class AccesoMonitor extends Component
 
     public function totalProximosExamenes(): int
     {
+        $ahora = now();
+
         return $this->consultaExamenesAccesibles()
-            ->where('fecha', '>=', now()->toDateString())
+            ->where('fecha', '>=', $ahora->toDateString())
+            ->get()
+            ->reject(function (Examen $examen) use ($ahora): bool {
+                $inicio = Carbon::parse($examen->fecha.' '.$examen->hora_inicio);
+                $fin = $examen->duracion !== null
+                    ? $inicio->copy()->addMinutes((int) $examen->duracion)
+                    : ($examen->hora_fin !== null
+                        ? Carbon::parse($examen->fecha.' '.$examen->hora_fin)->addDays(
+                            Carbon::parse($examen->fecha.' '.$examen->hora_fin)->lte($inicio) ? 1 : 0
+                        )
+                        : $inicio->copy()->addMinutes(60));
+
+                return $ahora->gt($fin);
+            })
             ->count();
     }
 
@@ -124,7 +147,9 @@ class AccesoMonitor extends Component
 
     private function consultaExamenesAccesibles()
     {
-        $consulta = Examen::query();
+        $consulta = Examen::query()
+            ->whereDoesntHave('cursos', fn ($cursos) => $cursos
+                ->where('curso.estado', CursoEstado::Archivado->value));
 
         if (! auth()->check()) {
             return $consulta;
